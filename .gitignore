@@ -5,6 +5,7 @@ dist/
 build/
 android/.gradle/
 android/app/libs/*.aar
+android/app/libs/*.aar.download
 android/local.properties
 android/signing.properties
 android/replay_pid*.log
