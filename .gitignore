@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+dist/
+build/
+android/.gradle/
+android/app/libs/*.aar
+android/local.properties
+android/signing.properties
+android/replay_pid*.log
+android/hs_err_pid*.log
+android/*.jks
+android/*.keystore
+android/**/build/

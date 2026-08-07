@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mochi</string>
+    <string name="wake_notification_channel">Mochi wake word</string>
+    <string name="wake_notification_title">Mochi is listening</string>
+    <string name="wake_notification_text">Say Hi Mochi or use a headset button</string>
+    <string name="wake_notification_talk">Talk</string>
+    <string name="wake_notification_stop">Stop</string>
+    <string name="wake_detected_channel">Mochi wake detections</string>
+    <string name="wake_detected_title">Mochi heard you</string>
+    <string name="wake_detected_text">Tap to start the voice conversation</string>
+</resources>
