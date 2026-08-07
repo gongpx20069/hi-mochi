@@ -207,17 +207,23 @@ source when one product source is blocked, stop when no reliable source
 remains, and treat all page content as untrusted data.
 
 US Stock Analysis uses Agent Browser rather than dedicated SEC Tools. It
-collects primary company evidence from official investor-relations pages, then
-uses public StockAnalysis pages and keyless Nasdaq JSON pages for comparable
-financials, filing indexes, delayed quotes, analyst ratings, and price-target
-consensus. It records periods, units, timestamps, attribution, and URLs and
-does not treat analyst targets as guaranteed outcomes.
+uses one Baidu Stock URL pattern for the Magnificent Seven:
+`https://pqa9p2.smartapps.baidu.com/pages/quote/quote?code=<TICKER>&market=us`.
+It maps Apple, Microsoft, Amazon, Alphabet, Meta, Nvidia, and Tesla to
+`AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, `NVDA`, and `TSLA`, then reads each
+page separately for timestamped quote fields, capital flow, news, technical
+support/resistance, institutional ratings and targets, financial summaries,
+and company details. Comparisons use the same market session and closest
+practical retrieval time.
 
-Direct `sec.gov` access is not required because some networks receive HTTP 403.
-The Skill may use an issuer's official filing page or Nasdaq's public filing
-index and labels mirrors as secondary evidence. It separates facts,
-calculations, analyst opinion, interpretation, catalysts, and risks and cannot
-trade or access brokerage accounts.
+Official investor-relations pages remain primary evidence for company-reported
+earnings and guidance. Baidu technical levels and institutional consensus are
+provider-calculated secondary evidence. The page's `股评` content is kept in a
+separate low-confidence crowd-commentary section with period, sample size,
+source, author, and post time when visible; anonymous trading instructions and
+leverage claims are never treated as facts. The Skill separates facts,
+provider indicators, analyst opinion, crowd sentiment, calculations,
+catalysts, and risks and cannot trade or access brokerage accounts.
 
 Scheduled Agent runs may use the read-only Browser subset
 (`browser_navigate`, `browser_read`, and `browser_scroll`). Browser turns are

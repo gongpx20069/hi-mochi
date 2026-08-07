@@ -55,7 +55,7 @@ view as the conversation unfolds.
 | Web Search | Enabled | Researches public web and WeChat official-account content through Agent Browser | None |
 | Product Search | Enabled | Finds and compares public product pages without ordering or payment | None |
 | Douban Ratings | Enabled | Reads public Douban ratings, counts, and review themes | None |
-| US Stock Analysis | Enabled | Collects issuer reports, public financials, news, analyst consensus, and price targets | None; uses public StockAnalysis, Nasdaq, and issuer pages |
+| US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
 | Notion Knowledge | Disabled | Searches, reads, creates, and updates an authorized Notion workspace | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
 | Tencent Docs Knowledge | Disabled | Searches, reads, creates, and updates an authorized Tencent Docs space | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
 | Travel & Transport | Disabled | Searches places, plans routes, geocodes addresses, and checks destination weather | [Apply for a Baidu Map Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |

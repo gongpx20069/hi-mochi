@@ -52,7 +52,7 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | Web Search | 启用 | 通过 Agent Browser 搜索公开网页和微信公众号内容 | 无 |
 | Product Search | 启用 | 搜索并比较公开商品页面，不下单、不支付 | 无 |
 | Douban Ratings | 启用 | 获取公开豆瓣评分、评分人数和评论主题 | 无 |
-| US Stock Analysis | 启用 | 收集公司公告、公开财务、新闻、分析师共识和目标价 | 无；使用 StockAnalysis、Nasdaq 和公司官网公开页面 |
+| US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
 | Notion Knowledge | 禁用 | 搜索、阅读、创建和更新已授权 Notion 工作区 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
 | Tencent Docs Knowledge | 禁用 | 搜索、阅读、创建和更新已授权腾讯文档空间 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
 | Travel & Transport | 禁用 | 搜索地点、规划路线、地址解析和目的地天气 | [申请百度地图 Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |

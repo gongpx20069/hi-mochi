@@ -330,9 +330,19 @@ class MochiDatabaseTest {
             )
             assertEquals("ok", stock.status)
             assertTrue(stock.data.toString().contains("browser_navigate"))
-            assertTrue(stock.data.toString().contains("stockanalysis.com"))
-            assertTrue(stock.data.toString().contains("api.nasdaq.com"))
-            assertTrue(stock.data.toString().contains("analyst price target"))
+            assertTrue(
+                stock.data.toString().contains(
+                    "pqa9p2.smartapps.baidu.com/pages/quote/quote",
+                ),
+            )
+            assertTrue(
+                stock.data.toString().contains(
+                    "AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, `NVDA`, and `TSLA",
+                ),
+            )
+            assertTrue(stock.data.toString().contains("support level"))
+            assertTrue(stock.data.toString().contains("resistance level"))
+            assertTrue(stock.data.toString().contains("bullish/bearish"))
 
             val schedules = tool.execute(
                 buildJsonObject {
