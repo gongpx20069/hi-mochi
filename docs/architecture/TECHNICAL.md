@@ -65,7 +65,9 @@ role instructions. Parent history, memories, persona, navigation sinks, and
 `delegate_agent` are absent. Researcher receives enabled Browser Tools and
 read-only MCP Tools; Analyst additionally receives sandboxed JavaScript. Child
 research is bounded to 30 Tool rounds. Reaching that bound returns a typed Tool
-error to the Main Agent instead of failing the entire conversation.
+error to the Main Agent instead of failing the entire conversation. Both child
+roles are instructed to use their isolated context and larger round budget for
+deeper investigation than the Main Agent performs directly.
 
 Every interaction has an immutable session ID. Starting a new interaction
 cancels the old coroutine scope. Late STT, model, tool, and TTS callbacks must

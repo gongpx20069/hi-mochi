@@ -25,6 +25,18 @@ class SubagentsTest {
     )
 
     @Test
+    fun `subagent roles explicitly support deeper investigation`() {
+        assertTrue(
+            SubagentType.RESEARCHER.instructions.contains("deeper research"),
+        )
+        assertTrue(
+            SubagentType.ANALYST.instructions.contains(
+                "deeper research and analysis",
+            ),
+        )
+    }
+
+    @Test
     fun `delegate tool validates input and returns structured result`() =
         runBlocking {
             var delegatedType: SubagentType? = null
