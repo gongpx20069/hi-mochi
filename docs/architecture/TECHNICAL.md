@@ -64,7 +64,7 @@ configuration, Tool execution context, enabled Skill metadata, and its fixed
 role instructions. Parent history, memories, persona, navigation sinks, and
 `delegate_agent` are absent. Researcher receives enabled Browser Tools and
 read-only MCP Tools; Analyst additionally receives sandboxed JavaScript. Child
-research is bounded to 20 Tool rounds. Reaching that bound returns a typed Tool
+research is bounded to 30 Tool rounds. Reaching that bound returns a typed Tool
 error to the Main Agent instead of failing the entire conversation.
 
 Every interaction has an immutable session ID. Starting a new interaction
@@ -196,7 +196,7 @@ The native implementation now includes:
 
 - serializable OpenAI-compatible chat messages, tool calls, and responses;
 - OkHttp `/chat/completions` client with cancellation and bounded responses;
-- `AgentOrchestrator` with a maximum of five tool rounds by default;
+- `AgentOrchestrator` with 20 Tool rounds for the Main Agent;
 - ToolRegistry execution and `role="tool"` continuation messages;
 - strict final JSON parsing and NavigationPolicy application;
 - bounded query, history, tool-result, and final-reply sizes.

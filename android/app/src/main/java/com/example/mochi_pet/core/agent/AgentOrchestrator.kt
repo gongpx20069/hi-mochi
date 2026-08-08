@@ -174,7 +174,7 @@ class AgentOrchestrator(
         suspend () -> List<AgentSkillMetadata> = { emptyList() },
     private val toolRegistryProvider:
         (suspend (AgentRunRequest) -> ToolRegistry)? = null,
-    private val maxToolRounds: Int = 10,
+    private val maxToolRounds: Int = 20,
     private val pipelineObserver: AgentPipelineObserver =
         AgentPipelineObserver { _, _ -> },
 ) : AgentRunner {
@@ -371,7 +371,7 @@ class AgentOrchestrator(
         const val MAX_QUERY_CHARS = 20_000
         const val MAX_REPLY_CHARS = 20_000
         const val MAX_HISTORY_MESSAGES = 100
-        const val MAX_TOOL_ROUNDS = 20
+        const val MAX_TOOL_ROUNDS = 30
         const val MAX_TOOL_RESULT_CHARS = 1_000_000
         val EMOTION_PATTERN = Regex("[a-z][a-z0-9_]{0,31}")
     }

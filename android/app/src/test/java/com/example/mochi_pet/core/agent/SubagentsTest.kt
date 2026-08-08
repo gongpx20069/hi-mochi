@@ -131,7 +131,7 @@ class SubagentsTest {
                 DelegateAgentTool(
                     SerialSubagentCoordinator(
                         executor = SubagentExecutor { _, _, _ ->
-                            throw AgentToolRoundLimitException(20)
+                            throw AgentToolRoundLimitException(30)
                         },
                     ),
                 ),

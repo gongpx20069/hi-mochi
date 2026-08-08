@@ -388,6 +388,18 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    fun `supports thirty round child budget`() = runBlocking {
+        val orchestrator = orchestrator(
+            client = QueueChatClient(
+                finalResponse("""{"reply":"Done","emotion":"neutral"}"""),
+            ),
+            maxToolRounds = 30,
+        )
+
+        assertEquals("Done", orchestrator.run(request()).reply)
+    }
+
+    @Test
     fun `propagates cancellation`() {
         val orchestrator = orchestrator(CancellingChatClient())
 
