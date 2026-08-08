@@ -18,6 +18,8 @@ import com.example.mochi_pet.core.presentation.CardToolEvidence
 import com.example.mochi_pet.core.presentation.parseCardDirective
 import com.example.mochi_pet.core.skills.AgentSkillMetadata
 import java.time.Clock
+import java.util.UUID
+import java.util.concurrent.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -58,6 +60,36 @@ fun interface AgentPipelineObserver {
 
 fun interface AgentRunner {
     suspend fun run(request: AgentRunRequest): AgentReply
+}
+
+enum class AgentDiagnosticEventType {
+    RUN_STARTED,
+    MODEL_ROUND_STARTED,
+    TOOL_STARTED,
+    TOOL_FINISHED,
+    RUN_COMPLETED,
+    RUN_CANCELLED,
+    RUN_FAILED,
+}
+
+data class AgentDiagnosticEvent(
+    val type: AgentDiagnosticEventType,
+    val runId: String,
+    val actor: String,
+    val modelRound: Int = 0,
+    val toolRound: Int = 0,
+    val toolCall: Int = 0,
+    val toolName: String? = null,
+    val toolStatus: String? = null,
+    val toolCode: String? = null,
+    val availableToolCount: Int = 0,
+    val maxToolRounds: Int = 0,
+    val durationMs: Long = 0,
+    val errorType: String? = null,
+)
+
+fun interface AgentDiagnosticLogger {
+    fun log(event: AgentDiagnosticEvent)
 }
 
 class AgentProtocolException(message: String) : Exception(message)
@@ -177,6 +209,12 @@ class AgentOrchestrator(
     private val maxToolRounds: Int = 20,
     private val pipelineObserver: AgentPipelineObserver =
         AgentPipelineObserver { _, _ -> },
+    private val diagnosticActor: String = "main",
+    private val diagnosticLogger: AgentDiagnosticLogger =
+        AgentDiagnosticLogger { },
+    private val elapsedRealtimeMillis: () -> Long =
+        { System.nanoTime() / 1_000_000L },
+    private val runIdProvider: () -> String = { UUID.randomUUID().toString() },
 ) : AgentRunner {
     init {
         require(maxToolRounds in 1..MAX_TOOL_ROUNDS) {
@@ -189,7 +227,6 @@ class AgentOrchestrator(
         require(query.isNotEmpty()) { "Agent query must not be empty" }
         require(query.length <= MAX_QUERY_CHARS) { "Agent query is too long" }
         validateHistory(request.history)
-        pipelineObserver.onStage(AgentPipelineStage.SKILLING, null)
 
         val promptRequest = if (request.availableSkills.isEmpty()) {
             request.copy(availableSkills = skillCatalogProvider())
@@ -198,88 +235,224 @@ class AgentOrchestrator(
         }
         val activeToolRegistry =
             toolRegistryProvider?.invoke(promptRequest) ?: toolRegistry
-        val messages = mutableListOf(
-            OpenAiChatMessage(
-                role = "system",
-                content = promptBuilder.build(promptRequest),
+        val runId = runIdProvider()
+        val runStartedAt = elapsedRealtimeMillis()
+        var modelRounds = 0
+        var toolRounds = 0
+        var toolCalls = 0
+        logDiagnostic(
+            AgentDiagnosticEvent(
+                type = AgentDiagnosticEventType.RUN_STARTED,
+                runId = runId,
+                actor = diagnosticActor,
+                availableToolCount = activeToolRegistry.names.size,
+                maxToolRounds = maxToolRounds,
             ),
         )
-        messages += request.history
-        messages += OpenAiChatMessage(role = "user", content = query)
 
-        var toolRounds = 0
-        val cardEvidence = mutableListOf<CardToolEvidence>()
-        while (true) {
-            pipelineObserver.onStage(
-                if (toolRounds == 0) {
-                    AgentPipelineStage.THINKING
-                } else {
-                    AgentPipelineStage.SUMMARY
-                },
-                null,
-            )
-            val response = chatClient.complete(
-                config = request.provider,
-                request = OpenAiChatRequest(
-                    model = request.provider.model,
-                    messages = messages.toList(),
-                    tools = activeToolRegistry.schemas,
+        try {
+            pipelineObserver.onStage(AgentPipelineStage.SKILLING, null)
+            val messages = mutableListOf(
+                OpenAiChatMessage(
+                    role = "system",
+                    content = promptBuilder.build(promptRequest),
                 ),
             )
-            val assistantMessage = response.choices.firstOrNull()?.message
-                ?: throw AgentProtocolException(
-                    "Provider response did not contain an assistant message",
-                )
-            val toolCalls = assistantMessage.toolCalls.orEmpty()
-            if (toolCalls.isEmpty()) {
-                return parseFinalReply(
-                    content = assistantMessage.content,
-                    context = request.context,
-                    evidence = cardEvidence,
-                )
-            }
-            if (toolRounds >= maxToolRounds) {
-                throw AgentToolRoundLimitException(maxToolRounds)
-            }
-            toolRounds += 1
-            messages += assistantMessage.copy(role = "assistant")
-            for (toolCall in toolCalls) {
-                if (toolCall.id.isBlank() || toolCall.function.name.isBlank()) {
-                    throw AgentProtocolException(
-                        "Provider returned an invalid tool call",
-                    )
-                }
+            messages += request.history
+            messages += OpenAiChatMessage(role = "user", content = query)
+
+            val cardEvidence = mutableListOf<CardToolEvidence>()
+            while (true) {
                 pipelineObserver.onStage(
-                    AgentPipelineStage.TOOL,
-                    toolCall.function.name,
+                    if (toolRounds == 0) {
+                        AgentPipelineStage.THINKING
+                    } else {
+                        AgentPipelineStage.SUMMARY
+                    },
+                    null,
                 )
-                val result = activeToolRegistry.execute(
-                    name = toolCall.function.name,
-                    argumentsJson = toolCall.function.arguments,
-                    context = request.context,
+                modelRounds += 1
+                logDiagnostic(
+                    AgentDiagnosticEvent(
+                        type = AgentDiagnosticEventType.MODEL_ROUND_STARTED,
+                        runId = runId,
+                        actor = diagnosticActor,
+                        modelRound = modelRounds,
+                        toolRound = toolRounds,
+                    ),
                 )
-                val encodedResult = AgentToolJson.encode(result)
-                if (encodedResult.length > MAX_TOOL_RESULT_CHARS) {
-                    throw AgentProtocolException(
-                        "Tool result exceeded the agent context limit",
+                val response = chatClient.complete(
+                    config = request.provider,
+                    request = OpenAiChatRequest(
+                        model = request.provider.model,
+                        messages = messages.toList(),
+                        tools = activeToolRegistry.schemas,
+                    ),
+                )
+                val assistantMessage = response.choices.firstOrNull()?.message
+                    ?: throw AgentProtocolException(
+                        "Provider response did not contain an assistant message",
                     )
+                val requestedToolCalls = assistantMessage.toolCalls.orEmpty()
+                if (requestedToolCalls.isEmpty()) {
+                    val reply = parseFinalReply(
+                        content = assistantMessage.content,
+                        context = request.context,
+                        evidence = cardEvidence,
+                    )
+                    logRunFinished(
+                        type = AgentDiagnosticEventType.RUN_COMPLETED,
+                        runId = runId,
+                        modelRounds = modelRounds,
+                        toolRounds = toolRounds,
+                        toolCalls = toolCalls,
+                        startedAt = runStartedAt,
+                    )
+                    return reply
                 }
-                messages += OpenAiChatMessage(
-                    role = "tool",
-                    toolCallId = toolCall.id,
-                    name = toolCall.function.name,
-                    content = encodedResult,
-                )
-                if (result.status == "ok") {
-                    (result.data as? JsonObject)?.let { data ->
-                        cardEvidence += CardToolEvidence(
-                            toolName = toolCall.function.name,
-                            data = data,
+                if (toolRounds >= maxToolRounds) {
+                    throw AgentToolRoundLimitException(maxToolRounds)
+                }
+                toolRounds += 1
+                messages += assistantMessage.copy(role = "assistant")
+                for (toolCall in requestedToolCalls) {
+                    if (
+                        toolCall.id.isBlank() ||
+                        toolCall.function.name.isBlank()
+                    ) {
+                        throw AgentProtocolException(
+                            "Provider returned an invalid tool call",
                         )
+                    }
+                    pipelineObserver.onStage(
+                        AgentPipelineStage.TOOL,
+                        toolCall.function.name,
+                    )
+                    toolCalls += 1
+                    val toolStartedAt = elapsedRealtimeMillis()
+                    logDiagnostic(
+                        AgentDiagnosticEvent(
+                            type = AgentDiagnosticEventType.TOOL_STARTED,
+                            runId = runId,
+                            actor = diagnosticActor,
+                            modelRound = modelRounds,
+                            toolRound = toolRounds,
+                            toolCall = toolCalls,
+                            toolName = toolCall.function.name,
+                        ),
+                    )
+                    val result = try {
+                        activeToolRegistry.execute(
+                            name = toolCall.function.name,
+                            argumentsJson = toolCall.function.arguments,
+                            context = request.context,
+                        )
+                    } catch (error: Throwable) {
+                        logDiagnostic(
+                            AgentDiagnosticEvent(
+                                type = AgentDiagnosticEventType.TOOL_FINISHED,
+                                runId = runId,
+                                actor = diagnosticActor,
+                                modelRound = modelRounds,
+                                toolRound = toolRounds,
+                                toolCall = toolCalls,
+                                toolName = toolCall.function.name,
+                                toolStatus = "threw",
+                                durationMs = elapsedSince(toolStartedAt),
+                                errorType = error.javaClass.simpleName,
+                            ),
+                        )
+                        throw error
+                    }
+                    logDiagnostic(
+                        AgentDiagnosticEvent(
+                            type = AgentDiagnosticEventType.TOOL_FINISHED,
+                            runId = runId,
+                            actor = diagnosticActor,
+                            modelRound = modelRounds,
+                            toolRound = toolRounds,
+                            toolCall = toolCalls,
+                            toolName = toolCall.function.name,
+                            toolStatus = result.status,
+                            toolCode = result.code,
+                            durationMs = elapsedSince(toolStartedAt),
+                        ),
+                    )
+                    val encodedResult = AgentToolJson.encode(result)
+                    if (encodedResult.length > MAX_TOOL_RESULT_CHARS) {
+                        throw AgentProtocolException(
+                            "Tool result exceeded the agent context limit",
+                        )
+                    }
+                    messages += OpenAiChatMessage(
+                        role = "tool",
+                        toolCallId = toolCall.id,
+                        name = toolCall.function.name,
+                        content = encodedResult,
+                    )
+                    if (result.status == "ok") {
+                        (result.data as? JsonObject)?.let { data ->
+                            cardEvidence += CardToolEvidence(
+                                toolName = toolCall.function.name,
+                                data = data,
+                            )
+                        }
                     }
                 }
             }
+        } catch (error: CancellationException) {
+            logRunFinished(
+                type = AgentDiagnosticEventType.RUN_CANCELLED,
+                runId = runId,
+                modelRounds = modelRounds,
+                toolRounds = toolRounds,
+                toolCalls = toolCalls,
+                startedAt = runStartedAt,
+                error = error,
+            )
+            throw error
+        } catch (error: Throwable) {
+            logRunFinished(
+                type = AgentDiagnosticEventType.RUN_FAILED,
+                runId = runId,
+                modelRounds = modelRounds,
+                toolRounds = toolRounds,
+                toolCalls = toolCalls,
+                startedAt = runStartedAt,
+                error = error,
+            )
+            throw error
         }
+    }
+
+    private fun logRunFinished(
+        type: AgentDiagnosticEventType,
+        runId: String,
+        modelRounds: Int,
+        toolRounds: Int,
+        toolCalls: Int,
+        startedAt: Long,
+        error: Throwable? = null,
+    ) {
+        logDiagnostic(
+            AgentDiagnosticEvent(
+                type = type,
+                runId = runId,
+                actor = diagnosticActor,
+                modelRound = modelRounds,
+                toolRound = toolRounds,
+                toolCall = toolCalls,
+                durationMs = elapsedSince(startedAt),
+                errorType = error?.javaClass?.simpleName,
+            ),
+        )
+    }
+
+    private fun elapsedSince(startedAt: Long): Long =
+        (elapsedRealtimeMillis() - startedAt).coerceAtLeast(0)
+
+    private fun logDiagnostic(event: AgentDiagnosticEvent) {
+        diagnosticLogger.log(event)
     }
 
     private suspend fun parseFinalReply(

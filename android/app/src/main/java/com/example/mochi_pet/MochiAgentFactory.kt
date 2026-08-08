@@ -1,5 +1,9 @@
 package com.example.mochi_pet
 
+import android.util.Log
+import com.example.mochi_pet.core.agent.AgentDiagnosticEvent
+import com.example.mochi_pet.core.agent.AgentDiagnosticEventType
+import com.example.mochi_pet.core.agent.AgentDiagnosticLogger
 import com.example.mochi_pet.core.agent.AgentOrchestrator
 import com.example.mochi_pet.core.agent.AgentPipelineObserver
 import com.example.mochi_pet.core.agent.AgentPipelineStage
@@ -33,6 +37,7 @@ suspend fun MochiApplication.createAgentRunner(
     includeBrowser: Boolean,
     includeBrowserInteractions: Boolean = includeBrowser,
 ): AgentRunner {
+    val diagnosticLogger = androidAgentDiagnosticLogger()
     val navigationPolicy = NavigationPolicy()
     var appliedNavigation: NavigationDecision? = null
     val recordingSink = UiDirectiveSink { decision ->
@@ -110,6 +115,7 @@ suspend fun MochiApplication.createAgentRunner(
             ToolRegistry(tools + DelegateAgentTool(coordinator))
         },
         pipelineObserver = observer,
+        diagnosticLogger = diagnosticLogger,
     )
 }
 
@@ -164,6 +170,8 @@ private suspend fun MochiApplication.executeSubagent(
                     buildSubagentPipelineDetail(type, stage, detail),
                 )
             },
+            diagnosticActor = type.id,
+            diagnosticLogger = androidAgentDiagnosticLogger(),
         ).run(
             AgentRunRequest(
                 provider = parentRequest.provider,
@@ -195,3 +203,88 @@ private fun buildSubagentPipelineDetail(
     }
     return "${type.displayName} · $activity"
 }
+
+private fun androidAgentDiagnosticLogger(): AgentDiagnosticLogger =
+    AgentDiagnosticLogger { event ->
+        val message = event.toLogMessage()
+        when (event.type) {
+            AgentDiagnosticEventType.RUN_FAILED,
+            AgentDiagnosticEventType.RUN_CANCELLED,
+            -> Log.w(AGENT_DIAGNOSTIC_TAG, message)
+
+            else -> Log.i(AGENT_DIAGNOSTIC_TAG, message)
+        }
+    }
+
+private fun AgentDiagnosticEvent.toLogMessage(): String = buildString {
+    append("event=")
+    append(type.name.lowercase())
+    append(" run_id=")
+    append(runId)
+    append(" actor=")
+    append(actor)
+    when (type) {
+        AgentDiagnosticEventType.RUN_STARTED -> {
+            append(" available_tools=")
+            append(availableToolCount)
+            append(" max_tool_rounds=")
+            append(maxToolRounds)
+        }
+
+        AgentDiagnosticEventType.MODEL_ROUND_STARTED -> {
+            append(" model_round=")
+            append(modelRound)
+            append(" completed_tool_rounds=")
+            append(toolRound)
+        }
+
+        AgentDiagnosticEventType.TOOL_STARTED,
+        AgentDiagnosticEventType.TOOL_FINISHED,
+        -> {
+            append(" model_round=")
+            append(modelRound)
+            append(" tool_round=")
+            append(toolRound)
+            append(" tool_call=")
+            append(toolCall)
+            append(" tool=")
+            append(toolName)
+            toolStatus?.let {
+                append(" status=")
+                append(it)
+            }
+            toolCode?.let {
+                append(" code=")
+                append(it)
+            }
+            errorType?.let {
+                append(" error=")
+                append(it)
+            }
+            if (type == AgentDiagnosticEventType.TOOL_FINISHED) {
+                append(" duration_ms=")
+                append(durationMs)
+            }
+        }
+
+        AgentDiagnosticEventType.RUN_COMPLETED,
+        AgentDiagnosticEventType.RUN_CANCELLED,
+        AgentDiagnosticEventType.RUN_FAILED,
+        -> {
+            append(" model_rounds=")
+            append(modelRound)
+            append(" tool_rounds=")
+            append(toolRound)
+            append(" tool_calls=")
+            append(toolCall)
+            append(" duration_ms=")
+            append(durationMs)
+            errorType?.let {
+                append(" error=")
+                append(it)
+            }
+        }
+    }
+}
+
+private const val AGENT_DIAGNOSTIC_TAG = "MochiAgent"

@@ -74,6 +74,13 @@ error to the Main Agent instead of failing the entire conversation. Both child
 roles are instructed to use their isolated context and larger round budget for
 deeper investigation than the Main Agent performs directly.
 
+Main and child orchestrators emit structured `MochiAgent` Logcat diagnostics
+for run start, model rounds, Tool start/finish, completion, cancellation, and
+failure. Events include a run ID, actor (`main`, `researcher`, or `analyst`),
+round and Tool counters, Tool name/status, duration, and exception type.
+Diagnostics never include prompts, delegated tasks, Tool arguments/results,
+provider responses, credentials, or endpoint URLs.
+
 Every interaction has an immutable session ID. Starting a new interaction
 cancels the old coroutine scope. Late STT, model, tool, and TTS callbacks must
 not update state when their session ID is stale.

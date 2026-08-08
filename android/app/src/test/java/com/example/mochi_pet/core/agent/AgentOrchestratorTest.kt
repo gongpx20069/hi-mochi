@@ -189,6 +189,47 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    fun `reports privacy safe execution diagnostics`() = runBlocking {
+        val events = mutableListOf<AgentDiagnosticEvent>()
+        val times = ArrayDeque(listOf(100L, 110L, 125L, 150L))
+        val client = QueueChatClient(
+            toolResponse("call_1", "echo", """{"secret":"private"}"""),
+            finalResponse("""{"reply":"Done","emotion":"neutral"}"""),
+        )
+        val orchestrator = orchestrator(
+            client = client,
+            registry = ToolRegistry(listOf(EchoTool())),
+            diagnosticLogger = AgentDiagnosticLogger(events::add),
+            elapsedRealtimeMillis = { times.removeFirst() },
+            runIdProvider = { "run-123" },
+        )
+
+        orchestrator.run(request())
+
+        assertEquals(
+            listOf(
+                AgentDiagnosticEventType.RUN_STARTED,
+                AgentDiagnosticEventType.MODEL_ROUND_STARTED,
+                AgentDiagnosticEventType.TOOL_STARTED,
+                AgentDiagnosticEventType.TOOL_FINISHED,
+                AgentDiagnosticEventType.MODEL_ROUND_STARTED,
+                AgentDiagnosticEventType.RUN_COMPLETED,
+            ),
+            events.map { it.type },
+        )
+        assertTrue(events.all { it.runId == "run-123" })
+        assertTrue(events.all { it.actor == "main" })
+        assertEquals("echo", events[2].toolName)
+        assertEquals("ok", events[3].toolStatus)
+        assertEquals(15L, events[3].durationMs)
+        assertEquals(2, events.last().modelRound)
+        assertEquals(1, events.last().toolRound)
+        assertEquals(1, events.last().toolCall)
+        assertTrue(events.none { it.toString().contains("private") })
+        assertTrue(events.none { it.toString().contains("Hello Mochi") })
+    }
+
+    @Test
     fun `unknown tool result is returned to provider for recovery`() = runBlocking {
         val client = QueueChatClient(
             toolResponse("call_1", "missing_tool", "{}"),
@@ -415,6 +456,11 @@ class AgentOrchestratorTest {
         maxToolRounds: Int = 5,
         observer: AgentPipelineObserver = AgentPipelineObserver { _, _ -> },
         appliedDecision: () -> NavigationDecision? = { null },
+        diagnosticLogger: AgentDiagnosticLogger =
+            AgentDiagnosticLogger { },
+        elapsedRealtimeMillis: () -> Long =
+            { System.nanoTime() / 1_000_000L },
+        runIdProvider: () -> String = { "test-run" },
     ): AgentOrchestrator =
         AgentOrchestrator(
             chatClient = client,
@@ -430,6 +476,9 @@ class AgentOrchestratorTest {
             ),
             maxToolRounds = maxToolRounds,
             pipelineObserver = observer,
+            diagnosticLogger = diagnosticLogger,
+            elapsedRealtimeMillis = elapsedRealtimeMillis,
+            runIdProvider = runIdProvider,
         )
 
     private fun request(): AgentRunRequest =
