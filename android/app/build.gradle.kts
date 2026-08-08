@@ -4,6 +4,19 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Properties
 
+val mochiVersionName = providers.gradleProperty("mochiVersionName")
+    .orElse("1.0.1")
+    .get()
+val mochiVersionMatch = Regex("""1\.0\.(\d+)""")
+    .matchEntire(mochiVersionName)
+    ?: error(
+        "mochiVersionName '$mochiVersionName' must match 1.0.x",
+    )
+val mochiVersionPatch = mochiVersionMatch.groupValues[1].toInt()
+require(mochiVersionPatch > 0) {
+    "mochiVersionName patch must be greater than zero"
+}
+
 plugins {
     id("com.android.application")
     id("androidx.room")
@@ -21,8 +34,8 @@ android {
         applicationId = "com.example.mochi_pet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10_001
-        versionName = "1.0.1"
+        versionCode = 10_000 + mochiVersionPatch
+        versionName = mochiVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

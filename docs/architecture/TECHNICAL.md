@@ -22,10 +22,15 @@ This document defines the native Android implementation.
 
 ## Releases and Provider sharing
 
-Native releases use monotonic `1.0.x` versions and Android `versionCode`
-values. A `v1.0.x` Git tag runs the Android release workflow, requires the
-repository signing secrets, verifies that the tag matches `versionName`, and
-publishes the signed APK plus its SHA-256 file to GitHub Releases. At startup,
+Native releases use monotonic `1.0.x` versions and derive Android
+`versionCode` as `10000 + x`. Git tags are the shared version authority. The
+manual Android workflow and local publisher both inspect remote `v1.0.x` tags,
+allocate the next patch, inject that version into Gradle, verify the signed
+APK's embedded version, and publish the APK plus its SHA-256 file. A release
+publisher atomically reserves the remote tag immediately before creating the
+Release; a collision fails rather than updating or reusing a version. Reserved
+tags are never automatically deleted, so interrupted publication may skip a
+patch number but cannot roll back or overwrite a released version. At startup,
 Mochi checks only the latest stable release and opens its GitHub page after
 explicit user confirmation; Android remains responsible for APK installation.
 

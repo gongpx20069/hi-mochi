@@ -57,6 +57,38 @@ adb -s <device-id> install -r `
 The default release artifact is unsigned unless a local signing configuration
 is supplied.
 
+## Publish an Android release
+
+Android releases use the next unused monotonic `1.0.x` tag. The tag is the
+shared allocator for both supported publication paths, so a pipeline release
+and a locally uploaded APK cannot intentionally reuse the same version.
+
+To build and publish in GitHub Actions, open **Actions > Manual Android
+Release > Run workflow**. The workflow calculates the next version, injects
+it into Gradle, builds and verifies a signed APK, uploads the APK as a workflow
+artifact, and publishes it with the matching `v1.0.x` GitHub Release.
+
+For a locally signed APK, create `android\signing.properties`, authenticate
+GitHub CLI with `gh auth login`, then run:
+
+```powershell
+.\scripts\Build-LocalAndroidRelease.ps1
+.\scripts\Publish-LocalAndroidRelease.ps1 `
+  -ApkPath .\dist\android-release\Mochi-v1.0.1.apk
+```
+
+The build script calculates the next remote version and embeds it in the APK.
+Use the exact versioned APK path printed by that script in the publish command.
+Local builds require a clean worktree and write a sidecar containing the source
+commit, version, and APK hash. The publish script verifies that metadata, the
+APK signature, and embedded version, rejects a stale or reused version,
+generates the SHA-256 file, and uploads both assets to a new GitHub Release. If
+another release wins the version race, rebuild with the newly allocated
+version instead of overwriting or reusing a tag. Once a publisher reserves a
+remote tag it is never deleted automatically; an interrupted publication may
+therefore leave a skipped `1.0.x` value, but can never make a released version
+move backward or be silently replaced.
+
 ## Engineering expectations
 
 - Follow the harness loop in [`AGENTS.md`](../AGENTS.md).

@@ -66,6 +66,7 @@ or verification in earlier phases.
 
 ## P2 - Release readiness
 
+- [x] Add monotonic manual pipeline and local APK publication paths.
 - [ ] Real-device release validation.
 - [ ] Performance, battery, and process-death validation.
 - [ ] Signed release APK.

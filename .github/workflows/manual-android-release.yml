@@ -1,0 +1,126 @@
+name: Manual Android Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Allocate next Android version
+        id: version
+        shell: pwsh
+        working-directory: .
+        run: |
+          . ./scripts/AndroidReleaseTools.ps1
+          $version = Get-MochiNextVersion
+          $commit = (git rev-parse HEAD).Trim()
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+          "commit=$commit" >> $env:GITHUB_OUTPUT
+
+      - name: Restore release signing key
+        shell: bash
+        env:
+          MOCHI_SIGNING_KEYSTORE_BASE64:
+            ${{ secrets.MOCHI_SIGNING_KEYSTORE_BASE64 }}
+          MOCHI_SIGNING_STORE_PASSWORD:
+            ${{ secrets.MOCHI_SIGNING_STORE_PASSWORD }}
+          MOCHI_SIGNING_KEY_ALIAS:
+            ${{ secrets.MOCHI_SIGNING_KEY_ALIAS }}
+          MOCHI_SIGNING_KEY_PASSWORD:
+            ${{ secrets.MOCHI_SIGNING_KEY_PASSWORD }}
+        run: |
+          test -n "$MOCHI_SIGNING_KEYSTORE_BASE64"
+          test -n "$MOCHI_SIGNING_STORE_PASSWORD"
+          test -n "$MOCHI_SIGNING_KEY_ALIAS"
+          test -n "$MOCHI_SIGNING_KEY_PASSWORD"
+          echo "$MOCHI_SIGNING_KEYSTORE_BASE64" | base64 --decode > release.jks
+          cat > signing.properties <<EOF
+          storeFile=release.jks
+          storePassword=$MOCHI_SIGNING_STORE_PASSWORD
+          keyAlias=$MOCHI_SIGNING_KEY_ALIAS
+          keyPassword=$MOCHI_SIGNING_KEY_PASSWORD
+          EOF
+
+      - name: Verify and build signed release APK
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          chmod +x gradlew
+          ./gradlew verifyNative verifyRelease \
+            "-PmochiVersionName=$VERSION" --no-daemon
+
+      - name: Prepare and validate release assets
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          apk="app/build/outputs/apk/release/app-release.apk"
+          embedded_version="$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" \
+            manifest version-name "$apk")"
+          test "$embedded_version" = "$VERSION"
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" \
+            verify "$apk"
+          cp "$apk" "Mochi-$TAG.apk"
+          sha256sum "Mochi-$TAG.apk" > "Mochi-$TAG.apk.sha256"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mochi-${{ steps.version.outputs.tag }}
+          path: |
+            android/Mochi-${{ steps.version.outputs.tag }}.apk
+            android/Mochi-${{ steps.version.outputs.tag }}.apk.sha256
+          if-no-files-found: error
+
+      - name: Reserve release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          COMMIT: ${{ steps.version.outputs.commit }}
+        shell: bash
+        working-directory: .
+        run: |
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$TAG" \
+            -f sha="$COMMIT"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        working-directory: .
+        run: |
+          gh release create "$TAG" \
+            "android/Mochi-$TAG.apk" \
+            "android/Mochi-$TAG.apk.sha256" \
+            --verify-tag \
+            --title "Mochi $VERSION" \
+            --generate-notes
