@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/mochi-banner.svg" alt="Mochi — a native Android voice AI companion" width="100%">
+
 # Mochi
 
 ### Your phone, now a little more alive.

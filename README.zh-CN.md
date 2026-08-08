@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/mochi-banner.svg" alt="Mochi 原生 Android 语音 AI 助手" width="100%">
+
 # Mochi
 
 ### 让你的手机，多一点生命力。

@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="520" viewBox="0 0 1400 520" role="img" aria-labelledby="title description">
+  <title id="title">Mochi Android voice AI assistant</title>
+  <desc id="description">A softly glowing Mochi character surrounded by voice waves on a dark peach and lavender background.</desc>
+  <defs>
+    <linearGradient id="background" x1="90" y1="30" x2="1320" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E0D12"/>
+      <stop offset="0.52" stop-color="#17131F"/>
+      <stop offset="1" stop-color="#21172A"/>
+    </linearGradient>
+    <radialGradient id="peachGlow" cx="0" cy="0" r="1" gradientTransform="translate(1060 250) rotate(90) scale(320 420)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB7A5" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#FFB7A5" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lavenderGlow" cx="0" cy="0" r="1" gradientTransform="translate(330 150) rotate(90) scale(270 430)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D6C2FF" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#D6C2FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="titleGradient" x1="112" y1="170" x2="585" y2="338" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF8F4"/>
+      <stop offset="0.52" stop-color="#FFCFBF"/>
+      <stop offset="1" stop-color="#D6C2FF"/>
+    </linearGradient>
+    <linearGradient id="bodyGradient" x1="980" y1="137" x2="1185" y2="392" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF9F5"/>
+      <stop offset="0.5" stop-color="#FFD5C8"/>
+      <stop offset="1" stop-color="#D9C6FF"/>
+    </linearGradient>
+    <linearGradient id="waveGradient" x1="695" y1="260" x2="1305" y2="260" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D6C2FF" stop-opacity="0"/>
+      <stop offset="0.35" stop-color="#D6C2FF" stop-opacity="0.6"/>
+      <stop offset="0.68" stop-color="#FFB7A5" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#FFB7A5" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="dots" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.5" fill="#F7F1F2" fill-opacity="0.08"/>
+    </pattern>
+    <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="bodyShadow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#FFB7A5" flood-opacity="0.24"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#D6C2FF" flood-opacity="0.18"/>
+    </filter>
+    <clipPath id="bannerClip">
+      <rect x="10" y="10" width="1380" height="500" rx="40"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#bannerClip)">
+    <rect x="10" y="10" width="1380" height="500" rx="40" fill="url(#background)"/>
+    <rect x="10" y="10" width="1380" height="500" rx="40" fill="url(#dots)"/>
+    <rect x="10" y="10" width="1380" height="500" rx="40" fill="url(#lavenderGlow)"/>
+    <rect x="10" y="10" width="1380" height="500" rx="40" fill="url(#peachGlow)"/>
+
+    <circle cx="1056" cy="260" r="178" fill="#FFB7A5" fill-opacity="0.08" stroke="#FFB7A5" stroke-opacity="0.14"/>
+    <circle cx="1056" cy="260" r="216" fill="none" stroke="#D6C2FF" stroke-opacity="0.10"/>
+    <circle cx="1056" cy="260" r="252" fill="none" stroke="#F7F1F2" stroke-opacity="0.05"/>
+
+    <path d="M683 260C719 260 719 218 755 218C791 218 791 306 827 306C863 306 863 181 899 181C935 181 935 340 971 340C1007 340 1007 236 1043 236C1079 236 1079 282 1115 282C1151 282 1151 211 1187 211C1223 211 1223 260 1259 260C1295 260 1295 260 1331 260" fill="none" stroke="url(#waveGradient)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M708 260C737 260 737 241 766 241C795 241 795 283 824 283C853 283 853 224 882 224C911 224 911 297 940 297C969 297 969 248 998 248C1027 248 1027 271 1056 271C1085 271 1085 238 1114 238C1143 238 1143 281 1172 281C1201 281 1201 260 1230 260" fill="none" stroke="#F7F1F2" stroke-opacity="0.12" stroke-width="1.5" stroke-linecap="round"/>
+
+    <g opacity="0.7">
+      <circle cx="871" cy="111" r="4" fill="#D6C2FF"/>
+      <path d="M871 98V124M858 111H884" stroke="#D6C2FF" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="1267" cy="391" r="3" fill="#FFB7A5"/>
+      <path d="M1267 380V402M1256 391H1278" stroke="#FFB7A5" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="1210" cy="99" r="4" fill="#FFF8F4" fill-opacity="0.65"/>
+      <circle cx="819" cy="408" r="3" fill="#FFF8F4" fill-opacity="0.55"/>
+    </g>
+
+    <g transform="translate(931 130)" filter="url(#bodyShadow)">
+      <rect width="250" height="256" rx="88" fill="url(#bodyGradient)"/>
+      <ellipse cx="76" cy="55" rx="58" ry="42" fill="#FFFFFF" fill-opacity="0.24"/>
+      <ellipse cx="75" cy="118" rx="12" ry="17" fill="#342B59"/>
+      <ellipse cx="175" cy="118" rx="12" ry="17" fill="#342B59"/>
+      <circle cx="71" cy="112" r="4" fill="#FFFFFF" fill-opacity="0.78"/>
+      <circle cx="171" cy="112" r="4" fill="#FFFFFF" fill-opacity="0.78"/>
+      <ellipse cx="48" cy="170" rx="22" ry="9" fill="#FF9EBA" fill-opacity="0.32"/>
+      <ellipse cx="202" cy="170" rx="22" ry="9" fill="#FF9EBA" fill-opacity="0.32"/>
+      <path d="M116 158C120 154 130 154 134 158C134 166 130 170 125 170C120 170 116 166 116 158Z" fill="#F0AEBB"/>
+      <path d="M125 170C117 184 103 187 94 177M125 170C133 184 147 187 156 177" fill="none" stroke="#342B59" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <ellipse cx="1056" cy="417" rx="146" ry="20" fill="#0E0D12" fill-opacity="0.48" filter="url(#softGlow)"/>
+
+    <g font-family="Inter, Segoe UI, Arial, sans-serif">
+      <g transform="translate(112 94)">
+        <rect width="278" height="38" rx="19" fill="#D6C2FF" fill-opacity="0.10" stroke="#D6C2FF" stroke-opacity="0.26"/>
+        <circle cx="21" cy="19" r="5" fill="#FFB7A5"/>
+        <text x="38" y="25" fill="#E9DFFF" font-size="14" font-weight="700" letter-spacing="2.2">OPEN SOURCE · NATIVE ANDROID</text>
+      </g>
+
+      <text x="105" y="271" fill="url(#titleGradient)" font-size="128" font-weight="800" letter-spacing="-5">MOCHI</text>
+      <text x="112" y="323" fill="#F7F1F2" fill-opacity="0.86" font-size="25" font-weight="500" letter-spacing="0.4">Your phone, now a little more alive.</text>
+      <text x="112" y="360" fill="#D4CDD6" font-size="17" letter-spacing="0.2">A private, extensible voice AI companion for Android.</text>
+
+      <g transform="translate(112 405)" font-size="13" font-weight="700" letter-spacing="1.4">
+        <g>
+          <rect width="90" height="34" rx="17" fill="#FFB7A5" fill-opacity="0.12" stroke="#FFB7A5" stroke-opacity="0.25"/>
+          <text x="45" y="22" text-anchor="middle" fill="#FFD5C8">VOICE</text>
+        </g>
+        <g transform="translate(102)">
+          <rect width="104" height="34" rx="17" fill="#D6C2FF" fill-opacity="0.10" stroke="#D6C2FF" stroke-opacity="0.24"/>
+          <text x="52" y="22" text-anchor="middle" fill="#E4D7FF">MEMORY</text>
+        </g>
+        <g transform="translate(218)">
+          <rect width="88" height="34" rx="17" fill="#FFB7A5" fill-opacity="0.12" stroke="#FFB7A5" stroke-opacity="0.25"/>
+          <text x="44" y="22" text-anchor="middle" fill="#FFD5C8">TOOLS</text>
+        </g>
+        <g transform="translate(318)">
+          <rect width="92" height="34" rx="17" fill="#D6C2FF" fill-opacity="0.10" stroke="#D6C2FF" stroke-opacity="0.24"/>
+          <text x="46" y="22" text-anchor="middle" fill="#E4D7FF">SKILLS</text>
+        </g>
+      </g>
+    </g>
+
+    <path d="M50 10H1350C1372 10 1390 28 1390 50V470C1390 492 1372 510 1350 510H50C28 510 10 492 10 470V50C10 28 28 10 50 10Z" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2"/>
+  </g>
+</svg>
