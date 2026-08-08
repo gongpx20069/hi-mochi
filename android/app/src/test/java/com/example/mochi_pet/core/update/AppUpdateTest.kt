@@ -7,6 +7,16 @@ import org.junit.Test
 
 class AppUpdateTest {
     @Test
+    fun `update check targets current Hi Mochi repository`() {
+        assertEquals("gongpx20069/hi-mochi", UPDATE_RELEASE_REPOSITORY)
+        assertEquals(
+            "https://api.github.com/repos/" +
+                "gongpx20069/hi-mochi/releases/latest",
+            LATEST_RELEASE_API,
+        )
+    }
+
+    @Test
     fun `semantic versions compare numerically`() {
         assertTrue(
             SemanticVersion.parse("v1.0.10")!! >

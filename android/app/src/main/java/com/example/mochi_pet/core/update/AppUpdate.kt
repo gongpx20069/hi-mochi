@@ -108,8 +108,10 @@ private data class GitHubRelease(
     val prerelease: Boolean = false,
 )
 
-private const val LATEST_RELEASE_API =
-    "https://api.github.com/repos/gongpx20069/hi-mochi/releases/latest"
+internal const val UPDATE_RELEASE_REPOSITORY = "gongpx20069/hi-mochi"
+internal const val LATEST_RELEASE_API =
+    "https://api.github.com/repos/" +
+        "$UPDATE_RELEASE_REPOSITORY/releases/latest"
 private const val TIMEOUT_SECONDS = 10L
 private const val MAX_RESPONSE_BYTES = 256L * 1024L
 private const val MAX_NOTES_CHARS = 2_000
