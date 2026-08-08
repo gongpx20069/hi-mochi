@@ -117,8 +117,6 @@ internal fun localizeUiText(
             "Hi Mochi 当前状态：${localizeUiText(text.removePrefix("Hi Mochi is "), language)}"
         text.startsWith("Mochi is ") ->
             "Mochi 正在${localizeUiText(text.removePrefix("Mochi is "), language)}"
-        text.startsWith("Voice or text · feeling ") ->
-            "语音或文字 · 情绪：${text.removePrefix("Voice or text · feeling ")}"
         text.startsWith("Back to ") ->
             "返回 ${text.removePrefix("Back to ")}"
         text.startsWith("Scheduled for ") ->
@@ -225,6 +223,7 @@ private val ZH_UI_TEXT = mapOf(
     "Use Talk whenever you want to chat." to "想聊天时，请使用“对话”。",
     "Mochi is ready." to "Mochi 已就绪。",
     "Talk to Mochi" to "与 Mochi 对话",
+    "Voice or text" to "语音或文字",
     "View today" to "查看今天",
     "Focus mode" to "专注模式",
     "Full screen" to "全屏",

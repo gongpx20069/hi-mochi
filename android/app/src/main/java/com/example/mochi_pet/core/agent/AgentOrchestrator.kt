@@ -179,8 +179,8 @@ class AgentOrchestrator(
         AgentPipelineObserver { _, _ -> },
 ) : AgentRunner {
     init {
-        require(maxToolRounds in 1..10) {
-            "maxToolRounds must be between 1 and 10"
+        require(maxToolRounds in 1..MAX_TOOL_ROUNDS) {
+            "maxToolRounds must be between 1 and $MAX_TOOL_ROUNDS"
         }
     }
 
@@ -371,6 +371,7 @@ class AgentOrchestrator(
         const val MAX_QUERY_CHARS = 20_000
         const val MAX_REPLY_CHARS = 20_000
         const val MAX_HISTORY_MESSAGES = 100
+        const val MAX_TOOL_ROUNDS = 20
         const val MAX_TOOL_RESULT_CHARS = 1_000_000
         val EMOTION_PATTERN = Regex("[a-z][a-z0-9_]{0,31}")
     }

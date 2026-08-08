@@ -4966,7 +4966,7 @@ private fun ConversationSurface(
                     fontWeight = FontWeight.Black,
                 )
                 Text(
-                    text = "Voice or text · feeling ${state.emotion}",
+                    text = "Voice or text",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )

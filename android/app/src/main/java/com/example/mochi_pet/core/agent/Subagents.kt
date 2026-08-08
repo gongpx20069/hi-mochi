@@ -185,6 +185,11 @@ class DelegateAgentTool(
                 ToolErrorCode.CONFLICT,
                 error.message ?: "Subagent delegation limit exceeded",
             )
+        } catch (error: AgentToolRoundLimitException) {
+            return ToolResultEnvelope.error(
+                ToolErrorCode.CONFLICT,
+                "${type.displayName} could not finish within its tool limit",
+            )
         }
         return ToolResultEnvelope.success(
             buildJsonObject {

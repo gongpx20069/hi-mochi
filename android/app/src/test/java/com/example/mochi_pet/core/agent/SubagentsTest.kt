@@ -125,6 +125,34 @@ class SubagentsTest {
         }
 
     @Test
+    fun `child tool limit returns recoverable tool error`() = runBlocking {
+        val registry = ToolRegistry(
+            listOf(
+                DelegateAgentTool(
+                    SerialSubagentCoordinator(
+                        executor = SubagentExecutor { _, _, _ ->
+                            throw AgentToolRoundLimitException(20)
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        val result = registry.execute(
+            name = "delegate_agent",
+            arguments = buildJsonObject {
+                put("agent", "researcher")
+                put("task", "Research all seven companies")
+            },
+            context = context,
+        )
+
+        assertEquals("error", result.status)
+        assertEquals(ToolErrorCode.CONFLICT.name, result.code)
+        assertTrue(result.message.orEmpty().contains("Researcher"))
+    }
+
+    @Test
     fun `parent cancellation cancels active subagent`() = runBlocking {
         var cancelled = false
         val started = CompletableDeferred<Unit>()

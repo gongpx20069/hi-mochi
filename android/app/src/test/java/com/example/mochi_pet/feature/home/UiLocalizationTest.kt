@@ -27,6 +27,10 @@ class UiLocalizationTest {
             "接收 Providers",
             localizeUiText("Receive Providers", "zh"),
         )
+        assertEquals(
+            "语音或文字",
+            localizeUiText("Voice or text", "zh"),
+        )
     }
 
     @Test
