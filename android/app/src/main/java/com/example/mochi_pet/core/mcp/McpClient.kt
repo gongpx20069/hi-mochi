@@ -37,6 +37,7 @@ data class McpRemoteTool(
         put("type", "object")
         put("properties", buildJsonObject {})
     },
+    val readOnlyHint: Boolean = false,
 )
 
 data class McpServerRuntime(
@@ -108,6 +109,15 @@ open class McpStreamableHttpClient(
                                             buildJsonObject {},
                                         )
                                     },
+                                readOnlyHint = tool["annotations"]
+                                    ?.let { annotations ->
+                                        runCatching {
+                                            annotations.jsonObject[
+                                                "readOnlyHint"
+                                            ]?.jsonPrimitive?.content == "true"
+                                        }.getOrDefault(false)
+                                    }
+                                    ?: false,
                             ),
                         )
                     }

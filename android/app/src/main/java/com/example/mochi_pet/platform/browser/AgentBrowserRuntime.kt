@@ -55,6 +55,7 @@ import kotlin.coroutines.resume
 data class AgentBrowserUiState(
     val active: Boolean = false,
     val sessionId: String? = null,
+    val actor: String? = null,
     val url: String = "",
     val title: String = "",
     val action: String? = null,
@@ -76,6 +77,7 @@ class AgentBrowserRuntime(
 
     private val turnMutex = Mutex()
     private var turnActive = false
+    private var actorLabel: String? = null
     private var webView: WebView? = null
     private var snapshotVersion = 0L
     private var nextElementRef = 1
@@ -91,6 +93,7 @@ class AgentBrowserRuntime(
             redirectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             nextElementRef = 1
             refAttributeName = newRefAttributeName()
+            actorLabel = null
             turnActive = true
         } catch (error: Exception) {
             turnMutex.unlock()
@@ -100,12 +103,21 @@ class AgentBrowserRuntime(
 
     suspend fun closeTurn() {
         turnActive = false
+        actorLabel = null
         try {
             resetTurnResources()
         } finally {
             if (turnMutex.isLocked) {
                 turnMutex.unlock()
             }
+        }
+    }
+
+    suspend fun setActor(label: String?) {
+        val normalized = label?.trim()?.takeIf(String::isNotEmpty)
+        actorLabel = normalized
+        withContext(Dispatchers.Main.immediate) {
+            mutableState.value = mutableState.value.copy(actor = normalized)
         }
     }
 
@@ -422,6 +434,7 @@ class AgentBrowserRuntime(
             mutableState.value = AgentBrowserUiState(
                 active = true,
                 sessionId = UUID.randomUUID().toString(),
+                actor = actorLabel,
             )
             created
         }

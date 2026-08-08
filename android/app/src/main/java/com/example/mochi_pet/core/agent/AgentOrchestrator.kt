@@ -44,6 +44,7 @@ data class AgentReply(
 enum class AgentPipelineStage {
     SKILLING,
     THINKING,
+    SUBAGENT,
     TOOL,
     SUMMARY,
 }
@@ -171,6 +172,8 @@ class AgentOrchestrator(
     private val promptBuilder: AgentPromptBuilder = AgentPromptBuilder(),
     private val skillCatalogProvider:
         suspend () -> List<AgentSkillMetadata> = { emptyList() },
+    private val toolRegistryProvider:
+        (suspend (AgentRunRequest) -> ToolRegistry)? = null,
     private val maxToolRounds: Int = 10,
     private val pipelineObserver: AgentPipelineObserver =
         AgentPipelineObserver { _, _ -> },
@@ -193,6 +196,8 @@ class AgentOrchestrator(
         } else {
             request
         }
+        val activeToolRegistry =
+            toolRegistryProvider?.invoke(promptRequest) ?: toolRegistry
         val messages = mutableListOf(
             OpenAiChatMessage(
                 role = "system",
@@ -218,7 +223,7 @@ class AgentOrchestrator(
                 request = OpenAiChatRequest(
                     model = request.provider.model,
                     messages = messages.toList(),
-                    tools = toolRegistry.schemas,
+                    tools = activeToolRegistry.schemas,
                 ),
             )
             val assistantMessage = response.choices.firstOrNull()?.message
@@ -248,7 +253,7 @@ class AgentOrchestrator(
                     AgentPipelineStage.TOOL,
                     toolCall.function.name,
                 )
-                val result = toolRegistry.execute(
+                val result = activeToolRegistry.execute(
                     name = toolCall.function.name,
                     argumentsJson = toolCall.function.arguments,
                     context = request.context,

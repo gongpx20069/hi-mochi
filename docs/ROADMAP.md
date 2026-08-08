@@ -80,3 +80,11 @@ or verification in earlier phases.
   `search_web` and `fetch_web_page`.
 - [ ] Add default-allow browser policy, blocked-platform-boundary, renderer
   recovery, background execution, and cleanup tests.
+
+## P2 - Serial Subagents
+
+- [x] Add isolated Researcher and Analyst roles.
+- [x] Add one-at-a-time delegation with a two-child per-run limit.
+- [x] Restrict children to Browser, read-only MCP, Skills, and Analyst JS.
+- [x] Reuse the active Browser session and identify the child on its card.
+- [ ] Add end-to-end provider and real-device Subagent validation.

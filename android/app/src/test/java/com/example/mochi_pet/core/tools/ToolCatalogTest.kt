@@ -221,6 +221,26 @@ class ToolCatalogTest {
         assertFalse(disconnected.connected)
         assertFalse(disconnected.enabled)
     }
+
+    @Test
+    fun `subagent MCP catalog exposes only enabled read only tools`() =
+        runBlocking {
+            client.tools = listOf(
+                McpRemoteTool("query_space_node"),
+                McpRemoteTool(
+                    name = "custom_read",
+                    readOnlyHint = true,
+                ),
+                McpRemoteTool("smartcanvas.update_element"),
+            )
+            repository.configureTencentDocs("personal-token")
+            val tools = repository.loadEnabledReadOnlyMcpTools()
+                .mapTo(mutableSetOf()) { it.name }
+
+            assertTrue(tools.any { it.endsWith("query_space_node") })
+            assertFalse(tools.any { it.endsWith("custom_read") })
+            assertFalse(tools.any { it.endsWith("update_element") })
+        }
 }
 
 private class RecordingMcpClient : McpStreamableHttpClient() {

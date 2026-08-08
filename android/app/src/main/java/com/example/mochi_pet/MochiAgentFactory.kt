@@ -2,7 +2,14 @@ package com.example.mochi_pet
 
 import com.example.mochi_pet.core.agent.AgentOrchestrator
 import com.example.mochi_pet.core.agent.AgentPipelineObserver
+import com.example.mochi_pet.core.agent.AgentPipelineStage
+import com.example.mochi_pet.core.agent.AgentRunRequest
 import com.example.mochi_pet.core.agent.AgentRunner
+import com.example.mochi_pet.core.agent.DelegateAgentTool
+import com.example.mochi_pet.core.agent.SerialSubagentCoordinator
+import com.example.mochi_pet.core.agent.SubagentExecutor
+import com.example.mochi_pet.core.agent.SubagentType
+import com.example.mochi_pet.core.agent.tool.AgentTool
 import com.example.mochi_pet.core.agent.tool.ManageMochiCalendarTool
 import com.example.mochi_pet.core.agent.tool.ManageMochiTodoTool
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
@@ -85,6 +92,106 @@ suspend fun MochiApplication.createAgentRunner(
         uiDirectiveSink = recordingSink,
         appliedNavigationDecision = { appliedNavigation },
         skillCatalogProvider = { availableSkills },
+        toolRegistryProvider = { parentRequest ->
+            val coordinator = SerialSubagentCoordinator(
+                executor = SubagentExecutor { type, task, context ->
+                    executeSubagent(
+                        type = type,
+                        task = task,
+                        context = context,
+                        parentRequest = parentRequest,
+                        parentObserver = observer,
+                        includeBrowser = includeBrowser,
+                        includeBrowserInteractions =
+                            includeBrowserInteractions,
+                    )
+                },
+            )
+            ToolRegistry(tools + DelegateAgentTool(coordinator))
+        },
         pipelineObserver = observer,
     )
+}
+
+private suspend fun MochiApplication.executeSubagent(
+    type: SubagentType,
+    task: String,
+    context: com.example.mochi_pet.core.agent.tool.ToolExecutionContext,
+    parentRequest: AgentRunRequest,
+    parentObserver: AgentPipelineObserver,
+    includeBrowser: Boolean,
+    includeBrowserInteractions: Boolean,
+): String {
+    val tools = mutableListOf<AgentTool>()
+    if (includeBrowser) {
+        tools += if (includeBrowserInteractions) {
+            agentBrowserTools(agentBrowserRuntime)
+        } else {
+            readOnlyAgentBrowserTools(agentBrowserRuntime)
+        }
+    }
+    if (type == SubagentType.ANALYST) {
+        tools += SandboxedJavaScriptTool(javaScriptExecutor)
+    }
+    val enabledTools = tools.filter { tool ->
+        toolCatalogRepository.isBuiltInEnabled(tool.name)
+    }.toMutableList()
+    enabledTools += toolCatalogRepository.loadEnabledReadOnlyMcpTools()
+    val availableSkills = skillRepository.listEnabledMetadata(
+        enabledTools.mapTo(mutableSetOf()) { it.name },
+    )
+    if (availableSkills.isNotEmpty()) {
+        enabledTools += LoadSkillTool(
+            repository = skillRepository,
+            availableToolNames =
+                enabledTools.mapTo(mutableSetOf()) { it.name },
+        )
+    }
+
+    parentObserver.onStage(AgentPipelineStage.SUBAGENT, type.displayName)
+    agentBrowserRuntime.setActor(type.displayName)
+    return try {
+        AgentOrchestrator(
+            chatClient = openAiChatClient,
+            toolRegistry = ToolRegistry(enabledTools),
+            navigationPolicy = NavigationPolicy(),
+            uiDirectiveSink = UiDirectiveSink { },
+            skillCatalogProvider = { availableSkills },
+            maxToolRounds = 8,
+            pipelineObserver = AgentPipelineObserver { stage, detail ->
+                parentObserver.onStage(
+                    AgentPipelineStage.SUBAGENT,
+                    buildSubagentPipelineDetail(type, stage, detail),
+                )
+            },
+        ).run(
+            AgentRunRequest(
+                provider = parentRequest.provider,
+                query = task,
+                currentEmotion = "neutral",
+                context = context,
+                history = emptyList(),
+                personaSections = listOf(type.instructions),
+                recalledMemories = emptyList(),
+                availableSkills = availableSkills,
+            ),
+        ).reply
+    } finally {
+        agentBrowserRuntime.setActor(null)
+    }
+}
+
+private fun buildSubagentPipelineDetail(
+    type: SubagentType,
+    stage: AgentPipelineStage,
+    detail: String?,
+): String {
+    val activity = when (stage) {
+        AgentPipelineStage.SKILLING -> "choosing skills"
+        AgentPipelineStage.THINKING -> "planning"
+        AgentPipelineStage.SUBAGENT -> "delegating"
+        AgentPipelineStage.TOOL -> detail ?: "using tools"
+        AgentPipelineStage.SUMMARY -> "preparing findings"
+    }
+    return "${type.displayName} · $activity"
 }

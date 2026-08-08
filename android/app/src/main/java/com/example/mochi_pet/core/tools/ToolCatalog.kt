@@ -164,6 +164,8 @@ interface ToolCatalogRepository {
     suspend fun isBuiltInEnabled(name: String): Boolean
 
     suspend fun loadEnabledMcpTools(): List<AgentTool>
+
+    suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool>
 }
 
 class DataStoreToolCatalogRepository(
@@ -687,10 +689,33 @@ class DataStoreToolCatalogRepository(
 
     override suspend fun loadEnabledMcpTools(): List<AgentTool> {
         val catalog = loadCatalog().withBuiltInServers()
-        return catalog.servers
+        return catalog.loadEnabledMcpTools { _, _ ->
+            true
+        }
+    }
+
+    override suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool> {
+        val catalog = loadCatalog().withBuiltInServers()
+        return catalog.loadEnabledMcpTools { server, tool ->
+            tool.definition.name in when (server.id) {
+                NOTION_SERVER_ID -> READ_ONLY_NOTION_TOOLS
+                TENCENT_DOCS_SERVER_ID -> READ_ONLY_TENCENT_DOCS_TOOLS
+                DIANPING_SERVER_ID -> READ_ONLY_DIANPING_TOOLS
+                else -> emptySet()
+            }
+        }
+    }
+
+    private fun PersistedToolCatalog.loadEnabledMcpTools(
+        include: (PersistedMcpServer, PersistedMcpTool) -> Boolean,
+    ): List<AgentTool> =
+        servers
             .filter { it.enabled && it.isConnected() }
             .flatMap { server ->
-                server.tools.filter(PersistedMcpTool::enabled).map { tool ->
+                server.tools
+                    .filter(PersistedMcpTool::enabled)
+                    .filter { tool -> include(server, tool) }
+                    .map { tool ->
                     val client = if (server.id == DIANPING_SERVER_ID) {
                         dianpingMcpClient
                     } else {
@@ -707,7 +732,6 @@ class DataStoreToolCatalogRepository(
                     )
                 }
             }
-    }
 
     private suspend fun repairTruncatedTencentDocsCatalog() {
         val catalog = loadCatalog().withBuiltInServers()
@@ -1525,11 +1549,29 @@ private val DEFAULT_NOTION_TOOLS = setOf(
     "notion-create-pages",
     "notion-update-page",
 )
+private val READ_ONLY_NOTION_TOOLS = setOf(
+    "notion-search",
+    "notion-fetch",
+)
 private val DEFAULT_TENCENT_DOCS_TOOLS = setOf(
     "query_space_node",
     "search_space_file",
     "manage.search_file",
     "get_content",
+)
+private val READ_ONLY_TENCENT_DOCS_TOOLS = setOf(
+    "query_space_node",
+    "search_space_file",
+    "manage.search_file",
+    "get_content",
+    "manage.query_folder_meta",
+    "manage.get_privilege",
+    "slide_get_page_info",
+    "slide_find_text",
+)
+private val READ_ONLY_DIANPING_TOOLS = setOf(
+    "search_poi",
+    "get_poi",
 )
 private val TENCENT_DOCS_SEARCH_TOOLS = setOf(
     "search_space_file",

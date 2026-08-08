@@ -113,7 +113,20 @@ support is an optional import/export adapter.
 - The Tools surface groups the Agent Browser provider switch and all five
   individual Browser Tool switches in one card.
 
-### 3.7 Skills
+### 3.7 Subagents
+
+- The Main Agent may delegate a self-contained task to Researcher or Analyst.
+- Delegation is serial: the Main Agent pauses, exactly one Subagent runs, and
+  the Main Agent resumes with its structured result.
+- One top-level interaction permits at most two delegations. Subagents cannot
+  delegate, run in parallel, or continue in the background.
+- Researcher receives enabled Browser Tools, read-only MCP Tools, and Skills.
+  Analyst receives the same capabilities plus sandboxed JavaScript.
+- Subagents receive no parent conversation history, memories, or persona.
+- Subagent Browser work reuses the current per-turn session. Home keeps the
+  Browser Card visible and identifies the active Subagent.
+
+### 3.8 Skills
 
 - Skills has Installed and Explore surfaces.
 - Built-in Mochi skills are visible and read-only.
@@ -129,7 +142,7 @@ support is an optional import/export adapter.
   disabled Tool is unavailable even when an enabled Skill refers to it.
 - Bundled scripts and dependencies are never executed automatically.
 
-### 3.8 Language
+### 3.9 Language
 
 - App language defaults to the Android system language.
 - Chinese system locales use the Chinese UI; every non-Chinese system locale

@@ -157,6 +157,7 @@ enum class ChatPipelineStage {
     LISTENING,
     SKILLING,
     THINKING,
+    SUBAGENT,
     TOOL,
     SUMMARY,
     SPEAKING,
@@ -1924,6 +1925,7 @@ private fun AgentPipelineStage.toUiStage(): ChatPipelineStage =
     when (this) {
         AgentPipelineStage.SKILLING -> ChatPipelineStage.SKILLING
         AgentPipelineStage.THINKING -> ChatPipelineStage.THINKING
+        AgentPipelineStage.SUBAGENT -> ChatPipelineStage.SUBAGENT
         AgentPipelineStage.TOOL -> ChatPipelineStage.TOOL
         AgentPipelineStage.SUMMARY -> ChatPipelineStage.SUMMARY
     }

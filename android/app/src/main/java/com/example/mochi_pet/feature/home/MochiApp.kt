@@ -806,14 +806,19 @@ private fun BrowserSessionCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = state.title.ifBlank { "Agent Browser" },
+                        text = state.actor
+                            ?: state.title.ifBlank { "Agent Browser" },
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                     )
                     Text(
-                        text = state.action
-                            ?: state.url.ifBlank { "Preparing page" },
+                        text = when {
+                            state.actor != null && state.title.isNotBlank() ->
+                                state.title
+                            else -> state.action
+                                ?: state.url.ifBlank { "Preparing page" }
+                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
@@ -992,6 +997,7 @@ private fun PipelineTrack(
             ChatPipelineStage.LISTENING,
             ChatPipelineStage.SKILLING,
             ChatPipelineStage.THINKING,
+            ChatPipelineStage.SUBAGENT,
             ChatPipelineStage.TOOL,
             ChatPipelineStage.SUMMARY,
             ChatPipelineStage.SPEAKING,
@@ -1028,6 +1034,7 @@ private fun ChatPipelineStage.displayText(): String =
         ChatPipelineStage.LISTENING -> "Listening"
         ChatPipelineStage.SKILLING -> "Choosing skills"
         ChatPipelineStage.THINKING -> "Thinking"
+        ChatPipelineStage.SUBAGENT -> "Delegating"
         ChatPipelineStage.TOOL -> "Working"
         ChatPipelineStage.SUMMARY -> "Composing"
         ChatPipelineStage.SPEAKING -> "Speaking"
@@ -1039,6 +1046,8 @@ private fun ChatPipelineStage.supportingText(): String =
         ChatPipelineStage.LISTENING -> "I'm here. Say what you need."
         ChatPipelineStage.SKILLING -> "Finding the best way to help."
         ChatPipelineStage.THINKING -> "Making sense of your request."
+        ChatPipelineStage.SUBAGENT ->
+            "Waiting for Mochi's specialist to finish."
         ChatPipelineStage.TOOL -> "Using Mochi's local tools."
         ChatPipelineStage.SUMMARY -> "Turning the result into a clear answer."
         ChatPipelineStage.SPEAKING -> "Reading the answer aloud."
@@ -1052,6 +1061,7 @@ private fun ChatPipelineStage.accentColor(): Color =
         ChatPipelineStage.LISTENING -> Color(0xFF62DFC3)
         ChatPipelineStage.SKILLING -> Color(0xFFB399FF)
         ChatPipelineStage.THINKING -> Color(0xFFFFBD70)
+        ChatPipelineStage.SUBAGENT -> Color(0xFF68C7FF)
         ChatPipelineStage.TOOL -> Color(0xFF8FAEFF)
         ChatPipelineStage.SUMMARY -> Color(0xFFFFA76C)
         ChatPipelineStage.SPEAKING -> Color(0xFFFF8FB4)
@@ -2485,6 +2495,7 @@ private fun MochiExpression(stage: ChatPipelineStage) {
             }
             ChatPipelineStage.THINKING,
             ChatPipelineStage.SKILLING,
+            ChatPipelineStage.SUBAGENT,
             ChatPipelineStage.TOOL,
             -> {
                 drawLine(

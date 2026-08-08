@@ -33,6 +33,7 @@ The native `ToolRegistry` currently supports:
 - `get_current_weather`;
 - `navigate_mochi_ui`;
 - `run_sandboxed_javascript`;
+- `delegate_agent` in the Main Agent's request-scoped registry;
 - the five grouped Agent Browser Tools;
 - configured Baidu Map Agent Plan Tools;
 - enabled MCP tools discovered through the Tool catalog.
@@ -49,6 +50,27 @@ They operate one visible, per-turn Android WebView and return bounded
 agent-only snapshots containing viewport Markdown plus a separate interactive
 element list with temporary references. Every successful action returns a fresh
 snapshot. Browser details and lifecycle are defined in `AGENT_BROWSER.md`.
+
+### `delegate_agent`
+
+Arguments:
+
+- `agent`: `researcher` or `analyst`;
+- `task`: a self-contained task, limited to 12,000 characters.
+
+The Tool runs one child synchronously and returns:
+
+```json
+{"status":"ok","data":{"agent":"researcher","result":"..."}}
+```
+
+The request-scoped coordinator permits at most two delegations. Child
+registries never contain `delegate_agent`. Researcher may use enabled Browser
+Tools, read-only MCP Tools, and `load_skill`; Analyst adds
+`run_sandboxed_javascript`. Read-only MCP access uses application-controlled
+allowlists for built-in Notion, Tencent Docs, and Dianping providers. Remote
+`readOnlyHint` annotations and manually configured MCP servers do not grant
+Subagent access.
 
 ## 2. Planner tools
 

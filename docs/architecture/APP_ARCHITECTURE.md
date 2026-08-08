@@ -34,6 +34,7 @@ run in local JVM tests.
 | --- | --- |
 | `VoiceSessionController` | interaction ID, cancellation, voice phases |
 | `AgentOrchestrator` | prompt/model/tool loop and round limits |
+| `SerialSubagentCoordinator` | one active child, per-run delegation count, cancellation propagation |
 | `PromptBuilder` | persona files, memory recall, skill catalog, time context |
 | `PersonaRepository` | app-private SOUL/USER/AGENTS files and atomic updates |
 | `ConversationRepository` | persisted turns and SQLite memory retrieval |
@@ -72,6 +73,8 @@ The app has one authoritative navigation state. Gestures, buttons, reminders,
 and voice directives all dispatch typed navigation intents to the same owner.
 Agent Browser does not add a navigation surface: Home may render a temporary
 Browser Card, while every other current surface remains unchanged.
+Researcher and Analyst reuse that top-level Browser session; the runtime actor
+label changes the Home card title without creating a second WebView.
 
 ## 4. Dependency rules
 
@@ -79,6 +82,7 @@ Browser Card, while every other current surface remains unchanged.
 Compose -> ViewModel -> Use case -> Repository interface
 Platform adapter -> Repository/tool interface
 Agent -> ToolRegistry -> typed tools
+Main Agent -> SerialSubagentCoordinator -> isolated child AgentOrchestrator
 Agent -X-> Compose/NavController/DAO/Android Context
 ```
 

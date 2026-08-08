@@ -53,6 +53,18 @@ Wake / mic / text
   -> TextToSpeech
 ```
 
+The Main Agent registry adds `delegate_agent` for each top-level run. Its
+request-scoped `SerialSubagentCoordinator` permits at most two delegations and
+holds a mutex while one Researcher or Analyst child runs. The parent coroutine
+waits for the child, so cancellation propagates naturally and there is no
+parallel, nested, or background Subagent execution.
+
+Each child uses a new `AgentOrchestrator` with only the delegated task, provider
+configuration, Tool execution context, enabled Skill metadata, and its fixed
+role instructions. Parent history, memories, persona, navigation sinks, and
+`delegate_agent` are absent. Researcher receives enabled Browser Tools and
+read-only MCP Tools; Analyst additionally receives sandboxed JavaScript.
+
 Every interaction has an immutable session ID. Starting a new interaction
 cancels the old coroutine scope. Late STT, model, tool, and TTS callbacks must
 not update state when their session ID is stale.
@@ -66,6 +78,9 @@ The first Browser Tool call in a turn lazily creates the session.
 interactive element list and temporary references.
 Home renders the active session through a trusted runtime Browser Card. Other
 surfaces remain unchanged and expose only the global Tool pipeline state.
+Subagents reuse this same top-level WebView and do not begin or close another
+browser turn. While a child is active, the Browser Card identifies Researcher
+or Analyst; the label clears when child execution finishes or is cancelled.
 After the LLM produces its final response, the Orchestrator closes the browser
 before TTS. Structured cleanup also runs on cancellation, timeout, and failure.
 App backgrounding does not close or pause the session. A foreground Agent
