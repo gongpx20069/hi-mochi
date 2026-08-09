@@ -95,6 +95,22 @@ Exit focus, presses Back, or navigates away from Home. Focus survives device
 rotation, and date-time and weather switch to two-column landscape layouts so
 their primary facts and supporting metrics remain balanced and unclipped.
 
+When enabled, an idle Focus presentation enters low-power standby after 30
+seconds by default. Settings places this low-priority option last and offers
+30-second, 1-minute, 2-minute, 5-minute, and 10-minute delays. Standby never
+starts while voice recognition, the Agent pipeline, or Agent Browser is active.
+It replaces every Home presentation with the same pure-black display: a
+minimal low-contrast Mochi, small localized date, and large system-format time
+without seconds. Portrait stacks Mochi, date, and time vertically; landscape
+places Mochi beside the date/time column. The content shifts among bounded
+positions once per minute to reduce OLED burn-in.
+
+Standby keeps the screen and wake-word pipeline active but lowers only Mochi's
+window brightness. Touch, listening, or any Agent pipeline activity restores
+the exact prior Home presentation and restarts the idle timer. Exiting Focus,
+leaving Home, backgrounding, or destroying the Activity restores the original
+window brightness.
+
 The visual transition never replaces the spoken response. Mochi's reply must
 explicitly contain the displayed local date/time or weather facts, and
 TextToSpeech reads that same reply.

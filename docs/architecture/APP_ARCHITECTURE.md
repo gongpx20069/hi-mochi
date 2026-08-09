@@ -113,6 +113,8 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   Room model, and there is no HEARTBEAT file.
 - Recent conversation context defaults to 20 user/assistant turns and is
   configurable from Settings. DataStore owns this preference.
+- DataStore owns Focus standby enablement and its validated idle-delay choice.
+  The default is enabled after 30 seconds; no Room migration is involved.
 - Export/import uses a versioned schema and excludes secrets.
 
 ## 6. Error model

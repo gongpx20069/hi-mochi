@@ -1018,6 +1018,40 @@ class MochiHomeViewModel(
         }
     }
 
+    fun setFocusStandby(
+        enabled: Boolean,
+        delaySeconds: Int,
+    ) {
+        val repository = agentSettingsRepository ?: return
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                val settings = repository.setFocusStandby(
+                    enabled = enabled,
+                    delaySeconds = delaySeconds,
+                )
+                mutableAgentSettingsState.value = AgentSettingsUiState(
+                    settings = settings,
+                    isLoading = false,
+                    feedback = "Fullscreen standby settings saved",
+                )
+            } catch (error: IllegalArgumentException) {
+                mutableAgentSettingsState.update {
+                    it.copy(
+                        isLoading = false,
+                        feedback = error.message,
+                    )
+                }
+            } catch (error: IOException) {
+                mutableAgentSettingsState.update {
+                    it.copy(
+                        isLoading = false,
+                        feedback = "Could not save fullscreen standby settings",
+                    )
+                }
+            }
+        }
+    }
+
     fun searchSkills(query: String) {
         val client = skillMarketClient ?: return
         val normalized = query.trim()

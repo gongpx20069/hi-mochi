@@ -6,7 +6,9 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.res.Configuration
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.os.Build
+import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,6 +36,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +51,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -74,6 +79,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -83,12 +89,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
@@ -104,6 +115,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -128,6 +140,7 @@ import com.example.mochi_pet.core.presentation.CardActionType
 import com.example.mochi_pet.core.presentation.CardPresentation
 import com.example.mochi_pet.core.presentation.CardType
 import com.example.mochi_pet.core.settings.AppLanguage
+import com.example.mochi_pet.core.settings.ALLOWED_FOCUS_STANDBY_DELAYS_SECONDS
 import com.example.mochi_pet.core.settings.ProviderSettingsInput
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.settings.SpeechSettingsInput
@@ -348,6 +361,8 @@ private fun MochiAppContent(
     val browserState by viewModel.browserState.collectAsStateWithLifecycle()
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
     var focusMode by rememberSaveable { mutableStateOf(false) }
+    var focusStandby by rememberSaveable { mutableStateOf(false) }
+    var standbyResetVersion by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
     val application = context.applicationContext as MochiApplication
     val coroutineScope = rememberCoroutineScope()
@@ -355,6 +370,7 @@ private fun MochiAppContent(
     val activity = context as? Activity
     var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
     val homePresentation = surface.isHomePresentation()
+    val focusStandbySettings = agentSettingsState.settings
     val visiblePipelineState =
         if (pipelineState.stage == ChatPipelineStage.LISTENING) {
             pipelineState.copy(
@@ -367,6 +383,36 @@ private fun MochiAppContent(
     LaunchedEffect(homePresentation) {
         if (!homePresentation) {
             focusMode = false
+            focusStandby = false
+        }
+    }
+    val focusStandbyEligible = isFocusStandbyEligible(
+        focusMode = focusMode,
+        homePresentation = homePresentation,
+        enabled = focusStandbySettings.focusStandbyEnabled,
+        pipelineActive = visiblePipelineState.isActive,
+        voiceListening = voiceState.isListening,
+        browserActive = browserState.active,
+    )
+    LaunchedEffect(
+        focusStandbyEligible,
+        focusStandbySettings.focusStandbyDelaySeconds,
+        standbyResetVersion,
+    ) {
+        if (!focusStandbyEligible) {
+            focusStandby = false
+            return@LaunchedEffect
+        }
+        focusStandby = false
+        delay(focusStandbySettings.focusStandbyDelaySeconds * 1_000L)
+        focusStandby = true
+    }
+    LifecycleResumeEffect(focusMode) {
+        onPauseOrDispose {
+            if (focusMode) {
+                focusStandby = false
+                standbyResetVersion += 1
+            }
         }
     }
     LaunchedEffect(Unit) {
@@ -413,7 +459,24 @@ private fun MochiAppContent(
             insetsController?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
+    DisposableEffect(focusStandby, activity) {
+        val window = activity?.window
+        if (!focusStandby || window == null) {
+            onDispose { }
+        } else {
+            val originalBrightness = window.attributes.screenBrightness
+            window.attributes = window.attributes.apply {
+                screenBrightness = FOCUS_STANDBY_BRIGHTNESS
+            }
+            onDispose {
+                window.attributes = window.attributes.apply {
+                    screenBrightness = originalBrightness
+                }
+            }
+        }
+    }
     BackHandler(enabled = focusMode) {
+        focusStandby = false
         focusMode = false
     }
     LaunchedEffect(toolsState.authorizationUrl) {
@@ -527,6 +590,7 @@ private fun MochiAppContent(
                 viewModel::stageProviderImport,
             onSetRecentConversationTurns =
                 viewModel::setRecentConversationTurns,
+            onSetFocusStandby = viewModel::setFocusStandby,
             onSavePersona = viewModel::savePersona,
             onSearchSkills = viewModel::searchSkills,
             onLoadPopularSkills = viewModel::loadPopularSkills,
@@ -564,7 +628,11 @@ private fun MochiAppContent(
             onRunSchedule = viewModel::runSchedule,
             onRemoveSchedule = viewModel::removeSchedule,
             onCardAction = performCardAction,
-            onFocus = { focusMode = true },
+            onFocus = {
+                focusStandby = false
+                standbyResetVersion += 1
+                focusMode = true
+            },
             modifier = modifier,
         )
     }
@@ -577,6 +645,16 @@ private fun MochiAppContent(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .pointerInput(focusMode) {
+                        awaitEachGesture {
+                            awaitFirstDown(
+                                requireUnconsumed = false,
+                                pass = PointerEventPass.Initial,
+                            )
+                            focusStandby = false
+                            standbyResetVersion += 1
+                        }
+                    }
                     .background(
                         Brush.verticalGradient(
                             listOf(
@@ -586,36 +664,45 @@ private fun MochiAppContent(
                         ),
                     ),
             ) {
-                if (browserState.active) {
-                    BrowserSessionCard(
-                        state = browserState,
-                        webViewProvider = viewModel::browserWebView,
-                        onRelease = viewModel::releaseBrowserWebView,
-                        onStop = viewModel::cancelConversation,
+                if (focusStandby) {
+                    FocusStandbyScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    renderSurface(Modifier.fillMaxSize())
-                }
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        OutlinedButton(
-                            onClick = { focusMode = false },
-                            shape = RoundedCornerShape(18.dp),
-                        ) {
-                            Text("Exit focus")
-                        }
+                    if (browserState.active) {
+                        BrowserSessionCard(
+                            state = browserState,
+                            webViewProvider = viewModel::browserWebView,
+                            onRelease = viewModel::releaseBrowserWebView,
+                            onStop = viewModel::cancelConversation,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        renderSurface(Modifier.fillMaxSize())
                     }
-                    ChatPipelineIndicator(state = visiblePipelineState)
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    focusStandby = false
+                                    focusMode = false
+                                },
+                                shape = RoundedCornerShape(18.dp),
+                            ) {
+                                Text("Exit focus")
+                            }
+                        }
+                        ChatPipelineIndicator(state = visiblePipelineState)
+                    }
                 }
             }
         } else {
@@ -1093,6 +1180,306 @@ private fun MochiSurface.isHomePresentation(): Boolean =
         this == MochiSurface.Card
 
 @Composable
+private fun FocusStandbyScreen(
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    var now by remember { mutableStateOf(ZonedDateTime.now()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val current = ZonedDateTime.now()
+            now = current
+            val untilNextMinuteMs =
+                60_000L -
+                    current.second * 1_000L -
+                    current.nano / 1_000_000L
+            delay(untilNextMinuteMs.coerceAtLeast(250L))
+        }
+    }
+
+    val timePattern = if (DateFormat.is24HourFormat(context)) {
+        "HH:mm"
+    } else {
+        "h:mm"
+    }
+    val time = now.format(DateTimeFormatter.ofPattern(timePattern))
+    val date = now.format(
+        uiDateFormatter(
+            englishPattern = "EEEE, MMMM d",
+            chinesePattern = "M月d日 EEEE",
+        ),
+    )
+    val offset = focusStandbyOffset(now.toEpochSecond() / 60L)
+    val contentModifier = Modifier.offset(
+        x = offset.xDp.dp,
+        y = offset.yDp.dp,
+    )
+
+    Box(
+        modifier = modifier
+            .background(Color.Black)
+            .semantics {
+                contentDescription = "Mochi standby, $date, $time"
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            FocusStandbyLandscape(
+                time = time,
+                date = date,
+                modifier = contentModifier,
+            )
+        } else {
+            FocusStandbyPortrait(
+                time = time,
+                date = date,
+                modifier = contentModifier,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FocusStandbyPortrait(
+    time: String,
+    date: String,
+    modifier: Modifier = Modifier,
+) {
+    val roundedFont = remember {
+        FontFamily(
+            Typeface.create("sans-serif-rounded", Typeface.BOLD),
+        )
+    }
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        MinimalStandbyMochi(
+            modifier = Modifier.size(width = 176.dp, height = 136.dp),
+        )
+        Spacer(modifier = Modifier.height(34.dp))
+        MaterialText(
+            text = date,
+            color = STANDBY_DATE_COLOR,
+            fontSize = 25.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = roundedFont,
+            letterSpacing = 0.6.sp,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        MaterialText(
+            text = time,
+            color = STANDBY_PRIMARY_COLOR,
+            fontSize = 114.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = roundedFont,
+            letterSpacing = (-3).sp,
+        )
+    }
+}
+
+@Composable
+private fun FocusStandbyLandscape(
+    time: String,
+    date: String,
+    modifier: Modifier = Modifier,
+) {
+    val roundedFont = remember {
+        FontFamily(
+            Typeface.create("sans-serif-rounded", Typeface.BOLD),
+        )
+    }
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(88.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MinimalStandbyMochi(
+            modifier = Modifier.size(width = 218.dp, height = 166.dp),
+        )
+        Column(
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            MaterialText(
+                text = date,
+                color = STANDBY_DATE_COLOR,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = roundedFont,
+                letterSpacing = 0.7.sp,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            MaterialText(
+                text = time,
+                color = STANDBY_PRIMARY_COLOR,
+                fontSize = 136.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = roundedFont,
+                letterSpacing = (-4).sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MinimalStandbyMochi(
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val outlineWidth = 2.5.dp.toPx()
+            val horizontalInset = size.width * 0.06f
+            val verticalInset = size.height * 0.08f
+            drawRoundRect(
+                color = STANDBY_FACE_FILL_COLOR,
+                topLeft = Offset(horizontalInset, verticalInset),
+                size = Size(
+                    width = size.width - horizontalInset * 2,
+                    height = size.height - verticalInset * 2,
+                ),
+                cornerRadius = CornerRadius(
+                    x = size.minDimension * 0.34f,
+                    y = size.minDimension * 0.34f,
+                ),
+            )
+            drawRoundRect(
+                color = STANDBY_OUTLINE_COLOR,
+                topLeft = Offset(horizontalInset, verticalInset),
+                size = Size(
+                    width = size.width - horizontalInset * 2,
+                    height = size.height - verticalInset * 2,
+                ),
+                cornerRadius = CornerRadius(
+                    x = size.minDimension * 0.34f,
+                    y = size.minDimension * 0.34f,
+                ),
+                style = Stroke(width = outlineWidth),
+            )
+
+            fun sleepingEye(centerX: Float) {
+                val eye = Path().apply {
+                    moveTo(centerX - size.width * 0.075f, size.height * 0.43f)
+                    cubicTo(
+                        centerX - size.width * 0.035f,
+                        size.height * 0.37f,
+                        centerX + size.width * 0.035f,
+                        size.height * 0.37f,
+                        centerX + size.width * 0.075f,
+                        size.height * 0.43f,
+                    )
+                }
+                drawPath(
+                    path = eye,
+                    color = STANDBY_PRIMARY_COLOR,
+                    style = Stroke(
+                        width = 4.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    ),
+                )
+                drawLine(
+                    color = STANDBY_PRIMARY_COLOR,
+                    start = Offset(
+                        centerX - size.width * 0.068f,
+                        size.height * 0.415f,
+                    ),
+                    end = Offset(
+                        centerX - size.width * 0.095f,
+                        size.height * 0.39f,
+                    ),
+                    strokeWidth = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+            sleepingEye(size.width * 0.36f)
+            sleepingEye(size.width * 0.64f)
+
+            drawOval(
+                color = STANDBY_CHEEK_COLOR,
+                topLeft = Offset(
+                    size.width * 0.19f,
+                    size.height * 0.57f,
+                ),
+                size = Size(size.width * 0.13f, size.height * 0.055f),
+            )
+            drawOval(
+                color = STANDBY_CHEEK_COLOR,
+                topLeft = Offset(
+                    size.width * 0.68f,
+                    size.height * 0.57f,
+                ),
+                size = Size(size.width * 0.13f, size.height * 0.055f),
+            )
+
+            drawOval(
+                color = STANDBY_NOSE_COLOR,
+                topLeft = Offset(
+                    size.width * 0.47f,
+                    size.height * 0.56f,
+                ),
+                size = Size(size.width * 0.06f, size.height * 0.055f),
+            )
+            drawOval(
+                color = STANDBY_MOUTH_COLOR,
+                topLeft = Offset(
+                    size.width * 0.465f,
+                    size.height * 0.65f,
+                ),
+                size = Size(size.width * 0.07f, size.height * 0.065f),
+                style = Stroke(
+                    width = 2.5.dp.toPx(),
+                ),
+            )
+            drawArc(
+                color = STANDBY_MOUTH_HIGHLIGHT_COLOR,
+                startAngle = 20f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = Offset(
+                    size.width * 0.478f,
+                    size.height * 0.672f,
+                ),
+                size = Size(size.width * 0.044f, size.height * 0.025f),
+                style = Stroke(width = 1.5.dp.toPx()),
+            )
+        }
+        MaterialText(
+            text = "Z",
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 1.dp, end = 1.dp),
+            color = STANDBY_SLEEP_COLOR,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Cursive,
+        )
+        MaterialText(
+            text = "z",
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 22.dp, end = 22.dp),
+            color = STANDBY_SLEEP_COLOR.copy(alpha = 0.72f),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Cursive,
+        )
+        MaterialText(
+            text = "z",
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 39.dp, end = 36.dp),
+            color = STANDBY_SLEEP_COLOR.copy(alpha = 0.48f),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Cursive,
+        )
+    }
+}
+
+@Composable
 private fun SurfaceContent(
     surface: MochiSurface,
     plannerState: PlannerSurfaceState,
@@ -1122,6 +1509,7 @@ private fun SurfaceContent(
     onCreateProviderShareLink: () -> Unit,
     onReceiveProviderShareLink: (String) -> Unit,
     onSetRecentConversationTurns: (Int) -> Unit,
+    onSetFocusStandby: (Boolean, Int) -> Unit,
     onSavePersona: (String, String, String) -> Unit,
     onSearchSkills: (String) -> Unit,
     onLoadPopularSkills: () -> Unit,
@@ -1208,6 +1596,7 @@ private fun SurfaceContent(
                     onReceiveProviderShareLink,
                 onSetRecentConversationTurns =
                     onSetRecentConversationTurns,
+                onSetFocusStandby = onSetFocusStandby,
                 onSavePersona = onSavePersona,
             )
             MochiSurface.Skills -> SkillsSurface(
@@ -5318,6 +5707,7 @@ private fun ProviderSettingsSurface(
     onCreateProviderShareLink: () -> Unit,
     onReceiveProviderShareLink: (String) -> Unit,
     onSetRecentConversationTurns: (Int) -> Unit,
+    onSetFocusStandby: (Boolean, Int) -> Unit,
     onSavePersona: (String, String, String) -> Unit,
 ) {
     val summary = state.summary
@@ -5341,6 +5731,14 @@ private fun ProviderSettingsSurface(
     var recentTurns by remember(agentSettingsState.settings) {
         mutableStateOf(
             agentSettingsState.settings.recentConversationTurns.toString(),
+        )
+    }
+    var focusStandbyEnabled by remember(agentSettingsState.settings) {
+        mutableStateOf(agentSettingsState.settings.focusStandbyEnabled)
+    }
+    var focusStandbyDelaySeconds by remember(agentSettingsState.settings) {
+        mutableIntStateOf(
+            agentSettingsState.settings.focusStandbyDelaySeconds,
         )
     }
     var soul by remember(personaState.context) {
@@ -5557,6 +5955,92 @@ private fun ProviderSettingsSurface(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("Save persona files")
+                    }
+                }
+            }
+        }
+        val focusStandbySection: LazyListScope.() -> Unit = {
+            item {
+                Text(
+                    text = "Fullscreen standby",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            item {
+                PlannerCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = "Low-power standby",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "After Focus is idle, show a dim " +
+                                    "Mochi, date, and time on pure black.",
+                                color =
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Switch(
+                            checked = focusStandbyEnabled,
+                            onCheckedChange = { enabled ->
+                                focusStandbyEnabled = enabled
+                                onSetFocusStandby(
+                                    enabled,
+                                    focusStandbyDelaySeconds,
+                                )
+                            },
+                        )
+                    }
+                    if (focusStandbyEnabled) {
+                        Text(
+                            text = "Enter standby after",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FOCUS_STANDBY_DELAY_OPTIONS_SECONDS.forEach {
+                                    delaySeconds ->
+                                val label = focusStandbyDelayLabel(delaySeconds)
+                                if (
+                                    delaySeconds ==
+                                    focusStandbyDelaySeconds
+                                ) {
+                                    Button(onClick = { }) {
+                                        Text(label)
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = {
+                                            focusStandbyDelaySeconds =
+                                                delaySeconds
+                                            onSetFocusStandby(
+                                                focusStandbyEnabled,
+                                                delaySeconds,
+                                            )
+                                        },
+                                    ) {
+                                        Text(label)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -6021,6 +6505,7 @@ private fun ProviderSettingsSurface(
             speechSection()
             appLanguageSection()
             personaSection()
+            focusStandbySection()
         }
         (
             state.feedback
@@ -6030,7 +6515,8 @@ private fun ProviderSettingsSurface(
                 text = it,
                 color = if (
                     it == "Provider settings saved" ||
-                    it == "Agent context settings saved"
+                    it == "Agent context settings saved" ||
+                    it == "Fullscreen standby settings saved"
                 ) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -6207,6 +6693,25 @@ private const val IFLYTEK_SPEECH_SIGNUP_URL =
     "https://www.xfyun.cn/services/voicedictation"
 private const val AZURE_SPEECH_SIGNUP_URL =
     "https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices"
+private const val FOCUS_STANDBY_BRIGHTNESS = 0.03f
+private val FOCUS_STANDBY_DELAY_OPTIONS_SECONDS =
+    ALLOWED_FOCUS_STANDBY_DELAYS_SECONDS.sorted()
+private val STANDBY_PRIMARY_COLOR = Color(0xFFD8D8D8)
+private val STANDBY_DATE_COLOR = Color(0xFFA8A8A8)
+private val STANDBY_OUTLINE_COLOR = Color(0xFF5A5A5A)
+private val STANDBY_FACE_FILL_COLOR = Color(0xFF111111)
+private val STANDBY_CHEEK_COLOR = Color(0xFF696969)
+private val STANDBY_NOSE_COLOR = Color(0xFFB0B0B0)
+private val STANDBY_MOUTH_COLOR = Color(0xFFC8C8C8)
+private val STANDBY_MOUTH_HIGHLIGHT_COLOR = Color(0xFF888888)
+private val STANDBY_SLEEP_COLOR = Color(0xFF909090)
+
+private fun focusStandbyDelayLabel(delaySeconds: Int): String =
+    if (delaySeconds < 60) {
+        "$delaySeconds sec"
+    } else {
+        "${delaySeconds / 60} min"
+    }
 
 private fun openExternalPage(
     context: android.content.Context,

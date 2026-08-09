@@ -30,6 +30,11 @@ runtime.
 - Touch and gesture navigation remain available alongside voice navigation.
 - Focus mode hides navigation and system chrome, keeps the screen awake, and
   dedicates the full display to the active Home presentation.
+- Focus mode enters an optional low-power standby presentation after 30 seconds
+  of idle time by default. Standby uses pure black with a minimal Mochi, local
+  date, and large local time, and restores the prior Home presentation on
+  touch or voice activity. Settings may disable standby or select a longer
+  idle delay.
 
 ### 3.2 Voice interaction
 
