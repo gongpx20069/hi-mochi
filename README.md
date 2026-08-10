@@ -6,7 +6,8 @@
 
 ### Your phone, now a little more alive.
 
-**A powerful, free and open-source voice AI assistant for Android.**
+**A powerful, free and open-source voice AI assistant—and a great way to give
+an old Android phone a new purpose.**
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#requirements--current-status)
 [![Native Kotlin](https://img.shields.io/badge/Native-Kotlin-7F52FF?logo=kotlin&logoColor=white)](android)
@@ -24,7 +25,10 @@ Mochi is a powerful, free and open-source personal voice AI assistant built
 natively for Android. Say **“Hi Mochi”** to wake it whenever you need it, then
 continue a natural hands-free conversation. Mochi combines voice, memory,
 planning, Tools, and Agent Skills—and brings the right screen or result into
-view as the conversation unfolds.
+view as the conversation unfolds. Install it on a spare or retired Android
+phone to turn that device into a dedicated always-ready AI companion, desk
+display, planner, and smart-home voice terminal instead of leaving useful
+hardware in a drawer.
 
 ### Always ready for your voice
 
