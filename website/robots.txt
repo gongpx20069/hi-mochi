@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://gongpx20069.github.io/hi-mochi/sitemap.xml

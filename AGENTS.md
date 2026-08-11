@@ -17,6 +17,7 @@ smallest relevant authoritative documents before changing the repository.
 | Build, tests, installation, repository layout | `docs/DEVELOPMENT.md` |
 | Current priorities and delivery status | `docs/ROADMAP.md` |
 | Documentation ownership | `docs/README.md` |
+| Official website code, tests, or documentation | `website/AGENTS.md` |
 
 When documents conflict, follow the authority order in `docs/README.md` and
 fix the lower-authority document in the same change.
@@ -38,6 +39,13 @@ document. Do not rely on conversation history.
 ## Repository rules
 
 - `android/` is the only application runtime.
+- `website/` is an independent subproject. Keep all website-specific source,
+  assets, tests, tooling, and documentation inside `website/`; the only
+  permitted repository-level integration is its GitHub Pages workflow under
+  `.github/workflows/`.
+- Root README files and `docs/` describe the Mochi product and Android
+  application. Do not place website implementation or development
+  documentation in those locations.
 - Keep model access behind typed tools and validated response contracts.
 - Preserve the dependency and state ownership rules in the architecture docs.
 - Room changes require a migration, schema snapshot, and migration coverage.
