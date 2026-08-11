@@ -5,6 +5,8 @@ import com.example.mochi_pet.core.agent.tool.ToolErrorCode
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
 import com.example.mochi_pet.core.agent.tool.functionToolSchema
+import com.example.mochi_pet.core.location.DeviceLocationException
+import com.example.mochi_pet.core.location.toToolResultEnvelope
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -44,11 +46,8 @@ class CurrentWeatherTool(
                     put("timezone", weather.timezone)
                 },
             )
-        } catch (error: LocationPermissionDeniedException) {
-            ToolResultEnvelope.error(
-                ToolErrorCode.PERMISSION_DENIED,
-                error.message ?: "Location permission was denied",
-            )
+        } catch (error: DeviceLocationException) {
+            error.toToolResultEnvelope()
         } catch (error: WeatherException) {
             ToolResultEnvelope.error(
                 ToolErrorCode.PROVIDER_ERROR,

@@ -25,6 +25,7 @@ import com.example.mochi_pet.core.navigation.NavigateMochiUiTool
 import com.example.mochi_pet.core.navigation.NavigationDecision
 import com.example.mochi_pet.core.navigation.NavigationPolicy
 import com.example.mochi_pet.core.navigation.UiDirectiveSink
+import com.example.mochi_pet.core.location.CurrentLocationTool
 import com.example.mochi_pet.core.schedule.ManageMochiScheduleTool
 import com.example.mochi_pet.core.skills.LoadSkillTool
 import com.example.mochi_pet.core.weather.CurrentWeather
@@ -47,6 +48,7 @@ suspend fun MochiApplication.createAgentRunner(
     val builtInTools = mutableListOf(
         ManageMochiCalendarTool(plannerStore),
         ManageMochiTodoTool(plannerStore),
+        CurrentLocationTool(deviceLocationProvider),
         CurrentWeatherTool(weatherRepository, onWeatherLoaded),
         SandboxedJavaScriptTool(javaScriptExecutor),
         ManageMochiScheduleTool(

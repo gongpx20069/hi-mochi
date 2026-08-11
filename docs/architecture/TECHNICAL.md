@@ -211,6 +211,8 @@ The native implementation now includes:
 - serializable OpenAI-compatible chat messages, tool calls, and responses;
 - OkHttp `/chat/completions` client with cancellation and bounded responses;
 - `AgentOrchestrator` with 20 Tool rounds for the Main Agent;
+- one bounded, Tool-disabled repair round when a provider final response does
+  not satisfy the Mochi JSON contract;
 - ToolRegistry execution and `role="tool"` continuation messages;
 - strict final JSON parsing and NavigationPolicy application;
 - bounded query, history, tool-result, and final-reply sizes.
@@ -257,16 +259,27 @@ SOUL, USER, AGENTS, and conversation-context settings are also persisted
 independently of LLM provider configuration and do not require a provider
 connection to edit or save.
 
-Memory search is local and embedding-free. Normalized English terms and Chinese
-character/bigram terms are stored with each message. Retrieval excludes IDs in
-the recent message window, selects up to four matching memories, includes up to
-three neighbors on either side, deduplicates, and returns chronological
-context. The Relevant memories section declares the device timezone once as
-`NOTE:<timezone ID>`. Every recalled line then includes its original instant
-rendered as local time with only the UTC offset, avoiding repeated timezone IDs
-while still distinguishing historical context from the current conversation.
-If no conversation match exists, only explicit fact/summary memories are
-eligible for recency fallback.
+Memory search is local, lexical, and embedding-free. Android ICU word
+boundaries produce normalized Chinese and non-Chinese terms after explicit
+Latin/Han transition splitting. Chinese indexing also retains contiguous Han
+bigrams and unigrams as recall fallbacks, while numeric runs remain searchable.
+Room FTS4 stores the pre-tokenized terms in a dedicated index; each successful
+turn writes message and FTS rows in one transaction. Database migration 4-to-5
+creates the FTS table and rebuilds every existing message with the current ICU
+tokenizer rather than copying stale normalized text. FTS selects a bounded
+candidate set, which is retokenized consistently and ranked in Kotlin by query
+coverage, term specificity, inverse candidate frequency, exact-phrase matches,
+and a deliberately small recency boost that cannot override a materially
+stronger lexical match.
+
+Retrieval excludes IDs in the recent message window, selects up to four
+matching memories, includes up to three neighbors on either side, deduplicates,
+and returns chronological context. The Relevant memories section declares the
+device timezone once as `NOTE:<timezone ID>`. Every recalled line then includes
+its original instant rendered as local time with only the UTC offset, avoiding
+repeated timezone IDs while still distinguishing historical context from the
+current conversation. If no conversation match exists, only explicit
+fact/summary memories are eligible for recency fallback.
 
 Skills follow the Agent Skills format: a root `SKILL.md` with required `name`
 and `description` frontmatter plus optional `license`, `compatibility`,
@@ -283,10 +296,14 @@ leaderboard and falls back to install-ranked public search if the page shape
 changes. Public search exposes install counts but not favorites; Mochi labels
 heat as a local derivation from the displayed 24-hour or all-time install count.
 
-Current weather uses a permission-gated Android location provider and the
-Open-Meteo current-conditions endpoint. A suspendable permission gate allows
-the active Agent tool call to continue after the system location dialog
-returns. The repository caches results for ten minutes and reduces latitude
+Current location and weather share one permission-gated Android location
+provider. A suspendable permission gate allows the active Agent Tool call to
+continue after the system location dialog returns. Last-known locations older
+than five minutes are rejected. `get_current_location` returns WGS-84 plus a
+locally converted GCJ-02 coordinate inside China, along with available
+accuracy, capture time, age, and provider metadata. The configured LLM receives
+that Tool evidence only when the Tool is called. Current weather uses the same
+provider with Open-Meteo, caches results for ten minutes, and reduces latitude
 and longitude to two decimal places before sending them to Open-Meteo.
 
 Native public-web research uses the Agent Browser through the built-in Web

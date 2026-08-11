@@ -64,8 +64,8 @@ hardware in a drawer.
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
 | Notion Knowledge | Disabled | Searches, reads, creates, and updates an authorized Notion workspace | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
 | Tencent Docs Knowledge | Disabled | Searches, reads, creates, and updates an authorized Tencent Docs space | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
-| Travel & Transport | Disabled | Searches places, plans routes, geocodes addresses, and checks destination weather | [Apply for a Baidu Map Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
-| Dianping Discovery | Disabled | Searches authorized Dianping POIs and reads official details | [Apply through Meituan Technical Services](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
+| Travel & Transport | Disabled | Uses current location when requested, searches places, plans routes, geocodes addresses, and checks destination weather | [Apply for a Baidu Map Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
+| Dianping Discovery | Disabled | Uses current location for requested nearby searches, then reads authorized Dianping POIs and official details | [Apply through Meituan Technical Services](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
 
 Agent Browser, Mochi built-ins, and provider Tool details are grouped and
 collapsed by default in Tools. Scheduled runs receive only the read-only
@@ -134,7 +134,9 @@ Conversation bubbles show the locally stored send date and time beside
 
 When answering, Mochi sends the necessary conversation context to the AI
 provider you configured. An external Tool receives only the information needed
-for an enabled Tool call.
+for an enabled Tool call. When `get_current_location` is called, its
+permission-gated coordinates are included in Tool evidence sent to that
+configured AI provider; the Tool can be disabled independently in Tools.
 
 ### Requirements & current status
 

@@ -1,6 +1,5 @@
 package com.example.mochi_pet.core.memory
 
-import androidx.sqlite.db.SimpleSQLiteQuery
 import com.example.mochi_pet.core.agent.llm.OpenAiChatMessage
 import com.example.mochi_pet.core.database.dao.AgentMemoryDao
 import com.example.mochi_pet.core.database.entity.AgentMemoryEntity
@@ -8,7 +7,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import java.util.UUID
 
 data class MemoryContext(
@@ -50,28 +48,24 @@ class RoomAgentMemoryRepository(
         val recent = dao.listRecentMessages(recentTurns * 2)
             .asReversed()
         val recentIds = recent.mapTo(mutableSetOf(), AgentMemoryEntity::id)
-        val terms = memoryTerms(query)
+        val terms = MemoryLexicalSearch.terms(query)
         val hits = if (terms.isEmpty()) {
             emptyList()
         } else {
-            dao.search(searchQuery(terms))
-                .asSequence()
-                .filterNot { it.id in recentIds }
-                .map { memory ->
-                    memory to terms.count { term ->
-                        memory.searchText.contains(" $term ")
-                    }
-                }
-                .filter { (_, score) -> score > 0 }
-                .sortedWith(
-                    compareByDescending<Pair<AgentMemoryEntity, Int>> {
-                        it.second
-                    }.thenByDescending {
-                        it.first.createdAtEpochMillis
-                    },
+            val lookupTerms = MemoryLexicalSearch.candidateLookupTerms(terms)
+            MemoryLexicalSearch.rank(
+                query = query,
+                queryTerms = terms,
+                candidates = dao.search(
+                    matchQuery = MemoryLexicalSearch.matchQuery(lookupTerms),
+                    limit = MAX_SEARCH_CANDIDATES,
                 )
+                    .asSequence()
+                    .filterNot { it.id in recentIds }
+                    .toList(),
+            )
+                .asSequence()
                 .take(MAX_MEMORY_HITS)
-                .map(Pair<AgentMemoryEntity, Int>::first)
                 .toList()
         }
         val recalled = linkedMapOf<String, AgentMemoryEntity>()
@@ -143,29 +137,16 @@ class RoomAgentMemoryRepository(
         role: String,
         content: String,
         createdAtEpochMillis: Long,
-    ): AgentMemoryEntity =
-        AgentMemoryEntity(
+    ): AgentMemoryEntity {
+        val storedContent = content.take(MAX_MEMORY_CONTENT_CHARS)
+        return AgentMemoryEntity(
             id = UUID.randomUUID().toString(),
             turnId = turnId,
             role = role,
             type = "${role}_msg",
-            content = content.take(MAX_MEMORY_CONTENT_CHARS),
-            searchText = searchableMemoryText(content),
+            content = storedContent,
+            searchText = searchableMemoryText(storedContent),
             createdAtEpochMillis = createdAtEpochMillis,
-        )
-
-    private fun searchQuery(terms: List<String>): SimpleSQLiteQuery {
-        val selected = terms.take(MAX_SEARCH_TERMS)
-        val where = selected.joinToString(" OR ") { "search_text LIKE ?" }
-        val args = selected.map { "% $it %" }.toTypedArray()
-        return SimpleSQLiteQuery(
-            """
-            SELECT * FROM agent_memories
-            WHERE ($where)
-            ORDER BY created_at_epoch_millis DESC
-            LIMIT $MAX_SEARCH_CANDIDATES
-            """.trimIndent(),
-            args,
         )
     }
 }
@@ -183,32 +164,10 @@ private fun AgentMemoryEntity.toMemoryMessage(): MemoryMessage? {
 }
 
 internal fun searchableMemoryText(value: String): String =
-    " ${memoryTerms(value).joinToString(" ")} "
+    MemoryLexicalSearch.searchableText(value)
 
-internal fun memoryTerms(value: String): List<String> {
-    val normalized = value.lowercase(Locale.ROOT)
-    val terms = linkedSetOf<String>()
-    Regex("[\\p{L}\\p{N}]+").findAll(normalized).forEach { match ->
-        val token = match.value
-        if (token.any(::isCjk)) {
-            token.forEach { character ->
-                if (isCjk(character)) {
-                    terms += character.toString()
-                }
-            }
-            token.windowed(size = 2, step = 1, partialWindows = false)
-                .filter { pair -> pair.all(::isCjk) }
-                .forEach(terms::add)
-        } else if (token.length >= 2) {
-            terms += token
-        }
-    }
-    return terms.take(MAX_INDEX_TERMS)
-}
-
-private fun isCjk(character: Char): Boolean =
-    Character.UnicodeScript.of(character.code) ==
-        Character.UnicodeScript.HAN
+internal fun memoryTerms(value: String): List<String> =
+    MemoryLexicalSearch.terms(value)
 
 private fun AgentMemoryEntity.toPromptLine(zoneId: ZoneId): String {
     val speaker = if (role == "assistant") "Mochi" else "User"
@@ -219,8 +178,6 @@ private fun AgentMemoryEntity.toPromptLine(zoneId: ZoneId): String {
 }
 
 private const val MAX_MEMORY_CONTENT_CHARS = 20_000
-private const val MAX_INDEX_TERMS = 256
-private const val MAX_SEARCH_TERMS = 16
 private const val MAX_SEARCH_CANDIDATES = 100
 private const val MAX_MEMORY_HITS = 4
 private const val MEMORY_CONTEXT_RADIUS = 3

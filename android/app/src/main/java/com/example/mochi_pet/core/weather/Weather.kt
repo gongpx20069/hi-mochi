@@ -1,5 +1,6 @@
 package com.example.mochi_pet.core.weather
 
+import com.example.mochi_pet.core.location.DeviceLocationProvider
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
@@ -19,11 +20,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 
-data class GeoPoint(
-    val latitude: Double,
-    val longitude: Double,
-)
-
 data class CurrentWeather(
     val temperatureC: Double,
     val apparentTemperatureC: Double,
@@ -36,19 +32,12 @@ data class CurrentWeather(
         get() = weatherCode.toCondition()
 }
 
-fun interface DeviceLocationProvider {
-    suspend fun currentLocation(): GeoPoint
-}
-
 fun interface WeatherRepository {
     suspend fun currentWeather(): CurrentWeather
 }
 
 open class WeatherException(message: String, cause: Throwable? = null) :
     Exception(message, cause)
-
-class LocationPermissionDeniedException :
-    WeatherException("Location permission is required for local weather")
 
 class OpenMeteoWeatherRepository(
     private val locationProvider: DeviceLocationProvider,

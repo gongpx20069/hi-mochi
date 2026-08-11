@@ -401,14 +401,35 @@ class AgentOrchestratorTest {
     }
 
     @Test
-    fun `rejects malformed final response`() {
-        val orchestrator = orchestrator(
-            QueueChatClient(finalResponse("not-json")),
+    fun `repairs one malformed final response without tools`() = runBlocking {
+        val client = QueueChatClient(
+            finalResponse("not-json"),
+            finalResponse("""{"reply":"Recovered","emotion":"neutral"}"""),
+        )
+        val orchestrator = orchestrator(client)
+
+        val result = orchestrator.run(request())
+
+        assertEquals("Recovered", result.reply)
+        assertEquals(2, client.requests.size)
+        assertTrue(client.requests[1].tools.isEmpty())
+        assertTrue(
+            client.requests[1].messages.last().content.orEmpty()
+                .contains("Do not call tools"),
+        )
+    }
+
+    @Test
+    fun `rejects a second malformed final response`() {
+        val client = QueueChatClient(
+            finalResponse("not-json"),
+            finalResponse("still-not-json"),
         )
 
         assertThrows(AgentProtocolException::class.java) {
-            runBlocking { orchestrator.run(request()) }
+            runBlocking { orchestrator(client).run(request()) }
         }
+        assertEquals(2, client.requests.size)
     }
 
     @Test

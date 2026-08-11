@@ -22,6 +22,7 @@ text for keywords.
 | --- | --- |
 | Current time/date | Home date-time presentation |
 | Current weather/temperature/humidity | Home weather presentation |
+| Current position or nearby request | Keep current surface; request location permission if needed |
 | Today's schedule/todos | Today's Day Planner |
 | Another date | Calendar Day for resolved date |
 | Todos on another date | Calendar Day with todo section |
@@ -176,6 +177,10 @@ Tools also contains a Baidu Map Agent Plan provider card. It opens the official
 Service Key page, stores the pasted key encrypted on-device, and exposes a
 provider switch. Its five capabilities remain individually selectable in the
 built-in Tool list.
+Current Location appears as an independent built-in Tool switch. A clearly
+location-dependent Agent request keeps the current surface, continues after
+the Android permission result, and returns typed permission, timeout, or
+provider errors instead of silently guessing a position.
 Agent Browser uses the same provider-card pattern. Its provider-level enable
 switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one

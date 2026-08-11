@@ -43,8 +43,8 @@ import com.example.mochi_pet.core.weather.OpenMeteoWeatherRepository
 import com.example.mochi_pet.core.weather.WeatherRepository
 import com.example.mochi_pet.core.update.AppUpdateClient
 import com.example.mochi_pet.platform.browser.AgentBrowserRuntime
-import com.example.mochi_pet.platform.weather.AndroidDeviceLocationProvider
-import com.example.mochi_pet.platform.weather.LocationPermissionGate
+import com.example.mochi_pet.platform.location.AndroidDeviceLocationProvider
+import com.example.mochi_pet.platform.location.LocationPermissionGate
 import com.example.mochi_pet.platform.voice.AndroidVoiceRuntime
 import com.example.mochi_pet.platform.wake.AndroidWakeRuntime
 import com.example.mochi_pet.platform.javascript.AndroidJavaScriptExecutor
@@ -198,12 +198,16 @@ class MochiApplication : Application() {
         }
     }
 
+    val deviceLocationProvider: AndroidDeviceLocationProvider by lazy {
+        AndroidDeviceLocationProvider(
+            context = this,
+            permissionGate = locationPermissionGate,
+        )
+    }
+
     val weatherRepository: WeatherRepository by lazy {
         OpenMeteoWeatherRepository(
-            AndroidDeviceLocationProvider(
-                context = this,
-                permissionGate = locationPermissionGate,
-            ),
+            deviceLocationProvider,
         )
     }
 

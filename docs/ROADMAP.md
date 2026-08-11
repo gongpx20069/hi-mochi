@@ -43,12 +43,15 @@ or verification in earlier phases.
 - [x] Agent Skills metadata discovery and on-demand activation.
 - [x] App-private SOUL/USER/AGENTS files.
 - [x] Configurable recent conversation context, default 20 turns.
-- [x] SQLite conversation persistence and direct memory recall.
+- [x] SQLite conversation persistence and ICU-tokenized FTS4 memory recall.
 - [x] Typed ToolRegistry, JSON schemas, and result envelopes.
 - [x] Mochi calendar/todo CRUD tools with destructive confirmation.
+- [x] Permission-gated current-location and weather Tools with explicit
+  WGS-84/GCJ-02 coordinate contracts.
 - [x] `navigate_mochi_ui` and deterministic directive validation.
 - [x] Wire validated UI directives into the agent response loop.
-- [x] Multi-round tool loop, cancellation, payload bounds, and protocol tests.
+- [x] Multi-round Tool loop, cancellation, payload bounds, one bounded final
+  JSON repair, and protocol tests.
 - [x] Keystore-backed provider settings and native settings UI.
 - [x] Connect text conversation UI to `AgentOrchestrator`.
 - [x] Persist conversation history locally and exclude the recent window from

@@ -1,5 +1,7 @@
 package com.example.mochi_pet.core.weather
 
+import com.example.mochi_pet.core.location.DeviceLocation
+import com.example.mochi_pet.core.location.DeviceLocationProvider
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -33,7 +35,7 @@ class OpenMeteoWeatherRepositoryTest {
             try {
                 val repository = OpenMeteoWeatherRepository(
                     locationProvider = DeviceLocationProvider {
-                        GeoPoint(31.230416, 121.473701)
+                        DeviceLocation(31.230416, 121.473701)
                     },
                     forecastUrl = server.url("/v1/forecast").toString(),
                 )

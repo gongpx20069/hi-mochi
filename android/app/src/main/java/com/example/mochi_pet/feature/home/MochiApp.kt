@@ -3455,6 +3455,7 @@ private val MOCHI_BUILT_IN_TOOL_NAMES = setOf(
     "manage_mochi_calendar",
     "manage_mochi_todo",
     "manage_mochi_schedule",
+    "get_current_location",
     "get_current_weather",
     "navigate_mochi_ui",
     "run_sandboxed_javascript",

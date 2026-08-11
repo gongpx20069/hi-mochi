@@ -74,6 +74,9 @@ support is an optional import/export adapter.
 - Questions about the current time/date transform Home into a live clock/date.
 - Questions about current weather, temperature, or humidity transform Home into
   a local weather card.
+- Explicit current-position, nearby, and current-origin route requests may use
+  Android's permission-gated device location. The location Tool is independently
+  disableable and exposes coordinates to the configured LLM only when called.
 - Questions about another date open that date in Mochi Calendar.
 - Questions about todos open the relevant day or Todo view.
 

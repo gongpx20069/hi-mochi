@@ -1458,6 +1458,12 @@ val BUILT_IN_TOOLS = listOf(
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
+        name = "get_current_location",
+        displayName = "Current Location",
+        description = "Read the device location after Android permission.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
         name = "get_current_weather",
         displayName = "Current Weather",
         description = "Read current local weather with device permission.",

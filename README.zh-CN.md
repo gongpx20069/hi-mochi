@@ -60,8 +60,8 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
 | Notion Knowledge | 禁用 | 搜索、阅读、创建和更新已授权 Notion 工作区 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
 | Tencent Docs Knowledge | 禁用 | 搜索、阅读、创建和更新已授权腾讯文档空间 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
-| Travel & Transport | 禁用 | 搜索地点、规划路线、地址解析和目的地天气 | [申请百度地图 Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
-| Dianping Discovery | 禁用 | 搜索已授权的大众点评 POI 并读取官方详情 | [通过美团技术服务合作中心申请](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
+| Travel & Transport | 禁用 | 在用户请求时使用当前位置，并搜索地点、规划路线、解析地址和查询目的地天气 | [申请百度地图 Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
+| Dianping Discovery | 禁用 | 在用户请求附近搜索时使用当前位置，并查询已授权的大众点评 POI 和官方详情 | [通过美团技术服务合作中心申请](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
 
 Tools 页面会将 Agent Browser、Mochi 内建能力和 Provider Tools 分组并默认
 收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
@@ -121,7 +121,9 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 时间，包括恢复的历史消息和 Scheduled Agent 结果。
 
 回答问题时，Mochi 会把必要的对话上下文发送给你配置的 AI 提供商。外部 Tool
-只会在已启用的调用中收到完成任务所需的信息。
+只会在已启用的调用中收到完成任务所需的信息。调用 `get_current_location`
+时，获得权限的坐标会作为 Tool 证据发送给你配置的 AI 提供商；你可以在 Tools
+中单独关闭该能力。
 
 ### 使用要求与当前状态
 

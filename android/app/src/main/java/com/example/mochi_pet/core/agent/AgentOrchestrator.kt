@@ -262,6 +262,7 @@ class AgentOrchestrator(
             messages += OpenAiChatMessage(role = "user", content = query)
 
             val cardEvidence = mutableListOf<CardToolEvidence>()
+            var finalReplyRepairAttempted = false
             while (true) {
                 pipelineObserver.onStage(
                     if (toolRounds == 0) {
@@ -286,7 +287,11 @@ class AgentOrchestrator(
                     request = OpenAiChatRequest(
                         model = request.provider.model,
                         messages = messages.toList(),
-                        tools = activeToolRegistry.schemas,
+                        tools = if (finalReplyRepairAttempted) {
+                            emptyList()
+                        } else {
+                            activeToolRegistry.schemas
+                        },
                     ),
                 )
                 val assistantMessage = response.choices.firstOrNull()?.message
@@ -295,11 +300,24 @@ class AgentOrchestrator(
                     )
                 val requestedToolCalls = assistantMessage.toolCalls.orEmpty()
                 if (requestedToolCalls.isEmpty()) {
-                    val reply = parseFinalReply(
-                        content = assistantMessage.content,
-                        context = request.context,
-                        evidence = cardEvidence,
-                    )
+                    val reply = try {
+                        parseFinalReply(
+                            content = assistantMessage.content,
+                            context = request.context,
+                            evidence = cardEvidence,
+                        )
+                    } catch (error: AgentProtocolException) {
+                        if (finalReplyRepairAttempted) {
+                            throw error
+                        }
+                        finalReplyRepairAttempted = true
+                        messages += assistantMessage.copy(role = "assistant")
+                        messages += OpenAiChatMessage(
+                            role = "user",
+                            content = FINAL_REPLY_REPAIR_PROMPT,
+                        )
+                        continue
+                    }
                     logRunFinished(
                         type = AgentDiagnosticEventType.RUN_COMPLETED,
                         runId = runId,
@@ -309,6 +327,11 @@ class AgentOrchestrator(
                         startedAt = runStartedAt,
                     )
                     return reply
+                }
+                if (finalReplyRepairAttempted) {
+                    throw AgentProtocolException(
+                        "Provider returned a tool call during final reply repair",
+                    )
                 }
                 if (toolRounds >= maxToolRounds) {
                     throw AgentToolRoundLimitException(maxToolRounds)
@@ -546,6 +569,12 @@ class AgentOrchestrator(
         const val MAX_HISTORY_MESSAGES = 100
         const val MAX_TOOL_ROUNDS = 30
         const val MAX_TOOL_RESULT_CHARS = 1_000_000
+        const val FINAL_REPLY_REPAIR_PROMPT =
+            "Your previous final response did not satisfy the Mochi response " +
+                "contract. Do not call tools. Return only one JSON object with " +
+                "a non-empty reply string, an emotion string, and optional " +
+                "ui_directive and card_directive objects or null. Do not use " +
+                "Markdown fences or add text outside the JSON object."
         val EMOTION_PATTERN = Regex("[a-z][a-z0-9_]{0,31}")
     }
 }

@@ -456,6 +456,9 @@ private val ZH_UI_TEXT = mapOf(
     "Read and update Mochi calendar events." to "读取和更新 Mochi 日历事件。",
     "Mochi Todo" to "Mochi 待办",
     "Read and update Mochi todos." to "读取和更新 Mochi 待办。",
+    "Current Location" to "当前位置",
+    "Read the device location after Android permission." to
+        "获得 Android 权限后读取设备当前位置。",
     "Current Weather" to "当前天气",
     "Read current local weather with device permission." to "在获得设备权限后读取当前本地天气。",
     "Web Search" to "网页搜索",

@@ -66,6 +66,7 @@ import com.example.mochi_pet.core.skills.SkillMarketException
 import com.example.mochi_pet.core.skills.SkillOrigin
 import com.example.mochi_pet.core.skills.SkillRepository
 import com.example.mochi_pet.core.skills.LoadSkillTool
+import com.example.mochi_pet.core.location.DeviceLocationException
 import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.ToolCatalogRepository
 import com.example.mochi_pet.core.tools.ToolCatalogSummary
@@ -79,7 +80,7 @@ import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
 import com.example.mochi_pet.platform.browser.AgentBrowserRuntime
 import com.example.mochi_pet.platform.browser.AgentBrowserUiState
-import com.example.mochi_pet.platform.weather.LocationPermissionGate
+import com.example.mochi_pet.platform.location.LocationPermissionGate
 import java.io.IOException
 import java.time.Clock
 import java.util.logging.Level
@@ -1708,12 +1709,18 @@ class MochiHomeViewModel(
         viewModelScope.launch(ioDispatcher) {
             try {
                 showWeather(repository.currentWeather())
+            } catch (error: DeviceLocationException) {
+                showWeatherError(error.message)
             } catch (error: WeatherException) {
-                mutableWeatherState.value = WeatherUiState(
-                    errorMessage = error.message ?: "Could not load weather",
-                )
+                showWeatherError(error.message)
             }
         }
+    }
+
+    private fun showWeatherError(message: String?) {
+        mutableWeatherState.value = WeatherUiState(
+            errorMessage = message ?: "Could not load weather",
+        )
     }
 
     private fun showWeather(weather: CurrentWeather) {

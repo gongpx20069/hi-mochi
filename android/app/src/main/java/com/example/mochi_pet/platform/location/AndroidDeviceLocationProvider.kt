@@ -1,4 +1,4 @@
-package com.example.mochi_pet.platform.weather
+package com.example.mochi_pet.platform.location
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -7,15 +7,18 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Looper
 import androidx.core.content.ContextCompat
-import com.example.mochi_pet.core.weather.DeviceLocationProvider
-import com.example.mochi_pet.core.weather.GeoPoint
-import com.example.mochi_pet.core.weather.LocationPermissionDeniedException
-import com.example.mochi_pet.core.weather.WeatherException
+import com.example.mochi_pet.core.location.DeviceLocation
+import com.example.mochi_pet.core.location.DeviceLocationProvider
+import com.example.mochi_pet.core.location.LocationPermissionDeniedException
+import com.example.mochi_pet.core.location.LocationRequestTimeoutException
+import com.example.mochi_pet.core.location.LocationUnavailableException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,13 +58,14 @@ class LocationPermissionGate(
 class AndroidDeviceLocationProvider(
     context: Context,
     private val permissionGate: LocationPermissionGate,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
 ) : DeviceLocationProvider {
     private val appContext = context.applicationContext
     private val locationManager =
         appContext.getSystemService(LocationManager::class.java)
 
     @SuppressLint("MissingPermission")
-    override suspend fun currentLocation(): GeoPoint {
+    override suspend fun currentLocation(): DeviceLocation {
         if (!permissionGate.awaitPermission()) {
             throw LocationPermissionDeniedException()
         }
@@ -70,10 +74,11 @@ class AndroidDeviceLocationProvider(
                 LocationManager.NETWORK_PROVIDER
             locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ->
                 LocationManager.GPS_PROVIDER
-            else -> throw WeatherException(
-                "Enable device location to get local weather",
+            else -> throw LocationUnavailableException(
+                "Enable device location to determine the current position",
             )
         }
+        val now = nowMillis()
         val lastKnown = listOf(
             LocationManager.NETWORK_PROVIDER,
             LocationManager.GPS_PROVIDER,
@@ -81,13 +86,25 @@ class AndroidDeviceLocationProvider(
             runCatching {
                 locationManager.getLastKnownLocation(candidate)
             }.getOrNull()
+        }.filter { location ->
+            location.time > 0 &&
+                now - location.time in 0..MAX_LAST_KNOWN_AGE_MILLIS
         }.maxByOrNull(Location::getTime)
-        val location = lastKnown ?: withTimeout(LOCATION_TIMEOUT_MILLIS) {
-            requestLocation(provider)
+        val location = lastKnown ?: try {
+            withTimeout(LOCATION_TIMEOUT_MILLIS) {
+                requestLocation(provider)
+            }
+        } catch (error: TimeoutCancellationException) {
+            throw LocationRequestTimeoutException()
         }
-        return GeoPoint(
+        return DeviceLocation(
             latitude = location.latitude,
             longitude = location.longitude,
+            accuracyMeters = location.accuracy
+                .takeIf { location.hasAccuracy() }
+                ?.toDouble(),
+            capturedAtEpochMillis = location.time.takeIf { it > 0 },
+            provider = location.provider,
         )
     }
 
@@ -96,15 +113,19 @@ class AndroidDeviceLocationProvider(
     private suspend fun requestLocation(provider: String): Location =
         suspendCancellableCoroutine { continuation ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val cancellationSignal = CancellationSignal()
+                continuation.invokeOnCancellation {
+                    cancellationSignal.cancel()
+                }
                 locationManager.getCurrentLocation(
                     provider,
-                    null,
+                    cancellationSignal,
                     ContextCompat.getMainExecutor(appContext),
                 ) { location ->
                     if (location == null) {
                         continuation.resumeWithException(
-                            WeatherException(
-                                "Could not determine the device location",
+                            LocationUnavailableException(
+                                "Could not determine the current location",
                             ),
                         )
                     } else {
@@ -145,5 +166,6 @@ class AndroidDeviceLocationProvider(
 
     private companion object {
         const val LOCATION_TIMEOUT_MILLIS = 12_000L
+        const val MAX_LAST_KNOWN_AGE_MILLIS = 5 * 60 * 1_000L
     }
 }

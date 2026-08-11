@@ -1026,17 +1026,22 @@ private val BUILT_IN_SKILLS = listOf(
 
             ## Tool workflow
 
-            1. Use `baidu_map_place` for semantic place discovery. Preserve the
+            1. When the user clearly requests a current-origin route, nearby
+               search, or current-position lookup, call
+               `get_current_location` when it is available. Use its `gcj02`
+               coordinate for Baidu Map tools; never pass its WGS-84 coordinate
+               to a GCJ-02 parameter and never convert coordinates yourself.
+            2. Use `baidu_map_place` for semantic place discovery. Preserve the
                user's full request and constraints in `user_raw_request`.
-            2. Use `baidu_map_geocoding` when a complete address must become a
+            3. Use `baidu_map_geocoding` when a complete address must become a
                trusted coordinate. Never invent coordinates.
-            3. Use `baidu_map_reverse_geocoding` only with a user-provided,
+            4. Use `baidu_map_reverse_geocoding` only with a user-provided,
                device-provided, or Tool-returned GCJ-02 coordinate.
-            4. Use `baidu_map_direction` for driving, walking, cycling, or
+            5. Use `baidu_map_direction` for driving, walking, cycling, or
                transit routes. Resolve ambiguous places before planning.
-            5. Use `baidu_map_weather` for destination or travel-day weather
+            6. Use `baidu_map_weather` for destination or travel-day weather
                context.
-            6. When railway or flight tools become available, combine their
+            7. When railway or flight tools become available, combine their
                schedules with Baidu place and local-route results rather than
                treating either provider as a booking system.
 
@@ -1066,13 +1071,17 @@ private val BUILT_IN_SKILLS = listOf(
 
             ## Tool workflow
 
-            1. Use `dianping_search_poi` for nearby or city-scoped discovery.
+            1. For an explicitly requested nearby search, call
+               `get_current_location` when available and pass only its `gcj02`
+               latitude and longitude to Dianping. Never invent coordinates or
+               pass WGS-84 values to Dianping's GCJ-02 fields.
+            2. Use `dianping_search_poi` for nearby or city-scoped discovery.
                Preserve the user's keyword, category, distance, and location
                constraints. Prefer a city or coarse area unless precise
                coordinates are necessary and clearly requested.
-            2. Use `dianping_get_poi` with the returned `openshopid` before
+            3. Use `dianping_get_poi` with the returned `openshopid` before
                presenting detailed hours, ratings, reviews, prices, or links.
-            3. Present official H5 or app links only when the API returns them.
+            4. Present official H5 or app links only when the API returns them.
                Opening a link is a handoff, not a completed booking or order.
 
             ## Safety

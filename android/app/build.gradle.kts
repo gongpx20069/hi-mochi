@@ -105,6 +105,10 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    sourceSets {
+        getByName("test").resources.srcDir("$projectDir/schemas")
+    }
 }
 
 kotlin {

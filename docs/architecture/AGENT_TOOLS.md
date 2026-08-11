@@ -30,6 +30,7 @@ The native `ToolRegistry` currently supports:
 - `manage_mochi_calendar`;
 - `manage_mochi_todo`;
 - `manage_mochi_schedule`;
+- `get_current_location`;
 - `get_current_weather`;
 - `navigate_mochi_ui`;
 - `run_sandboxed_javascript`;
@@ -187,6 +188,24 @@ permission-gated location:
 - observation time and timezone.
 
 Coordinates are reduced to two decimal places before they leave the device.
+
+### `get_current_location`
+
+Returns the Android device's permission-gated current position only for an
+explicit current-position request or a clearly location-dependent action such
+as nearby discovery or routing. The result contains:
+
+- WGS-84 latitude and longitude;
+- GCJ-02 latitude and longitude when the point is inside China;
+- reported accuracy, capture time, age, and Android provider when available.
+
+The Tool rejects denied permission, disabled providers, unavailable fixes, and
+timeouts with typed errors. It accepts no model-supplied coordinates. Android
+locations older than five minutes are not reused. The configured LLM receives
+the returned coordinates as Tool evidence, so the Tool can be disabled
+independently from Tools settings. Baidu Map and Dianping parameters must use
+the returned GCJ-02 fields, never the WGS-84 fields or model-generated
+conversion.
 
 ## 4. Public web research
 

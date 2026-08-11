@@ -12,10 +12,12 @@ import com.example.mochi_pet.core.database.dao.TodoDao
 import com.example.mochi_pet.core.database.dao.SkillDao
 import com.example.mochi_pet.core.database.dao.AgentScheduleDao
 import com.example.mochi_pet.core.database.entity.CalendarEventEntity
+import com.example.mochi_pet.core.database.entity.AgentMemoryFtsEntity
 import com.example.mochi_pet.core.database.entity.AgentMemoryEntity
 import com.example.mochi_pet.core.database.entity.TodoEntity
 import com.example.mochi_pet.core.database.entity.SkillEntity
 import com.example.mochi_pet.core.database.entity.AgentScheduleEntity
+import com.example.mochi_pet.core.memory.MemoryLexicalSearch
 
 @Database(
     entities = [
@@ -23,9 +25,10 @@ import com.example.mochi_pet.core.database.entity.AgentScheduleEntity
         TodoEntity::class,
         SkillEntity::class,
         AgentMemoryEntity::class,
+        AgentMemoryFtsEntity::class,
         AgentScheduleEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class MochiDatabase : RoomDatabase() {
@@ -48,7 +51,12 @@ abstract class MochiDatabase : RoomDatabase() {
                 MochiDatabase::class.java,
                 DATABASE_NAME,
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                )
                 .build()
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -152,6 +160,52 @@ abstract class MochiDatabase : RoomDatabase() {
                         "`index_agent_schedules_next_run_at_epoch_millis` " +
                         "ON `agent_schedules` (`next_run_at_epoch_millis`)",
                 )
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE VIRTUAL TABLE IF NOT EXISTS `agent_memory_fts`
+                    USING FTS4(
+                        `memory_id` TEXT NOT NULL,
+                        `search_text` TEXT NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                val insert = db.compileStatement(
+                    """
+                    INSERT INTO `agent_memory_fts` (`memory_id`, `search_text`)
+                    VALUES (?, ?)
+                    """.trimIndent(),
+                )
+                try {
+                    db.query(
+                        """
+                        SELECT `id`, `content`
+                        FROM `agent_memories`
+                        ORDER BY `created_at_epoch_millis` ASC
+                        """.trimIndent(),
+                    ).use { cursor ->
+                        val idColumn = cursor.getColumnIndexOrThrow("id")
+                        val contentColumn =
+                            cursor.getColumnIndexOrThrow("content")
+                        while (cursor.moveToNext()) {
+                            insert.clearBindings()
+                            insert.bindString(1, cursor.getString(idColumn))
+                            insert.bindString(
+                                2,
+                                MemoryLexicalSearch.searchableText(
+                                    cursor.getString(contentColumn),
+                                ),
+                            )
+                            insert.executeInsert()
+                        }
+                    }
+                } finally {
+                    insert.close()
+                }
             }
         }
     }
