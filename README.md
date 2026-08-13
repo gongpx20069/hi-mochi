@@ -44,12 +44,12 @@ hardware in a drawer.
 
 | Voice first | Remember what matters | Get real work done |
 | --- | --- | --- |
-| Always-ready “Hi Mochi” wake word and continuous voice conversation | Local conversation history and relevant long-term memory | Built-in Tools for web, maps, weather, calendar, todos, and documents |
-| Android speech recognition by default, with optional built-in iFlytek/Azure STT settings; Android TTS and text input remain available | Editable `SOUL`, `USER`, and `AGENTS` persona files | Trusted cards and automatic navigation surface results at the right moment |
+| Always-ready “Hi Mochi” wake word and continuous voice conversation | Local conversation history and ICU-tokenized lexical memory recall | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
+| Android speech recognition by default, with optional built-in iFlytek/Azure STT settings; Android TTS and text input remain available | Editable `SOUL`, `USER`, and `AGENTS` persona files | Trusted cards, native navigation, and serial Researcher/Analyst Subagents surface useful results |
 
 | Your AI knowledge base and workspace | Expand through the Skill Market |
 | --- | --- |
-| Built-in Notion and Tencent Docs Skills connect in one tap, then help search, read, create, and update documents | Discover and install community Agent Skills from the built-in skills.sh market |
+| Connect Notion and Tencent Docs as writable AI knowledge bases that Mochi can search, read, create, and continuously update | Discover and install community Agent Skills from the built-in skills.sh market |
 
 ### Built-in Skills
 
@@ -67,9 +67,33 @@ hardware in a drawer.
 | Travel & Transport | Disabled | Uses current location when requested, searches places, plans routes, geocodes addresses, and checks destination weather | [Apply for a Baidu Map Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
 | Dianping Discovery | Disabled | Uses current location for requested nearby searches, then reads authorized Dianping POIs and official details | [Apply through Meituan Technical Services](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
 
+### Built-in Tools
+
+| Group | Included Tools | Purpose and setup |
+| --- | --- | --- |
+| **Planner** | `manage_mochi_calendar`<br>`manage_mochi_todo` | Read and update Mochi-owned events and dated todos. No additional setup. |
+| **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
+| **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
+| **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Research public HTTPS pages in one visible, bounded Android WebView session. |
+| **Native UX** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | Open trusted Mochi surfaces or run bounded pure JavaScript calculations locally. |
+| **Baidu Map Agent Plan** | Place · Routes · Geocoding<br>Reverse geocoding · Weather | Search places and plan driving, walking, cycling, or transit routes with trusted GCJ-02 coordinates. Requires a Service Key. |
+| **Connected MCP** | Notion · Tencent Docs · Dianping<br>Manually configured MCP servers | Search, read, create, and update authorized knowledge bases, or discover other Tools from explicitly enabled services. |
+
 Agent Browser, Mochi built-ins, and provider Tool details are grouped and
 collapsed by default in Tools. Scheduled runs receive only the read-only
 Browser subset; foreground conversations may also click and enter page data.
+Every Tool has an independent switch, and provider-backed Tools also require
+their provider switch to be enabled.
+
+### Serial Subagents
+
+The Main Agent can delegate a focused task to an isolated **Researcher** or
+**Analyst** and receive the result before continuing. Delegation is serial,
+limited to two child runs per request, and never grants a child access to
+planner mutations, device location, credentials, UI navigation, or other
+foreground-only capabilities. Researcher uses enabled Browser and approved
+read-only MCP Tools; Analyst can additionally use the local JavaScript
+sandbox.
 
 ### Supported LLM Providers
 
@@ -91,12 +115,13 @@ Need another LLM or Speech Provider? Please
 [open an issue](https://github.com/gongpx20069/hi-mochi/issues/new) describing
 the provider and API compatibility, or submit a pull request.
 
-### Knowledge that becomes action
+### A writable knowledge base that becomes action
 
 Mochi includes dedicated Notion and Tencent Docs Skills with one-tap
-connection. Once connected, they become AI knowledge bases and workspaces
-where Mochi can find information, summarize and organize content, and help
-create or update documents through official MCP integrations.
+connection. Once connected, they become writable AI knowledge bases and
+workspaces—not read-only search sources. Mochi can find information, summarize
+and organize content, create new pages or documents, and keep existing
+knowledge up to date through official MCP integrations.
 
 The built-in Skill Market makes Mochi extensible beyond its default
 capabilities. Browse trending Skills, search the skills.sh ecosystem, install
@@ -145,8 +170,9 @@ configured AI provider; the Tool can be disabled independently in Tools.
 - Microphone permission for voice input.
 - Optional location and notification permissions for related features.
 
-Mochi is an active native Android preview. Speech recognition, wake behavior,
-audio focus, reminders, and background operation can vary by device and
+Stable builds are distributed as signed APKs through GitHub Releases. Mochi
+remains under active development; speech recognition, wake behavior, audio
+focus, reminders, and background operation can vary by device and
 manufacturer.
 
 ---
