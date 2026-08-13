@@ -44,9 +44,11 @@ and choose the APK that matches the device:
 | Architecture is unknown, or one file must support different devices | `universal` — largest download |
 
 1. Download and install the matching APK from the release page above.
-2. Open **Settings** and add your AI provider endpoint, model, and API key.
-3. Enable the Tools and Skills you trust, then talk by text, microphone, or
-   wake trigger.
+2. Open **Settings** and configure an
+   [AI provider endpoint, model, and API key](#supported-llm-providers), plus
+   an optional [Speech Provider](#supported-speech-providers).
+3. Enable the [Tools](#built-in-tools) and [Skills](#built-in-skills) you
+   trust, then talk by text, microphone, or wake trigger.
 
 The ABI-specific APKs contain the same Mochi features as the universal APK;
 they omit native speech libraries for other CPU architectures and are

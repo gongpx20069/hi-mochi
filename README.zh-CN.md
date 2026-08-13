@@ -42,8 +42,11 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | 不清楚设备架构，或需要一个文件兼容不同设备 | `universal`——下载体积最大 |
 
 1. 从上述发布页下载并安装与设备架构匹配的 APK。
-2. 打开**设置**，填写 AI 提供商端点、模型名称和 API 密钥。
-3. 启用你信任的 Tools 与 Skills，然后通过文字、麦克风或唤醒词开始交流。
+2. 打开**设置**，配置
+   [AI Provider 端点、模型名称和 API 密钥](#支持的-llm-provider)，并按需设置
+   [Speech Provider](#支持的-speech-provider)。
+3. 启用你信任的[内置 Tools](#内置-tools)与[内置 Skills](#内置-skills)，然后通过
+   文字、麦克风或唤醒词开始交流。
 
 各 ABI 专用 APK 与通用版功能完全相同，只是不包含其他 CPU 架构的本地语音库，
 因此体积会小很多。开发者可通过
