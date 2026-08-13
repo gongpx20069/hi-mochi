@@ -28,7 +28,7 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 手机上，将旧设备改造成常驻待命的 AI 伙伴、桌面信息屏、计划助手和智能家居
 语音终端，而不是让仍可使用的硬件一直躺在抽屉里。
 
-### 选择正确的 APK
+### 快速开始：选择正确的 APK
 
 打开[最新 GitHub Release](https://github.com/gongpx20069/hi-mochi/releases/latest)，
 根据设备选择安装包：
@@ -40,6 +40,10 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | 64 位 Android 模拟器或少见的 Intel 设备 | `x86_64` |
 | 32 位 Android 模拟器或更早的 Intel 设备 | `x86` |
 | 不清楚设备架构，或需要一个文件兼容不同设备 | `universal`——下载体积最大 |
+
+1. 从上述发布页下载并安装与设备架构匹配的 APK。
+2. 打开**设置**，填写 AI 提供商端点、模型名称和 API 密钥。
+3. 启用你信任的 Tools 与 Skills，然后通过文字、麦克风或唤醒词开始交流。
 
 各 ABI 专用 APK 与通用版功能完全相同，只是不包含其他 CPU 架构的本地语音库，
 因此体积会小很多。开发者可通过
@@ -136,13 +140,6 @@ Mochi 可将已授权的 **Notion** 或 **腾讯文档** 工作区连接为你�
 搜索 skills.sh 生态、安装需要的能力，并在需要时启用它们。
 
 > 启用 Skill 不会自动开启它所依赖的 Tools。
-
-### 三步开始
-
-1. 从[最新 GitHub Release](https://github.com/gongpx20069/hi-mochi/releases/latest)
-   下载并安装与设备架构匹配的 APK。
-2. 打开**设置**，填写 AI 提供商端点、模型名称和 API 密钥。
-3. 启用你信任的 Tools 与 Skills，然后通过文字、麦克风或唤醒词开始交流。
 
 Mochi 默认跟随 Android 系统语言，也可以在设置中固定使用中文或英文。
 每次打开应用时，Mochi 会检查最新稳定 GitHub Release；发现更高的 `1.0.x`
