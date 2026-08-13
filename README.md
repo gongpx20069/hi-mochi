@@ -65,9 +65,9 @@ therefore much smaller. Developers can check a connected device with
 | Always-ready “Hi Mochi” wake word and continuous voice conversation | Local conversation history and ICU-tokenized lexical memory recall | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
 | Android speech recognition by default, with optional built-in iFlytek/Azure STT settings; Android TTS and text input remain available | Editable `SOUL`, `USER`, and `AGENTS` persona files | Trusted cards, native navigation, and serial Researcher/Analyst Subagents surface useful results |
 
-| Your AI knowledge base and workspace | Expand through the Skill Market |
+| Cowork with **Notion** and **Tencent Docs** | Expand through the Skill Market |
 | --- | --- |
-| Connect Notion and Tencent Docs as writable AI knowledge bases that Mochi can search, read, create, and continuously update | Discover and install community Agent Skills from the built-in skills.sh market |
+| Turn your authorized workspaces into private, writable knowledge bases. Mochi can find your material, research new topics, organize sources, cowork with you to draft documents, and publish the finished work back into **Notion** or **Tencent Docs**. | Discover and install community Agent Skills from the built-in skills.sh market |
 
 ### Built-in Skills
 
@@ -80,8 +80,8 @@ therefore much smaller. Developers can check a connected device with
 | Product Search | Enabled | Finds and compares public product pages without ordering or payment | None |
 | Douban Ratings | Enabled | Reads public Douban ratings, counts, and review themes | None |
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
-| Notion Knowledge | Disabled | Collects and organizes material, drafts new pages, and searches or updates an authorized Notion workspace | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
-| Tencent Docs Knowledge | Disabled | Collects and organizes material, drafts new documents, and searches or updates an authorized Tencent Docs space | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
+| **Notion Knowledge** | Disabled | Coworks with you to research, organize material, draft new pages, and find or update information in your authorized private knowledge base | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
+| **Tencent Docs Knowledge** | Disabled | Coworks with you to research, organize material, draft new documents, and find or update information in your authorized private knowledge base | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
 | Travel & Transport | Disabled | Uses current location when requested, searches places, plans routes, geocodes addresses, and checks destination weather | [Apply for a Baidu Map Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
 | Dianping Discovery | Disabled | Uses current location for requested nearby searches, then reads authorized Dianping POIs and official details | [Apply through Meituan Technical Services](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
 
@@ -95,7 +95,7 @@ therefore much smaller. Developers can check a connected device with
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Research public HTTPS pages in one visible, bounded Android WebView session. |
 | **Native UX** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | Open trusted Mochi surfaces or run bounded pure JavaScript calculations locally. |
 | **Baidu Map Agent Plan** | Place · Routes · Geocoding<br>Reverse geocoding · Weather | Search places and plan driving, walking, cycling, or transit routes with trusted GCJ-02 coordinates. Requires a Service Key. |
-| **Connected MCP** | Notion · Tencent Docs · Dianping<br>Manually configured MCP servers | Search, read, create, and update authorized knowledge bases, or discover other Tools from explicitly enabled services. |
+| **Connected MCP** | **Notion** · **Tencent Docs** · Dianping<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
 
 Agent Browser, Mochi built-ins, and provider Tool details are grouped and
 collapsed by default in Tools. Scheduled runs receive only the read-only
@@ -133,14 +133,15 @@ Need another LLM or Speech Provider? Please
 [open an issue](https://github.com/gongpx20069/hi-mochi/issues/new) describing
 the provider and API compatibility, or submit a pull request.
 
-### A writable knowledge base that becomes action
+### Cowork with **Notion** and **Tencent Docs**
 
-Mochi includes dedicated Notion and Tencent Docs Skills with one-tap
-connection. Once connected, they become writable AI knowledge bases and
-workspaces—not read-only search sources. Mochi can find information, summarize
-and organize content, collect source material with enabled research Tools,
-draft new pages or documents, write the result back to the chosen workspace,
-and keep existing knowledge up to date through official MCP integrations.
+Mochi connects your authorized **Notion** or **Tencent Docs** workspace as a
+private, writable knowledge base—not merely a read-only search source. It can
+find relevant material from your own documents, use enabled research Tools to
+investigate new topics, collect and organize sources, and cowork with you to
+draft a new page or document. Mochi can then write the finished work back to
+the selected workspace and continue updating it through the official MCP
+integration.
 
 The built-in Skill Market makes Mochi extensible beyond its default
 capabilities. Browse trending Skills, search the skills.sh ecosystem, install

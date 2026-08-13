@@ -60,9 +60,9 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | 全天候 “Hi Mochi” 语音唤醒和连续语音对话 | 在本地保存对话历史，并通过 ICU 分词的词法检索召回相关长期记忆 | 内置计划、定时任务、定位、天气、网页、地图、文档和本地计算 Tools |
 | 默认使用 Android 语音识别，也可选配讯飞/Azure STT；语音输出使用 Android TTS，并支持文字输入 | 可直接编辑 `SOUL`、`USER` 和 `AGENTS` Persona 文件 | 通过可信卡片、原生导航以及串行 Researcher/Analyst Subagent 呈现有用结果 |
 
-| 你的 AI 知识库和工作区 | 通过 Skill Market 持续扩展 |
+| 与 **Notion** 和 **腾讯文档** Cowork | 通过 Skill Market 持续扩展 |
 | --- | --- |
-| 将 Notion 与腾讯文档连接为可读写的 AI 知识库，让 Mochi 能够搜索、阅读、创建并持续更新内容 | 从内置的 skills.sh 市场发现并安装社区 Agent Skills |
+| 将已授权工作区变成你的私人可读写知识库。Mochi 能查找你的资料、调研新主题、整理信息，与你共同撰写文档，并把成稿直接写回 **Notion** 或 **腾讯文档**。 | 从内置的 skills.sh 市场发现并安装社区 Agent Skills |
 
 ### 内置 Skills
 
@@ -75,8 +75,8 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | Product Search | 启用 | 搜索并比较公开商品页面，不下单、不支付 | 无 |
 | Douban Ratings | 启用 | 获取公开豆瓣评分、评分人数和评论主题 | 无 |
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
-| Notion Knowledge | 禁用 | 收集并整理资料、撰写新页面，以及搜索或更新已授权 Notion 工作区 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
-| Tencent Docs Knowledge | 禁用 | 收集并整理资料、撰写新文档，以及搜索或更新已授权腾讯文档空间 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
+| **Notion Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新页面，并在已授权的私人知识库中查找或更新信息 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
+| **腾讯文档 Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新文档，并在已授权的私人知识库中查找或更新信息 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
 | Travel & Transport | 禁用 | 在用户请求时使用当前位置，并搜索地点、规划路线、解析地址和查询目的地天气 | [申请百度地图 Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
 | Dianping Discovery | 禁用 | 在用户请求附近搜索时使用当前位置，并查询已授权的大众点评 POI 和官方详情 | [通过美团技术服务合作中心申请](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
 
@@ -90,7 +90,7 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
 | **原生体验** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | 打开可信 Mochi 界面，或在本地运行有界的纯 JavaScript 计算。 |
 | **百度地图 Agent Plan** | 地点 · 路线 · 地理编码<br>逆地理编码 · 天气 | 使用可信 GCJ-02 坐标搜索地点并规划驾车、步行、骑行或公交路线，需要 Service Key。 |
-| **已连接 MCP** | Notion · 腾讯文档 · 大众点评<br>手动配置的 MCP Server | 搜索、阅读、创建和更新已授权知识库，或从用户明确启用的服务中发现更多 Tools。 |
+| **已连接 MCP** | **Notion** · **腾讯文档** · 大众点评<br>手动配置的 MCP Server | 检索私人知识、开展调研，并在已授权工作区中协作创建或更新文档。 |
 
 Tools 页面会将 Agent Browser、Mochi 内建能力和 Provider Tools 分组并默认
 收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
@@ -124,12 +124,13 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 [提交 Issue](https://github.com/gongpx20069/hi-mochi/issues/new)说明 Provider
 及其 API 兼容性，或直接提交 Pull Request。
 
-### 可持续更新，也能转化为行动的知识库
+### 与 **Notion** 和 **腾讯文档** 一起 Cowork
 
-Mochi 内置了专用的 Notion 与腾讯文档 Skills，可一键连接为 AI 知识库和
-工作区，而不只是只读搜索源。连接后，Mochi 能够跨文档查找信息、总结和整理
-内容，结合已启用的研究 Tools 收集资料并撰写新的页面或文档，再把成稿写入
-指定工作区，并通过官方 MCP 集成持续更新已有知识。
+Mochi 可将已授权的 **Notion** 或 **腾讯文档** 工作区连接为你的私人可读写
+知识库，而不只是只读搜索源。它可以从你的文档中查找相关资料，结合已启用的
+研究 Tools 调研新主题、收集并整理信息，再与你共同撰写新的页面或文档。
+完成后，Mochi 会将成稿写回指定工作区，并通过官方 MCP 集成继续更新已有
+知识。
 
 内置 Skill Market 让 Mochi 的能力不受默认功能限制。你可以浏览热门 Skills、
 搜索 skills.sh 生态、安装需要的能力，并在需要时启用它们。

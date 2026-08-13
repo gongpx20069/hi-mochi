@@ -894,6 +894,16 @@ img {
   background: radial-gradient(circle, rgba(151, 215, 197, 0.11), transparent 67%);
 }
 
+.knowledge-feature {
+  padding-bottom: 118px;
+}
+
+.knowledge-feature::after {
+  top: -120px;
+  right: -130px;
+  background: radial-gradient(circle, rgba(255, 182, 163, 0.13), transparent 67%);
+}
+
 .feature-card h3 {
   max-width: 500px;
   margin: 18px 0 14px;
@@ -1058,6 +1068,52 @@ img {
   border-color: rgba(255, 182, 163, 0.4);
   background: rgba(255, 182, 163, 0.12);
   color: var(--peach);
+}
+
+.knowledge-icon span,
+.knowledge-icon i {
+  position: absolute;
+  width: 20px;
+  height: 25px;
+  border: 2px solid var(--peach);
+  border-radius: 5px;
+}
+
+.knowledge-icon span {
+  transform: translate(-5px, 3px);
+}
+
+.knowledge-icon i {
+  opacity: 0.52;
+  transform: translate(6px, -4px);
+}
+
+.knowledge-workspaces {
+  position: absolute;
+  right: 34px;
+  bottom: 34px;
+  left: 34px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.knowledge-workspaces span,
+.knowledge-workspaces i {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 182, 163, 0.15);
+  border-radius: 999px;
+  background: rgba(255, 182, 163, 0.06);
+  color: #e4c2b9;
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.knowledge-workspaces i {
+  border-color: rgba(151, 215, 197, 0.15);
+  background: rgba(151, 215, 197, 0.06);
+  color: var(--mint);
 }
 
 .feature-wide {
