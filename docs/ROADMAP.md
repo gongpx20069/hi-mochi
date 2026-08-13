@@ -72,7 +72,7 @@ or verification in earlier phases.
 - [x] Add monotonic manual pipeline and local APK publication paths.
 - [ ] Real-device release validation.
 - [ ] Performance, battery, and process-death validation.
-- [ ] Signed release APK.
+- [x] Signed release APKs with per-ABI and universal download variants.
 
 ## P2 - Agent Browser
 

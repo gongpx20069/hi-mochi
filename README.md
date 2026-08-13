@@ -30,6 +30,24 @@ phone to turn that device into a dedicated always-ready AI companion, desk
 display, planner, and smart-home voice terminal instead of leaving useful
 hardware in a drawer.
 
+### Download the right APK
+
+Open the [latest GitHub Release](https://github.com/gongpx20069/hi-mochi/releases/latest)
+and choose the APK that matches the device:
+
+| Device | APK to install |
+| --- | --- |
+| Most current Android phones and tablets | **`arm64-v8a` — recommended** |
+| Older 32-bit ARM phones and tablets | `armeabi-v7a` |
+| 64-bit Android emulator or rare Intel device | `x86_64` |
+| 32-bit Android emulator or older Intel device | `x86` |
+| Architecture is unknown, or one file must support different devices | `universal` — largest download |
+
+The ABI-specific APKs contain the same Mochi features as the universal APK;
+they omit native speech libraries for other CPU architectures and are
+therefore much smaller. Developers can check a connected device with
+`adb shell getprop ro.product.cpu.abi`.
+
 ### Always ready for your voice
 
 - Wake Mochi anytime with the on-device **“Hi Mochi”** wake word.
@@ -132,7 +150,8 @@ the ones you need, and enable them when you want Mochi to use them.
 
 ### Start in three steps
 
-1. Install the latest Mochi APK from GitHub Releases on an Android phone.
+1. Install the matching APK from the
+   [latest GitHub Release](https://github.com/gongpx20069/hi-mochi/releases/latest).
 2. Open **Settings** and add your AI provider endpoint, model, and API key.
 3. Enable the Tools and Skills you trust, then talk by text, microphone, or
    wake trigger.

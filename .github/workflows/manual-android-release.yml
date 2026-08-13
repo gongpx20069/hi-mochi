@@ -77,24 +77,22 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
-        shell: bash
+          COMMIT: ${{ steps.version.outputs.commit }}
+        shell: pwsh
+        working-directory: .
         run: |
-          apk="app/build/outputs/apk/release/app-release.apk"
-          embedded_version="$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" \
-            manifest version-name "$apk")"
-          test "$embedded_version" = "$VERSION"
-          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" \
-            verify "$apk"
-          cp "$apk" "Mochi-$TAG.apk"
-          sha256sum "Mochi-$TAG.apk" > "Mochi-$TAG.apk.sha256"
+          . ./scripts/AndroidReleaseTools.ps1
+          New-MochiReleaseAssets `
+            -Version $env:VERSION `
+            -Commit $env:COMMIT `
+            -SourceOutputDirectory android/app/build/outputs/apk/release `
+            -DestinationDirectory "android/Mochi-$env:TAG"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Mochi-${{ steps.version.outputs.tag }}
-          path: |
-            android/Mochi-${{ steps.version.outputs.tag }}.apk
-            android/Mochi-${{ steps.version.outputs.tag }}.apk.sha256
+          path: android/Mochi-${{ steps.version.outputs.tag }}/
           if-no-files-found: error
 
       - name: Reserve release tag
@@ -118,9 +116,22 @@ jobs:
         shell: bash
         working-directory: .
         run: |
+          notes="$(cat <<'EOF'
+          ## Choose your APK / 选择安装包
+
+          - **`arm64-v8a`**: most current Android phones and tablets / 目前绝大多数手机和平板（推荐）
+          - **`armeabi-v7a`**: older 32-bit ARM devices / 较老的 32 位 ARM 设备
+          - **`x86_64`**: 64-bit Android emulators or rare Intel devices / 64 位模拟器或少见 Intel 设备
+          - **`x86`**: 32-bit Android emulators or older Intel devices / 32 位模拟器或更早 Intel 设备
+          - **`universal`**: use only when the architecture is unknown; this is the largest download / 不确定架构时使用，体积最大
+
+          All variants provide the same Mochi features.
+          EOF
+          )"
           gh release create "$TAG" \
-            "android/Mochi-$TAG.apk" \
-            "android/Mochi-$TAG.apk.sha256" \
+            "android/Mochi-$TAG/"*.apk \
+            "android/Mochi-$TAG/"*SHA256SUMS.txt \
             --verify-tag \
             --title "Mochi $VERSION" \
+            --notes "$notes" \
             --generate-notes

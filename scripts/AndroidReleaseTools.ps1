@@ -16,8 +16,17 @@ function Get-MochiNextVersion {
         [string] $Remote = 'origin'
     )
 
-    $remoteTags = & git ls-remote --tags $Remote 'refs/tags/v1.0.*'
-    if ($LASTEXITCODE -ne 0) {
+    $remoteTags = $null
+    foreach ($attempt in 1..3) {
+        $remoteTags = & git ls-remote --tags $Remote 'refs/tags/v1.0.*'
+        if ($LASTEXITCODE -eq 0) {
+            break
+        }
+        if ($attempt -lt 3) {
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    }
+    if ($LASTEXITCODE -ne 0 -or $null -eq $remoteTags) {
         throw "Could not read Android release tags from remote '$Remote'."
     }
 
@@ -57,21 +66,31 @@ function Resolve-AndroidSdkTool {
     }
 
     if ($Name -eq 'apkanalyzer') {
-        $candidate = Join-Path $sdkRoot 'cmdline-tools\latest\bin\apkanalyzer.bat'
-        if (Test-Path $candidate) {
+        $candidates = @(
+            (Join-Path $sdkRoot 'cmdline-tools\latest\bin\apkanalyzer.bat'),
+            (Join-Path $sdkRoot 'cmdline-tools/latest/bin/apkanalyzer')
+        )
+        $candidate = $candidates |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+        if ($candidate) {
             return $candidate
         }
     }
 
     if ($Name -eq 'apksigner') {
         $buildTools = Join-Path $sdkRoot 'build-tools'
-        $candidate = Get-ChildItem $buildTools -Directory -ErrorAction SilentlyContinue |
-            Sort-Object { [version] $_.Name } -Descending |
-            ForEach-Object {
-                Join-Path $_.FullName 'apksigner.bat'
-            } |
-            Where-Object { Test-Path $_ } |
-            Select-Object -First 1
+        $candidate =
+            Get-ChildItem $buildTools -Directory -ErrorAction SilentlyContinue |
+                Sort-Object { [version] $_.Name } -Descending |
+                ForEach-Object {
+                    @(
+                        (Join-Path $_.FullName 'apksigner.bat'),
+                        (Join-Path $_.FullName 'apksigner')
+                    )
+                } |
+                Where-Object { Test-Path $_ } |
+                Select-Object -First 1
         if ($candidate) {
             return $candidate
         }
@@ -104,5 +123,143 @@ function Assert-AndroidApkSignature {
     & $signer verify $ApkPath
     if ($LASTEXITCODE -ne 0) {
         throw "APK signature verification failed for '$ApkPath'."
+    }
+}
+
+function Get-MochiReleaseApkOutputs {
+    param(
+        [Parameter(Mandatory)]
+        [string] $OutputDirectory
+    )
+
+    $metadataPath = Join-Path $OutputDirectory 'output-metadata.json'
+    if (-not (Test-Path $metadataPath)) {
+        throw "Android output metadata was not found at '$metadataPath'."
+    }
+    $metadata = Get-Content $metadataPath -Raw | ConvertFrom-Json
+    $outputs = @(
+        $metadata.elements |
+            ForEach-Object {
+                $abiFilters = @(
+                    $_.filters |
+                        Where-Object { $_.filterType -eq 'ABI' }
+                )
+                $abi = if ($abiFilters.Count -eq 0) {
+                    'universal'
+                } elseif ($abiFilters.Count -eq 1) {
+                    "$($abiFilters[0].value)"
+                } else {
+                    throw "APK '$($_.outputFile)' has multiple ABI filters."
+                }
+                [pscustomobject]@{
+                    abi = $abi
+                    path = Join-Path $OutputDirectory $_.outputFile
+                }
+            }
+    )
+    $expectedAbis = @(
+        'arm64-v8a',
+        'armeabi-v7a',
+        'x86',
+        'x86_64',
+        'universal'
+    )
+    $actualAbis = @($outputs.abi | Sort-Object)
+    $missing = @($expectedAbis | Where-Object { $_ -notin $actualAbis })
+    $unexpected = @($actualAbis | Where-Object { $_ -notin $expectedAbis })
+    $duplicates = @(
+        $outputs |
+            Group-Object abi |
+            Where-Object Count -ne 1 |
+            ForEach-Object Name
+    )
+    if ($missing -or $unexpected -or $duplicates) {
+        throw (
+            "Unexpected release ABI outputs. " +
+            "Missing: [$($missing -join ', ')]. " +
+            "Unexpected: [$($unexpected -join ', ')]. " +
+            "Duplicates: [$($duplicates -join ', ')]."
+        )
+    }
+    $outputs |
+        Sort-Object {
+            [array]::IndexOf($expectedAbis, $_.abi)
+        }
+}
+
+function New-MochiReleaseAssets {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version,
+        [Parameter(Mandatory)]
+        [string] $Commit,
+        [Parameter(Mandatory)]
+        [string] $SourceOutputDirectory,
+        [Parameter(Mandatory)]
+        [string] $DestinationDirectory
+    )
+
+    Assert-MochiVersion $Version
+    if ($Commit -notmatch '^[0-9a-f]{40}$') {
+        throw "Release commit '$Commit' is not a full Git SHA."
+    }
+    if (Test-Path $DestinationDirectory) {
+        throw "Release destination '$DestinationDirectory' already exists."
+    }
+
+    $tag = "v$Version"
+    $artifacts = @()
+    New-Item -ItemType Directory -Path $DestinationDirectory | Out-Null
+    try {
+        foreach (
+            $output in Get-MochiReleaseApkOutputs $SourceOutputDirectory
+        ) {
+            if (-not (Test-Path $output.path)) {
+                throw "Release APK '$($output.path)' does not exist."
+            }
+            $embeddedVersion = Get-AndroidApkVersion $output.path
+            if ($embeddedVersion -ne $Version) {
+                throw (
+                    "APK '$($output.path)' version '$embeddedVersion' " +
+                    "does not match '$Version'."
+                )
+            }
+            Assert-AndroidApkSignature $output.path
+
+            $fileName = "Mochi-$tag-$($output.abi).apk"
+            $destination = Join-Path $DestinationDirectory $fileName
+            Copy-Item $output.path $destination
+            $hash = (
+                Get-FileHash -Algorithm SHA256 $destination
+            ).Hash.ToLowerInvariant()
+            $artifacts += [ordered]@{
+                abi = $output.abi
+                file = $fileName
+                sha256 = $hash
+            }
+        }
+
+        $checksumName = "Mochi-$tag-SHA256SUMS.txt"
+        $checksumPath = Join-Path $DestinationDirectory $checksumName
+        $artifacts |
+            ForEach-Object {
+                "$($_.sha256)  $($_.file)"
+            } |
+            Set-Content -Encoding ascii $checksumPath
+
+        [ordered]@{
+            version = $Version
+            commit = $Commit
+            checksum_file = $checksumName
+            artifacts = $artifacts
+        } |
+            ConvertTo-Json -Depth 4 |
+            Set-Content -Encoding utf8 (
+                Join-Path $DestinationDirectory 'release.json'
+            )
+    } catch {
+        Remove-Item $DestinationDirectory -Recurse -Force `
+            -ErrorAction SilentlyContinue
+        throw
     }
 }

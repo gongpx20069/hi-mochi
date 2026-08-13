@@ -52,52 +52,20 @@ if (
     throw 'Source changed during the release build; discard the APK and rebuild.'
 }
 
-$sourceApk = Join-Path $androidRoot 'app\build\outputs\apk\release\app-release.apk'
-$embeddedVersion = Get-AndroidApkVersion $sourceApk
-if ($embeddedVersion -ne $version) {
-    throw "Built APK version '$embeddedVersion' does not match '$version'."
-}
-Assert-AndroidApkSignature $sourceApk
-
 $resolvedOutput = Join-Path $repositoryRoot $OutputDirectory
-New-Item -ItemType Directory -Force -Path $resolvedOutput | Out-Null
 $tag = "v$version"
-$apkName = "Mochi-$tag.apk"
-$apkPath = Join-Path $resolvedOutput $apkName
-$shaPath = "$apkPath.sha256"
-$metadataPath = "$apkPath.release.json"
-if (
-    (Test-Path $apkPath) -or
-    (Test-Path $shaPath) -or
-    (Test-Path $metadataPath)
-) {
-    throw "Release output for '$version' already exists in '$resolvedOutput'."
-}
-$reservation = [System.IO.File]::Open(
-    $apkPath,
-    [System.IO.FileMode]::CreateNew,
-    [System.IO.FileAccess]::Write,
-    [System.IO.FileShare]::None
-)
-$reservation.Dispose()
-try {
-    Copy-Item $sourceApk $apkPath -Force
-    $hash = (Get-FileHash -Algorithm SHA256 $apkPath).Hash.ToLowerInvariant()
-    "$hash  $apkName" | Set-Content -Encoding ascii $shaPath
-    [ordered]@{
-        version = $version
-        commit = $commit
-        sha256 = $hash
-    } |
-        ConvertTo-Json |
-        Set-Content -Encoding utf8 $metadataPath
-} catch {
-    Remove-Item $apkPath, $shaPath, $metadataPath -Force `
-        -ErrorAction SilentlyContinue
-    throw
-}
+$releaseDirectory = Join-Path $resolvedOutput "Mochi-$tag"
+New-MochiReleaseAssets `
+    -Version $version `
+    -Commit $commit `
+    -SourceOutputDirectory (
+        Join-Path $androidRoot 'app\build\outputs\apk\release'
+    ) `
+    -DestinationDirectory $releaseDirectory
 
 Write-Output "Version: $version"
-Write-Output "APK: $apkPath"
-Write-Output "SHA-256: $shaPath"
-Write-Output "Metadata: $metadataPath"
+Write-Output "Release directory: $releaseDirectory"
+Get-ChildItem $releaseDirectory -File |
+    ForEach-Object {
+        Write-Output "Asset: $($_.FullName)"
+    }
