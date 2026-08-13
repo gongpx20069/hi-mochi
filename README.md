@@ -62,8 +62,8 @@ hardware in a drawer.
 | Product Search | Enabled | Finds and compares public product pages without ordering or payment | None |
 | Douban Ratings | Enabled | Reads public Douban ratings, counts, and review themes | None |
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
-| Notion Knowledge | Disabled | Searches, reads, creates, and updates an authorized Notion workspace | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
-| Tencent Docs Knowledge | Disabled | Searches, reads, creates, and updates an authorized Tencent Docs space | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
+| Notion Knowledge | Disabled | Collects and organizes material, drafts new pages, and searches or updates an authorized Notion workspace | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
+| Tencent Docs Knowledge | Disabled | Collects and organizes material, drafts new documents, and searches or updates an authorized Tencent Docs space | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
 | Travel & Transport | Disabled | Uses current location when requested, searches places, plans routes, geocodes addresses, and checks destination weather | [Apply for a Baidu Map Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
 | Dianping Discovery | Disabled | Uses current location for requested nearby searches, then reads authorized Dianping POIs and official details | [Apply through Meituan Technical Services](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
 
@@ -120,8 +120,9 @@ the provider and API compatibility, or submit a pull request.
 Mochi includes dedicated Notion and Tencent Docs Skills with one-tap
 connection. Once connected, they become writable AI knowledge bases and
 workspaces—not read-only search sources. Mochi can find information, summarize
-and organize content, create new pages or documents, and keep existing
-knowledge up to date through official MCP integrations.
+and organize content, collect source material with enabled research Tools,
+draft new pages or documents, write the result back to the chosen workspace,
+and keep existing knowledge up to date through official MCP integrations.
 
 The built-in Skill Market makes Mochi extensible beyond its default
 capabilities. Browse trending Skills, search the skills.sh ecosystem, install

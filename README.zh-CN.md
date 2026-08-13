@@ -58,8 +58,8 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | Product Search | 启用 | 搜索并比较公开商品页面，不下单、不支付 | 无 |
 | Douban Ratings | 启用 | 获取公开豆瓣评分、评分人数和评论主题 | 无 |
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
-| Notion Knowledge | 禁用 | 搜索、阅读、创建和更新已授权 Notion 工作区 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
-| Tencent Docs Knowledge | 禁用 | 搜索、阅读、创建和更新已授权腾讯文档空间 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
+| Notion Knowledge | 禁用 | 收集并整理资料、撰写新页面，以及搜索或更新已授权 Notion 工作区 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
+| Tencent Docs Knowledge | 禁用 | 收集并整理资料、撰写新文档，以及搜索或更新已授权腾讯文档空间 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
 | Travel & Transport | 禁用 | 在用户请求时使用当前位置，并搜索地点、规划路线、解析地址和查询目的地天气 | [申请百度地图 Agent Plan Service Key](https://lbs.baidu.com/apiconsole/agentplan) |
 | Dianping Discovery | 禁用 | 在用户请求附近搜索时使用当前位置，并查询已授权的大众点评 POI 和官方详情 | [通过美团技术服务合作中心申请](https://developer.meituan.com/?applyFrom=dianping_c_pc_home) |
 
@@ -111,7 +111,8 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 
 Mochi 内置了专用的 Notion 与腾讯文档 Skills，可一键连接为 AI 知识库和
 工作区，而不只是只读搜索源。连接后，Mochi 能够跨文档查找信息、总结和整理
-内容、创建新页面或文档，并通过官方 MCP 集成持续更新已有知识。
+内容，结合已启用的研究 Tools 收集资料并撰写新的页面或文档，再把成稿写入
+指定工作区，并通过官方 MCP 集成持续更新已有知识。
 
 内置 Skill Market 让 Mochi 的能力不受默认功能限制。你可以浏览热门 Skills、
 搜索 skills.sh 生态、安装需要的能力，并在需要时启用它们。
