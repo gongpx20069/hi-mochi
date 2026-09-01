@@ -152,6 +152,12 @@ rejected, current time/date prefers the Home date-time presentation, current
 weather prefers the Home weather presentation, today's planner context prefers
 Today, and non-today date context prefers Calendar Day.
 
+The final response contract requires current local time/date requests to return
+`surface=date_time` with `reason=current_time_date`. Current local weather,
+temperature, or humidity requests must call `get_current_weather` and return
+`surface=weather` with `reason=current_weather`. These deterministic Home
+presentations use `ui_directive`, never a generic `card_directive`.
+
 The final Agent payload may also contain a `card_directive`. It is not a Tool:
 the Orchestrator binds it only to successful Tool evidence from the same run,
 then Android resolves Home, inline, or deferred placement and renders a trusted

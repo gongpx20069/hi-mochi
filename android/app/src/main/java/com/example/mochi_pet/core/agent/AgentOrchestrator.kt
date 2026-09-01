@@ -135,6 +135,24 @@ class AgentPromptBuilder(
                 "A visual presentation never replaces the spoken reply.",
             )
             appendLine(
+                "For a request for the current local time or today's date, " +
+                    "always set ui_directive to " +
+                    """{"surface":"date_time","reason":"current_time_date","section":"time"} """ +
+                    "(use section date when the date is primary). Do not use " +
+                    "card_directive for this presentation.",
+            )
+            appendLine(
+                "For a request for current local weather, temperature, or " +
+                    "humidity, call get_current_weather and always set " +
+                    "ui_directive to " +
+                    """{"surface":"weather","reason":"current_weather","section":"weather"}. """ +
+                    "Do not use card_directive for this presentation.",
+            )
+            appendLine(
+                "Do not apply those current-information directives to other " +
+                    "dates, destination forecasts, or generic knowledge.",
+            )
+            appendLine(
                 "Use card_directive only when structured visual content is " +
                     "clearer than text. Card facts must come from successful " +
                     "same-run tools, except insight/progress based only on reply.",
@@ -150,6 +168,11 @@ class AgentPromptBuilder(
             appendLine(
                 "Optional ui_directive fields: surface, reason, date, month, " +
                     "section, status, highlight_ids.",
+            )
+            appendLine(
+                "Valid ui_directive reasons: current_time_date, current_weather, " +
+                    "today_planner, other_date, todo_list, item_mutation, " +
+                    "explicit_ui_request, generic_knowledge.",
             )
         }.trim()
     }

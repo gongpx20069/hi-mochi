@@ -136,6 +136,7 @@ Current date/time and current weather remain deterministic exceptions:
 
 - date/time uses the existing live DateTime Home presentation without a Tool;
 - weather uses `get_current_weather` and the existing Weather presentation;
+- the final response must include the matching validated `ui_directive`;
 - the model must not request a generic card for either case.
 
 ## 6. Rendering

@@ -98,6 +98,22 @@ class AgentOrchestratorTest {
         assertTrue(prompt.contains("<name>web-search</name>"))
         assertTrue(prompt.contains("Call load_skill"))
         assertTrue(prompt.contains("visual presentation never replaces"))
+        assertTrue(
+            prompt.contains(
+                """{"surface":"date_time","reason":"current_time_date","section":"time"}""",
+            ),
+        )
+        assertTrue(
+            prompt.contains(
+                """{"surface":"weather","reason":"current_weather","section":"weather"}""",
+            ),
+        )
+        assertTrue(
+            prompt.contains(
+                "Do not apply those current-information directives",
+            ),
+        )
+        assertTrue(prompt.contains("Valid ui_directive reasons:"))
         assertTrue(prompt.contains("card_directive"))
         assertTrue(!prompt.contains("Current surface:"))
         assertTrue(!prompt.contains("Current emotion:"))
