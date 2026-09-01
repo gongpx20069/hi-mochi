@@ -175,7 +175,10 @@ knowledge providers enable their core search, listing, and reading Tools on
 first connection.
 Tools also contains an Amap Maps provider card. It opens the official console,
 stores the pasted Web Service Key and optional Security Key encrypted
-on-device, and exposes a provider switch. Its six map and merchant capabilities
+on-device, and exposes a provider switch. Its connection guidance explicitly
+selects the Web Service platform rather than Android, explains that release and
+debug SHA1 fingerprints are not required, and distinguishes the optional
+digital-signature Security Key from SHA1. Its six map and merchant capabilities
 remain individually selectable in an expandable Tool list. The two built-in
 Amap Maps and Merchant Discovery Skills provide route, nearby-search, merchant
 detail, rating, average-cost, and missing-review guidance.

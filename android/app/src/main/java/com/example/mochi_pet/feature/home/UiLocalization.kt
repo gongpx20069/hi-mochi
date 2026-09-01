@@ -444,8 +444,8 @@ private val ZH_UI_TEXT = mapOf(
     "Connected · 6 map and merchant tools" to "已连接 · 6 个地图与商家工具",
     "Open the official Tencent Docs page, copy your personal MCP token, then paste it below." to
         "打开腾讯文档官方页面，复制个人 MCP 令牌并粘贴到下方。",
-    "Create an application in the Amap console, add a Web Service Key, and paste it below. Add the Security Key only when digital signatures are enabled." to
-        "在高德开放平台创建应用并添加 Web 服务 Key，然后粘贴到下方。仅在启用数字签名时填写安全密钥。",
+    "In the Amap console, add a key for the Web Service platform, not Android. Web Service keys do not need release or debug SHA1 fingerprints. The optional Security Key is not a SHA1; enter it only when digital signatures are enabled." to
+        "在高德控制台添加 Key 时，服务平台请选择 Web 服务，不要选择 Android。Web 服务 Key 无需发布版或调试版安全码 SHA1。可选的安全密钥不是 SHA1，仅在启用数字签名时填写。",
     "Only public HTTPS Streamable HTTP MCP endpoints are accepted." to
         "仅接受公开的 HTTPS Streamable HTTP MCP 端点。",
     "This skill has local edits. Updating will replace them with the latest skills.sh version." to

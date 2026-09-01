@@ -4158,9 +4158,11 @@ private fun AmapCredentialsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Create an application in the Amap console, add a " +
-                        "Web Service Key, and paste it below. Add the Security " +
-                        "Key only when digital signatures are enabled.",
+                    text = "In the Amap console, add a key for the Web Service " +
+                        "platform, not Android. Web Service keys do not need " +
+                        "release or debug SHA1 fingerprints. The optional " +
+                        "Security Key is not a SHA1; enter it only when " +
+                        "digital signatures are enabled.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedButton(

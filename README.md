@@ -92,6 +92,11 @@ therefore much smaller. Developers can check a connected device with
 | Amap Maps | Enabled | Uses requested current location, resolves places and addresses, plans routes, and checks destination weather | [Create an Amap Web Service Key](https://console.amap.com/) |
 | Merchant Discovery | Enabled | Finds and compares merchants using available Amap ratings, average cost, hours, phone, tags, and photos | [Create an Amap Web Service Key](https://console.amap.com/) |
 
+> **Amap setup:** Select **Web Service** as the key platform, not Android.
+> Web Service keys do not require release or debug SHA1 fingerprints. Mochi's
+> optional Security Key is not a SHA1 value; enter it only when digital
+> signatures are enabled in the Amap console.
+
 ### Built-in Tools
 
 | Group | Included Tools | Purpose and setup |
