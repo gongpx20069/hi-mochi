@@ -96,9 +96,9 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 - Android Keystore protects BYOK credentials.
 - A dedicated Tool DataStore owns built-in enablement, MCP configuration, and
   encrypted MCP/OAuth credentials.
-- The same Tool DataStore stores the encrypted Baidu Map Agent Plan Service Key
-  and provider enablement. Five native Tools call fixed official HTTPS REST
-  endpoints; they are not represented as a remote MCP server.
+- The same Tool DataStore stores the encrypted Amap Web Service Key, optional
+  Security Key, and provider enablement. Six native Tools call fixed official
+  HTTPS REST endpoints; they are not represented as a remote MCP server.
 - Room stores editable market skills and their upstream/local digests; built-in
   skills remain read-only application resources while Room stores their local
   enable/disable overrides.
@@ -143,7 +143,7 @@ immutable native definitions --enabled--> ToolRegistry
 JavaScriptEngine adapter -----enabled--> ToolRegistry
 Agent Browser provider -------enabled--> ToolRegistry
 selected MCP definitions -----enabled--> ToolRegistry
-Baidu Map native Tools -------enabled--> ToolRegistry
+Amap native Tools -----------enabled--> ToolRegistry
 ```
 
 Skill discovery follows the same runtime enablement boundary. Only enabled

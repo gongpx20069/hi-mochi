@@ -7,12 +7,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpAgentTool
-import com.example.mochi_pet.core.mcp.DIANPING_MCP_ENDPOINT
-import com.example.mochi_pet.core.mcp.DIANPING_MCP_TOOLS
-import com.example.mochi_pet.core.mcp.DIANPING_SERVER_ID
-import com.example.mochi_pet.core.mcp.DianpingCredentials
-import com.example.mochi_pet.core.mcp.DianpingMcpClient
 import com.example.mochi_pet.core.mcp.McpRemoteTool
 import com.example.mochi_pet.core.mcp.McpServerRuntime
 import com.example.mochi_pet.core.mcp.McpStreamableHttpClient
@@ -53,14 +49,14 @@ data class BuiltInToolDescriptor(
 
 data class ToolCatalogSummary(
     val builtInTools: List<BuiltInToolSummary> = emptyList(),
-    val baiduMap: BaiduMapProviderSummary = BaiduMapProviderSummary(),
+    val amap: AmapProviderSummary = AmapProviderSummary(),
     val agentBrowser: AgentBrowserProviderSummary = AgentBrowserProviderSummary(),
     val servers: List<McpServerSummary> = emptyList(),
     val isLoading: Boolean = false,
     val feedback: String? = null,
 )
 
-data class BaiduMapProviderSummary(
+data class AmapProviderSummary(
     val connected: Boolean = false,
     val enabled: Boolean = false,
     val tools: List<BuiltInToolSummary> = emptyList(),
@@ -127,24 +123,18 @@ interface ToolCatalogRepository {
 
     suspend fun disconnectTencentDocs(): ToolCatalogSummary
 
-    suspend fun configureDianping(
-        appKey: String,
-        appSecret: String,
-        searchSession: String,
-        detailSession: String,
+    suspend fun configureAmap(
+        webServiceKey: String,
+        securityKey: String,
     ): ToolCatalogSummary
 
-    suspend fun disconnectDianping(): ToolCatalogSummary
+    suspend fun disconnectAmap(): ToolCatalogSummary
 
-    suspend fun configureBaiduMap(token: String): ToolCatalogSummary
-
-    suspend fun disconnectBaiduMap(): ToolCatalogSummary
-
-    suspend fun setBaiduMapEnabled(enabled: Boolean): ToolCatalogSummary
+    suspend fun setAmapEnabled(enabled: Boolean): ToolCatalogSummary
 
     suspend fun setAgentBrowserEnabled(enabled: Boolean): ToolCatalogSummary
 
-    suspend fun loadBaiduMapToken(): String?
+    suspend fun loadAmapCredentials(): AmapCredentials?
 
     suspend fun addManualServer(input: ManualMcpServerInput): ToolCatalogSummary
 
@@ -172,7 +162,6 @@ class DataStoreToolCatalogRepository(
     private val dataStore: DataStore<Preferences>,
     private val secretCipher: ApiKeyCipher,
     private val mcpClient: McpStreamableHttpClient,
-    private val dianpingMcpClient: DianpingMcpClient = DianpingMcpClient(),
     private val oauthClient: McpOAuthClient = McpOAuthClient(),
     private val nowMillis: () -> Long = System::currentTimeMillis,
 ) : ToolCatalogRepository {
@@ -423,137 +412,70 @@ class DataStoreToolCatalogRepository(
         return loadSummary()
     }
 
-    override suspend fun configureDianping(
-        appKey: String,
-        appSecret: String,
-        searchSession: String,
-        detailSession: String,
+    override suspend fun configureAmap(
+        webServiceKey: String,
+        securityKey: String,
     ): ToolCatalogSummary {
-        val credentials = DianpingCredentials(
-            appKey = appKey.trim(),
-            appSecret = appSecret.trim(),
-            searchSession = searchSession.trim(),
-            detailSession = detailSession.trim()
-                .ifEmpty { searchSession.trim() },
+        val credentials = AmapCredentials(
+            webServiceKey = webServiceKey.trim(),
+            securityKey = securityKey.trim().ifEmpty { null },
         )
-        require(credentials.appKey.isNotEmpty()) {
-            "Dianping AppKey is required"
-        }
-        require(credentials.appSecret.isNotEmpty()) {
-            "Dianping AppSecret is required"
-        }
-        require(credentials.searchSession.isNotEmpty()) {
-            "Dianping search session is required"
+        require(credentials.webServiceKey.isNotEmpty()) {
+            "Amap Web Service Key is required"
         }
         require(
-            credentials.appKey.length <= MAX_DIANPING_CREDENTIAL_CHARS &&
-                credentials.appSecret.length <=
-                MAX_DIANPING_CREDENTIAL_CHARS &&
-                credentials.searchSession.length <=
-                MAX_DIANPING_SESSION_CHARS &&
-                credentials.detailSession.length <=
-                MAX_DIANPING_SESSION_CHARS,
+            credentials.webServiceKey.length <= MAX_MAP_CREDENTIAL_CHARS &&
+                (
+                    credentials.securityKey?.length
+                        ?: 0
+                ) <= MAX_MAP_CREDENTIAL_CHARS,
         ) {
-            "Dianping credentials are too long"
-        }
-        updateCatalog { existing ->
-            val catalog = existing.withBuiltInServers()
-            catalog.copy(
-                servers = catalog.servers.map { server ->
-                    if (server.id == DIANPING_SERVER_ID) {
-                        server.copy(
-                            enabled = true,
-                            accessToken = encrypt(
-                                DianpingMcpClient.encodeCredentials(
-                                    credentials,
-                                ),
-                            ),
-                            toolDefaultsVersion =
-                                BUILT_IN_TOOL_DEFAULTS_VERSION,
-                            tools = DIANPING_MCP_TOOLS.map { tool ->
-                                PersistedMcpTool(
-                                    definition = tool,
-                                    enabled = true,
-                                )
-                            },
-                        )
-                    } else {
-                        server
-                    }
-                },
-            )
-        }
-        return loadSummary()
-    }
-
-    override suspend fun disconnectDianping(): ToolCatalogSummary {
-        updateCatalog { existing ->
-            val catalog = existing.withBuiltInServers()
-            catalog.copy(
-                servers = catalog.servers.map { server ->
-                    if (server.id == DIANPING_SERVER_ID) {
-                        server.copy(
-                            enabled = false,
-                            accessToken = null,
-                        )
-                    } else {
-                        server
-                    }
-                },
-            )
-        }
-        return loadSummary()
-    }
-
-    override suspend fun configureBaiduMap(
-        token: String,
-    ): ToolCatalogSummary {
-        val normalized = token.trim()
-        require(normalized.isNotEmpty()) {
-            "Baidu Map Agent Plan token is required"
-        }
-        require(normalized.length <= MAX_MAP_TOKEN_CHARS) {
-            "Baidu Map Agent Plan token is too long"
+            "Amap credentials are too long"
         }
         updateCatalog { catalog ->
             catalog.copy(
-                baiduMapToken = encrypt(normalized),
-                baiduMapEnabled = true,
+                amapCredentials = encrypt(json.encodeToString(credentials)),
+                amapEnabled = true,
             )
         }
         return loadSummary()
     }
 
-    override suspend fun disconnectBaiduMap(): ToolCatalogSummary {
+    override suspend fun disconnectAmap(): ToolCatalogSummary {
         updateCatalog { catalog ->
             catalog.copy(
-                baiduMapToken = null,
-                baiduMapEnabled = false,
+                amapCredentials = null,
+                amapEnabled = false,
             )
         }
         return loadSummary()
     }
 
-    override suspend fun setBaiduMapEnabled(
+    override suspend fun setAmapEnabled(
         enabled: Boolean,
     ): ToolCatalogSummary {
         updateCatalog { catalog ->
             if (enabled) {
-                require(catalog.baiduMapToken != null) {
-                    "Configure the Baidu Map token before enabling it"
+                require(catalog.amapCredentials != null) {
+                    "Configure Amap before enabling it"
                 }
             }
-            catalog.copy(baiduMapEnabled = enabled)
+            catalog.copy(amapEnabled = enabled)
         }
         return loadSummary()
     }
 
-    override suspend fun loadBaiduMapToken(): String? {
+    override suspend fun loadAmapCredentials(): AmapCredentials? {
         val catalog = loadCatalog()
-        if (!catalog.baiduMapEnabled) {
+        if (!catalog.amapEnabled) {
             return null
         }
-        return catalog.baiduMapToken?.let(::decrypt)
+        val raw = catalog.amapCredentials?.let(::decrypt) ?: return null
+        return try {
+            json.decodeFromString<AmapCredentials>(raw)
+        } catch (error: SerializationException) {
+            throw IllegalStateException("Stored Amap credentials are invalid", error)
+        }
     }
 
     override suspend fun setAgentBrowserEnabled(
@@ -614,8 +536,7 @@ class DataStoreToolCatalogRepository(
     override suspend fun removeManualServer(id: String): ToolCatalogSummary {
         require(
             id != NOTION_SERVER_ID &&
-                id != TENCENT_DOCS_SERVER_ID &&
-                id != DIANPING_SERVER_ID,
+                id != TENCENT_DOCS_SERVER_ID,
         ) {
             "Built-in MCP servers cannot be removed"
         }
@@ -700,7 +621,6 @@ class DataStoreToolCatalogRepository(
             tool.definition.name in when (server.id) {
                 NOTION_SERVER_ID -> READ_ONLY_NOTION_TOOLS
                 TENCENT_DOCS_SERVER_ID -> READ_ONLY_TENCENT_DOCS_TOOLS
-                DIANPING_SERVER_ID -> READ_ONLY_DIANPING_TOOLS
                 else -> emptySet()
             }
         }
@@ -716,11 +636,6 @@ class DataStoreToolCatalogRepository(
                     .filter(PersistedMcpTool::enabled)
                     .filter { tool -> include(server, tool) }
                     .map { tool ->
-                    val client = if (server.id == DIANPING_SERVER_ID) {
-                        dianpingMcpClient
-                    } else {
-                        mcpClient
-                    }
                     McpAgentTool(
                         name = mcpToolAlias(
                             serverId = server.id,
@@ -728,7 +643,7 @@ class DataStoreToolCatalogRepository(
                         ),
                         remoteTool = tool.definition,
                         server = { runtimeServer(server.id) },
-                        client = client,
+                        client = mcpClient,
                     )
                 }
             }
@@ -841,7 +756,6 @@ class DataStoreToolCatalogRepository(
             endpoint = server.endpoint,
             accessToken = token,
             authorizationHeader = token
-                ?.takeUnless { server.id == DIANPING_SERVER_ID }
                 ?.let { value ->
                     if (server.authMode == McpAuthMode.TOKEN) {
                         value
@@ -907,16 +821,16 @@ class DataStoreToolCatalogRepository(
         ToolCatalogSummary(
             builtInTools = BUILT_IN_TOOLS
                 .filterNot {
-                    it.isBaiduMapTool() || it.isAgentBrowserTool()
+                    it.isAmapTool() || it.isAgentBrowserTool()
                 }
                 .map { descriptor ->
                     toBuiltInToolSummary(descriptor)
                 },
-            baiduMap = BaiduMapProviderSummary(
-                connected = baiduMapToken != null,
-                enabled = baiduMapEnabled && baiduMapToken != null,
+            amap = AmapProviderSummary(
+                connected = amapCredentials != null,
+                enabled = amapEnabled && amapCredentials != null,
                 tools = BUILT_IN_TOOLS
-                    .filter(BuiltInToolDescriptor::isBaiduMapTool)
+                    .filter(BuiltInToolDescriptor::isAmapTool)
                     .map { descriptor ->
                         toBuiltInToolSummary(descriptor)
                     },
@@ -954,7 +868,17 @@ class DataStoreToolCatalogRepository(
         )
 
     private fun PersistedToolCatalog.withBuiltInServers(): PersistedToolCatalog {
-        val existingIds = servers.mapTo(mutableSetOf(), PersistedMcpServer::id)
+        val retainedServers = servers.filterNot {
+            it.id == LEGACY_DIANPING_SERVER_ID
+        }
+        val retainedBuiltIns = builtInEnabled.filterKeys { name ->
+            !name.startsWith("baidu_map_") &&
+                !name.startsWith("dianping_")
+        }
+        val existingIds = retainedServers.mapTo(
+            mutableSetOf(),
+            PersistedMcpServer::id,
+        )
         val missing = listOf(
             PersistedMcpServer(
                 id = NOTION_SERVER_ID,
@@ -972,28 +896,19 @@ class DataStoreToolCatalogRepository(
                 enabled = false,
                 authMode = McpAuthMode.TOKEN,
             ),
-            PersistedMcpServer(
-                id = DIANPING_SERVER_ID,
-                name = "Dianping MCP",
-                endpoint = DIANPING_MCP_ENDPOINT,
-                builtIn = true,
-                enabled = false,
-                authMode = McpAuthMode.TOKEN,
-                tools = DIANPING_MCP_TOOLS.map { tool ->
-                    PersistedMcpTool(
-                        definition = tool,
-                        enabled = true,
-                    )
-                },
-            ),
         ).filterNot { it.id in existingIds }
-        val normalizedServers = servers.map { server ->
+        val normalizedServers = retainedServers.map { server ->
             server.withBuiltInToolDefaults()
         }
-        if (missing.isEmpty() && normalizedServers == servers) {
+        if (
+            missing.isEmpty() &&
+            normalizedServers == servers &&
+            retainedBuiltIns == builtInEnabled
+        ) {
             return this
         }
         return copy(
+            builtInEnabled = retainedBuiltIns,
             servers = missing + normalizedServers,
         )
     }
@@ -1003,8 +918,6 @@ class DataStoreToolCatalogRepository(
         val defaults = when (id) {
             NOTION_SERVER_ID -> DEFAULT_NOTION_TOOLS
             TENCENT_DOCS_SERVER_ID -> DEFAULT_TENCENT_DOCS_TOOLS
-            DIANPING_SERVER_ID -> DIANPING_MCP_TOOLS
-                .mapTo(mutableSetOf(), McpRemoteTool::name)
             else -> return this
         }
         val shouldApplyDefaults =
@@ -1299,8 +1212,8 @@ class McpOAuthClient(
 @Serializable
 private data class PersistedToolCatalog(
     val builtInEnabled: Map<String, Boolean> = emptyMap(),
-    val baiduMapToken: StoredSecret? = null,
-    val baiduMapEnabled: Boolean = false,
+    val amapCredentials: StoredSecret? = null,
+    val amapEnabled: Boolean = false,
     val agentBrowserEnabled: Boolean = true,
     val servers: List<PersistedMcpServer> = emptyList(),
     val pendingNotionOAuth: PendingOAuthRecord? = null,
@@ -1512,39 +1425,45 @@ val BUILT_IN_TOOLS = listOf(
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
-        name = "baidu_map_place",
-        displayName = "Baidu Place Search",
-        description = "Semantically search places with Baidu Map Agent Plan.",
+        name = "amap_search_poi",
+        displayName = "Amap Place Search",
+        description = "Search Amap places and nearby merchants.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
-        name = "baidu_map_direction",
-        displayName = "Baidu Route Planning",
+        name = "amap_get_poi",
+        displayName = "Amap Place Details",
+        description = "Read merchant details, ratings, cost, hours, and photos.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "amap_direction",
+        displayName = "Amap Route Planning",
         description = "Plan driving, walking, cycling, or transit routes.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
-        name = "baidu_map_geocoding",
-        displayName = "Baidu Geocoding",
+        name = "amap_geocoding",
+        displayName = "Amap Geocoding",
         description = "Convert complete addresses to map coordinates.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
-        name = "baidu_map_reverse_geocoding",
-        displayName = "Baidu Reverse Geocoding",
+        name = "amap_reverse_geocoding",
+        displayName = "Amap Reverse Geocoding",
         description = "Convert trusted coordinates to addresses.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
-        name = "baidu_map_weather",
-        displayName = "Baidu Map Weather",
-        description = "Read weather by region or trusted coordinates.",
+        name = "amap_weather",
+        displayName = "Amap Weather",
+        description = "Read weather forecasts for an administrative region.",
         defaultEnabled = true,
     ),
 )
 
-private fun BuiltInToolDescriptor.isBaiduMapTool(): Boolean =
-    name.startsWith("baidu_map_")
+private fun BuiltInToolDescriptor.isAmapTool(): Boolean =
+    name.startsWith("amap_")
 
 private fun BuiltInToolDescriptor.isAgentBrowserTool(): Boolean =
     name.startsWith("browser_")
@@ -1574,10 +1493,6 @@ private val READ_ONLY_TENCENT_DOCS_TOOLS = setOf(
     "manage.get_privilege",
     "slide_get_page_info",
     "slide_find_text",
-)
-private val READ_ONLY_DIANPING_TOOLS = setOf(
-    "search_poi",
-    "get_poi",
 )
 private val TENCENT_DOCS_SEARCH_TOOLS = setOf(
     "search_space_file",
@@ -1701,9 +1616,8 @@ private const val NOTION_REDIRECT_URI = "mochi://oauth/notion"
 private const val NOTION_MCP_RESOURCE = "https://mcp.notion.com/mcp"
 private const val MAX_SERVER_NAME_CHARS = 64
 private const val MAX_MCP_TOKEN_CHARS = 4_096
-private const val MAX_DIANPING_CREDENTIAL_CHARS = 512
-private const val MAX_DIANPING_SESSION_CHARS = 4_096
-private const val MAX_MAP_TOKEN_CHARS = 4_096
+private const val MAX_MAP_CREDENTIAL_CHARS = 512
+private const val LEGACY_DIANPING_SERVER_ID = "dianping"
 private const val OAUTH_TIMEOUT_SECONDS = 30L
 private const val MAX_OAUTH_RESPONSE_BYTES = 256L * 1024L
 private const val OAUTH_PENDING_MAX_AGE_MS = 10L * 60L * 1_000L

@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.database.entity.CalendarEventEntity
+import com.example.mochi_pet.core.database.entity.SkillEntity
 import com.example.mochi_pet.core.database.entity.TodoEntity
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.skills.DownloadedSkill
@@ -18,6 +19,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -177,21 +179,16 @@ class MochiDatabaseTest {
                 false,
                 initial.first { it.name == "Tencent Docs Knowledge" }.enabled,
             )
+            assertEquals(true, initial.first { it.name == "Amap Maps" }.enabled)
             assertEquals(
-                false,
-                initial.first { it.name == "Travel & Transport" }.enabled,
-            )
-            assertEquals(
-                false,
-                initial.first { it.name == "Dianping Discovery" }.enabled,
+                true,
+                initial.first { it.name == "Merchant Discovery" }.enabled,
             )
             assertEquals(
                 true,
                 initial.filter {
                     it.origin == SkillOrigin.BUILT_IN &&
-                        !it.name.endsWith("Knowledge") &&
-                        it.name != "Travel & Transport" &&
-                        it.name != "Dianping Discovery"
+                        !it.name.endsWith("Knowledge")
                 }.all { it.enabled },
             )
 
@@ -251,6 +248,33 @@ class MochiDatabaseTest {
                 ).map { it.name },
             )
         }
+
+    @Test
+    fun `retired built in skill overrides are removed`() = runBlocking {
+        val retired = SkillEntity(
+            id = "builtin:dianping-discovery",
+            name = "Dianping Discovery",
+            description = "Retired",
+            content = "Retired",
+            source = "Mochi",
+            sourceUrl = "",
+            upstreamVersion = null,
+            upstreamDigest = "retired",
+            localDigest = "retired",
+            enabled = true,
+            modified = false,
+            updateAvailable = false,
+            installedAtEpochMillis = 0,
+            updatedAtEpochMillis = 0,
+            lastCheckedAtEpochMillis = null,
+        )
+        database.skillDao().upsert(retired)
+
+        val skills = RoomSkillRepository(database.skillDao()).listSkills()
+
+        assertFalse(skills.any { it.id == retired.id })
+        assertEquals(null, database.skillDao().getById(retired.id))
+    }
 
     @Test
     fun `load skill exposes standard document only while enabled`() =

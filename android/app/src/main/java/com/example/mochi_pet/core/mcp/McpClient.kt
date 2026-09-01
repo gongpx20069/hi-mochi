@@ -450,9 +450,6 @@ fun mcpToolAlias(
     if (server == TENCENT_DOCS_SERVER_ID) {
         return "tencent_docs_${tool.take(51)}".take(MAX_ALIAS_CHARS)
     }
-    if (server == DIANPING_SERVER_ID) {
-        return "dianping_${tool.take(54)}".take(MAX_ALIAS_CHARS)
-    }
     val suffix = (serverId + '\u0000' + remoteName)
         .hashCode()
         .toUInt()

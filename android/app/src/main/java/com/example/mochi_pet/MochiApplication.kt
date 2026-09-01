@@ -30,8 +30,7 @@ import com.example.mochi_pet.core.skills.SkillMarketClient
 import com.example.mochi_pet.core.skills.SkillRepository
 import com.example.mochi_pet.core.skills.SkillsShClient
 import com.example.mochi_pet.core.mcp.McpStreamableHttpClient
-import com.example.mochi_pet.core.mcp.DianpingMcpClient
-import com.example.mochi_pet.core.maps.BaiduMapAgentClient
+import com.example.mochi_pet.core.maps.AmapMapsClient
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.navigation.UiDirectiveSink
 import com.example.mochi_pet.core.schedule.AgentScheduleResult
@@ -150,16 +149,12 @@ class MochiApplication : Application() {
         McpStreamableHttpClient()
     }
 
-    val dianpingMcpClient: DianpingMcpClient by lazy {
-        DianpingMcpClient()
-    }
-
     val javaScriptExecutor: AndroidJavaScriptExecutor by lazy {
         AndroidJavaScriptExecutor(this)
     }
 
-    val baiduMapAgentClient: BaiduMapAgentClient by lazy {
-        BaiduMapAgentClient()
+    val amapMapsClient: AmapMapsClient by lazy {
+        AmapMapsClient()
     }
 
     val toolCatalogRepository: ToolCatalogRepository by lazy {
@@ -169,7 +164,6 @@ class MochiApplication : Application() {
                 keyAlias = "mochi_tool_secret_v1",
             ),
             mcpClient = mcpClient,
-            dianpingMcpClient = dianpingMcpClient,
         )
     }
 

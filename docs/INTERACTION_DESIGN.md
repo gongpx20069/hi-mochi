@@ -173,10 +173,12 @@ Each MCP server's detailed Tool list starts collapsed and can be expanded
 without disabling the server or changing individual Tool selections. Built-in
 knowledge providers enable their core search, listing, and reading Tools on
 first connection.
-Tools also contains a Baidu Map Agent Plan provider card. It opens the official
-Service Key page, stores the pasted key encrypted on-device, and exposes a
-provider switch. Its five capabilities remain individually selectable in the
-built-in Tool list.
+Tools also contains an Amap Maps provider card. It opens the official console,
+stores the pasted Web Service Key and optional Security Key encrypted
+on-device, and exposes a provider switch. Its six map and merchant capabilities
+remain individually selectable in an expandable Tool list. The two built-in
+Amap Maps and Merchant Discovery Skills provide route, nearby-search, merchant
+detail, rating, average-cost, and missing-review guidance.
 Current Location appears as an independent built-in Tool switch. A clearly
 location-dependent Agent request keeps the current surface, continues after
 the Android permission result, and returns typed permission, timeout, or

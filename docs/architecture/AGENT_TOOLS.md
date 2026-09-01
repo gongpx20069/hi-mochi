@@ -36,7 +36,7 @@ The native `ToolRegistry` currently supports:
 - `run_sandboxed_javascript`;
 - `delegate_agent` in the Main Agent's request-scoped registry;
 - the five grouped Agent Browser Tools;
-- configured Baidu Map Agent Plan Tools;
+- configured Amap map and merchant Tools;
 - enabled MCP tools discovered through the Tool catalog.
 
 Agent Browser provides five grouped schemas:
@@ -69,7 +69,7 @@ The request-scoped coordinator permits at most two delegations. Child
 registries never contain `delegate_agent`. Researcher may use enabled Browser
 Tools, read-only MCP Tools, and `load_skill`; Analyst adds
 `run_sandboxed_javascript`. Read-only MCP access uses application-controlled
-allowlists for built-in Notion, Tencent Docs, and Dianping providers. Remote
+allowlists for built-in Notion and Tencent Docs providers. Remote
 `readOnlyHint` annotations and manually configured MCP servers do not grant
 Subagent access.
 
@@ -159,22 +159,28 @@ Compose card. Typed weather/calendar/todo cards remain deterministic; external
 web and MCP evidence can use a bounded general content card selected by the
 model. See `CARD_PRESENTATION.md`.
 
-### Baidu Map Agent Plan
+### Amap Maps
 
-The built-in Baidu Map provider stores a user-owned Service Key encrypted with
-Android Keystore. Its provider switch and five individual Tool switches must
-both be enabled before the Tools enter the Agent prompt:
+The built-in Amap provider stores a user-owned Web Service Key and optional
+Security Key encrypted with Android Keystore. Its provider switch and six
+individual Tool switches must both be enabled before the Tools enter the Agent
+prompt:
 
-- `baidu_map_place`
-- `baidu_map_direction`
-- `baidu_map_geocoding`
-- `baidu_map_reverse_geocoding`
-- `baidu_map_weather`
+- `amap_search_poi`
+- `amap_get_poi`
+- `amap_direction`
+- `amap_geocoding`
+- `amap_reverse_geocoding`
+- `amap_weather`
 
-Requests use the official `https://api.map.baidu.com/agent_plan/v1/` HTTPS
-endpoints with `Authorization: ******. Responses are bounded and enter
-the same-run general content Card evidence path. Coordinates must be trusted
-GCJ-02 values rather than model-generated guesses.
+Requests use fixed official `https://restapi.amap.com/` HTTPS endpoints. When
+the user supplies a Security Key, Mochi adds the documented request signature.
+POI search and detail requests always ask for `business` and `photos`, allowing
+supported categories to return ratings, average cost, hours, phone, tags, and
+photos. Missing fields remain missing; the Agent must not infer review text,
+ratings, prices, or open state. Responses are bounded and enter the same-run
+general content Card evidence path. Coordinates must be trusted GCJ-02 values
+rather than model-generated guesses.
 
 ### `get_current_weather`
 
@@ -203,8 +209,8 @@ The Tool rejects denied permission, disabled providers, unavailable fixes, and
 timeouts with typed errors. It accepts no model-supplied coordinates. Android
 locations older than five minutes are not reused. The configured LLM receives
 the returned coordinates as Tool evidence, so the Tool can be disabled
-independently from Tools settings. Baidu Map and Dianping parameters must use
-the returned GCJ-02 fields, never the WGS-84 fields or model-generated
+independently from Tools settings. Amap parameters must use the returned GCJ-02
+fields, never the WGS-84 fields or model-generated
 conversion.
 
 ## 4. Public web research
@@ -352,18 +358,6 @@ encryption and sends it as the provider-required raw `Authorization` value.
 Search, read, SmartCanvas creation, append, and update tools are selected by
 default after successful discovery. The separate Tencent Docs Knowledge Skill
 is read-only and disabled by default.
-
-The built-in Dianping provider is a Mochi-owned in-process MCP adapter over
-the official Dianping POI Open Platform. It exposes only
-`dianping_search_poi` and `dianping_get_poi`; it does not scrape Dianping,
-import cookies, create orders, reserve, queue, call, or pay. AppKey, AppSecret,
-search session, and optional per-interface detail session are encrypted with
-Android Keystore. Requests use the documented lowercase/sorted MD5 signature,
-bounded official JSON responses, and only provider-returned H5 or app links.
-Actual cities, categories, reviews, prices, and link fields depend on the
-partner permissions attached to the credentials. Because AppSecret is a
-partner shared secret, production deployments should prefer a trusted relay
-when the partnership permits one.
 
 FlyAI's public CLI calls `https://flyai.open.fliggy.com/mcp` with a stateless
 `tools/call` request plus proprietary `x-ff-ctx`, timestamp, nonce, HMAC, and

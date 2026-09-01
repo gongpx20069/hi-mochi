@@ -1,11 +1,15 @@
 package com.example.mochi_pet.core.tools
 
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpRemoteTool
 import com.example.mochi_pet.core.mcp.McpServerRuntime
 import com.example.mochi_pet.core.mcp.McpStreamableHttpClient
 import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
-import com.example.mochi_pet.core.mcp.DIANPING_SERVER_ID
 import com.example.mochi_pet.core.settings.ApiKeyCipher
 import com.example.mochi_pet.core.settings.EncryptedSecret
 import java.io.File
@@ -14,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -31,6 +36,7 @@ class ToolCatalogTest {
     private lateinit var directory: File
     private lateinit var scope: CoroutineScope
     private lateinit var client: RecordingMcpClient
+    private lateinit var dataStore: DataStore<Preferences>
     private lateinit var repository: DataStoreToolCatalogRepository
 
     @Before
@@ -38,10 +44,11 @@ class ToolCatalogTest {
         directory = createTempDirectory("mochi-tools-").toFile()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         client = RecordingMcpClient()
-        repository = DataStoreToolCatalogRepository(
-            dataStore = PreferenceDataStoreFactory.create(scope = scope) {
+        dataStore = PreferenceDataStoreFactory.create(scope = scope) {
                 File(directory, "tools.preferences_pb")
-            },
+            }
+        repository = DataStoreToolCatalogRepository(
+            dataStore = dataStore,
             secretCipher = PlaintextCipher,
             mcpClient = client,
         )
@@ -138,31 +145,77 @@ class ToolCatalogTest {
         }
 
     @Test
-    fun `Baidu Map token configures and disables provider`() = runBlocking {
-        val connected = repository.configureBaiduMap("map-token")
+    fun `Amap credentials configure and disable provider`() = runBlocking {
+        val connected = repository.configureAmap(
+            webServiceKey = "map-key",
+            securityKey = "security-key",
+        )
 
-        assertTrue(connected.baiduMap.connected)
-        assertTrue(connected.baiduMap.enabled)
-        assertEquals(5, connected.baiduMap.tools.size)
+        assertTrue(connected.amap.connected)
+        assertTrue(connected.amap.enabled)
+        assertEquals(6, connected.amap.tools.size)
         assertTrue(
-            connected.baiduMap.tools.all {
-                it.name.startsWith("baidu_map_")
+            connected.amap.tools.all {
+                it.name.startsWith("amap_")
             },
         )
         assertFalse(
             connected.builtInTools.any {
-                it.name.startsWith("baidu_map_")
+                it.name.startsWith("amap_")
             },
         )
-        assertEquals("map-token", repository.loadBaiduMapToken())
+        assertEquals(
+            AmapCredentials("map-key", "security-key"),
+            repository.loadAmapCredentials(),
+        )
 
-        val disabled = repository.setBaiduMapEnabled(false)
-        assertTrue(disabled.baiduMap.connected)
-        assertFalse(disabled.baiduMap.enabled)
-        assertEquals(null, repository.loadBaiduMapToken())
+        val disabled = repository.setAmapEnabled(false)
+        assertTrue(disabled.amap.connected)
+        assertFalse(disabled.amap.enabled)
+        assertEquals(null, repository.loadAmapCredentials())
 
-        val disconnected = repository.disconnectBaiduMap()
-        assertFalse(disconnected.baiduMap.connected)
+        val disconnected = repository.disconnectAmap()
+        assertFalse(disconnected.amap.connected)
+    }
+
+    @Test
+    fun `legacy map and Dianping settings are removed`() = runBlocking {
+        val catalogKey = stringPreferencesKey("tools.catalog")
+        dataStore.edit { preferences ->
+            preferences[catalogKey] =
+                """
+                {
+                  "builtInEnabled": {
+                    "baidu_map_place": false,
+                    "dianping_search_poi": true,
+                    "browser_read": false
+                  },
+                  "baiduMapToken": {
+                    "ciphertext": "legacy",
+                    "iv": "legacy"
+                  },
+                  "baiduMapEnabled": true,
+                  "servers": [
+                    {
+                      "id": "dianping",
+                      "name": "Dianping MCP",
+                      "endpoint": "https://poiopen.dianping.com/router",
+                      "builtIn": true,
+                      "enabled": true,
+                      "authMode": "TOKEN"
+                    }
+                  ]
+                }
+                """.trimIndent()
+        }
+
+        val summary = repository.loadSummary()
+        val persisted = dataStore.data.first()[catalogKey].orEmpty()
+
+        assertFalse(summary.servers.any { it.id == "dianping" })
+        assertFalse(persisted.contains("baiduMap"))
+        assertFalse(persisted.contains("dianping"))
+        assertFalse(repository.isBuiltInEnabled("browser_read"))
     }
 
     @Test
@@ -191,36 +244,6 @@ class ToolCatalogTest {
             assertFalse(disabled.agentBrowser.enabled)
             assertFalse(repository.isBuiltInEnabled("browser_navigate"))
         }
-
-    @Test
-    fun `Dianping credentials enable read only MCP tools`() = runBlocking {
-        val initial = repository.loadSummary().servers.first {
-            it.id == DIANPING_SERVER_ID
-        }
-        assertFalse(initial.connected)
-        assertEquals(2, initial.tools.size)
-
-        val configured = repository.configureDianping(
-            appKey = "app-key",
-            appSecret = "app-secret",
-            searchSession = "search-session",
-            detailSession = "",
-        ).servers.first { it.id == DIANPING_SERVER_ID }
-
-        assertTrue(configured.connected)
-        assertTrue(configured.enabled)
-        assertEquals(
-            setOf("dianping_search_poi", "dianping_get_poi"),
-            configured.tools.mapTo(mutableSetOf()) { it.alias },
-        )
-        assertTrue(configured.tools.all { it.enabled })
-
-        val disconnected = repository.disconnectDianping().servers.first {
-            it.id == DIANPING_SERVER_ID
-        }
-        assertFalse(disconnected.connected)
-        assertFalse(disconnected.enabled)
-    }
 
     @Test
     fun `subagent MCP catalog exposes only enabled read only tools`() =

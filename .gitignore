@@ -4,6 +4,7 @@
 dist/
 build/
 android/.gradle/
+android/.kotlin/
 android/app/libs/*.aar
 android/app/libs/*.aar.download
 android/local.properties

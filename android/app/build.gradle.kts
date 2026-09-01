@@ -207,6 +207,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
+    // OkHttp 5.5 requires compileSdk 37, beyond the current AGP maximum.
+    //noinspection NewerVersionAvailable
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation(files(sherpaOnnxAar))
@@ -216,6 +218,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("androidx.test:core:1.7.0")
+    //noinspection NewerVersionAvailable
     testImplementation("com.squareup.okhttp3:mockwebserver:5.4.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")

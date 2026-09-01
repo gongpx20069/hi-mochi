@@ -26,8 +26,7 @@ import com.example.mochi_pet.core.database.PlannerStore
 import com.example.mochi_pet.core.memory.AgentMemoryRepository
 import com.example.mochi_pet.core.persona.PersonaRepository
 import com.example.mochi_pet.core.persona.PersonaContext
-import com.example.mochi_pet.core.maps.BAIDU_MAP_AGENT_TOKEN_URL
-import com.example.mochi_pet.core.maps.baiduMapAgentTools
+import com.example.mochi_pet.core.maps.AMAP_CONSOLE_URL
 import com.example.mochi_pet.core.model.CalendarEvent
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.model.MochiTodo
@@ -1307,52 +1306,38 @@ class MochiHomeViewModel(
         }
     }
 
-    fun configureDianping(
-        appKey: String,
-        appSecret: String,
-        searchSession: String,
-        detailSession: String,
-    ) {
-        updateTools("Dianping discovery tools configured") {
-            requireRepository().configureDianping(
-                appKey = appKey,
-                appSecret = appSecret,
-                searchSession = searchSession,
-                detailSession = detailSession,
-            )
-        }
-    }
-
-    fun disconnectDianping() {
-        updateTools("Dianping disconnected") {
-            requireRepository().disconnectDianping()
-        }
-    }
-
-    fun openBaiduMapTokenPage() {
+    fun openAmapConsole() {
         mutableToolsState.update {
             it.copy(
-                feedback = "Copy your Baidu Map Agent Plan token",
-                authorizationUrl = BAIDU_MAP_AGENT_TOKEN_URL,
+                feedback = "Create an Amap Web Service Key",
+                authorizationUrl = AMAP_CONSOLE_URL,
             )
         }
     }
 
-    fun configureBaiduMap(token: String) {
-        updateTools("Baidu Map Agent Plan connected") {
-            requireRepository().configureBaiduMap(token)
+    fun configureAmap(
+        webServiceKey: String,
+        securityKey: String,
+    ) {
+        updateTools(
+            "Amap connected. Amap Maps and Merchant Discovery are ready.",
+        ) {
+            requireRepository().configureAmap(
+                webServiceKey = webServiceKey,
+                securityKey = securityKey,
+            )
         }
     }
 
-    fun disconnectBaiduMap() {
-        updateTools("Baidu Map Agent Plan disconnected") {
-            requireRepository().disconnectBaiduMap()
+    fun disconnectAmap() {
+        updateTools("Amap disconnected") {
+            requireRepository().disconnectAmap()
         }
     }
 
-    fun setBaiduMapEnabled(enabled: Boolean) {
+    fun setAmapEnabled(enabled: Boolean) {
         updateTools {
-            requireRepository().setBaiduMapEnabled(enabled)
+            requireRepository().setAmapEnabled(enabled)
         }
     }
 

@@ -133,7 +133,6 @@ import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.model.MochiTodo
 import com.example.mochi_pet.core.model.TodoStatus
 import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
-import com.example.mochi_pet.core.mcp.DIANPING_SERVER_ID
 import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import com.example.mochi_pet.core.presentation.CardAction
 import com.example.mochi_pet.core.presentation.CardActionType
@@ -609,12 +608,10 @@ private fun MochiAppContent(
                 viewModel::openTencentDocsTokenPage,
             onConfigureTencentDocs = viewModel::configureTencentDocs,
             onDisconnectTencentDocs = viewModel::disconnectTencentDocs,
-            onConfigureDianping = viewModel::configureDianping,
-            onDisconnectDianping = viewModel::disconnectDianping,
-            onOpenBaiduMapTokenPage = viewModel::openBaiduMapTokenPage,
-            onConfigureBaiduMap = viewModel::configureBaiduMap,
-            onDisconnectBaiduMap = viewModel::disconnectBaiduMap,
-            onSetBaiduMapEnabled = viewModel::setBaiduMapEnabled,
+            onOpenAmapConsole = viewModel::openAmapConsole,
+            onConfigureAmap = viewModel::configureAmap,
+            onDisconnectAmap = viewModel::disconnectAmap,
+            onSetAmapEnabled = viewModel::setAmapEnabled,
             onSetAgentBrowserEnabled = viewModel::setAgentBrowserEnabled,
             onAddMcpServer = viewModel::addManualMcpServer,
             onRemoveMcpServer = viewModel::removeManualMcpServer,
@@ -1527,12 +1524,10 @@ private fun SurfaceContent(
     onOpenTencentDocsTokenPage: () -> Unit,
     onConfigureTencentDocs: (String) -> Unit,
     onDisconnectTencentDocs: () -> Unit,
-    onConfigureDianping: (String, String, String, String) -> Unit,
-    onDisconnectDianping: () -> Unit,
-    onOpenBaiduMapTokenPage: () -> Unit,
-    onConfigureBaiduMap: (String) -> Unit,
-    onDisconnectBaiduMap: () -> Unit,
-    onSetBaiduMapEnabled: (Boolean) -> Unit,
+    onOpenAmapConsole: () -> Unit,
+    onConfigureAmap: (String, String) -> Unit,
+    onDisconnectAmap: () -> Unit,
+    onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
     onAddMcpServer: (ManualMcpServerInput) -> Unit,
     onRemoveMcpServer: (String) -> Unit,
@@ -1621,12 +1616,10 @@ private fun SurfaceContent(
                     onOpenTencentDocsTokenPage,
                 onConfigureTencentDocs = onConfigureTencentDocs,
                 onDisconnectTencentDocs = onDisconnectTencentDocs,
-                onConfigureDianping = onConfigureDianping,
-                onDisconnectDianping = onDisconnectDianping,
-                onOpenBaiduMapTokenPage = onOpenBaiduMapTokenPage,
-                onConfigureBaiduMap = onConfigureBaiduMap,
-                onDisconnectBaiduMap = onDisconnectBaiduMap,
-                onSetBaiduMapEnabled = onSetBaiduMapEnabled,
+                onOpenAmapConsole = onOpenAmapConsole,
+                onConfigureAmap = onConfigureAmap,
+                onDisconnectAmap = onDisconnectAmap,
+                onSetAmapEnabled = onSetAmapEnabled,
                 onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
                 onAddServer = onAddMcpServer,
                 onRemoveServer = onRemoveMcpServer,
@@ -3568,12 +3561,10 @@ private fun ToolsSurface(
     onOpenTencentDocsTokenPage: () -> Unit,
     onConfigureTencentDocs: (String) -> Unit,
     onDisconnectTencentDocs: () -> Unit,
-    onConfigureDianping: (String, String, String, String) -> Unit,
-    onDisconnectDianping: () -> Unit,
-    onOpenBaiduMapTokenPage: () -> Unit,
-    onConfigureBaiduMap: (String) -> Unit,
-    onDisconnectBaiduMap: () -> Unit,
-    onSetBaiduMapEnabled: (Boolean) -> Unit,
+    onOpenAmapConsole: () -> Unit,
+    onConfigureAmap: (String, String) -> Unit,
+    onDisconnectAmap: () -> Unit,
+    onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
     onAddServer: (ManualMcpServerInput) -> Unit,
     onRemoveServer: (String) -> Unit,
@@ -3582,9 +3573,8 @@ private fun ToolsSurface(
 ) {
     var showAddServer by remember { mutableStateOf(false) }
     var showTencentDocsToken by remember { mutableStateOf(false) }
-    var showDianpingCredentials by remember { mutableStateOf(false) }
-    var showBaiduMapToken by remember { mutableStateOf(false) }
-    var baiduToolsExpanded by rememberSaveable {
+    var showAmapCredentials by remember { mutableStateOf(false) }
+    var amapToolsExpanded by rememberSaveable {
         mutableStateOf(false)
     }
     var browserToolsExpanded by rememberSaveable {
@@ -3758,66 +3748,66 @@ private fun ToolsSurface(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Baidu Map Agent Plan",
+                                    text = "Amap Maps",
                                     fontWeight = FontWeight.Bold,
                                 )
                                 Text(
-                                    text = if (state.catalog.baiduMap.connected) {
-                                        "Connected · 5 semantic map tools"
+                                    text = if (state.catalog.amap.connected) {
+                                        "Connected · 6 map and merchant tools"
                                     } else {
-                                        "Token required"
+                                        "Web Service Key required"
                                     },
                                     color =
                                         MaterialTheme.colorScheme.onSurfaceVariant,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
-                            if (state.catalog.baiduMap.connected) {
+                            if (state.catalog.amap.connected) {
                                 Switch(
-                                    checked = state.catalog.baiduMap.enabled,
-                                    onCheckedChange = onSetBaiduMapEnabled,
+                                    checked = state.catalog.amap.enabled,
+                                    onCheckedChange = onSetAmapEnabled,
                                     enabled = !state.isLoading,
                                 )
                             }
                         }
-                        if (state.catalog.baiduMap.connected) {
+                        if (state.catalog.amap.connected) {
                             OutlinedButton(
-                                onClick = onDisconnectBaiduMap,
+                                onClick = onDisconnectAmap,
                                 enabled = !state.isLoading,
                             ) {
                                 Text("Disconnect")
                             }
                         } else {
                             Button(
-                                onClick = { showBaiduMapToken = true },
+                                onClick = { showAmapCredentials = true },
                                 enabled = !state.isLoading,
                             ) {
-                                Text("Configure token")
+                                Text("Configure Amap")
                             }
                         }
-                        if (state.catalog.baiduMap.tools.isNotEmpty()) {
+                        if (state.catalog.amap.tools.isNotEmpty()) {
                             TextButton(
                                 onClick = {
-                                    baiduToolsExpanded = !baiduToolsExpanded
+                                    amapToolsExpanded = !amapToolsExpanded
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text(
-                                    if (baiduToolsExpanded) {
+                                    if (amapToolsExpanded) {
                                         "Hide tools " +
-                                            "(${state.catalog.baiduMap.tools.size})"
+                                            "(${state.catalog.amap.tools.size})"
                                     } else {
                                         "Show tools " +
-                                            "(${state.catalog.baiduMap.tools.size})"
+                                            "(${state.catalog.amap.tools.size})"
                                     },
                                 )
                             }
-                            AnimatedVisibility(visible = baiduToolsExpanded) {
+                            AnimatedVisibility(visible = amapToolsExpanded) {
                                 Column(
                                     verticalArrangement =
                                         Arrangement.spacedBy(10.dp),
                                 ) {
-                                    state.catalog.baiduMap.tools.forEach { tool ->
+                                    state.catalog.amap.tools.forEach { tool ->
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement =
@@ -3864,7 +3854,7 @@ private fun ToolsSurface(
                                                     )
                                                 },
                                                 enabled =
-                                                    state.catalog.baiduMap
+                                                    state.catalog.amap
                                                         .connected &&
                                                         !state.isLoading,
                                             )
@@ -3908,10 +3898,6 @@ private fun ToolsSurface(
                         showTencentDocsToken = true
                     },
                     onDisconnectTencentDocs = onDisconnectTencentDocs,
-                    onConfigureDianping = {
-                        showDianpingCredentials = true
-                    },
-                    onDisconnectDianping = onDisconnectDianping,
                     onRemove = { onRemoveServer(server.id) },
                     onSetEnabled = {
                         onSetServerEnabled(server.id, it)
@@ -3942,32 +3928,13 @@ private fun ToolsSurface(
             },
         )
     }
-    if (showDianpingCredentials) {
-        DianpingCredentialsDialog(
-            onDismiss = { showDianpingCredentials = false },
-            onConfirm = {
-                    appKey,
-                    appSecret,
-                    searchSession,
-                    detailSession,
-                ->
-                onConfigureDianping(
-                    appKey,
-                    appSecret,
-                    searchSession,
-                    detailSession,
-                )
-                showDianpingCredentials = false
-            },
-        )
-    }
-    if (showBaiduMapToken) {
-        BaiduMapTokenDialog(
-            onGetToken = onOpenBaiduMapTokenPage,
-            onDismiss = { showBaiduMapToken = false },
-            onConfirm = { token ->
-                onConfigureBaiduMap(token)
-                showBaiduMapToken = false
+    if (showAmapCredentials) {
+        AmapCredentialsDialog(
+            onOpenConsole = onOpenAmapConsole,
+            onDismiss = { showAmapCredentials = false },
+            onConfirm = { webServiceKey, securityKey ->
+                onConfigureAmap(webServiceKey, securityKey)
+                showAmapCredentials = false
             },
         )
     }
@@ -3981,8 +3948,6 @@ private fun McpServerCard(
     onDisconnectNotion: () -> Unit,
     onConfigureTencentDocs: () -> Unit,
     onDisconnectTencentDocs: () -> Unit,
-    onConfigureDianping: () -> Unit,
-    onDisconnectDianping: () -> Unit,
     onRemove: () -> Unit,
     onSetEnabled: (Boolean) -> Unit,
     onSetToolEnabled: (String, Boolean) -> Unit,
@@ -4006,8 +3971,6 @@ private fun McpServerCard(
                         server.connected -> "Connected"
                         server.authMode == McpAuthMode.OAUTH ->
                             "Authorization required"
-                        server.id == DIANPING_SERVER_ID ->
-                            "Official POI credentials required"
                         server.authMode == McpAuthMode.TOKEN ->
                             "Personal token required"
                         else -> "Ready"
@@ -4051,39 +4014,18 @@ private fun McpServerCard(
             McpAuthMode.TOKEN -> {
                 if (server.connected) {
                     OutlinedButton(
-                        onClick = {
-                            if (server.id == DIANPING_SERVER_ID) {
-                                onDisconnectDianping()
-                            } else {
-                                onDisconnectTencentDocs()
-                            }
-                        },
+                        onClick = onDisconnectTencentDocs,
                         enabled = !disabled,
                     ) {
                         Text("Disconnect")
                     }
                 } else {
                     Button(
-                        onClick = {
-                            if (server.id == DIANPING_SERVER_ID) {
-                                onConfigureDianping()
-                            } else {
-                                onConfigureTencentDocs()
-                            }
-                        },
+                        onClick = onConfigureTencentDocs,
                         enabled = !disabled &&
-                            (
-                                server.id == TENCENT_DOCS_SERVER_ID ||
-                                    server.id == DIANPING_SERVER_ID
-                            ),
+                            server.id == TENCENT_DOCS_SERVER_ID,
                     ) {
-                        Text(
-                            if (server.id == DIANPING_SERVER_ID) {
-                                "Configure credentials"
-                            } else {
-                                "Configure token"
-                            },
-                        )
+                        Text("Configure token")
                     }
                 }
             }
@@ -4154,86 +4096,6 @@ private fun McpServerCard(
 }
 
 @Composable
-private fun DianpingCredentialsDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, String, String) -> Unit,
-) {
-    var appKey by remember { mutableStateOf("") }
-    var appSecret by remember { mutableStateOf("") }
-    var searchSession by remember { mutableStateOf("") }
-    var detailSession by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Connect Dianping MCP") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "Use credentials and POI permissions issued by " +
-                        "the official Dianping Open Platform. Mochi encrypts " +
-                        "all three values on this device.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                OutlinedTextField(
-                    value = appKey,
-                    onValueChange = { appKey = it },
-                    label = { Text("AppKey") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = appSecret,
-                    onValueChange = { appSecret = it },
-                    label = { Text("AppSecret") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = searchSession,
-                    onValueChange = { searchSession = it },
-                    label = { Text("Search session") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = detailSession,
-                    onValueChange = { detailSession = it },
-                    label = { Text("POI detail session (optional)") },
-                    placeholder = { Text("Uses search session if blank") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm(
-                        appKey,
-                        appSecret,
-                        searchSession,
-                        detailSession,
-                    )
-                },
-                enabled = appKey.isNotBlank() &&
-                    appSecret.isNotBlank() &&
-                    searchSession.isNotBlank(),
-            ) {
-                Text("Connect")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-    )
-}
-
-@Composable
 private fun TencentDocsTokenDialog(
     onGetToken: () -> Unit,
     onDismiss: () -> Unit,
@@ -4283,33 +4145,43 @@ private fun TencentDocsTokenDialog(
 }
 
 @Composable
-private fun BaiduMapTokenDialog(
-    onGetToken: () -> Unit,
+private fun AmapCredentialsDialog(
+    onOpenConsole: () -> Unit,
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
+    onConfirm: (String, String) -> Unit,
 ) {
-    var token by remember { mutableStateOf("") }
+    var webServiceKey by remember { mutableStateOf("") }
+    var securityKey by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Connect Baidu Map Agent Plan") },
+        title = { Text("Connect Amap Maps") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Get a free-test Service Key from Baidu Maps, then " +
-                        "paste it below. Mochi encrypts it on this device.",
+                    text = "Create an application in the Amap console, add a " +
+                        "Web Service Key, and paste it below. Add the Security " +
+                        "Key only when digital signatures are enabled.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedButton(
-                    onClick = onGetToken,
+                    onClick = onOpenConsole,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Open token page")
+                    Text("Open Amap console")
                 }
                 OutlinedTextField(
-                    value = token,
-                    onValueChange = { token = it },
+                    value = webServiceKey,
+                    onValueChange = { webServiceKey = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Service Key") },
+                    label = { Text("Web Service Key") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = securityKey,
+                    onValueChange = { securityKey = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Security Key (optional)") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                 )
@@ -4317,8 +4189,8 @@ private fun BaiduMapTokenDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(token) },
-                enabled = token.isNotBlank(),
+                onClick = { onConfirm(webServiceKey, securityKey) },
+                enabled = webServiceKey.isNotBlank(),
             ) {
                 Text("Connect")
             }

@@ -20,7 +20,7 @@ import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.browser.readOnlyAgentBrowserTools
-import com.example.mochi_pet.core.maps.baiduMapAgentTools
+import com.example.mochi_pet.core.maps.amapMapTools
 import com.example.mochi_pet.core.navigation.NavigateMochiUiTool
 import com.example.mochi_pet.core.navigation.NavigationDecision
 import com.example.mochi_pet.core.navigation.NavigationPolicy
@@ -72,10 +72,10 @@ suspend fun MochiApplication.createAgentRunner(
     val enabledBuiltIns = builtInTools.filter { tool ->
         toolCatalogRepository.isBuiltInEnabled(tool.name)
     }.toMutableList()
-    toolCatalogRepository.loadBaiduMapToken()?.let { token ->
-        enabledBuiltIns += baiduMapAgentTools(
-            client = baiduMapAgentClient,
-            token = token,
+    toolCatalogRepository.loadAmapCredentials()?.let { credentials ->
+        enabledBuiltIns += amapMapTools(
+            client = amapMapsClient,
+            credentials = credentials,
         ).filter { tool ->
             toolCatalogRepository.isBuiltInEnabled(tool.name)
         }
