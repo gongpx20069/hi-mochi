@@ -84,7 +84,7 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
 | **Notion Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新页面，并在已授权的私人知识库中查找或更新信息 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
 | **腾讯文档 Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新文档，并在已授权的私人知识库中查找或更新信息 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
-| 高德地图 | 启用 | 在用户请求时使用当前位置，解析地点与地址、规划路线并查询目的地天气 | [创建高德 Web 服务 Key](https://console.amap.com/) |
+| 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过 Agent Browser 调研无需登录的公开火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用 Agent Browser |
 | 商家发现 | 启用 | 使用高德提供的评分、人均、营业时间、电话、标签和图片发现并比较商家 | [创建高德 Web 服务 Key](https://console.amap.com/) |
 
 > **高德配置：** 创建 Key 时，服务平台请选择 **Web 服务**，不要选择
@@ -107,6 +107,11 @@ Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还
 Tools 页面会将 Agent Browser、Mochi 内建能力和 Provider Tools 分组并默认
 收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
 每个 Tool 都有独立开关；Provider 支持的 Tools 还要求对应 Provider 开关已启用。
+
+出行规划只使用公开 HTTPS 页面上的正常可见控件。火车票查询从 12306 官方
+公开查询页开始，机票优先查询航空公司官网。Mochi 不登录、不绕过验证、不填写
+乘客或支付信息，也不会进入预订流程；遇到登录、验证码、身份验证或结算页面时
+立即停止。
 
 ### 串行 Subagent
 

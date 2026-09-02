@@ -84,6 +84,12 @@ support is an optional import/export adapter.
 
 - Mochi can search current public information through Bing.
 - Mochi can search WeChat official-account articles through Sogou Weixin.
+- Travel Planning combines Amap route and destination context with
+  foreground-only Agent Browser research on public no-login train and flight
+  pages.
+- Ticket research uses visible website controls only, never undocumented
+  endpoints, account login, CAPTCHA bypass, passenger identity, booking, or
+  payment.
 - Both search engines, result pages, and selected sources are operated through
   the built-in Agent Browser rather than dedicated search or fetch Tools.
 - Mochi opens selected source pages and bases answers on bounded readable text,

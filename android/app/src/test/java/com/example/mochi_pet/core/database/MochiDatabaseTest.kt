@@ -179,7 +179,20 @@ class MochiDatabaseTest {
                 false,
                 initial.first { it.name == "Tencent Docs Knowledge" }.enabled,
             )
-            assertEquals(true, initial.first { it.name == "Amap Maps" }.enabled)
+            val travelPlanning = initial.first {
+                it.name == "Travel Planning"
+            }
+            assertEquals(true, travelPlanning.enabled)
+            assertTrue(
+                travelPlanning.content.contains(
+                    "https://kyfw.12306.cn/otn/leftTicket/init",
+                ),
+            )
+            assertTrue(
+                travelPlanning.content.contains(
+                    "call undocumented 12306 JSON endpoints",
+                ),
+            )
             assertEquals(
                 true,
                 initial.first { it.name == "Merchant Discovery" }.enabled,
@@ -247,6 +260,58 @@ class MochiDatabaseTest {
                     ),
                 ).map { it.name },
             )
+            val amapTools = setOf(
+                "amap_search_poi",
+                "amap_direction",
+                "amap_geocoding",
+                "amap_reverse_geocoding",
+                "amap_weather",
+            )
+            assertFalse(
+                repository.listEnabledMetadata(amapTools).any {
+                    it.name == "travel-planning"
+                },
+            )
+            assertTrue(
+                repository.listEnabledMetadata(
+                    amapTools + setOf(
+                        "browser_read",
+                        "browser_navigate",
+                        "browser_click",
+                        "browser_input",
+                        "browser_scroll",
+                    ),
+                ).any { it.name == "travel-planning" },
+            )
+        }
+
+    @Test
+    fun `travel planning preserves the legacy Amap skill enablement`() =
+        runBlocking {
+            database.skillDao().upsert(
+                SkillEntity(
+                    id = "builtin:amap-maps",
+                    name = "Amap Maps",
+                    description = "Legacy",
+                    content = "Legacy",
+                    source = "Mochi",
+                    sourceUrl = "",
+                    upstreamVersion = null,
+                    upstreamDigest = "legacy",
+                    localDigest = "legacy",
+                    enabled = false,
+                    modified = false,
+                    updateAvailable = false,
+                    installedAtEpochMillis = 0,
+                    updatedAtEpochMillis = 0,
+                    lastCheckedAtEpochMillis = null,
+                ),
+            )
+
+            val skills = RoomSkillRepository(database.skillDao()).listSkills()
+
+            assertFalse(skills.first { it.name == "Travel Planning" }.enabled)
+            assertFalse(skills.any { it.id == "builtin:amap-maps" })
         }
 
     @Test
@@ -319,6 +384,48 @@ class MochiDatabaseTest {
             assertTrue(
                 productSearch.data.toString().contains(
                     "site:mobile.yangkeduo.com/goods.html",
+                ),
+            )
+            val travelTool = LoadSkillTool(
+                repository = repository,
+                availableToolNames = setOf(
+                    "browser_read",
+                    "browser_navigate",
+                    "browser_click",
+                    "browser_input",
+                    "browser_scroll",
+                    "amap_search_poi",
+                    "amap_direction",
+                    "amap_geocoding",
+                    "amap_reverse_geocoding",
+                    "amap_weather",
+                ),
+            )
+            val travelPlanning = travelTool.execute(
+                buildJsonObject {
+                    put("skill_name", "travel-planning")
+                },
+                context,
+            )
+            assertEquals("ok", travelPlanning.status)
+            assertTrue(
+                travelPlanning.data.toString().contains(
+                    "name: travel-planning",
+                ),
+            )
+            assertTrue(
+                travelPlanning.data.toString().contains(
+                    "browser_input",
+                ),
+            )
+            assertTrue(
+                travelPlanning.data.toString().contains(
+                    "amap_direction",
+                ),
+            )
+            assertTrue(
+                travelPlanning.data.toString().contains(
+                    "https://kyfw.12306.cn/otn/leftTicket/init",
                 ),
             )
             assertTrue(

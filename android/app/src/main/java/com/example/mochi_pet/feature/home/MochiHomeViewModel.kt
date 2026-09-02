@@ -1320,7 +1320,7 @@ class MochiHomeViewModel(
         securityKey: String,
     ) {
         updateTools(
-            "Amap connected. Amap Maps and Merchant Discovery are ready.",
+            "Amap connected. Travel Planning and Merchant Discovery are ready.",
         ) {
             requireRepository().configureAmap(
                 webServiceKey = webServiceKey,

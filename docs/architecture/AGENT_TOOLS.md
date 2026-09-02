@@ -165,7 +165,7 @@ Compose card. Typed weather/calendar/todo cards remain deterministic; external
 web and MCP evidence can use a bounded general content card selected by the
 model. See `CARD_PRESENTATION.md`.
 
-### Amap Maps
+### Amap Maps provider
 
 The built-in Amap provider stores a user-owned Web Service Key and optional
 Security Key encrypted with Android Keystore. Its provider switch and six
@@ -187,6 +187,18 @@ photos. Missing fields remain missing; the Agent must not infer review text,
 ratings, prices, or open state. Responses are bounded and enter the same-run
 general content Card evidence path. Coordinates must be trusted GCJ-02 values
 rather than model-generated guesses.
+
+The built-in Travel Planning Skill combines these Amap Tools with all five
+foreground Agent Browser Tools. It uses Amap for place resolution, first- and
+last-mile routes, and destination weather. Train research starts from the
+official public 12306 query page and interacts only with visible page controls;
+it never calls undocumented ticket endpoints. Flight research prefers public
+official-airline search forms and bounds fallback sources. The Skill never
+logs in, imports account state, bypasses verification, enters passenger or
+payment data, or continues into booking. Authentication, CAPTCHA, real-user
+challenges, identity checks, 403/429 responses, and checkout are hard stop
+conditions. Because click and input are required, the Skill is unavailable to
+read-only scheduled Browser runs.
 
 ### `get_current_weather`
 

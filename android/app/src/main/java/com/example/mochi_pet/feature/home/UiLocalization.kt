@@ -437,8 +437,8 @@ private val ZH_UI_TEXT = mapOf(
     "Tencent Docs knowledge tools connected" to "腾讯文档知识工具已连接",
     "Tencent Docs disconnected" to "腾讯文档已断开",
     "Create an Amap Web Service Key" to "创建高德 Web 服务 Key",
-    "Amap connected. Amap Maps and Merchant Discovery are ready." to
-        "高德地图已连接。高德地图和商家发现 Skills 已可使用。",
+    "Amap connected. Travel Planning and Merchant Discovery are ready." to
+        "高德地图已连接。出行规划和商家发现 Skills 已可使用。",
     "Amap disconnected" to "高德地图已断开",
     "MCP server removed" to "MCP 服务已移除",
     "Connected · 6 map and merchant tools" to "已连接 · 6 个地图与商家工具",
@@ -500,8 +500,9 @@ private val ZH_UI_TEXT = mapOf(
     "Notion Knowledge" to "Notion 知识",
     "Tencent Docs Knowledge" to "腾讯文档知识",
     "Amap Maps" to "高德地图",
-    "Search places, resolve addresses, plan routes, and check destination weather." to
-        "搜索地点、解析地址、规划路线并查询目的地天气。",
+    "Travel Planning" to "出行规划",
+    "Plan routes and research public train or flight options without logging in." to
+        "规划路线并调研无需登录的公开火车票或机票信息。",
     "Merchant Discovery" to "商家发现",
     "Find and compare merchants using Amap ratings, cost, hours, and details." to
         "使用高德评分、人均、营业时间和详情发现并比较商家。",

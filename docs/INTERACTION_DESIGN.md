@@ -180,8 +180,13 @@ selects the Web Service platform rather than Android, explains that release and
 debug SHA1 fingerprints are not required, and distinguishes the optional
 digital-signature Security Key from SHA1. Its six map and merchant capabilities
 remain individually selectable in an expandable Tool list. The two built-in
-Amap Maps and Merchant Discovery Skills provide route, nearby-search, merchant
-detail, rating, average-cost, and missing-review guidance.
+Travel Planning and Merchant Discovery Skills provide route, destination
+weather, public no-login train or flight research, nearby-search, merchant
+detail, rating, average-cost, and missing-review guidance. Travel Planning is
+available only in foreground interactions with its Amap and all five Agent
+Browser Tools enabled. It stops on authentication, CAPTCHA, identity,
+passenger, booking, or payment flows rather than requesting manual takeover or
+bypassing the website.
 Current Location appears as an independent built-in Tool switch. A clearly
 location-dependent Agent request keeps the current surface, continues after
 the Android permission result, and returns typed permission, timeout, or

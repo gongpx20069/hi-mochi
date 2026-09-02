@@ -89,7 +89,7 @@ therefore much smaller. Developers can check a connected device with
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
 | **Notion Knowledge** | Disabled | Coworks with you to research, organize material, draft new pages, and find or update information in your authorized private knowledge base | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
 | **Tencent Docs Knowledge** | Disabled | Coworks with you to research, organize material, draft new documents, and find or update information in your authorized private knowledge base | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
-| Amap Maps | Enabled | Uses requested current location, resolves places and addresses, plans routes, and checks destination weather | [Create an Amap Web Service Key](https://console.amap.com/) |
+| Travel Planning | Enabled | Uses Amap for grounded routes and weather, then Agent Browser to research public no-login train or flight options without booking | [Create an Amap Web Service Key](https://console.amap.com/); enable Agent Browser |
 | Merchant Discovery | Enabled | Finds and compares merchants using available Amap ratings, average cost, hours, phone, tags, and photos | [Create an Amap Web Service Key](https://console.amap.com/) |
 
 > **Amap setup:** Select **Web Service** as the key platform, not Android.
@@ -114,6 +114,12 @@ collapsed by default in Tools. Scheduled runs receive only the read-only
 Browser subset; foreground conversations may also click and enter page data.
 Every Tool has an independent switch, and provider-backed Tools also require
 their provider switch to be enabled.
+
+Travel Planning uses the normal visible controls on public HTTPS pages. Train
+research starts from the official 12306 query page; flight research prefers
+official airline sites. Mochi never logs in, bypasses verification, enters
+passenger or payment data, or continues into booking. It stops when a site
+requires authentication, CAPTCHA, identity verification, or checkout.
 
 ### Serial Subagents
 
