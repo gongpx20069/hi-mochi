@@ -4,10 +4,19 @@
 
 # Mochi
 
-### 让你的手机，多一点生命力。
-
 **把闲置 Android 手机变成随时待命的开源语音生活 Agent：数据默认留在本机，
 模型由你选择，说话就能记事、查资料、规划生活并打开正确的原生界面。**
+
+[**下载 APK**](https://github.com/gongpx20069/hi-mochi/releases/latest)
+· **观看演示：即将提供**
+· [**从源码构建**](docs/DEVELOPMENT.md)
+
+**Android 8.0+** · **推荐 `arm64-v8a`** ·
+**需要 OpenAI、Azure OpenAI 或兼容 Provider**
+
+> **本地优先，但并非完全离线：** Persona、对话、记忆、计划数据和凭据默认
+> 保留在设备上；模型请求、可选云端语音及已启用的外部 Tools 会使用你配置的
+> 服务。
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#使用要求与当前状态)
 [![Native Kotlin](https://img.shields.io/badge/Native-Kotlin-7F52FF?logo=kotlin&logoColor=white)](android)
@@ -21,12 +30,9 @@
 
 ---
 
-Mochi 是使用原生 Android 技术构建、免费且开源的语音生活 Agent。数据默认
-保留在设备上，模型通过你自己的 Provider Key 选择。说出 **“Hi Mochi”**，
-就能让它记事、查询公开资料、规划日常生活并打开正确的原生界面。你可以把
-Mochi 安装在闲置或退役的 Android 手机上，将旧设备改造成常驻待命的伙伴、
-桌面信息屏、计划助手和智能家居语音终端，而不是让仍可使用的硬件一直躺在
-抽屉里。
+说出 **“Hi Mochi”**，就能让它记事、查询公开资料、规划日常生活并打开正确的
+原生界面。原生 Android 语音、记忆、计划、Tools 和 Skills 能把闲置手机变成
+常驻待命的伙伴、桌面信息屏、计划助手和智能家居语音终端。
 
 ### 快速开始：选择正确的 APK
 

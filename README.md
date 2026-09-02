@@ -4,10 +4,19 @@
 
 # Mochi
 
-### Your phone, now a little more alive.
-
 **Turn an old Android phone into an always-ready, voice-first life agent.
 Local-first data, BYOK intelligence, native actions.**
+
+[**Download APK**](https://github.com/gongpx20069/hi-mochi/releases/latest)
+· **Watch Demo: coming soon**
+· [**Build from source**](docs/DEVELOPMENT.md)
+
+**Android 8.0+** · **`arm64-v8a` recommended** ·
+**OpenAI, Azure OpenAI, or compatible provider required**
+
+> **Local-first, not fully offline:** Persona, conversations, memory, planner
+> data, and credentials stay on-device by default. Model requests, optional
+> cloud speech, and enabled external Tools use the providers you configure.
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#requirements--current-status)
 [![Native Kotlin](https://img.shields.io/badge/Native-Kotlin-7F52FF?logo=kotlin&logoColor=white)](android)
@@ -21,13 +30,10 @@ Local-first data, BYOK intelligence, native actions.**
 
 ---
 
-Mochi is a free and open-source, voice-first life agent built natively for
-Android. Data stays on the device by default, and you choose the model through
-your own provider key. Say **“Hi Mochi”** to remember something, research
-public information, plan daily life, or open the right native screen. Install
-it on a spare or retired Android phone to create a dedicated always-ready
-companion, desk display, planner, and smart-home voice terminal instead of
-leaving useful hardware in a drawer.
+Say **“Hi Mochi”** to remember something, research public information, plan
+daily life, or open the right native screen. Native Android voice, memory,
+planning, Tools, and Skills turn a spare phone into a dedicated companion,
+desk display, planner, and smart-home voice terminal.
 
 ### Quick start: choose the right APK
 
