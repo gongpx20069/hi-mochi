@@ -38,6 +38,12 @@ GitHub Pages project path. The fixed `/hi-mochi/` paths in `404.html` are
 intentional because GitHub Pages serves that document for arbitrary missing
 URLs.
 
+Download controls include a checked-in current-release fallback. On page load,
+`scripts.js` reads GitHub's public `releases/latest` API, validates the returned
+repository URLs, and updates the displayed version, ARM64 download, and release
+page links. If the API is unavailable or rate-limited, the fallback remains
+usable.
+
 ## Validation
 
 Run the website-owned static checks from the repository root:

@@ -6,8 +6,8 @@
 
 ### 让你的手机，多一点生命力。
 
-**强大、免费、开源的 Android 语音 AI 助手，也是一个让旧手机重新发挥价值的
-改造计划。**
+**把闲置 Android 手机变成随时待命的开源语音生活 Agent：数据默认留在本机，
+模型由你选择，说话就能记事、查资料、规划生活并打开正确的原生界面。**
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#使用要求与当前状态)
 [![Native Kotlin](https://img.shields.io/badge/Native-Kotlin-7F52FF?logo=kotlin&logoColor=white)](android)
@@ -21,12 +21,12 @@
 
 ---
 
-Mochi 是一款使用原生 Android 技术构建，强大、免费且开源的个人语音 AI
-助手。全天候随时说出 **“Hi Mochi”** 即可唤醒，并自然地继续免手持语音对话。
-Mochi 将语音、记忆、规划、Tools 和 Agent Skills 集成在一起，还能随着对话
-自动展示合适的界面与结果。你可以把 Mochi 安装在闲置或退役的 Android
-手机上，将旧设备改造成常驻待命的 AI 伙伴、桌面信息屏、计划助手和智能家居
-语音终端，而不是让仍可使用的硬件一直躺在抽屉里。
+Mochi 是使用原生 Android 技术构建、免费且开源的语音生活 Agent。数据默认
+保留在设备上，模型通过你自己的 Provider Key 选择。说出 **“Hi Mochi”**，
+就能让它记事、查询公开资料、规划日常生活并打开正确的原生界面。你可以把
+Mochi 安装在闲置或退役的 Android 手机上，将旧设备改造成常驻待命的伙伴、
+桌面信息屏、计划助手和智能家居语音终端，而不是让仍可使用的硬件一直躺在
+抽屉里。
 
 ### 快速开始：选择正确的 APK
 
@@ -206,4 +206,4 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 
 ## License
 
-MIT
+[MIT](LICENSE)

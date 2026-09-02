@@ -3,6 +3,7 @@ from __future__ import annotations
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
+import re
 import struct
 
 
@@ -95,9 +96,45 @@ def main() -> None:
             if parser.canonical != "https://gongpx20069.github.io/hi-mochi/zh-CN/":
                 errors.append("zh-CN/index.html: incorrect canonical URL")
 
+        if page.name == "index.html":
+            source = page.read_text(encoding="utf-8")
+            download_versions = re.findall(
+                r'data-release-download href="[^"]+/download/'
+                r'(v1\.0\.[1-9][0-9]*)/Mochi-\1-arm64-v8a\.apk"',
+                source,
+            )
+            page_versions = re.findall(
+                r'data-release-page href="[^"]+/tag/(v1\.0\.[1-9][0-9]*)"',
+                source,
+            )
+            label_versions = re.findall(
+                r"data-release-version>(v1\.0\.[1-9][0-9]*)</span>",
+                source,
+            )
+            versions = set(download_versions + page_versions + label_versions)
+            if (
+                len(download_versions) != 2
+                or len(page_versions) != 2
+                or len(label_versions) != 3
+                or len(versions) != 1
+            ):
+                errors.append(
+                    f"{relative_page}: inconsistent release fallback metadata",
+                )
+
     og_image = SITE_ROOT / "assets" / "mochi-og.png"
     if png_dimensions(og_image) != (1200, 630):
         errors.append("assets/mochi-og.png: expected 1200x630")
+
+    scripts = (SITE_ROOT / "scripts.js").read_text(encoding="utf-8")
+    for marker in (
+        "/releases/latest",
+        "[data-release-version]",
+        "[data-release-page]",
+        "[data-release-download]",
+    ):
+        if marker not in scripts:
+            errors.append(f"scripts.js: missing release updater marker {marker}")
 
     if errors:
         raise SystemExit("\n".join(errors))
