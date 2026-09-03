@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.extensions.MijiaExtensionSnapshot
+import com.example.mochi_pet.core.extensions.MochiExtensionClient
+import com.example.mochi_pet.core.extensions.UnavailableMijiaExtensionClient
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpAgentTool
 import com.example.mochi_pet.core.mcp.McpRemoteTool
@@ -51,6 +54,7 @@ data class ToolCatalogSummary(
     val builtInTools: List<BuiltInToolSummary> = emptyList(),
     val amap: AmapProviderSummary = AmapProviderSummary(),
     val agentBrowser: AgentBrowserProviderSummary = AgentBrowserProviderSummary(),
+    val mijia: MijiaProviderSummary = MijiaProviderSummary(),
     val servers: List<McpServerSummary> = emptyList(),
     val isLoading: Boolean = false,
     val feedback: String? = null,
@@ -65,6 +69,29 @@ data class AmapProviderSummary(
 data class AgentBrowserProviderSummary(
     val enabled: Boolean = true,
     val tools: List<BuiltInToolSummary> = emptyList(),
+)
+
+data class MijiaProviderSummary(
+    val installed: Boolean = false,
+    val trusted: Boolean = false,
+    val connected: Boolean = false,
+    val enabled: Boolean = false,
+    val status: String = "disconnected",
+    val detail: String? = null,
+    val versionName: String? = null,
+    val accountLabel: String? = null,
+    val selectedHomeCount: Int = 0,
+    val selectedDeviceCount: Int = 0,
+    val configurationPackage: String? = null,
+    val configurationActivity: String? = null,
+    val tools: List<MijiaToolSummary> = emptyList(),
+)
+
+data class MijiaToolSummary(
+    val name: String,
+    val description: String,
+    val riskLevel: String,
+    val enabled: Boolean,
 )
 
 data class BuiltInToolSummary(
@@ -134,6 +161,15 @@ interface ToolCatalogRepository {
 
     suspend fun setAgentBrowserEnabled(enabled: Boolean): ToolCatalogSummary
 
+    suspend fun setMijiaEnabled(enabled: Boolean): ToolCatalogSummary
+
+    suspend fun setMijiaToolEnabled(
+        name: String,
+        enabled: Boolean,
+    ): ToolCatalogSummary
+
+    suspend fun disconnectMijia(): ToolCatalogSummary
+
     suspend fun loadAmapCredentials(): AmapCredentials?
 
     suspend fun addManualServer(input: ManualMcpServerInput): ToolCatalogSummary
@@ -156,6 +192,8 @@ interface ToolCatalogRepository {
     suspend fun loadEnabledMcpTools(): List<AgentTool>
 
     suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool>
+
+    suspend fun loadEnabledExtensionTools(): List<AgentTool>
 }
 
 class DataStoreToolCatalogRepository(
@@ -164,6 +202,8 @@ class DataStoreToolCatalogRepository(
     private val mcpClient: McpStreamableHttpClient,
     private val oauthClient: McpOAuthClient = McpOAuthClient(),
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val extensionClient: MochiExtensionClient =
+        UnavailableMijiaExtensionClient,
 ) : ToolCatalogRepository {
     private val json = Json {
         encodeDefaults = true
@@ -174,7 +214,7 @@ class DataStoreToolCatalogRepository(
     override suspend fun loadSummary(): ToolCatalogSummary {
         repairTruncatedTencentDocsCatalog()
         updateCatalog { it }
-        return loadCatalog().toSummary()
+        return loadCatalog().toSummary(extensionClient.snapshot())
     }
 
     override suspend fun setBuiltInEnabled(
@@ -487,6 +527,43 @@ class DataStoreToolCatalogRepository(
         return loadSummary()
     }
 
+    override suspend fun setMijiaEnabled(enabled: Boolean): ToolCatalogSummary {
+        if (enabled) {
+            require(extensionClient.snapshot().connected) {
+                "Connect Mi Home before enabling its Tools"
+            }
+        }
+        updateCatalog { catalog ->
+            catalog.copy(mijiaEnabled = enabled)
+        }
+        return loadSummary()
+    }
+
+    override suspend fun setMijiaToolEnabled(
+        name: String,
+        enabled: Boolean,
+    ): ToolCatalogSummary {
+        val snapshot = extensionClient.snapshot()
+        require(snapshot.tools.any { it.name == name }) {
+            "Unknown Mi Home Tool"
+        }
+        updateCatalog { catalog ->
+            catalog.copy(
+                mijiaToolsEnabled = catalog.mijiaToolsEnabled +
+                    (name to enabled),
+            )
+        }
+        return loadSummary()
+    }
+
+    override suspend fun disconnectMijia(): ToolCatalogSummary {
+        extensionClient.disconnect()
+        updateCatalog { catalog ->
+            catalog.copy(mijiaEnabled = false)
+        }
+        return loadSummary()
+    }
+
     override suspend fun addManualServer(
         input: ManualMcpServerInput,
     ): ToolCatalogSummary {
@@ -624,6 +701,19 @@ class DataStoreToolCatalogRepository(
                 else -> emptySet()
             }
         }
+    }
+
+    override suspend fun loadEnabledExtensionTools(): List<AgentTool> {
+        val catalog = loadCatalog()
+        if (!catalog.mijiaEnabled) return emptyList()
+        val snapshot = extensionClient.snapshot()
+        if (!snapshot.connected) return emptyList()
+        return snapshot.tools
+            .filter { definition ->
+                catalog.mijiaToolsEnabled[definition.name]
+                    ?: definition.defaultEnabled
+            }
+            .map(extensionClient::agentTool)
     }
 
     private fun PersistedToolCatalog.loadEnabledMcpTools(
@@ -817,7 +907,9 @@ class DataStoreToolCatalogRepository(
         }
     }
 
-    private fun PersistedToolCatalog.toSummary(): ToolCatalogSummary =
+    private fun PersistedToolCatalog.toSummary(
+        extension: MijiaExtensionSnapshot,
+    ): ToolCatalogSummary =
         ToolCatalogSummary(
             builtInTools = BUILT_IN_TOOLS
                 .filterNot {
@@ -842,6 +934,33 @@ class DataStoreToolCatalogRepository(
                     .map { descriptor ->
                         toBuiltInToolSummary(descriptor)
                     },
+            ),
+            mijia = MijiaProviderSummary(
+                installed = extension.installed,
+                trusted = extension.trusted,
+                connected = extension.connected,
+                enabled = mijiaEnabled && extension.connected,
+                status = extension.connectionState.status,
+                detail = extension.detail ?: extension.connectionState.detail,
+                versionName = extension.metadata?.versionName,
+                accountLabel = extension.connectionState.accountLabel,
+                selectedHomeCount =
+                    extension.connectionState.selectedHomeCount,
+                selectedDeviceCount =
+                    extension.connectionState.selectedDeviceCount,
+                configurationPackage =
+                    extension.configurationTarget?.packageName,
+                configurationActivity =
+                    extension.configurationTarget?.className,
+                tools = extension.tools.map { definition ->
+                    MijiaToolSummary(
+                        name = definition.name,
+                        description = definition.description,
+                        riskLevel = definition.riskLevel,
+                        enabled = mijiaToolsEnabled[definition.name]
+                            ?: definition.defaultEnabled,
+                    )
+                },
             ),
             servers = withBuiltInServers().servers.map { server ->
                 McpServerSummary(
@@ -1215,6 +1334,8 @@ private data class PersistedToolCatalog(
     val amapCredentials: StoredSecret? = null,
     val amapEnabled: Boolean = false,
     val agentBrowserEnabled: Boolean = true,
+    val mijiaEnabled: Boolean = false,
+    val mijiaToolsEnabled: Map<String, Boolean> = emptyMap(),
     val servers: List<PersistedMcpServer> = emptyList(),
     val pendingNotionOAuth: PendingOAuthRecord? = null,
 )

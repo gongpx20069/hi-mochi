@@ -384,7 +384,91 @@ embedded in the published npm bundle. Direct Android support therefore remains
 blocked until FlyAI issues Android-approved signing material and client
 identity rules, or an approved relay is selected.
 
-## 7. Previously proposed tool groups
+## 7. Signed extension Tools
+
+Extension Tool schemas enter the top-level registry only when all of these are
+true:
+
+- the expected APK is installed;
+- its signing certificate and signature permission match Mochi;
+- Binder protocol negotiation succeeds;
+- the extension reports a connected state;
+- the provider is enabled;
+- the individual Tool is enabled.
+
+The initial Mi Home extension may expose:
+
+- `mijia_list_devices`
+- `mijia_get_device_state`
+- `mijia_control_device`
+- `mijia_control_television`
+- `mijia_configure_camera`
+- `mijia_get_latest_camera_event_image`
+- `mijia_list_scenes`
+- `mijia_run_scene`
+
+All results use the common typed envelope. Extension errors are mapped to the
+same validation, permission, not-found, provider, timeout, cancellation, and
+internal error codes as native Tools. Tool names, descriptions, schemas,
+argument sizes, result text, attachment count, and call duration are bounded
+by the host.
+
+`mijia_list_devices` returns selected supported devices grouped by home and
+room, with stable device IDs, category, online state, model, and available
+capability names. Duplicate names never remove their home/room qualifiers.
+
+`mijia_get_device_state` reads only MIoT properties whose specification permits
+reading. Common sensor results are restricted to selected temperature,
+humidity, air-quality, contact, motion, and battery properties. The initial
+scale result is limited to identity, connectivity, and battery state. It
+excludes user profiles, weight, body-fat percentage, heart rate, body
+composition, and measurement history.
+
+`mijia_control_device` supports a semantic allowlist for common
+specification-driven devices:
+
+- light: power, brightness, and color temperature;
+- switch or plug: power;
+- fan: power, mode, and fan level;
+- air conditioner: power, mode, target temperature, and fan level;
+- air purifier or humidifier: power, mode, target value, and fan level;
+- curtain: open, close, stop, and target position.
+
+Each operation is offered only when the selected device specification declares
+the required readable/writable property or action and the value passes the
+declared range/enum contract. The Tool does not accept arbitrary MIoT service,
+property, or action IDs.
+
+`mijia_control_television` accepts only host-approved semantic operations that
+map to writable properties or declared actions: power, input, volume, mute,
+home, menu, settings, back, directional navigation, confirm, play, and pause.
+The Tool reports command acceptance separately from a verified state change.
+It never exposes a generic message-router action.
+
+`mijia_configure_camera` accepts only named settings present in the selected
+device specification. Camera power, recording, motion detection/tracking, or
+other surveillance-affecting changes require explicit current-turn intent and
+`confirmed=true`. Storage formatting/ejection, credentials, arbitrary action
+IDs, stream-start actions, PTZ, playback, two-way audio, and live viewing are
+not exposed.
+
+`mijia_get_latest_camera_event_image` is foreground Main-Agent only. It
+requires an explicitly selected camera and returns the newest available motion
+or doorbell event metadata plus one JPEG/PNG attachment descriptor. It does not
+claim the image is live, invoke a camera shutter, start a stream, or return
+image bytes/URLs in JSON. Missing events or unsupported models return typed
+errors. Successful evidence deterministically creates the trusted Camera
+Snapshot card.
+
+`mijia_list_scenes` returns only enabled manually triggered scenes from selected
+homes. `mijia_run_scene` requires an exact stable scene ID selected from that
+evidence plus explicit current-turn intent and `confirmed=true`; scene contents
+are not inferred to be safe.
+
+Mi Home Tools are not available to Scheduled Agent runs or Subagents in the
+initial release. The Skill catalog cannot bypass this restriction.
+
+## 8. Previously proposed tool groups
 
 - `trigger_haptic`
 - `show_notification`
@@ -393,7 +477,7 @@ identity rules, or an approved relay is selected.
 - `http_fetch`
 - `script_execute`
 
-## 8. Opt-in Android tools
+## 9. Opt-in Android tools
 
 - `manage_alarm`
 - `manage_timer`
@@ -405,7 +489,7 @@ identity rules, or an approved relay is selected.
 Calls and SMS open system UI; Mochi does not silently place calls or send
 messages. Contact mutation requires explicit permission and confirmation.
 
-## 9. Agent loop
+## 10. Agent loop
 
 1. Send schemas allowed by current settings and permissions.
 2. Execute tool calls through typed Kotlin executors.

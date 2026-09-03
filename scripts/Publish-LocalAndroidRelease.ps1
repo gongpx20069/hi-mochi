@@ -24,15 +24,26 @@ $expectedAbis = @(
     'universal'
 )
 $artifacts = @($metadata.artifacts)
+$baseArtifacts = @($artifacts | Where-Object { $_.kind -eq 'base' })
+$extensionArtifacts = @(
+    $artifacts | Where-Object { $_.kind -eq 'extension' }
+)
 if (
-    $artifacts.Count -ne $expectedAbis.Count -or
-    @($expectedAbis | Where-Object { $_ -notin $artifacts.abi })
+    $baseArtifacts.Count -ne $expectedAbis.Count -or
+    @($expectedAbis | Where-Object { $_ -notin $baseArtifacts.abi }) -or
+    $extensionArtifacts.Count -ne 1
 ) {
-    throw "Release metadata does not contain the expected ABI artifacts."
+    throw "Release metadata does not contain the expected APK artifacts."
 }
 $releaseAssets = @()
+$baseSignerDigests = $null
+$extensionSignerDigests = $null
 foreach ($artifact in $artifacts) {
-    $expectedFile = "Mochi-v$version-$($artifact.abi).apk"
+    $expectedFile = if ($artifact.kind -eq 'extension') {
+        "Mochi-Mijia-Extension-v$version.apk"
+    } else {
+        "Mochi-v$version-$($artifact.abi).apk"
+    }
     if ($artifact.file -ne $expectedFile) {
         throw (
             "ABI '$($artifact.abi)' must use release file " +
@@ -45,6 +56,24 @@ foreach ($artifact in $artifacts) {
         throw "APK '$($artifact.file)' has version '$embeddedVersion'."
     }
     Assert-AndroidApkSignature $apkPath
+    if ($artifact.kind -eq 'extension') {
+        Assert-AndroidApkIdentity `
+            -ApkPath $apkPath `
+            -ExpectedApplicationId 'com.example.mochi_pet.extension.mijia' `
+            -ShouldHaveLauncher $false
+        $extensionSignerDigests = @(Get-AndroidApkSignerSha256 $apkPath)
+    } else {
+        Assert-AndroidApkIdentity `
+            -ApkPath $apkPath `
+            -ExpectedApplicationId 'com.example.mochi_pet' `
+            -ShouldHaveLauncher $true
+        $signerDigests = @(Get-AndroidApkSignerSha256 $apkPath)
+        if ($null -eq $baseSignerDigests) {
+            $baseSignerDigests = $signerDigests
+        } elseif (Compare-Object $baseSignerDigests $signerDigests) {
+            throw "Base APK '$($artifact.file)' uses a different signer."
+        }
+    }
     $apkHash = (
         Get-FileHash -Algorithm SHA256 $apkPath
     ).Hash.ToLowerInvariant()
@@ -52,6 +81,9 @@ foreach ($artifact in $artifacts) {
         throw "APK '$($artifact.file)' failed SHA-256 validation."
     }
     $releaseAssets += $apkPath
+}
+if (Compare-Object $baseSignerDigests $extensionSignerDigests) {
+    throw 'The Mi Home extension APK must use the base APK signer.'
 }
 $expectedChecksumName = "Mochi-v$version-SHA256SUMS.txt"
 if ($metadata.checksum_file -ne $expectedChecksumName) {
@@ -124,6 +156,9 @@ $releaseNotes = @'
 - **`universal`**: use only when the architecture is unknown; this is the largest download / 不确定架构时使用，体积最大
 
 All variants provide the same Mochi features.
+
+Install **`Mochi-Mijia-Extension`** only if you want optional Mi Home Tools.
+It has no launcher icon and must be signed by the same release key as Mochi.
 '@
 
 & gh release create $tag @releaseAssets `

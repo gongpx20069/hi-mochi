@@ -196,6 +196,66 @@ switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
 
+Tools also contains an Extensions section. The Mi Home card always occupies
+one stable position and moves through these states:
+
+1. **Not installed**: describe the optional unofficial connector, its
+   approximate download size, and open the trusted GitHub Release page through
+   an **Install extension** action.
+2. **Installed, not connected**: show extension version and a **Connect Mi
+   Home** action.
+3. **Waiting for QR confirmation**: open the extension-owned connection
+   activity, show a bounded QR expiry countdown, refresh on expiry, and allow
+   cancellation. Copy explains that another phone already signed into Mi Home
+   must scan and confirm the code.
+4. **Connected, disabled**: show the selected homes and device count without
+   registering any Agent Tools.
+5. **Connected, enabled**: show one provider switch and one collapsed list of
+   individually selectable Mi Home Tools.
+6. **Authorization expired**: remove every Mi Home Tool from the Agent
+   registry and show **Reconnect**.
+7. **Update available**: open the trusted replacement APK. Android performs an
+   in-place package update; stored authorization and device selections remain
+   unless the extension rejects an incompatible state version.
+
+The extension has no launcher activity, so the Android launcher continues to
+show only Mochi. Android Settings and the system package installer identify it
+as **Mochi Mi Home Extension** so users can inspect or uninstall it.
+
+After QR connection, users select homes and supported devices. Lights,
+switches, plugs, fans, air conditioners, air purifiers, humidifiers, curtains,
+read-only sensors, televisions, cameras, and scales derive capabilities from
+each device's MIoT specification rather than from a fixed model allowlist.
+Locks, alarms, garage doors, robot-vacuum maps, camera storage mutation, and
+unsupported capabilities never appear. Ambiguous duplicate device names are
+displayed with home and room labels.
+
+Ordinary use remains voice-first:
+
+- “Turn on the living-room television” may execute an available power action.
+- “Turn the television volume down” invokes a bounded television control.
+- “Set the bedroom air conditioner to 26 degrees” invokes only the declared
+  temperature and mode properties for that selected device.
+- “Set the dining-room light to 40 percent” invokes only declared power and
+  brightness properties.
+- “What is the study temperature?” reads the selected sensor without exposing
+  unrelated devices.
+- “Show the latest door-camera event” retrieves the newest available event
+  image and presents it locally.
+- “How much battery does the scale have?” reads only exposed device state.
+
+Television commands report **sent** unless a later state read proves the new
+state. Camera setting changes and scene execution require explicit current-turn
+intent; ambiguous devices or scenes produce a clarification instead of a
+guess.
+
+A successful latest-camera-event request creates a deterministic trusted
+Camera Snapshot card. The image remains local and ephemeral, with device,
+home/room, event type, and capture time shown from Tool evidence. The card does
+not imply that the image is live. It has Dismiss but no source, share, save, or
+model-analysis action. Leaving the card, cancelling the turn, process death,
+or attachment expiry releases the image.
+
 When a Browser Tool runs while Home is selected, Home transforms into a trusted
 `BrowserSessionCard` containing the live WebView, origin, loading state, current
 Agent action, and Stop Agent. This runtime card is not a

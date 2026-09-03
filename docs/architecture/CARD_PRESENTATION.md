@@ -59,6 +59,7 @@ Supported card types:
 - `comparison`
 - `insight`
 - `progress`
+- `camera_snapshot` (deterministic extension attachment only)
 
 Supported requested placements:
 
@@ -82,6 +83,23 @@ keeps the normal text bubble.
 Unknown types, placements, sources, malformed fields, invalid actions, or cards
 without required Tool evidence are ignored. The valid text reply still succeeds
 and is rendered as the normal assistant bubble.
+
+`camera_snapshot` is not model-authored general content. A successful
+foreground `mijia_get_latest_camera_event_image` result creates it
+deterministically after the host validates same-run evidence and an attachment
+from the official extension. The renderer shows only:
+
+- the locally decoded image;
+- camera name;
+- home and room;
+- event type when available;
+- event capture time;
+- a clear **latest event** label.
+
+The card permits Dismiss and the existing placement/expand behavior, but no
+Save, Share, Open source, or model-analysis action. It is never persisted.
+Expired, cancelled, stale, oversized, malformed, or undecodable attachments
+discard the card while preserving the text reply.
 
 ## 4. Evidence binding
 

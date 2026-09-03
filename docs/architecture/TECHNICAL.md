@@ -184,6 +184,42 @@ remains the TTS, history, and rendering-failure fallback. Action targets are
 bound to same-run evidence, and state changes are applied to every placement
 sharing the card ID.
 
+## 2.1 Optional extension runtime
+
+Mochi supports separately installed Android extension APKs through the
+versioned Binder contract in `:extension-api`. The initial host accepts only
+explicit official package IDs signed by the same release certificate as the
+base application. It does not scan for arbitrary plugins, load foreign DEX,
+execute extension-provided UI inside Mochi, or grant network/filesystem access
+through a generic bridge.
+
+The host discovers the optional Mi Home package through PackageManager, binds
+its explicit service, negotiates the protocol version, loads bounded Tool
+definitions, and adapts selected definitions into `ToolRegistry`. Provider and
+individual Tool switches remain authoritative. The extension Activity handles
+QR login; the service handles Tool calls. Neither interface returns Xiaomi
+session credentials.
+
+Binder calls use request IDs and callbacks rather than blocking the main
+thread. Cancellation propagates from the active Agent coroutine to the
+extension service. Binder death, package replacement, timeout, disabled state,
+or stale session causes a typed Tool error and removes unavailable definitions
+from the next registry assembly.
+
+The Mi Home extension reuses Android Keystore, OkHttp, coroutines, and
+kotlinx.serialization. It implements only the independently documented Xiaomi
+Passport and MIoT request behavior needed for interoperability. It does not
+copy Xiaomi's Home Assistant integration, whose license limits that work and
+its related cloud interfaces to non-commercial Home Assistant use.
+
+Camera event images are bounded ephemeral attachments. The extension retrieves
+the latest available event metadata and encrypted image, decrypts it into its
+private cache, and returns metadata plus a read-only file descriptor. Mochi
+validates and decodes the image locally for one trusted card. Image bytes are
+never inserted into the Agent message list, diagnostic logs, Room history,
+memory recall, provider sharing, export, scheduled execution, Subagent context,
+or TTS.
+
 ## 3. Agent response
 
 ```json
@@ -365,6 +401,11 @@ Navigation is a local deterministic policy, not an unrestricted model action.
 - Require explicit confirmation for destructive or sensitive operations,
   except the documented default-allow Agent Browser Tool provider.
 - Keep model API keys out of prompts, logs, exports, and JavaScript.
+- Keep extension credentials and camera attachments out of prompts, logs,
+  exports, Room, JavaScript, MCP, Browser, and provider-sharing links.
+- Bind only same-signer extension packages with the expected explicit package
+  and service identity. Never relax the public web URL policy to implement a
+  local plugin.
 - Bound tool rounds, network response size, script time, and script output.
 - Do not expose shell/process execution or arbitrary filesystem access.
 

@@ -192,6 +192,7 @@ tasks.named("preBuild").configure {
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.06.01")
 
+    implementation(project(":extension-api"))
     implementation(composeBom)
     androidTestImplementation(composeBom)
 

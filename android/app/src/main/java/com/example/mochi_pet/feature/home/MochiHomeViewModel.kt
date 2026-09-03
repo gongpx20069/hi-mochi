@@ -2,6 +2,10 @@ package com.example.mochi_pet.feature.home
 
 import android.database.sqlite.SQLiteException
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.system.Os
+import android.system.OsConstants
 import android.webkit.WebView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -18,8 +22,11 @@ import com.example.mochi_pet.core.agent.AgentRunRequest
 import com.example.mochi_pet.core.agent.AgentRunner
 import com.example.mochi_pet.core.agent.tool.ManageMochiCalendarTool
 import com.example.mochi_pet.core.agent.tool.ManageMochiTodoTool
+import com.example.mochi_pet.core.agent.tool.AgentToolJson
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.extensions.ExtensionActivityTarget
+import com.example.mochi_pet.core.extensions.MochiExtensionClient
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.database.PlannerStore
@@ -105,6 +112,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class PlannerSurfaceState(
     val isLoading: Boolean = false,
@@ -207,6 +217,16 @@ data class ToolsUiState(
     val isLoading: Boolean = true,
     val feedback: String? = null,
     val authorizationUrl: String? = null,
+    val extensionActivityTarget: ExtensionActivityTarget? = null,
+)
+
+data class CameraSnapshotUiState(
+    val bitmap: Bitmap,
+    val cameraName: String,
+    val home: String?,
+    val room: String?,
+    val eventType: String?,
+    val capturedAt: String?,
 )
 
 data class WeatherUiState(
@@ -245,6 +265,7 @@ class MochiHomeViewModel(
     private val skillRepository: SkillRepository? = null,
     private val skillMarketClient: SkillMarketClient? = null,
     private val toolCatalogRepository: ToolCatalogRepository? = null,
+    private val extensionClient: MochiExtensionClient? = null,
     private val agentBrowserRuntime: AgentBrowserRuntime? = null,
     private val weatherRepository: WeatherRepository? = null,
     private val locationPermissionGate: LocationPermissionGate? = null,
@@ -272,6 +293,8 @@ class MochiHomeViewModel(
     private val mutableToolsState = MutableStateFlow(ToolsUiState())
     private val mutableWeatherState = MutableStateFlow(WeatherUiState())
     private val mutableHomeCard = MutableStateFlow<CardPresentation?>(null)
+    private val mutableCameraSnapshot =
+        MutableStateFlow<CameraSnapshotUiState?>(null)
     private val unavailableLocationPermissionRequest = MutableStateFlow(false)
     private val unavailableBrowserState =
         MutableStateFlow(AgentBrowserUiState())
@@ -306,6 +329,8 @@ class MochiHomeViewModel(
     val weatherState: StateFlow<WeatherUiState> =
         mutableWeatherState.asStateFlow()
     val homeCard: StateFlow<CardPresentation?> = mutableHomeCard.asStateFlow()
+    val cameraSnapshot: StateFlow<CameraSnapshotUiState?> =
+        mutableCameraSnapshot.asStateFlow()
     val browserState: StateFlow<AgentBrowserUiState> =
         agentBrowserRuntime?.state ?: unavailableBrowserState.asStateFlow()
     val locationPermissionRequest: StateFlow<Boolean> =
@@ -318,6 +343,7 @@ class MochiHomeViewModel(
         loadAgentContext()
         loadSkills()
         loadTools()
+        observeExtensionAttachments()
     }
 
     fun browserWebView(context: Context): WebView? =
@@ -335,6 +361,9 @@ class MochiHomeViewModel(
             target == MochiSurface.Weather
         ) {
             mutableHomeCard.value = null
+        }
+        if (target != MochiSurface.Card) {
+            mutableCameraSnapshot.value = null
         }
         mutableSurface.value = target
         load(target)
@@ -1347,6 +1376,71 @@ class MochiHomeViewModel(
         }
     }
 
+    fun installMijiaExtension() {
+        mutableToolsState.update {
+            it.copy(
+                feedback = "Download the trusted Mi Home extension APK",
+                authorizationUrl = MIJIA_RELEASE_URL,
+            )
+        }
+    }
+
+    fun configureMijiaExtension() {
+        val mijia = mutableToolsState.value.catalog.mijia
+        val packageName = mijia.configurationPackage
+        val activity = mijia.configurationActivity
+        if (packageName == null || activity == null) {
+            mutableToolsState.update {
+                it.copy(feedback = "The Mi Home extension is unavailable")
+            }
+            return
+        }
+        mutableToolsState.update {
+            it.copy(
+                extensionActivityTarget = ExtensionActivityTarget(
+                    packageName = packageName,
+                    className = activity,
+                ),
+            )
+        }
+    }
+
+    fun consumeExtensionActivityTarget() {
+        mutableToolsState.update {
+            it.copy(extensionActivityTarget = null)
+        }
+    }
+
+    fun refreshTools() {
+        loadTools()
+    }
+
+    fun setMijiaEnabled(enabled: Boolean) {
+        updateTools {
+            requireRepository().setMijiaEnabled(enabled)
+        }
+    }
+
+    fun setMijiaToolEnabled(
+        name: String,
+        enabled: Boolean,
+    ) {
+        updateTools {
+            requireRepository().setMijiaToolEnabled(name, enabled)
+        }
+    }
+
+    fun disconnectMijia() {
+        updateTools("Mi Home disconnected") {
+            requireRepository().disconnectMijia()
+        }
+    }
+
+    fun dismissCameraSnapshot() {
+        mutableCameraSnapshot.value = null
+        mutableSurface.value = MochiSurface.Face
+    }
+
     fun addManualMcpServer(input: ManualMcpServerInput) {
         updateTools("MCP server added; choose tools to enable") {
             requireRepository().addManualServer(input)
@@ -1547,6 +1641,89 @@ class MochiHomeViewModel(
                 }
                 .onFailure(::showToolError)
         }
+    }
+
+    private fun observeExtensionAttachments() {
+        val client = extensionClient ?: return
+        viewModelScope.launch {
+            client.attachmentEvents.collect { descriptor ->
+                runCatching {
+                    withContext(ioDispatcher) {
+                        client.openAttachment(descriptor).use { opened ->
+                            val bitmap = decodeCameraSnapshot(
+                                opened.fileDescriptor.fileDescriptor,
+                                opened.descriptor.widthPixels,
+                                opened.descriptor.heightPixels,
+                            )
+                            val metadata = AgentToolJson.format
+                                .parseToJsonElement(
+                                    opened.descriptor.metadataJson,
+                                ).jsonObject
+                            CameraSnapshotUiState(
+                                bitmap = bitmap,
+                                cameraName = metadata.stringValue("camera_name")
+                                    ?: "Mi Home camera",
+                                home = metadata.stringValue("home"),
+                                room = metadata.stringValue("room"),
+                                eventType = metadata.stringValue("event_type"),
+                                capturedAt = metadata.stringValue("captured_at"),
+                            )
+                        }
+                    }
+                }.onSuccess { snapshot ->
+                    mutableCameraSnapshot.value = snapshot
+                    mutableSurface.value = MochiSurface.Card
+                }.onFailure { error ->
+                    mutableConversationState.update {
+                        it.copy(
+                            errorMessage = error.message
+                                ?: "Camera event image could not be opened.",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun decodeCameraSnapshot(
+        fileDescriptor: java.io.FileDescriptor,
+        expectedWidth: Int,
+        expectedHeight: Int,
+    ): Bitmap {
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeFileDescriptor(fileDescriptor, null, bounds)
+        if (
+            bounds.outWidth <= 0 ||
+            bounds.outHeight <= 0 ||
+            bounds.outWidth != expectedWidth ||
+            bounds.outHeight != expectedHeight
+        ) {
+            throw IllegalStateException(
+                "Camera event image dimensions are invalid.",
+            )
+        }
+        var sampleSize = 1
+        while (
+            bounds.outWidth / sampleSize > CAMERA_BITMAP_MAX_DIMENSION ||
+            bounds.outHeight / sampleSize > CAMERA_BITMAP_MAX_DIMENSION ||
+            bounds.outWidth.toLong() / sampleSize *
+            (bounds.outHeight.toLong() / sampleSize) >
+            CAMERA_BITMAP_MAX_PIXELS
+        ) {
+            sampleSize *= 2
+        }
+        Os.lseek(fileDescriptor, 0, OsConstants.SEEK_SET)
+        return BitmapFactory.decodeFileDescriptor(
+            fileDescriptor,
+            null,
+            BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+            },
+        ) ?: throw IllegalStateException(
+            "Camera event image could not be decoded.",
+        )
     }
 
     private fun updateTools(
@@ -1887,6 +2064,7 @@ class MochiHomeViewModel(
     override fun onCleared() {
         interactionVersion += 1
         agentJob?.cancel()
+        mutableCameraSnapshot.value = null
         voiceRuntime?.stopListening()
         voiceRuntime?.stopSpeaking()
         wakeRuntime?.resume()
@@ -1898,6 +2076,10 @@ class MochiHomeViewModel(
         private val AGENT_LOGGER = Logger.getLogger(AGENT_LOG_TAG)
         private const val TENCENT_DOCS_TOKEN_URL =
             "https://docs.qq.com/open/auth/mcp.html"
+        private const val MIJIA_RELEASE_URL =
+            "https://github.com/gongpx20069/hi-mochi/releases/latest"
+        private const val CAMERA_BITMAP_MAX_DIMENSION = 2_048
+        private const val CAMERA_BITMAP_MAX_PIXELS = 4_194_304L
 
         fun factory(
             application: MochiApplication,
@@ -1936,6 +2118,7 @@ class MochiHomeViewModel(
                         skillMarketClient = application.skillMarketClient,
                         toolCatalogRepository =
                             application.toolCatalogRepository,
+                        extensionClient = application.extensionClient,
                         agentBrowserRuntime = application.agentBrowserRuntime,
                         weatherRepository = application.weatherRepository,
                         locationPermissionGate =
@@ -1955,3 +2138,8 @@ private fun AgentPipelineStage.toUiStage(): ChatPipelineStage =
         AgentPipelineStage.TOOL -> ChatPipelineStage.TOOL
         AgentPipelineStage.SUMMARY -> ChatPipelineStage.SUMMARY
     }
+
+private fun kotlinx.serialization.json.JsonObject.stringValue(
+    name: String,
+): String? =
+    this[name]?.jsonPrimitive?.contentOrNull

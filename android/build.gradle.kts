@@ -1,9 +1,11 @@
 plugins {
     id("com.android.application") version "8.11.1" apply false
+    id("com.android.library") version "8.11.1" apply false
     id("androidx.room") version "2.8.4" apply false
     id("com.google.devtools.ksp") version "2.3.10" apply false
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.2.20" apply false
+    id("org.jetbrains.kotlin.plugin.parcelize") version "2.2.20" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.2.20" apply false
 }
 
@@ -96,6 +98,12 @@ tasks.register("verifyNative") {
         ":app:lintDebug",
         ":app:testDebugUnitTest",
         ":app:assembleDebug",
+        ":extension-api:lintDebug",
+        ":extension-api:testDebugUnitTest",
+        ":extension-api:assembleDebug",
+        ":extensions:mijia:lintDebug",
+        ":extensions:mijia:testDebugUnitTest",
+        ":extensions:mijia:assembleDebug",
     )
 }
 
@@ -108,5 +116,11 @@ tasks.register("verifyRelease") {
         ":app:lintRelease",
         ":app:testDebugUnitTest",
         ":app:assembleRelease",
+        ":extension-api:lintRelease",
+        ":extension-api:testDebugUnitTest",
+        ":extension-api:assembleRelease",
+        ":extensions:mijia:lintRelease",
+        ":extensions:mijia:testDebugUnitTest",
+        ":extensions:mijia:assembleRelease",
     )
 }

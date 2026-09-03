@@ -165,6 +165,43 @@ support is an optional import/export adapter.
 - Default model-facing instructions, including SOUL, USER, AGENTS, Tool
   contracts, and the system prompt, remain English in every UI language.
 
+### 3.10 Optional signed extensions
+
+- Mochi may expose optional Android capabilities through separately installed
+  APK extensions rather than increasing every base APK.
+- The first extension is the optional Mi Home connector. It has no launcher
+  entry and is installed, connected, enabled, updated, and disconnected from
+  the Mochi Tools surface.
+- The base app accepts only extension packages signed by the same trusted
+  release certificate and implementing the versioned Mochi Extension API.
+  Installing an extension never enables it or grants device access implicitly.
+- Mi Home connection uses a QR code scanned and confirmed through an already
+  authenticated Mi Home app. Mochi never asks for or stores the Xiaomi account
+  password.
+- Mi Home is explicitly labeled as an unofficial cloud integration. It may
+  stop working when Xiaomi changes undocumented account or device interfaces.
+- The initial Mi Home scope covers:
+  - common specification-driven devices such as lights, switches, plugs,
+    fans, air conditioners, air purifiers, humidifiers, and curtains;
+  - read-only temperature, humidity, air-quality, contact, motion, and battery
+    sensor state when exposed by the device;
+  - television state, input, volume, mute, navigation, and playback controls
+    when exposed by the device's MIoT specification;
+  - camera state and selected settings, plus the newest available motion or
+    doorbell event image;
+  - scale identity, connectivity, and battery state when exposed;
+  - manually triggered scenes selected by the user.
+- Camera live view, playback, two-way audio, PTZ, current-frame capture, memory
+  card mutation, robot-vacuum maps, arbitrary private device protocols, locks,
+  alarms, garage doors, and scale body measurements are outside the initial
+  scope.
+- Camera event images are foreground-only ephemeral local attachments. They
+  are not persisted to conversation history, copied to the gallery, exposed to
+  scheduled runs or Subagents, or sent to the configured model provider.
+- Xiaomi session credentials remain inside the extension's Keystore-backed
+  storage and never enter Mochi prompts, logs, exports, provider sharing, or
+  Binder payloads.
+
 ## 4. Local agent
 
 The agent uses:
@@ -205,6 +242,10 @@ settings without exposing API keys.
 - Silent phone calls, SMS sending, contact mutation, or destructive deletion.
 - System calendar as required storage.
 - Arbitrary shell or filesystem access from model-generated scripts.
+- Downloaded executable code, unsigned extension packages, or dynamically
+  loaded DEX/JAR plugins.
+- Generic camera streaming or body-composition history in the first Mi Home
+  extension release.
 
 ## 7. Acceptance criteria
 
@@ -219,3 +260,8 @@ settings without exposing API keys.
   date formatting without translating model-facing instructions.
 - Automated tests cover date resolution, navigation policy, tool validation,
   Room migrations, and agent cancellation.
+- Optional extensions remain absent from the Agent registry until the package,
+  signature, protocol version, connection, provider switch, and individual
+  Tool selection all validate.
+- A successful latest-camera-event image request renders a trusted local image
+  card without putting image bytes in the model request or persisted history.

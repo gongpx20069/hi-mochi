@@ -13,6 +13,8 @@ import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.database.MochiDatabase
 import com.example.mochi_pet.core.database.PlannerRepository
 import com.example.mochi_pet.core.database.PlannerStore
+import com.example.mochi_pet.core.extensions.AndroidMijiaExtensionClient
+import com.example.mochi_pet.core.extensions.MochiExtensionClient
 import com.example.mochi_pet.core.memory.AgentMemoryRepository
 import com.example.mochi_pet.core.memory.RoomAgentMemoryRepository
 import com.example.mochi_pet.core.persona.FilePersonaRepository
@@ -157,6 +159,10 @@ class MochiApplication : Application() {
         AmapMapsClient()
     }
 
+    val extensionClient: MochiExtensionClient by lazy {
+        AndroidMijiaExtensionClient(this)
+    }
+
     val toolCatalogRepository: ToolCatalogRepository by lazy {
         DataStoreToolCatalogRepository(
             dataStore = toolDataStore,
@@ -164,6 +170,7 @@ class MochiApplication : Application() {
                 keyAlias = "mochi_tool_secret_v1",
             ),
             mcpClient = mcpClient,
+            extensionClient = extensionClient,
         )
     }
 
@@ -247,6 +254,7 @@ class MochiApplication : Application() {
                     onWeatherLoaded = {},
                     includeBrowser = true,
                     includeBrowserInteractions = false,
+                    includeExtensions = false,
                 ).run(
                     AgentRunRequest(
                         provider = provider,

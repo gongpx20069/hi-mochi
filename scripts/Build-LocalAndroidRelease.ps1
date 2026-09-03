@@ -61,6 +61,9 @@ New-MochiReleaseAssets `
     -SourceOutputDirectory (
         Join-Path $androidRoot 'app\build\outputs\apk\release'
     ) `
+    -ExtensionSourceOutputDirectory (
+        Join-Path $androidRoot 'extensions\mijia\build\outputs\apk\release'
+    ) `
     -DestinationDirectory $releaseDirectory
 
 Write-Output "Version: $version"

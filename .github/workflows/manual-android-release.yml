@@ -86,6 +86,8 @@ jobs:
             -Version $env:VERSION `
             -Commit $env:COMMIT `
             -SourceOutputDirectory android/app/build/outputs/apk/release `
+            -ExtensionSourceOutputDirectory `
+              android/extensions/mijia/build/outputs/apk/release `
             -DestinationDirectory "android/Mochi-$env:TAG"
 
       - name: Upload workflow artifact
@@ -124,6 +126,7 @@ jobs:
           - **`x86_64`**: 64-bit Android emulators or rare Intel devices / 64 位模拟器或少见 Intel 设备
           - **`x86`**: 32-bit Android emulators or older Intel devices / 32 位模拟器或更早 Intel 设备
           - **`universal`**: use only when the architecture is unknown; this is the largest download / 不确定架构时使用，体积最大
+          - **`Mochi-Mijia-Extension`**: optional Mi Home Tools; install beside Mochi, with no extra launcher icon / 可选米家工具扩展，与 Mochi 一同安装且不会增加桌面图标
 
           All variants provide the same Mochi features.
           EOF

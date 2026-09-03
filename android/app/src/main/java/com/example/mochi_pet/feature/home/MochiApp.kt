@@ -3,6 +3,7 @@ package com.example.mochi_pet.feature.home
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
 import android.content.res.Configuration
 import android.content.pm.PackageManager
@@ -35,6 +36,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -98,6 +100,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -113,6 +116,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -154,6 +158,7 @@ import com.example.mochi_pet.core.tools.BuiltInToolSummary
 import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.McpAuthMode
 import com.example.mochi_pet.core.tools.McpServerSummary
+import com.example.mochi_pet.core.tools.MijiaProviderSummary
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
@@ -357,6 +362,8 @@ private fun MochiAppContent(
     val toolsState by viewModel.toolsState.collectAsStateWithLifecycle()
     val weatherState by viewModel.weatherState.collectAsStateWithLifecycle()
     val homeCard by viewModel.homeCard.collectAsStateWithLifecycle()
+    val cameraSnapshot by
+        viewModel.cameraSnapshot.collectAsStateWithLifecycle()
     val browserState by viewModel.browserState.collectAsStateWithLifecycle()
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
     var focusMode by rememberSaveable { mutableStateOf(false) }
@@ -494,6 +501,36 @@ private fun MochiAppContent(
             viewModel.consumeToolAuthorizationUrl()
         }
     }
+    val extensionActivityLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        viewModel.refreshTools()
+    }
+    LaunchedEffect(toolsState.extensionActivityTarget) {
+        val target = toolsState.extensionActivityTarget
+            ?: return@LaunchedEffect
+        try {
+            extensionActivityLauncher.launch(
+                Intent().setComponent(
+                    ComponentName(target.packageName, target.className),
+                ),
+            )
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(
+                context,
+                localizeUiText("The Mi Home extension is unavailable"),
+                Toast.LENGTH_SHORT,
+            ).show()
+        } catch (_: SecurityException) {
+            Toast.makeText(
+                context,
+                localizeUiText("Android blocked the Mi Home extension"),
+                Toast.LENGTH_SHORT,
+            ).show()
+        } finally {
+            viewModel.consumeExtensionActivityTarget()
+        }
+    }
 
     val renderSurface: @Composable (Modifier) -> Unit = { modifier ->
         val performCardAction:
@@ -574,6 +611,7 @@ private fun MochiAppContent(
             toolsState = toolsState,
             weatherState = weatherState,
             homeCard = homeCard,
+            cameraSnapshot = cameraSnapshot,
             onNavigate = viewModel::navigate,
             onSendMessage = viewModel::sendConversation,
             onCancelMessage = viewModel::cancelConversation,
@@ -613,6 +651,11 @@ private fun MochiAppContent(
             onDisconnectAmap = viewModel::disconnectAmap,
             onSetAmapEnabled = viewModel::setAmapEnabled,
             onSetAgentBrowserEnabled = viewModel::setAgentBrowserEnabled,
+            onInstallMijia = viewModel::installMijiaExtension,
+            onConfigureMijia = viewModel::configureMijiaExtension,
+            onDisconnectMijia = viewModel::disconnectMijia,
+            onSetMijiaEnabled = viewModel::setMijiaEnabled,
+            onSetMijiaToolEnabled = viewModel::setMijiaToolEnabled,
             onAddMcpServer = viewModel::addManualMcpServer,
             onRemoveMcpServer = viewModel::removeManualMcpServer,
             onSetMcpServerEnabled = viewModel::setMcpServerEnabled,
@@ -625,6 +668,7 @@ private fun MochiAppContent(
             onRunSchedule = viewModel::runSchedule,
             onRemoveSchedule = viewModel::removeSchedule,
             onCardAction = performCardAction,
+            onDismissCameraSnapshot = viewModel::dismissCameraSnapshot,
             onFocus = {
                 focusStandby = false
                 standbyResetVersion += 1
@@ -1494,6 +1538,7 @@ private fun SurfaceContent(
     toolsState: ToolsUiState,
     weatherState: WeatherUiState,
     homeCard: CardPresentation?,
+    cameraSnapshot: CameraSnapshotUiState?,
     onNavigate: (MochiNavigationIntent) -> Unit,
     onSendMessage: (String) -> Unit,
     onCancelMessage: () -> Unit,
@@ -1529,6 +1574,11 @@ private fun SurfaceContent(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onInstallMijia: () -> Unit,
+    onConfigureMijia: () -> Unit,
+    onDisconnectMijia: () -> Unit,
+    onSetMijiaEnabled: (Boolean) -> Unit,
+    onSetMijiaToolEnabled: (String, Boolean) -> Unit,
     onAddMcpServer: (ManualMcpServerInput) -> Unit,
     onRemoveMcpServer: (String) -> Unit,
     onSetMcpServerEnabled: (String, Boolean) -> Unit,
@@ -1539,6 +1589,7 @@ private fun SurfaceContent(
     onRunSchedule: (String) -> Unit,
     onRemoveSchedule: (String) -> Unit,
     onCardAction: (CardPresentation, CardAction) -> Unit,
+    onDismissCameraSnapshot: () -> Unit,
     onFocus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1556,8 +1607,10 @@ private fun SurfaceContent(
                 pipelineState = pipelineState,
                 weatherState = weatherState,
                 card = homeCard,
+                cameraSnapshot = cameraSnapshot,
                 onNavigate = onNavigate,
                 onCardAction = onCardAction,
+                onDismissCameraSnapshot = onDismissCameraSnapshot,
                 onFocus = onFocus,
             )
             MochiSurface.Conversation -> ConversationSurface(
@@ -1621,6 +1674,11 @@ private fun SurfaceContent(
                 onDisconnectAmap = onDisconnectAmap,
                 onSetAmapEnabled = onSetAmapEnabled,
                 onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
+                onInstallMijia = onInstallMijia,
+                onConfigureMijia = onConfigureMijia,
+                onDisconnectMijia = onDisconnectMijia,
+                onSetMijiaEnabled = onSetMijiaEnabled,
+                onSetMijiaToolEnabled = onSetMijiaToolEnabled,
                 onAddServer = onAddMcpServer,
                 onRemoveServer = onRemoveMcpServer,
                 onSetServerEnabled = onSetMcpServerEnabled,
@@ -1695,8 +1753,10 @@ private fun HomePresentationSurface(
     pipelineState: ChatPipelineUiState,
     weatherState: WeatherUiState,
     card: CardPresentation?,
+    cameraSnapshot: CameraSnapshotUiState?,
     onNavigate: (MochiNavigationIntent) -> Unit,
     onCardAction: (CardPresentation, CardAction) -> Unit,
+    onDismissCameraSnapshot: () -> Unit,
     onFocus: () -> Unit,
 ) {
     AnimatedContent(
@@ -1748,16 +1808,94 @@ private fun HomePresentationSurface(
                     onNavigate(MochiNavigationIntent.ShowWeather)
                 },
             )
-            MochiSurface.Card -> card?.let {
-                MochiGeneratedCard(
-                    card = it,
-                    onAction = { action -> onCardAction(it, action) },
-                    onRestoreFace = {
-                        onNavigate(MochiNavigationIntent.ShowFace)
-                    },
-                )
+            MochiSurface.Card -> {
+                if (cameraSnapshot != null) {
+                    CameraSnapshotCard(
+                        snapshot = cameraSnapshot,
+                        onDismiss = onDismissCameraSnapshot,
+                    )
+                } else {
+                    card?.let {
+                        MochiGeneratedCard(
+                            card = it,
+                            onAction = { action -> onCardAction(it, action) },
+                            onRestoreFace = {
+                                onNavigate(MochiNavigationIntent.ShowFace)
+                            },
+                        )
+                    }
+                }
             }
             else -> Unit
+        }
+    }
+}
+
+@Composable
+private fun CameraSnapshotCard(
+    snapshot: CameraSnapshotUiState,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(20.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        PlannerCard {
+            Text(
+                text = "Latest camera event",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = buildString {
+                    append(snapshot.cameraName)
+                    snapshot.home?.let {
+                        append(" · ")
+                        append(it)
+                    }
+                    snapshot.room?.let {
+                        append(" / ")
+                        append(it)
+                    }
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Image(
+                bitmap = snapshot.bitmap.asImageBitmap(),
+                contentDescription = "Latest Mi Home camera event",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp)
+                    .clip(RoundedCornerShape(18.dp)),
+                contentScale = ContentScale.Fit,
+            )
+            snapshot.eventType?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            snapshot.capturedAt?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+            Text(
+                text = "Displayed only on this device. The image was not " +
+                    "sent to the model or saved to conversation history.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Button(onClick = onDismiss) {
+                Text("Dismiss")
+            }
         }
     }
 }
@@ -3566,6 +3704,11 @@ private fun ToolsSurface(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onInstallMijia: () -> Unit,
+    onConfigureMijia: () -> Unit,
+    onDisconnectMijia: () -> Unit,
+    onSetMijiaEnabled: (Boolean) -> Unit,
+    onSetMijiaToolEnabled: (String, Boolean) -> Unit,
     onAddServer: (ManualMcpServerInput) -> Unit,
     onRemoveServer: (String) -> Unit,
     onSetServerEnabled: (String, Boolean) -> Unit,
@@ -3578,6 +3721,9 @@ private fun ToolsSurface(
         mutableStateOf(false)
     }
     var browserToolsExpanded by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var mijiaToolsExpanded by rememberSaveable {
         mutableStateOf(false)
     }
     var mochiToolsExpanded by rememberSaveable {
@@ -3867,6 +4013,29 @@ private fun ToolsSurface(
                 }
             item {
                 Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Extensions",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            item {
+                MijiaExtensionCard(
+                    summary = state.catalog.mijia,
+                    toolsExpanded = mijiaToolsExpanded,
+                    disabled = state.isLoading,
+                    onToggleTools = {
+                        mijiaToolsExpanded = !mijiaToolsExpanded
+                    },
+                    onInstall = onInstallMijia,
+                    onConfigure = onConfigureMijia,
+                    onDisconnect = onDisconnectMijia,
+                    onSetEnabled = onSetMijiaEnabled,
+                    onSetToolEnabled = onSetMijiaToolEnabled,
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -3937,6 +4106,189 @@ private fun ToolsSurface(
                 showAmapCredentials = false
             },
         )
+    }
+}
+
+@Composable
+private fun MijiaExtensionCard(
+    summary: MijiaProviderSummary,
+    toolsExpanded: Boolean,
+    disabled: Boolean,
+    onToggleTools: () -> Unit,
+    onInstall: () -> Unit,
+    onConfigure: () -> Unit,
+    onDisconnect: () -> Unit,
+    onSetEnabled: (Boolean) -> Unit,
+    onSetToolEnabled: (String, Boolean) -> Unit,
+) {
+    PlannerCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Mi Home",
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = when {
+                        !summary.installed ->
+                            "Optional unofficial extension · not installed"
+                        !summary.trusted ->
+                            "Installed package could not be trusted"
+                        summary.connected ->
+                            "${summary.selectedDeviceCount} selected devices"
+                        summary.status == "authorization_expired" ->
+                            "Authorization expired"
+                        else -> "Installed · connection required"
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                summary.versionName?.let { version ->
+                    Text(
+                        text = "Extension $version",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+            if (summary.connected) {
+                Switch(
+                    checked = summary.enabled,
+                    onCheckedChange = onSetEnabled,
+                    enabled = !disabled,
+                )
+            }
+        }
+        Text(
+            text = "Lights, switches, climate and air devices, curtains, " +
+                "sensors, televisions, camera event images, scales, and scenes.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        summary.detail?.let { detail ->
+            Text(
+                text = detail,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        when {
+            !summary.installed || !summary.trusted -> {
+                Button(
+                    onClick = onInstall,
+                    enabled = !disabled,
+                ) {
+                    Text(
+                        if (summary.installed) {
+                            "Get trusted extension"
+                        } else {
+                            "Install extension"
+                        },
+                    )
+                }
+            }
+            !summary.connected -> {
+                Button(
+                    onClick = onConfigure,
+                    enabled = !disabled,
+                ) {
+                    Text(
+                        if (summary.status == "authorization_expired") {
+                            "Reconnect Mi Home"
+                        } else {
+                            "Connect Mi Home"
+                        },
+                    )
+                }
+            }
+            else -> {
+                Text(
+                    text = buildString {
+                        summary.accountLabel?.let {
+                            append(it)
+                            append(" · ")
+                        }
+                        append(summary.selectedHomeCount)
+                        append(" homes · ")
+                        append(summary.selectedDeviceCount)
+                        append(" devices")
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onConfigure,
+                        enabled = !disabled,
+                    ) {
+                        Text("Manage")
+                    }
+                    TextButton(
+                        onClick = onDisconnect,
+                        enabled = !disabled,
+                    ) {
+                        Text("Disconnect")
+                    }
+                }
+            }
+        }
+        if (summary.tools.isNotEmpty()) {
+            TextButton(
+                onClick = onToggleTools,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (toolsExpanded) {
+                        "Hide tools (${summary.tools.size})"
+                    } else {
+                        "Show tools (${summary.tools.size})"
+                    },
+                )
+            }
+            AnimatedVisibility(visible = toolsExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    summary.tools.forEach { tool ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tool.name,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Text(
+                                    text = tool.description,
+                                    color = MaterialTheme.colorScheme
+                                        .onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                )
+                                Text(
+                                    text = tool.riskLevel,
+                                    color = MaterialTheme.colorScheme
+                                        .onSurfaceVariant,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                            Switch(
+                                checked = tool.enabled,
+                                onCheckedChange = {
+                                    onSetToolEnabled(tool.name, it)
+                                },
+                                enabled = summary.enabled && !disabled,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

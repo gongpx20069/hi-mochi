@@ -37,6 +37,7 @@ suspend fun MochiApplication.createAgentRunner(
     onWeatherLoaded: (CurrentWeather) -> Unit,
     includeBrowser: Boolean,
     includeBrowserInteractions: Boolean = includeBrowser,
+    includeExtensions: Boolean = true,
 ): AgentRunner {
     val diagnosticLogger = androidAgentDiagnosticLogger()
     val navigationPolicy = NavigationPolicy()
@@ -81,7 +82,13 @@ suspend fun MochiApplication.createAgentRunner(
         }
     }
     val tools = (
-        enabledBuiltIns + toolCatalogRepository.loadEnabledMcpTools()
+        enabledBuiltIns +
+            toolCatalogRepository.loadEnabledMcpTools() +
+            if (includeExtensions) {
+                toolCatalogRepository.loadEnabledExtensionTools()
+            } else {
+                emptyList()
+            }
     ).toMutableList()
     val availableSkills = skillRepository.listEnabledMetadata(
         tools.mapTo(mutableSetOf()) { it.name },

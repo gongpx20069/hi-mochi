@@ -1,0 +1,2 @@
+-keep class com.example.mochi_mijia.MijiaExtensionService { *; }
+-keep class com.example.mochi_mijia.MijiaConfigurationActivity { *; }
