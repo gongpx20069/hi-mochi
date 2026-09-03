@@ -98,9 +98,9 @@ from the official extension. The renderer shows only:
 
 The card permits Dismiss and the existing placement/expand behavior, but no
 Save, Share, or Open source action. It states whether the normalized image is
-available for one current foreground model request under the provider's
-explicit permission or stayed device-only. The card and image are never
-persisted.
+available only inside the current foreground run, including at most one
+explicit Subagent handoff under the provider's permission, or stayed
+device-only. The card and image are never persisted.
 Expired, cancelled, stale, oversized, malformed, or undecodable attachments
 discard the card while preserving the text reply.
 

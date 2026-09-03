@@ -232,7 +232,13 @@ filesystem paths, or exported world-readable files. The host validates
 declared MIME type, byte count, image dimensions, and total decoded size before
 rendering, then closes the descriptor and deletes any temporary host copy. It
 normalizes at most one image to a maximum 2048-pixel edge, 4,194,304 pixels,
-and 2 MiB. The normalized bytes may enter only the current foreground
-Main-Agent request when the selected provider's explicit image-input permission
-is enabled; they never enter Tool JSON, persistent state, Scheduled Agents, or
-Subagents.
+and 2 MiB. The normalized bytes may enter the current foreground Main-Agent
+request when the selected provider's explicit image-input permission is
+enabled. A per-run in-memory relay may then hand the same image to at most one
+serial Subagent when `delegate_agent` explicitly sets `include_image=true`.
+The host first runs a no-Tool multimodal analysis request, rejects Tool calls or
+raw image echo, and injects only bounded text observations into the normal
+Subagent request as explicitly delimited untrusted user-role evidence, never as
+persona or system instructions. The Subagent Tool loop receives no image bytes,
+extension Tool, descriptor, URL, parent history, or reusable relay. Bytes never
+enter Tool JSON, persistent state, or Scheduled Agents.

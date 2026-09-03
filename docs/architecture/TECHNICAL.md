@@ -221,7 +221,16 @@ requests the latest event to be viewed, described, or analyzed, and the model
 supports images, the Orchestrator adds one temporary OpenAI-compatible
 `image_url` data part to the same foreground Main-Agent run. Image bytes never
 enter Tool JSON, diagnostic logs, Room history, memory recall, provider
-sharing, export, scheduled execution, Subagent context, or TTS.
+sharing, export, scheduled execution, or TTS. After the Main Agent receives the
+image, an in-memory single-use relay may attach it to the first
+`delegate_agent` call that explicitly requests `include_image=true`. That
+delegation performs a dedicated no-Tool multimodal prepass. The host rejects
+Tool calls, empty output, data URLs, and raw encoded-image echo, bounds the
+plain-text observations, and then supplies only JSON-escaped, explicitly
+untrusted user-role evidence to the normal Subagent Tool loop. Image-derived
+text is never promoted to persona or system instructions. The Subagent cannot
+forward the image, reopen the extension attachment, or access Mi Home Tools. A
+second delegation cannot reuse the image.
 
 ## 3. Agent response
 

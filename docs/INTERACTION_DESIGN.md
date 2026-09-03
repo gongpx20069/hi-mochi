@@ -255,10 +255,10 @@ guess.
 A successful latest-camera-event request creates a deterministic trusted
 Camera Snapshot card. The image remains local and ephemeral, with device,
 home/room, event type, and capture time shown from Tool evidence. The card does
-not imply that the image is live. It states whether the image is available for
-one model request in the current run or remained device-only. Provider settings
-contain a default-off **Camera image input** switch and tell the user to enable
-it only
+not imply that the image is live. It states whether the image is available only
+inside the current run, including at most one explicit Subagent handoff, or
+remained device-only. Provider settings contain a default-off **Camera image
+input** switch and tell the user to enable it only
 for an image-capable model. The card has Dismiss but no source, share, or save
 action. Leaving the card, cancelling the turn, process death, or attachment
 expiry releases the image.

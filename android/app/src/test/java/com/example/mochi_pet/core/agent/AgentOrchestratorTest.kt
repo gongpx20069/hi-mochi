@@ -264,6 +264,75 @@ class AgentOrchestratorTest {
         }
 
     @Test
+    fun `image relay opens only after Main Agent receives the image`() =
+        runBlocking {
+            val delegatedImages = mutableListOf<ModelImageAttachment?>()
+            val delegateTool = DelegateAgentTool(
+                SerialSubagentCoordinator(
+                    executor = SubagentExecutor { _, _, _, image ->
+                        delegatedImages += image
+                        "Image analysis"
+                    },
+                ),
+            )
+            val delegateArguments =
+                """{"agent":"analyst","task":"Analyze image","include_image":true}"""
+            val client = QueueChatClient(
+                multiToolResponse(
+                    OpenAiToolCall(
+                        id = "camera",
+                        function = OpenAiFunctionCall(
+                            name = "camera_image",
+                            arguments = "{}",
+                        ),
+                    ),
+                    OpenAiToolCall(
+                        id = "early_delegate",
+                        function = OpenAiFunctionCall(
+                            name = "delegate_agent",
+                            arguments = delegateArguments,
+                        ),
+                    ),
+                ),
+                toolResponse(
+                    id = "valid_delegate",
+                    name = "delegate_agent",
+                    arguments = delegateArguments,
+                ),
+                finalResponse("""{"reply":"Done","emotion":"neutral"}"""),
+            )
+            val orchestrator = orchestrator(
+                client,
+                ToolRegistry(listOf(CameraImageTool(), delegateTool)),
+            )
+
+            orchestrator.run(
+                request().copy(
+                    provider = OpenAiProviderConfig(
+                        endpoint = "https://example.com/v1",
+                        apiKey = "test-key",
+                        model = "vision-model",
+                        imageInputEnabled = true,
+                    ),
+                    context = context.copy(modelImageInputAllowed = true),
+                ),
+            )
+
+            assertEquals(1, delegatedImages.size)
+            assertEquals(
+                byteArrayOf(1, 2, 3).toList(),
+                delegatedImages.single()?.bytes?.toList(),
+            )
+            assertTrue(
+                client.requests[1].messages.any {
+                    it.contentParts?.any { part ->
+                        part.type == "image_url"
+                    } == true
+                },
+            )
+        }
+
+    @Test
     fun `reports pipeline stages around tool execution`() = runBlocking {
         val stages = mutableListOf<Pair<AgentPipelineStage, String?>>()
         val client = QueueChatClient(
@@ -744,6 +813,20 @@ private fun toolResponse(
                             ),
                         ),
                     ),
+                ),
+            ),
+        ),
+    )
+
+private fun multiToolResponse(
+    vararg toolCalls: OpenAiToolCall,
+): OpenAiChatResponse =
+    OpenAiChatResponse(
+        choices = listOf(
+            OpenAiChoice(
+                message = OpenAiChatMessage(
+                    role = "assistant",
+                    toolCalls = toolCalls.toList(),
                 ),
             ),
         ),

@@ -1,10 +1,18 @@
 package com.example.mochi_pet.core.agent
 
+import com.example.mochi_pet.core.agent.llm.OpenAiChatClient
+import com.example.mochi_pet.core.agent.llm.OpenAiChatMessage
+import com.example.mochi_pet.core.agent.llm.OpenAiChatRequest
+import com.example.mochi_pet.core.agent.llm.OpenAiChatResponse
+import com.example.mochi_pet.core.agent.llm.OpenAiChoice
+import com.example.mochi_pet.core.agent.llm.OpenAiProviderConfig
 import com.example.mochi_pet.core.agent.tool.ToolErrorCode
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
+import com.example.mochi_pet.core.agent.tool.ModelImageAttachment
 import com.example.mochi_pet.core.model.MochiSurface
 import java.time.LocalDate
+import java.util.Base64
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -15,6 +23,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -37,6 +46,107 @@ class SubagentsTest {
     }
 
     @Test
+    fun `isolated image analysis sends no Tool schemas`() = runBlocking {
+        val client = RecordingSubagentImageClient(
+            OpenAiChatResponse(
+                choices = listOf(
+                    OpenAiChoice(
+                        OpenAiChatMessage(
+                            role = "assistant",
+                            content = "No person is visible near the door.",
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val result = IsolatedSubagentImageAnalyzer(client).analyze(
+            type = SubagentType.ANALYST,
+            task = "Describe the latest event",
+            provider = provider(),
+            image = ModelImageAttachment(
+                mimeType = "image/jpeg",
+                bytes = byteArrayOf(1, 2, 3),
+            ),
+        )
+
+        assertEquals("No person is visible near the door.", result)
+        assertTrue(client.request.tools.isEmpty())
+        assertEquals(
+            1,
+            client.request.messages.count { message ->
+                message.contentParts?.any { it.type == "image_url" } == true
+            },
+        )
+    }
+
+    @Test
+    fun `isolated image analysis rejects echoed raw image data`() {
+        val client = RecordingSubagentImageClient(
+            OpenAiChatResponse(
+                choices = listOf(
+                    OpenAiChoice(
+                        OpenAiChatMessage(
+                            role = "assistant",
+                            content = "data:image/jpeg;base64,AQID",
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        assertThrows(AgentProtocolException::class.java) {
+            runBlocking {
+                IsolatedSubagentImageAnalyzer(client).analyze(
+                    type = SubagentType.RESEARCHER,
+                    task = "Describe the latest event",
+                    provider = provider(),
+                    image = ModelImageAttachment(
+                        mimeType = "image/jpeg",
+                        bytes = byteArrayOf(1, 2, 3),
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `isolated image analysis rejects wrapped partial Base64`() {
+        val bytes = ByteArray(256) { index -> index.toByte() }
+        val encoded = Base64.getEncoder().encodeToString(bytes)
+        val wrappedPartial = encoded
+            .substring(80, 176)
+            .chunked(24)
+            .joinToString("\n")
+        val client = RecordingSubagentImageClient(
+            OpenAiChatResponse(
+                choices = listOf(
+                    OpenAiChoice(
+                        OpenAiChatMessage(
+                            role = "assistant",
+                            content = wrappedPartial,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        assertThrows(AgentProtocolException::class.java) {
+            runBlocking {
+                IsolatedSubagentImageAnalyzer(client).analyze(
+                    type = SubagentType.RESEARCHER,
+                    task = "Describe the latest event",
+                    provider = provider(),
+                    image = ModelImageAttachment(
+                        mimeType = "image/jpeg",
+                        bytes = bytes,
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
     fun `delegate tool validates input and returns structured result`() =
         runBlocking {
             var delegatedType: SubagentType? = null
@@ -45,7 +155,7 @@ class SubagentsTest {
                 listOf(
                     DelegateAgentTool(
                         SerialSubagentCoordinator(
-                            executor = SubagentExecutor { type, task, _ ->
+                            executor = SubagentExecutor { type, task, _, _ ->
                                 delegatedType = type
                                 delegatedTask = task
                                 "Evidence report"
@@ -93,6 +203,85 @@ class SubagentsTest {
         }
 
     @Test
+    fun `validated image can be handed to only one subagent`() = runBlocking {
+        val delegatedImages = mutableListOf<ModelImageAttachment?>()
+        context.modelImageRelay.offer(
+            ModelImageAttachment(
+                mimeType = "image/jpeg",
+                bytes = byteArrayOf(1, 2, 3),
+            ),
+        )
+        val registry = ToolRegistry(
+            listOf(
+                DelegateAgentTool(
+                    SerialSubagentCoordinator(
+                        executor = SubagentExecutor { _, _, _, image ->
+                            delegatedImages += image
+                            "Image report"
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        val first = registry.execute(
+            name = "delegate_agent",
+            arguments = buildJsonObject {
+                put("agent", "analyst")
+                put("task", "Analyze the attached event image")
+                put("include_image", true)
+            },
+            context = context,
+        )
+        val second = registry.execute(
+            name = "delegate_agent",
+            arguments = buildJsonObject {
+                put("agent", "researcher")
+                put("task", "Analyze the attached event image again")
+                put("include_image", true)
+            },
+            context = context,
+        )
+
+        assertEquals("ok", first.status)
+        assertEquals(
+            true,
+            first.data?.jsonObject
+                ?.get("image_included")
+                ?.jsonPrimitive
+                ?.content
+                ?.toBoolean(),
+        )
+        assertEquals(
+            byteArrayOf(1, 2, 3).toList(),
+            delegatedImages.single()?.bytes?.toList(),
+        )
+        assertEquals(ToolErrorCode.NOT_FOUND.name, second.code)
+    }
+
+    private class RecordingSubagentImageClient(
+        private val response: OpenAiChatResponse,
+    ) : OpenAiChatClient {
+        lateinit var request: OpenAiChatRequest
+
+        override suspend fun complete(
+            config: OpenAiProviderConfig,
+            request: OpenAiChatRequest,
+        ): OpenAiChatResponse {
+            this.request = request
+            return response
+        }
+    }
+
+    private fun provider(): OpenAiProviderConfig =
+        OpenAiProviderConfig(
+            endpoint = "https://example.com/v1",
+            apiKey = "test-key",
+            model = "vision-model",
+            imageInputEnabled = true,
+        )
+
+    @Test
     fun `coordinator permits two serial delegations and rejects a third`() =
         runBlocking {
             val calls = mutableListOf<SubagentType>()
@@ -100,7 +289,7 @@ class SubagentsTest {
                 listOf(
                     DelegateAgentTool(
                         SerialSubagentCoordinator(
-                            executor = SubagentExecutor { type, _, _ ->
+                            executor = SubagentExecutor { type, _, _, _ ->
                                 calls += type
                                 type.displayName
                             },
@@ -142,7 +331,7 @@ class SubagentsTest {
             listOf(
                 DelegateAgentTool(
                     SerialSubagentCoordinator(
-                        executor = SubagentExecutor { _, _, _ ->
+                        executor = SubagentExecutor { _, _, _, _ ->
                             throw AgentToolRoundLimitException(30)
                         },
                     ),
@@ -169,7 +358,7 @@ class SubagentsTest {
         var cancelled = false
         val started = CompletableDeferred<Unit>()
         val coordinator = SerialSubagentCoordinator(
-            executor = SubagentExecutor { _, _, _ ->
+            executor = SubagentExecutor { _, _, _, _ ->
                 try {
                     started.complete(Unit)
                     awaitCancellation()
@@ -183,6 +372,7 @@ class SubagentsTest {
                 SubagentType.RESEARCHER,
                 "Wait for evidence",
                 context,
+                null,
             )
         }
 

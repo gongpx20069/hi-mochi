@@ -54,6 +54,29 @@ data class ModelImageAttachment(
     val bytes: ByteArray,
 )
 
+class ModelImageRelay {
+    private var image: ModelImageAttachment? = null
+    private var handedToSubagent = false
+
+    @Synchronized
+    fun offer(candidate: ModelImageAttachment) {
+        if (image == null) {
+            image = candidate
+        }
+    }
+
+    @Synchronized
+    fun takeForSubagent(): ModelImageAttachment? {
+        if (handedToSubagent) {
+            return null
+        }
+        val available = image ?: return null
+        handedToSubagent = true
+        image = null
+        return available
+    }
+}
+
 enum class ToolErrorCode {
     INVALID_ARGS,
     UNKNOWN_TOOL,
@@ -71,6 +94,7 @@ data class ToolExecutionContext(
     val currentDate: LocalDate,
     val currentSurface: MochiSurface,
     val modelImageInputAllowed: Boolean = false,
+    val modelImageRelay: ModelImageRelay = ModelImageRelay(),
 )
 
 fun allowsCameraEventImageInput(query: String): Boolean {

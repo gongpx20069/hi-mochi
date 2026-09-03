@@ -187,11 +187,18 @@ delete pending images.
 
 The normalized image never enters Tool JSON, TTS, Room, conversation history,
 Agent Memory, diagnostic logs, export, sharing, Browser, JavaScript, MCP,
-scheduled runs, or Subagent context. It may be attached once to the current
-foreground Main-Agent provider request only when the provider's default-off
+or scheduled runs. It may be attached once to the current foreground
+Main-Agent provider request when the provider's default-off
 image-input permission is enabled and the user explicitly asks to view,
-describe, or analyze the latest event. The host does not infer visual support
-from a model name. Gallery export remains out of scope.
+describe, or analyze the latest event. A run-local relay may then pass the same
+normalized bytes to one explicitly requested serial Subagent, where they appear
+only in a dedicated no-Tool multimodal prepass. The host rejects Tool calls and
+raw image echo, then provides only bounded text observations to the normal
+Subagent loop as JSON-escaped, explicitly untrusted user-role evidence rather
+than system instructions. The Subagent receives no extension Tool, file
+descriptor, attachment ID, URL, raw bytes, or forwarding capability. The host
+does not infer visual support from a model name. Gallery export remains out of
+scope.
 
 ## 9. Release and compatibility
 

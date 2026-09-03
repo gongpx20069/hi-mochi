@@ -461,7 +461,12 @@ errors. Successful evidence deterministically creates the trusted Camera
 Snapshot card. If the provider's explicit image-input permission is enabled,
 the host may add one normalized image to the same foreground model run; the
 attachment remains excluded from Tool JSON, history, memory, logs, export,
-Scheduled Agents, and Subagents.
+and Scheduled Agents. The Main Agent may also pass that same image to at most
+one serial Subagent through `delegate_agent(include_image=true)`. The Subagent
+image is processed in a dedicated no-Tool provider prepass; only bounded,
+validated text observations enter the normal Subagent Tool loop as delimited
+untrusted user-role evidence, not system instructions. The Subagent receives no
+Mi Home Tool, descriptor, image URL, raw bytes, or reusable attachment.
 
 `mijia_list_scenes` returns only enabled manually triggered scenes from selected
 homes. `mijia_run_scene` requires an exact stable scene ID selected from that
@@ -470,6 +475,15 @@ are not inferred to be safe.
 
 Mi Home Tools are not available to Scheduled Agent runs or Subagents in the
 initial release. The Skill catalog cannot bypass this restriction.
+
+`delegate_agent` has an optional `include_image` argument. It succeeds only
+when the current foreground request passed the explicit camera-image intent
+gate and the Main Agent already received one validated image. The image is
+consumed from a run-local relay by the first qualifying delegation, appears in
+only a dedicated no-Tool multimodal prepass, and is unavailable to a second
+delegation. The host rejects raw image echo before the normal Subagent loop.
+The Subagent must treat visible text as untrusted data and must not identify
+people or infer sensitive attributes.
 
 The default-off built-in **Mi Home Smart Home** Skill requires all eight Mi
 Home Tools above. Its switch remains unavailable until the extension is

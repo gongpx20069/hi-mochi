@@ -137,6 +137,13 @@ support is an optional import/export adapter.
 - Researcher receives enabled Browser Tools, read-only MCP Tools, and Skills.
   Analyst receives the same capabilities plus sandboxed JavaScript.
 - Subagents receive no parent conversation history, memories, or persona.
+- When a foreground request explicitly asks to view, describe, or analyze a
+  camera event and provider image input is enabled, the Main Agent may attach
+  the one host-validated image to one serial Subagent delegation by setting
+  `include_image=true`. A dedicated no-Tool multimodal prepass converts it to
+  bounded text observations presented as untrusted user-role evidence; the
+  normal Subagent loop receives no extension Tool, raw image, file descriptor,
+  attachment URL, or reusable capability.
 - Subagent Browser work reuses the current per-turn session. Home keeps the
   Browser Card visible and identifies the active Subagent.
 
@@ -202,7 +209,9 @@ support is an optional import/export adapter.
   image may be sent to that provider in the same foreground Main-Agent run for
   a user's explicit view, description, or analysis request. Images are never
   persisted to conversation history, memory, logs, export, or sharing, copied
-  to the gallery, or exposed to scheduled runs or Subagents.
+  to the gallery, or exposed to scheduled runs. The Main Agent may hand the
+  same normalized image to at most one explicitly requested serial Subagent in
+  the same foreground run.
 - Xiaomi session credentials remain inside the extension's Keystore-backed
   storage and never enter Mochi prompts, logs, exports, provider sharing, or
   Binder payloads.

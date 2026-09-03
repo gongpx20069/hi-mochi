@@ -109,7 +109,10 @@ or verification in earlier phases.
   trusted Camera Snapshot card.
 - [x] Add Tool-readiness-gated Mi Home Smart Home Skill activation.
 - [x] Add default-off, same-run model image input with bounded normalization and
-  no history, memory, log, export, Scheduled Agent, or Subagent persistence.
+  no history, memory, log, export, or Scheduled Agent persistence.
+- [x] Allow one explicit serial Subagent handoff of the current validated image
+  through a no-Tool visual prepass without exposing extension Tools,
+  descriptors, URLs, raw bytes, or reusable image capability to its Tool loop.
 - [x] Build, sign, validate, checksum, and publish the universal extension APK
   with the normal Android Release.
 - [ ] Validate Xiaomi QR authorization, region discovery, device control, and

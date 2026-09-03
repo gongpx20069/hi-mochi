@@ -1890,7 +1890,8 @@ private fun CameraSnapshotCard(
             }
             Text(
                 text = if (snapshot.readyForModel) {
-                    "Available for one model request in this Agent run. " +
+                    "Available only in this Agent run, including one explicit " +
+                        "Subagent handoff. " +
                         "Not saved to conversation history."
                 } else {
                     "Displayed only on this device. Camera image input is " +
@@ -6647,8 +6648,9 @@ private fun ProviderSettingsSurface(
                         )
                         Text(
                             text = "Allow validated Mi Home camera event " +
-                                "images to be sent to this model. Enable only " +
-                                "when the configured model supports images.",
+                                "images in the current Main Agent run and one " +
+                                "explicit Subagent handoff. Enable only when " +
+                                "the configured model supports images.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
