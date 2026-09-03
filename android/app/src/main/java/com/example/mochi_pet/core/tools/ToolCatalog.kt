@@ -119,6 +119,29 @@ data class McpToolSummary(
     val enabled: Boolean,
 )
 
+fun ToolCatalogSummary.readyToolNames(): Set<String> =
+    buildSet {
+        builtInTools.filterToReadyNames(this)
+        if (agentBrowser.enabled) {
+            agentBrowser.tools.filterToReadyNames(this)
+        }
+        if (amap.connected && amap.enabled) {
+            amap.tools.filterToReadyNames(this)
+        }
+        if (mijia.connected && mijia.enabled) {
+            mijia.tools.filter { it.enabled }.mapTo(this) { it.name }
+        }
+        servers.filter { it.connected && it.enabled }.forEach { server ->
+            server.tools.filter { it.enabled }.mapTo(this) { it.alias }
+        }
+    }
+
+private fun List<BuiltInToolSummary>.filterToReadyNames(
+    destination: MutableSet<String>,
+) {
+    filter { it.enabled }.mapTo(destination) { it.name }
+}
+
 data class ManualMcpServerInput(
     val name: String,
     val endpoint: String,

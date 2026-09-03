@@ -9,6 +9,7 @@ import com.example.mochi_pet.core.agent.llm.OpenAiFunctionCall
 import com.example.mochi_pet.core.agent.llm.OpenAiProviderConfig
 import com.example.mochi_pet.core.agent.llm.OpenAiToolCall
 import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.agent.tool.ModelImageAttachment
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
@@ -175,6 +176,92 @@ class AgentOrchestratorTest {
         assertEquals("call_1", toolMessage.toolCallId)
         assertTrue(toolMessage.content.orEmpty().contains("calendar"))
     }
+
+    @Test
+    fun `adds transient image message when provider image input is enabled`() =
+        runBlocking {
+            val client = QueueChatClient(
+                toolResponse("call_1", "camera_image", "{}"),
+                toolResponse("call_2", "camera_image", "{}"),
+                finalResponse("""{"reply":"I see it","emotion":"neutral"}"""),
+            )
+            val orchestrator = orchestrator(
+                client,
+                ToolRegistry(listOf(CameraImageTool())),
+            )
+
+            orchestrator.run(
+                request().copy(
+                    provider = OpenAiProviderConfig(
+                        endpoint = "https://example.com/v1",
+                        apiKey = "test-key",
+                        model = "vision-model",
+                        imageInputEnabled = true,
+                    ),
+                    context = context.copy(
+                        modelImageInputAllowed = true,
+                    ),
+                ),
+            )
+
+            val messages = client.requests[1].messages
+            assertEquals("tool", messages[messages.lastIndex - 1].role)
+            val imageMessage = messages.last()
+            assertEquals("user", imageMessage.role)
+            assertEquals("text", imageMessage.contentParts?.first()?.type)
+            assertEquals("image_url", imageMessage.contentParts?.last()?.type)
+            assertTrue(
+                imageMessage.contentParts?.last()?.imageUrl?.url
+                    ?.startsWith("data:image/jpeg;base64,") == true,
+            )
+            assertTrue(
+                messages[messages.lastIndex - 1].content
+                    .orEmpty()
+                    .contains("modelImages")
+                    .not(),
+            )
+            assertTrue(
+                client.requests[2].messages.none {
+                    it.contentParts?.any { part ->
+                        part.type == "image_url"
+                    } == true
+                },
+            )
+            assertEquals(
+                1,
+                client.requests.sumOf { request ->
+                    request.messages.count { message ->
+                        message.contentParts?.any { part ->
+                            part.type == "image_url"
+                        } == true
+                    }
+                },
+            )
+        }
+
+    @Test
+    fun `does not add image message when provider image input is disabled`() =
+        runBlocking {
+            val client = QueueChatClient(
+                toolResponse("call_1", "camera_image", "{}"),
+                finalResponse("""{"reply":"Shown locally","emotion":"neutral"}"""),
+            )
+            val orchestrator = orchestrator(
+                client,
+                ToolRegistry(listOf(CameraImageTool())),
+            )
+
+            orchestrator.run(request())
+
+            assertEquals("tool", client.requests[1].messages.last().role)
+            assertTrue(
+                client.requests[1].messages.none {
+                    it.contentParts?.any { part ->
+                        part.type == "image_url"
+                    } == true
+                },
+            )
+        }
 
     @Test
     fun `reports pipeline stages around tool execution`() = runBlocking {
@@ -562,6 +649,36 @@ private class EchoTool : AgentTool {
         arguments: JsonObject,
         context: ToolExecutionContext,
     ): ToolResultEnvelope = ToolResultEnvelope.success(arguments)
+}
+
+private class CameraImageTool : AgentTool {
+    override val name: String = "camera_image"
+    override val schema: JsonObject = functionToolSchema(
+        name = name,
+        description = "Return a transient test image",
+        properties = buildJsonObject {},
+        required = emptyList(),
+    )
+
+    override suspend fun execute(
+        arguments: JsonObject,
+        context: ToolExecutionContext,
+    ): ToolResultEnvelope =
+        ToolResultEnvelope.success(
+            data = buildJsonObject {
+                put("image_available", true)
+            },
+            modelImages = if (context.modelImageInputAllowed) {
+                listOf(
+                    ModelImageAttachment(
+                        mimeType = "image/jpeg",
+                        bytes = byteArrayOf(1, 2, 3),
+                    ),
+                )
+            } else {
+                emptyList()
+            },
+        )
 }
 
 private class SearchTool : AgentTool {

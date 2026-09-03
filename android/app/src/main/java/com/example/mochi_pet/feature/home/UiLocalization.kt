@@ -150,6 +150,8 @@ internal fun localizeUiText(
             "默认：${text.removePrefix("Default: ")}"
         text.endsWith(" · Modified") ->
             "${text.removeSuffix(" · Modified")} · 已修改"
+        text.startsWith("Requires enabled Tools: ") ->
+            "需要先启用以下工具：${text.removePrefix("Requires enabled Tools: ")}"
         else -> text
     }
 }
@@ -506,6 +508,16 @@ private val ZH_UI_TEXT = mapOf(
     "Merchant Discovery" to "商家发现",
     "Find and compare merchants using Amap ratings, cost, hours, and details." to
         "使用高德评分、人均、营业时间和详情发现并比较商家。",
+    "Mi Home Smart Home" to "米家智能家居",
+    "Control selected Mi Home devices, inspect state, run scenes, and review the latest supported camera event." to
+        "控制已选择的米家设备、查看状态、执行场景并查看支持的最新摄像头事件。",
+    "Camera image input" to "摄像头图片输入",
+    "Allow validated Mi Home camera event images to be sent to this model. Enable only when the configured model supports images." to
+        "允许将已验证的米家摄像头事件图片发送给此模型。仅在配置的模型支持图片时启用。",
+    "Available for one model request in this Agent run. Not saved to conversation history." to
+        "可用于本次 Agent 运行中的一次模型请求，不会保存到对话历史。",
+    "Displayed only on this device. Camera image input is disabled for the configured model." to
+        "仅在此设备上显示；已配置模型的摄像头图片输入未启用。",
     "Could not load persisted conversation history" to "无法加载已保存的对话历史",
     "Could not load persona files" to "无法加载 Persona 文件",
     "Reply succeeded, but conversation memory was not saved" to "回答已完成，但未能保存对话记忆",

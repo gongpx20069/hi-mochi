@@ -166,9 +166,12 @@ Installed/Explore uses a dark selected segment. Explore opens with the public
 skills.sh Trending (24h) leaderboard, then switches to search results after a
 query. Cards show rank, source, install count, and a derived popularity label.
 Every installed Skill, including read-only built-ins, can be enabled or
-disabled. Existing built-ins default to enabled; the Notion Knowledge built-in
-and Tencent Docs Knowledge built-in default to disabled and guide search,
-reading, creation, and updates through their configured MCP tools.
+disabled. A Skill cannot be enabled until all of its required Tools are ready;
+its card names missing Tools and keeps the switch off. A previously enabled
+Skill whose dependencies become unavailable remains switchable off but is
+suspended from Agent discovery. Existing built-ins default to enabled; the
+Notion Knowledge, Tencent Docs Knowledge, and Mi Home Smart Home built-ins
+default to disabled.
 Each MCP server's detailed Tool list starts collapsed and can be expanded
 without disabling the server or changing individual Tool selections. Built-in
 knowledge providers enable their core search, listing, and reading Tools on
@@ -252,9 +255,13 @@ guess.
 A successful latest-camera-event request creates a deterministic trusted
 Camera Snapshot card. The image remains local and ephemeral, with device,
 home/room, event type, and capture time shown from Tool evidence. The card does
-not imply that the image is live. It has Dismiss but no source, share, save, or
-model-analysis action. Leaving the card, cancelling the turn, process death,
-or attachment expiry releases the image.
+not imply that the image is live. It states whether the image is available for
+one model request in the current run or remained device-only. Provider settings
+contain a default-off **Camera image input** switch and tell the user to enable
+it only
+for an image-capable model. The card has Dismiss but no source, share, or save
+action. Leaving the card, cancelling the turn, process death, or attachment
+expiry releases the image.
 
 When a Browser Tool runs while Home is selected, Home transforms into a trusted
 `BrowserSessionCard` containing the live WebView, origin, loading state, current

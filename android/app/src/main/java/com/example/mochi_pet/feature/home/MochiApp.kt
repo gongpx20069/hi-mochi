@@ -154,6 +154,7 @@ import com.example.mochi_pet.core.skills.MochiSkill
 import com.example.mochi_pet.core.skills.DownloadedSkill
 import com.example.mochi_pet.core.skills.InstallWindow
 import com.example.mochi_pet.core.skills.SkillOrigin
+import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_pet.core.tools.BuiltInToolSummary
 import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.McpAuthMode
@@ -1888,8 +1889,13 @@ private fun CameraSnapshotCard(
                 )
             }
             Text(
-                text = "Displayed only on this device. The image was not " +
-                    "sent to the model or saved to conversation history.",
+                text = if (snapshot.readyForModel) {
+                    "Available for one model request in this Agent run. " +
+                        "Not saved to conversation history."
+                } else {
+                    "Displayed only on this device. Camera image input is " +
+                        "disabled for the configured model."
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -3493,6 +3499,7 @@ private fun SkillsSurface(
                 items(state.skills, key = MochiSkill::id) { skill ->
                     InstalledSkillCard(
                         skill = skill,
+                        readiness = state.readinessById[skill.id],
                         onView = { selectedSkill = skill },
                         onSetEnabled = onSetEnabled,
                         onDelete = { pendingDelete = skill },
@@ -4664,6 +4671,7 @@ private fun SkillSectionTab(
 @Composable
 private fun InstalledSkillCard(
     skill: MochiSkill,
+    readiness: SkillReadiness?,
     onView: () -> Unit,
     onSetEnabled: (String, Boolean) -> Unit,
     onDelete: () -> Unit,
@@ -4726,6 +4734,7 @@ private fun InstalledSkillCard(
                         onCheckedChange = {
                             onSetEnabled(skill.id, it)
                         },
+                        enabled = skill.enabled || readiness?.isReady != false,
                     )
                     if (skill.updateAvailable) {
                         Text(
@@ -4748,6 +4757,14 @@ private fun InstalledSkillCard(
                     text = skill.description,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (readiness?.isReady == false) {
+                Text(
+                    text = "Enable required Tools first: " +
+                        readiness.missingTools.sorted().joinToString(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
                 )
             }
         }
@@ -5978,6 +5995,9 @@ private fun ProviderSettingsSurface(
         mutableStateOf(personaState.context.agents)
     }
     var apiKeyReplacement by remember(summary) { mutableStateOf("") }
+    var imageInputEnabled by remember(summary) {
+        mutableStateOf(summary.imageInputEnabled)
+    }
     val speechSummary = speechState.summary
     var speechProvider by remember(speechSummary) {
         mutableStateOf(speechSummary.provider)
@@ -6615,6 +6635,31 @@ private fun ProviderSettingsSurface(
                 }
             }
             item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Camera image input",
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "Allow validated Mi Home camera event " +
+                                "images to be sent to this model. Enable only " +
+                                "when the configured model supports images.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(
+                        checked = imageInputEnabled,
+                        onCheckedChange = { imageInputEnabled = it },
+                    )
+                }
+            }
+            item {
                 OutlinedTextField(
                     value = apiKeyReplacement,
                     onValueChange = { apiKeyReplacement = it },
@@ -6761,6 +6806,7 @@ private fun ProviderSettingsSurface(
                         apiVersion = apiVersion,
                         timeoutSeconds = timeout.toIntOrNull() ?: 0,
                         maxResponseBytes = summary.maxResponseBytes,
+                        imageInputEnabled = imageInputEnabled,
                         apiKeyReplacement = apiKeyReplacement,
                     ),
                 )

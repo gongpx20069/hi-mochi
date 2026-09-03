@@ -97,7 +97,10 @@ from the official extension. The renderer shows only:
 - a clear **latest event** label.
 
 The card permits Dismiss and the existing placement/expand behavior, but no
-Save, Share, Open source, or model-analysis action. It is never persisted.
+Save, Share, or Open source action. It states whether the normalized image is
+available for one current foreground model request under the provider's
+explicit permission or stayed device-only. The card and image are never
+persisted.
 Expired, cancelled, stale, oversized, malformed, or undecodable attachments
 discard the card while preserving the text reply.
 

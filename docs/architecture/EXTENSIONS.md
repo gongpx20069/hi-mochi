@@ -179,21 +179,26 @@ The extension decrypts into its private cache and returns:
 
 On demand, the host opens a read-only `ParcelFileDescriptor`, enforces a 5 MiB
 encoded limit and bounded decoded dimensions, decodes one JPEG/PNG locally,
-closes the descriptor, and causes the extension cache entry to be deleted.
+normalizes it to JPEG with at most a 2048-pixel edge, 4,194,304 pixels, and
+2 MiB, closes the descriptor, and causes the extension cache entry to be
+deleted.
 Expiry, disconnect, cancellation, package removal, and process death also
 delete pending images.
 
-The image never enters Tool JSON, the model provider request, TTS, Room,
-conversation history, Agent Memory, export, sharing, Browser, JavaScript, MCP,
-scheduled runs, or Subagent context. Visual analysis and gallery export are
-separate future capabilities requiring explicit privacy contracts.
+The normalized image never enters Tool JSON, TTS, Room, conversation history,
+Agent Memory, diagnostic logs, export, sharing, Browser, JavaScript, MCP,
+scheduled runs, or Subagent context. It may be attached once to the current
+foreground Main-Agent provider request only when the provider's default-off
+image-input permission is enabled and the user explicitly asks to view,
+describe, or analyze the latest event. The host does not infer visual support
+from a model name. Gallery export remains out of scope.
 
 ## 9. Release and compatibility
 
 The standard Android release builds and signs:
 
 - five Mochi ABI APKs;
-- one universal Mi Home extension APK;
+- one universal Mi Home extension APK, not split by native ABI;
 - one shared SHA-256 manifest and release metadata file.
 
 The publisher verifies application ID, embedded version, signature, absence of

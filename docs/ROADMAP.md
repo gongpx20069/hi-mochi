@@ -107,6 +107,9 @@ or verification in earlier phases.
   manual scenes.
 - [x] Add foreground-only latest camera event images and the deterministic
   trusted Camera Snapshot card.
+- [x] Add Tool-readiness-gated Mi Home Smart Home Skill activation.
+- [x] Add default-off, same-run model image input with bounded normalization and
+  no history, memory, log, export, Scheduled Agent, or Subagent persistence.
 - [x] Build, sign, validate, checksum, and publish the universal extension APK
   with the normal Android Release.
 - [ ] Validate Xiaomi QR authorization, region discovery, device control, and

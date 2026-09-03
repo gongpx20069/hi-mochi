@@ -215,10 +215,13 @@ its related cloud interfaces to non-commercial Home Assistant use.
 Camera event images are bounded ephemeral attachments. The extension retrieves
 the latest available event metadata and encrypted image, decrypts it into its
 private cache, and returns metadata plus a read-only file descriptor. Mochi
-validates and decodes the image locally for one trusted card. Image bytes are
-never inserted into the Agent message list, diagnostic logs, Room history,
-memory recall, provider sharing, export, scheduled execution, Subagent context,
-or TTS.
+validates and normalizes the image locally for one trusted card. When the
+provider's default-off image-input permission is enabled, the user explicitly
+requests the latest event to be viewed, described, or analyzed, and the model
+supports images, the Orchestrator adds one temporary OpenAI-compatible
+`image_url` data part to the same foreground Main-Agent run. Image bytes never
+enter Tool JSON, diagnostic logs, Room history, memory recall, provider
+sharing, export, scheduled execution, Subagent context, or TTS.
 
 ## 3. Agent response
 
@@ -324,8 +327,12 @@ enabled Skill metadata. `load_skill` activates full instructions on demand;
 bounded resources are accessed relative to the Skill root. Disabled Skills are
 absent from discovery and cannot be activated. A Skill never enables a Tool:
 provider and individual Tool switches still determine ToolRegistry membership,
-and activation reports missing required Tools. Android never runs downloaded
-scripts or package-install instructions.
+and activation reports missing required Tools. The UI also derives a readiness
+set from actual ToolRegistry prerequisites and blocks enablement until every
+required Tool is installed, connected, provider-enabled, and individually
+enabled. If readiness later fails, the saved preference remains but the Skill
+is omitted from discovery and activation. Android never runs downloaded scripts
+or package-install instructions.
 
 The unauthenticated Explore default parses the public skills.sh Trending (24h)
 leaderboard and falls back to install-ranked public search if the page shape

@@ -2,7 +2,23 @@ package com.example.mochi_pet.core.agent.llm
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 enum class ProviderType {
     OPENAI,
@@ -18,6 +34,7 @@ class OpenAiProviderConfig(
     val apiVersion: String = DEFAULT_AZURE_API_VERSION,
     val timeoutSeconds: Long = 60,
     val maxResponseBytes: Long = 2L * 1024L * 1024L,
+    val imageInputEnabled: Boolean = false,
 ) {
     init {
         require(endpoint.isNotBlank()) { "Provider endpoint must not be empty" }
@@ -38,15 +55,105 @@ class OpenAiProviderConfig(
 }
 
 @Serializable
+data class OpenAiImageUrl(
+    val url: String,
+    val detail: String = "auto",
+)
+
+@Serializable
+data class OpenAiChatContentPart(
+    val type: String,
+    val text: String? = null,
+    @SerialName("image_url")
+    val imageUrl: OpenAiImageUrl? = null,
+)
+
+@Serializable(with = OpenAiChatMessageSerializer::class)
 data class OpenAiChatMessage(
     val role: String,
     val content: String? = null,
+    val contentParts: List<OpenAiChatContentPart>? = null,
     @SerialName("tool_calls")
     val toolCalls: List<OpenAiToolCall>? = null,
     @SerialName("tool_call_id")
     val toolCallId: String? = null,
     val name: String? = null,
 )
+
+object OpenAiChatMessageSerializer : KSerializer<OpenAiChatMessage> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("OpenAiChatMessage")
+
+    override fun serialize(
+        encoder: Encoder,
+        value: OpenAiChatMessage,
+    ) {
+        require(encoder is JsonEncoder)
+        encoder.encodeJsonElement(
+            buildJsonObject {
+                put("role", value.role)
+                when {
+                    value.contentParts != null -> put(
+                        "content",
+                        encoder.json.encodeToJsonElement(
+                            kotlinx.serialization.builtins.ListSerializer(
+                                OpenAiChatContentPart.serializer(),
+                            ),
+                            value.contentParts,
+                        ),
+                    )
+                    value.content != null -> put(
+                        "content",
+                        value.content,
+                    )
+                    else -> put("content", JsonNull)
+                }
+                value.toolCalls?.let {
+                    put(
+                        "tool_calls",
+                        encoder.json.encodeToJsonElement(
+                            kotlinx.serialization.builtins.ListSerializer(
+                                OpenAiToolCall.serializer(),
+                            ),
+                            it,
+                        ),
+                    )
+                }
+                value.toolCallId?.let { put("tool_call_id", it) }
+                value.name?.let { put("name", it) }
+            },
+        )
+    }
+
+    override fun deserialize(decoder: Decoder): OpenAiChatMessage {
+        require(decoder is JsonDecoder)
+        val value = decoder.decodeJsonElement().jsonObject
+        val contentValue = value["content"]
+        return OpenAiChatMessage(
+            role = value.getValue("role").jsonPrimitive.content,
+            content = (contentValue as? JsonPrimitive)?.contentOrNull,
+            contentParts = (contentValue as? JsonArray)?.let {
+                decoder.json.decodeFromJsonElement(
+                    kotlinx.serialization.builtins.ListSerializer(
+                        OpenAiChatContentPart.serializer(),
+                    ),
+                    it,
+                )
+            },
+            toolCalls = (value["tool_calls"] as? JsonArray)?.let {
+                decoder.json.decodeFromJsonElement(
+                    kotlinx.serialization.builtins.ListSerializer(
+                        OpenAiToolCall.serializer(),
+                    ),
+                    it,
+                )
+            },
+            toolCallId = value["tool_call_id"]
+                ?.jsonPrimitive?.contentOrNull,
+            name = value["name"]?.jsonPrimitive?.contentOrNull,
+        )
+    }
+}
 
 @Serializable
 data class OpenAiFunctionCall(

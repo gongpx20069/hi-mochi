@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
@@ -27,9 +29,11 @@ import com.example.mochi_extension.MochiExtensionProtocol
 import com.example.mochi_pet.BuildConfig
 import com.example.mochi_pet.core.agent.tool.AgentTool
 import com.example.mochi_pet.core.agent.tool.AgentToolJson
+import com.example.mochi_pet.core.agent.tool.ModelImageAttachment
 import com.example.mochi_pet.core.agent.tool.ToolErrorCode
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
+import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -61,6 +65,12 @@ data class OpenedExtensionAttachment(
     }
 }
 
+data class ExtensionImageAttachment(
+    val descriptor: ExtensionAttachmentDescriptor,
+    val bytes: ByteArray,
+    val readyForModel: Boolean,
+)
+
 data class MijiaExtensionSnapshot(
     val installed: Boolean = false,
     val trusted: Boolean = false,
@@ -89,7 +99,7 @@ data class MijiaExtensionSnapshot(
 }
 
 interface MochiExtensionClient {
-    val attachmentEvents: Flow<ExtensionAttachmentDescriptor>
+    val attachmentEvents: Flow<ExtensionImageAttachment>
 
     suspend fun snapshot(): MijiaExtensionSnapshot
 
@@ -103,7 +113,7 @@ interface MochiExtensionClient {
 }
 
 object UnavailableMijiaExtensionClient : MochiExtensionClient {
-    override val attachmentEvents: Flow<ExtensionAttachmentDescriptor> =
+    override val attachmentEvents: Flow<ExtensionImageAttachment> =
         emptyFlow()
 
     override suspend fun snapshot() = MijiaExtensionSnapshot()
@@ -129,11 +139,11 @@ class AndroidMijiaExtensionClient(
         MochiExtensionProtocol.MIJIA_SERVICE,
     )
     private val mutableAttachmentEvents =
-        MutableSharedFlow<ExtensionAttachmentDescriptor>(
-            extraBufferCapacity = 4,
+        MutableSharedFlow<ExtensionImageAttachment>(
+            extraBufferCapacity = 1,
         )
 
-    override val attachmentEvents: Flow<ExtensionAttachmentDescriptor> =
+    override val attachmentEvents: Flow<ExtensionImageAttachment> =
         mutableAttachmentEvents
 
     override suspend fun snapshot(): MijiaExtensionSnapshot =
@@ -297,6 +307,7 @@ class AndroidMijiaExtensionClient(
     internal suspend fun execute(
         definition: ExtensionToolDefinition,
         arguments: JsonObject,
+        modelImageInputAllowed: Boolean,
     ): ToolResultEnvelope {
         val request = ExtensionToolRequest(
             requestId = "request-${UUID.randomUUID()}",
@@ -309,7 +320,7 @@ class AndroidMijiaExtensionClient(
             return ToolResultEnvelope.error(ToolErrorCode.INVALID_ARGS, it)
         }
         return try {
-            withService { service ->
+            val result = withService { service ->
                 withTimeout(request.timeoutMillis) {
                     suspendCancellableCoroutine { continuation ->
                         continuation.invokeOnCancellation {
@@ -327,23 +338,49 @@ class AndroidMijiaExtensionClient(
                                         expectedRequestId = request.requestId,
                                     )?.let { error ->
                                         continuation.resume(
-                                            ToolResultEnvelope.error(
-                                                ToolErrorCode.PROVIDER_ERROR,
-                                                error,
+                                            ExtensionToolResult(
+                                                requestId = request.requestId,
+                                                success = false,
+                                                contentJson = null,
+                                                errorCode = "PROVIDER_ERROR",
+                                                errorMessage = error,
+                                                attachments = emptyList(),
                                             ),
                                         )
                                         return
                                     }
-                                    result.attachments.forEach(
-                                        mutableAttachmentEvents::tryEmit,
-                                    )
-                                    continuation.resume(result.toEnvelope())
+                                    continuation.resume(result)
                                 }
                             },
                         )
                     }
                 }
             }
+            val images = if (result.success) {
+                result.attachments.map { descriptor ->
+                    consumeAttachment(descriptor)
+                }
+            } else {
+                emptyList()
+            }
+            images.forEach { image ->
+                mutableAttachmentEvents.tryEmit(
+                    ExtensionImageAttachment(
+                        descriptor = image.descriptor,
+                        bytes = image.modelImage.bytes,
+                        readyForModel = modelImageInputAllowed,
+                    ),
+                )
+            }
+            result.toEnvelope(
+                modelImages = if (modelImageInputAllowed) {
+                    images.map(ConsumedExtensionImage::modelImage)
+                } else {
+                    emptyList()
+                },
+                imageReadyForModel =
+                    modelImageInputAllowed && images.isNotEmpty(),
+            )
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
             ToolResultEnvelope.error(
                 ToolErrorCode.TIMEOUT,
@@ -362,7 +399,109 @@ class AndroidMijiaExtensionClient(
         }
     }
 
-    private fun ExtensionToolResult.toEnvelope(): ToolResultEnvelope {
+    private suspend fun consumeAttachment(
+        descriptor: ExtensionAttachmentDescriptor,
+    ): ConsumedExtensionImage =
+        withContext(Dispatchers.IO) {
+            val opened = openAttachment(descriptor)
+            val bytes = ParcelFileDescriptor.AutoCloseInputStream(
+                opened.fileDescriptor,
+            ).use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    output.write(buffer, 0, count)
+                    if (
+                        output.size().toLong() >
+                        com.example.mochi_extension.ExtensionApiLimits
+                            .MAX_ATTACHMENT_BYTES
+                    ) {
+                        throw ExtensionBindingException(
+                            "Extension image exceeded the attachment limit.",
+                        )
+                    }
+                }
+                output.toByteArray()
+            }
+            if (bytes.size.toLong() != descriptor.byteCount) {
+                throw ExtensionBindingException(
+                    "Extension image length did not match its descriptor.",
+                )
+            }
+            normalizeImage(descriptor, bytes)
+        }
+
+    private fun normalizeImage(
+        descriptor: ExtensionAttachmentDescriptor,
+        bytes: ByteArray,
+    ): ConsumedExtensionImage {
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (
+            bounds.outWidth != descriptor.widthPixels ||
+            bounds.outHeight != descriptor.heightPixels
+        ) {
+            throw ExtensionBindingException(
+                "Extension image dimensions did not match its descriptor.",
+            )
+        }
+        var sampleSize = 1
+        while (
+            bounds.outWidth / sampleSize > MODEL_IMAGE_MAX_DIMENSION ||
+            bounds.outHeight / sampleSize > MODEL_IMAGE_MAX_DIMENSION ||
+            bounds.outWidth.toLong() / sampleSize *
+            (bounds.outHeight.toLong() / sampleSize) >
+            MODEL_IMAGE_MAX_PIXELS
+        ) {
+            sampleSize *= 2
+        }
+        val bitmap = BitmapFactory.decodeByteArray(
+            bytes,
+            0,
+            bytes.size,
+            BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+            },
+        ) ?: throw ExtensionBindingException(
+            "Extension image could not be decoded.",
+        )
+        return try {
+            val normalized = listOf(85, 70, 55).firstNotNullOfOrNull {
+                quality ->
+                ByteArrayOutputStream().use { output ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)
+                    output.toByteArray().takeIf {
+                        it.size <= MODEL_IMAGE_MAX_BYTES
+                    }
+                }
+            } ?: throw ExtensionBindingException(
+                "Extension image could not fit the model input limit.",
+            )
+            ConsumedExtensionImage(
+                descriptor = descriptor.copy(
+                    mimeType = "image/jpeg",
+                    byteCount = normalized.size.toLong(),
+                    widthPixels = bitmap.width,
+                    heightPixels = bitmap.height,
+                ),
+                modelImage = ModelImageAttachment(
+                    mimeType = "image/jpeg",
+                    bytes = normalized,
+                ),
+            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private fun ExtensionToolResult.toEnvelope(
+        modelImages: List<ModelImageAttachment>,
+        imageReadyForModel: Boolean,
+    ): ToolResultEnvelope {
         if (!success) {
             return ToolResultEnvelope.error(
                 errorCode.toToolErrorCode(),
@@ -379,7 +518,18 @@ class AndroidMijiaExtensionClient(
                 "The Mi Home extension returned invalid JSON.",
             )
         }
-        return ToolResultEnvelope.success(data)
+        val enrichedData = if (attachments.isNotEmpty() && data is JsonObject) {
+            buildJsonObject {
+                data.forEach { (name, value) -> put(name, value) }
+                put("image_ready_for_model", imageReadyForModel)
+            }
+        } else {
+            data
+        }
+        return ToolResultEnvelope.success(
+            data = enrichedData,
+            modelImages = modelImages,
+        )
     }
 
     private fun String?.toToolErrorCode(): ToolErrorCode =
@@ -593,8 +743,16 @@ class AndroidMijiaExtensionClient(
             "com.example.mochi_extension.BIND_EXTENSION"
         const val EXTENSION_TOOL_TIMEOUT_MILLIS = 60_000L
         const val EXTENSION_OPERATION_TIMEOUT_MILLIS = 15_000L
+        const val MODEL_IMAGE_MAX_DIMENSION = 2_048
+        const val MODEL_IMAGE_MAX_PIXELS = 4_194_304L
+        const val MODEL_IMAGE_MAX_BYTES = 2 * 1_024 * 1_024
     }
 }
+
+private data class ConsumedExtensionImage(
+    val descriptor: ExtensionAttachmentDescriptor,
+    val modelImage: ModelImageAttachment,
+)
 
 private class ExtensionAgentTool(
     private val client: AndroidMijiaExtensionClient,
@@ -621,7 +779,11 @@ private class ExtensionAgentTool(
     override suspend fun execute(
         arguments: JsonObject,
         context: ToolExecutionContext,
-    ): ToolResultEnvelope = client.execute(definition, arguments)
+    ): ToolResultEnvelope = client.execute(
+        definition,
+        arguments,
+        context.modelImageInputAllowed,
+    )
 }
 
 private class BoundExtension(

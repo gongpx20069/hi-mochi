@@ -4,8 +4,6 @@ import android.database.sqlite.SQLiteException
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.system.Os
-import android.system.OsConstants
 import android.webkit.WebView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -25,6 +23,7 @@ import com.example.mochi_pet.core.agent.tool.ManageMochiTodoTool
 import com.example.mochi_pet.core.agent.tool.AgentToolJson
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.agent.tool.allowsCameraEventImageInput
 import com.example.mochi_pet.core.extensions.ExtensionActivityTarget
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
@@ -70,12 +69,15 @@ import com.example.mochi_pet.core.skills.DownloadedSkill
 import com.example.mochi_pet.core.skills.SkillMarketClient
 import com.example.mochi_pet.core.skills.SkillMarketException
 import com.example.mochi_pet.core.skills.SkillOrigin
+import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_pet.core.skills.SkillRepository
 import com.example.mochi_pet.core.skills.LoadSkillTool
+import com.example.mochi_pet.core.skills.readiness
 import com.example.mochi_pet.core.location.DeviceLocationException
 import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.ToolCatalogRepository
 import com.example.mochi_pet.core.tools.ToolCatalogSummary
+import com.example.mochi_pet.core.tools.readyToolNames
 import com.example.mochi_pet.core.weather.CurrentWeather
 import com.example.mochi_pet.core.weather.CurrentWeatherTool
 import com.example.mochi_pet.core.weather.WeatherException
@@ -204,6 +206,7 @@ data class ProviderShareUiState(
 
 data class SkillsUiState(
     val skills: List<MochiSkill> = emptyList(),
+    val readinessById: Map<String, SkillReadiness> = emptyMap(),
     val searchResults: List<MarketSkillSummary> = emptyList(),
     val isLoading: Boolean = true,
     val isSearching: Boolean = false,
@@ -222,6 +225,7 @@ data class ToolsUiState(
 
 data class CameraSnapshotUiState(
     val bitmap: Bitmap,
+    val readyForModel: Boolean,
     val cameraName: String,
     val home: String?,
     val room: String?,
@@ -570,6 +574,9 @@ class MochiHomeViewModel(
                             context = ToolExecutionContext(
                                 currentDate = LocalDate.now(clock),
                                 currentSurface = mutableSurface.value,
+                                modelImageInputAllowed =
+                                    provider.imageInputEnabled &&
+                                        allowsCameraEventImageInput(query),
                             ),
                             history = memoryContext?.recentMessages.orEmpty(),
                             personaSections = persona?.sections.orEmpty(),
@@ -1191,6 +1198,8 @@ class MochiHomeViewModel(
                 showSkillError(error, "Skill update failed")
             } catch (error: SQLiteException) {
                 showSkillError(error, "Skill update failed")
+            } catch (error: IOException) {
+                showSkillError(error, "Skill update failed")
             }
         }
     }
@@ -1202,6 +1211,26 @@ class MochiHomeViewModel(
         val repository = skillRepository ?: return
         viewModelScope.launch(ioDispatcher) {
             try {
+                if (enabled) {
+                    val skill = repository.listSkills()
+                        .firstOrNull { it.id == id }
+                        ?: throw IllegalArgumentException(
+                            "Skill was not found",
+                        )
+                    val catalog = toolCatalogRepository?.loadSummary()
+                        ?: ToolCatalogSummary()
+                    val readiness = skill.readiness(
+                        catalog.readyToolNames(),
+                    )
+                    require(readiness.isReady) {
+                        "Enable required Tools first: " +
+                            readiness.missingTools.sorted().joinToString()
+                    }
+                    mutableToolsState.value = ToolsUiState(
+                        catalog = catalog,
+                        isLoading = false,
+                    )
+                }
                 repository.setEnabled(id, enabled)
                 refreshSkills(if (enabled) "Skill enabled" else "Skill disabled")
             } catch (error: IllegalArgumentException) {
@@ -1638,6 +1667,7 @@ class MochiHomeViewModel(
                         catalog = catalog,
                         isLoading = false,
                     )
+                    refreshSkillReadiness(catalog)
                 }
                 .onFailure(::showToolError)
         }
@@ -1646,29 +1676,41 @@ class MochiHomeViewModel(
     private fun observeExtensionAttachments() {
         val client = extensionClient ?: return
         viewModelScope.launch {
-            client.attachmentEvents.collect { descriptor ->
+            client.attachmentEvents.collect { attachment ->
                 runCatching {
                     withContext(ioDispatcher) {
-                        client.openAttachment(descriptor).use { opened ->
-                            val bitmap = decodeCameraSnapshot(
-                                opened.fileDescriptor.fileDescriptor,
-                                opened.descriptor.widthPixels,
-                                opened.descriptor.heightPixels,
-                            )
-                            val metadata = AgentToolJson.format
-                                .parseToJsonElement(
-                                    opened.descriptor.metadataJson,
-                                ).jsonObject
-                            CameraSnapshotUiState(
-                                bitmap = bitmap,
-                                cameraName = metadata.stringValue("camera_name")
-                                    ?: "Mi Home camera",
-                                home = metadata.stringValue("home"),
-                                room = metadata.stringValue("room"),
-                                eventType = metadata.stringValue("event_type"),
-                                capturedAt = metadata.stringValue("captured_at"),
+                        val bitmap = BitmapFactory.decodeByteArray(
+                            attachment.bytes,
+                            0,
+                            attachment.bytes.size,
+                        ) ?: throw IllegalStateException(
+                            "Camera event image could not be decoded.",
+                        )
+                        if (
+                            bitmap.width !=
+                            attachment.descriptor.widthPixels ||
+                            bitmap.height !=
+                            attachment.descriptor.heightPixels
+                        ) {
+                            bitmap.recycle()
+                            throw IllegalStateException(
+                                "Camera event image dimensions are invalid.",
                             )
                         }
+                        val metadata = AgentToolJson.format
+                            .parseToJsonElement(
+                                attachment.descriptor.metadataJson,
+                            ).jsonObject
+                        CameraSnapshotUiState(
+                            bitmap = bitmap,
+                            readyForModel = attachment.readyForModel,
+                            cameraName = metadata.stringValue("camera_name")
+                                ?: "Mi Home camera",
+                            home = metadata.stringValue("home"),
+                            room = metadata.stringValue("room"),
+                            eventType = metadata.stringValue("event_type"),
+                            capturedAt = metadata.stringValue("captured_at"),
+                        )
                     }
                 }.onSuccess { snapshot ->
                     mutableCameraSnapshot.value = snapshot
@@ -1683,47 +1725,6 @@ class MochiHomeViewModel(
                 }
             }
         }
-    }
-
-    private fun decodeCameraSnapshot(
-        fileDescriptor: java.io.FileDescriptor,
-        expectedWidth: Int,
-        expectedHeight: Int,
-    ): Bitmap {
-        val bounds = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-        BitmapFactory.decodeFileDescriptor(fileDescriptor, null, bounds)
-        if (
-            bounds.outWidth <= 0 ||
-            bounds.outHeight <= 0 ||
-            bounds.outWidth != expectedWidth ||
-            bounds.outHeight != expectedHeight
-        ) {
-            throw IllegalStateException(
-                "Camera event image dimensions are invalid.",
-            )
-        }
-        var sampleSize = 1
-        while (
-            bounds.outWidth / sampleSize > CAMERA_BITMAP_MAX_DIMENSION ||
-            bounds.outHeight / sampleSize > CAMERA_BITMAP_MAX_DIMENSION ||
-            bounds.outWidth.toLong() / sampleSize *
-            (bounds.outHeight.toLong() / sampleSize) >
-            CAMERA_BITMAP_MAX_PIXELS
-        ) {
-            sampleSize *= 2
-        }
-        Os.lseek(fileDescriptor, 0, OsConstants.SEEK_SET)
-        return BitmapFactory.decodeFileDescriptor(
-            fileDescriptor,
-            null,
-            BitmapFactory.Options().apply {
-                inSampleSize = sampleSize
-            },
-        ) ?: throw IllegalStateException(
-            "Camera event image could not be decoded.",
-        )
     }
 
     private fun updateTools(
@@ -1741,6 +1742,7 @@ class MochiHomeViewModel(
                         isLoading = false,
                         feedback = successFeedback,
                     )
+                    refreshSkillReadiness(catalog)
                 }
                 .onFailure(::showToolError)
         }
@@ -1762,15 +1764,32 @@ class MochiHomeViewModel(
     private suspend fun refreshSkills(feedback: String? = null) {
         val repository = skillRepository ?: return
         try {
+            val skills = repository.listSkills()
+            val readyToolNames = mutableToolsState.value.catalog
+                .readyToolNames()
             mutableSkillsState.update {
                 it.copy(
-                    skills = repository.listSkills(),
+                    skills = skills,
+                    readinessById = skills.associate { skill ->
+                        skill.id to skill.readiness(readyToolNames)
+                    },
                     isLoading = false,
                     feedback = feedback,
                 )
             }
         } catch (error: SQLiteException) {
             showSkillError(error, "Could not load Skills")
+        }
+    }
+
+    private fun refreshSkillReadiness(catalog: ToolCatalogSummary) {
+        val readyToolNames = catalog.readyToolNames()
+        mutableSkillsState.update { state ->
+            state.copy(
+                readinessById = state.skills.associate { skill ->
+                    skill.id to skill.readiness(readyToolNames)
+                },
+            )
         }
     }
 
@@ -2078,8 +2097,6 @@ class MochiHomeViewModel(
             "https://docs.qq.com/open/auth/mcp.html"
         private const val MIJIA_RELEASE_URL =
             "https://github.com/gongpx20069/hi-mochi/releases/latest"
-        private const val CAMERA_BITMAP_MAX_DIMENSION = 2_048
-        private const val CAMERA_BITMAP_MAX_PIXELS = 4_194_304L
 
         fun factory(
             application: MochiApplication,

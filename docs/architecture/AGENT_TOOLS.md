@@ -458,7 +458,10 @@ or doorbell event metadata plus one JPEG/PNG attachment descriptor. It does not
 claim the image is live, invoke a camera shutter, start a stream, or return
 image bytes/URLs in JSON. Missing events or unsupported models return typed
 errors. Successful evidence deterministically creates the trusted Camera
-Snapshot card.
+Snapshot card. If the provider's explicit image-input permission is enabled,
+the host may add one normalized image to the same foreground model run; the
+attachment remains excluded from Tool JSON, history, memory, logs, export,
+Scheduled Agents, and Subagents.
 
 `mijia_list_scenes` returns only enabled manually triggered scenes from selected
 homes. `mijia_run_scene` requires an exact stable scene ID selected from that
@@ -467,6 +470,15 @@ are not inferred to be safe.
 
 Mi Home Tools are not available to Scheduled Agent runs or Subagents in the
 initial release. The Skill catalog cannot bypass this restriction.
+
+The default-off built-in **Mi Home Smart Home** Skill requires all eight Mi
+Home Tools above. Its switch remains unavailable until the extension is
+installed, connected, provider-enabled, and every Tool is individually enabled.
+It resolves devices from fresh list evidence, uses category-specific control
+Tools, requires explicit current-turn confirmation for camera settings and
+scenes, and retrieves an event image only when the user explicitly asks to view,
+describe, or analyze it. It must not perform face identification or infer
+sensitive personal attributes from an image.
 
 ## 8. Previously proposed tool groups
 

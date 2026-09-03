@@ -68,8 +68,8 @@ class MijiaToolExecutor(
                 put("latest_event_image_available", true)
                 put(
                     "message",
-                    "The newest available camera event image is displayed " +
-                        "locally and was not sent to the model.",
+                    "The newest available camera event image is available " +
+                        "as a validated host attachment.",
                 )
             },
             attachments = listOf(descriptor),

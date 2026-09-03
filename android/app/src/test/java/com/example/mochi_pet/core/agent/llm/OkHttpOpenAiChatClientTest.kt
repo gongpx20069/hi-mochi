@@ -6,6 +6,7 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -66,6 +67,75 @@ class OkHttpOpenAiChatClientTest {
             assertEquals(null, recorded.getHeader("Authorization"))
             assertEquals(false, recorded.body.readUtf8().contains("\"model\""))
         }
+
+    @Test
+    fun `serializes bounded image content parts`() = runBlocking {
+        server.enqueue(successResponse())
+
+        client.complete(
+            config = config(server.url("/v1/").toString()),
+            request = OpenAiChatRequest(
+                messages = listOf(
+                    OpenAiChatMessage(
+                        role = "user",
+                        contentParts = listOf(
+                            OpenAiChatContentPart(
+                                type = "text",
+                                text = "Describe this image.",
+                            ),
+                            OpenAiChatContentPart(
+                                type = "image_url",
+                                imageUrl = OpenAiImageUrl(
+                                    url = "data:image/jpeg;base64,AQID",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val body = server.takeRequest().body.readUtf8()
+        assertTrue(body.contains("\"type\":\"image_url\""))
+        assertTrue(body.contains("data:image/jpeg;base64,AQID"))
+        assertTrue(!body.contains("\"contentParts\""))
+    }
+
+    @Test
+    fun `accepts null tool calls in provider response`() = runBlocking {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(
+                    """
+                    {
+                      "choices": [
+                        {
+                          "message": {
+                            "role": "assistant",
+                            "content": "Done",
+                            "tool_calls": null
+                          }
+                        }
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+        )
+
+        val response = client.complete(
+            config = config(server.url("/v1/").toString()),
+            request = OpenAiChatRequest(
+                messages = listOf(
+                    OpenAiChatMessage(role = "user", content = "Hello"),
+                ),
+            ),
+        )
+
+        assertEquals("Done", response.choices.single().message.content)
+        assertEquals(null, response.choices.single().message.toolCalls)
+    }
 
     @Test
     fun `surfaces provider HTTP error without exposing request secret`() {

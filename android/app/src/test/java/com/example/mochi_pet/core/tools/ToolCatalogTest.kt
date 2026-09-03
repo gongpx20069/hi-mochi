@@ -61,6 +61,34 @@ class ToolCatalogTest {
     }
 
     @Test
+    fun `ready Tool names require provider and individual switches`() {
+        val summary = ToolCatalogSummary(
+            builtInTools = listOf(
+                BuiltInToolSummary("native_on", "On", "", true),
+                BuiltInToolSummary("native_off", "Off", "", false),
+            ),
+            mijia = MijiaProviderSummary(
+                connected = true,
+                enabled = true,
+                tools = listOf(
+                    MijiaToolSummary("mijia_on", "", "read", true),
+                    MijiaToolSummary("mijia_off", "", "read", false),
+                ),
+            ),
+        )
+
+        assertEquals(
+            setOf("native_on", "mijia_on"),
+            summary.readyToolNames(),
+        )
+        assertFalse(
+            summary.copy(
+                mijia = summary.mijia.copy(enabled = false),
+            ).readyToolNames().contains("mijia_on"),
+        )
+    }
+
+    @Test
     fun `Tencent Docs token discovers and selects knowledge tools`() =
         runBlocking {
             val initial = repository.loadSummary().servers.first {

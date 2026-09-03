@@ -230,4 +230,9 @@ Image attachments cross the process boundary through a read-only
 `ParcelFileDescriptor`, never through Binder byte arrays, Base64 JSON, shared
 filesystem paths, or exported world-readable files. The host validates
 declared MIME type, byte count, image dimensions, and total decoded size before
-rendering, then closes the descriptor and deletes any temporary host copy.
+rendering, then closes the descriptor and deletes any temporary host copy. It
+normalizes at most one image to a maximum 2048-pixel edge, 4,194,304 pixels,
+and 2 MiB. The normalized bytes may enter only the current foreground
+Main-Agent request when the selected provider's explicit image-input permission
+is enabled; they never enter Tool JSON, persistent state, Scheduled Agents, or
+Subagents.

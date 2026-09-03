@@ -44,6 +44,30 @@ import org.junit.Test
 
 class MochiHomeViewModelTest {
     @Test
+    fun `camera model input permission is scoped to explicit current query`() {
+        val permissions = mutableListOf<Boolean>()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(
+                imageInputEnabled = true,
+            ),
+            agentRunnerBuilder = { _, _, _ ->
+                AgentRunner { request ->
+                    permissions += request.context.modelImageInputAllowed
+                    AgentReply("Done", "neutral")
+                }
+            },
+            clock = fixedClock(),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.sendConversation("Turn on camera motion detection")
+        viewModel.sendConversation("Show the latest door camera event image")
+
+        assertEquals(listOf(false, true), permissions)
+    }
+
+    @Test
     fun `show weather loads current conditions on Home`() {
         val weather = CurrentWeather(
             temperatureC = 29.0,
@@ -538,10 +562,13 @@ private class PlannerStoreFake(
         throw UnsupportedOperationException("Not required by this test")
 }
 
-private class ProviderSettingsRepositoryFake : ProviderSettingsRepository {
+private class ProviderSettingsRepositoryFake(
+    imageInputEnabled: Boolean = false,
+) : ProviderSettingsRepository {
     private val summary = ProviderSettingsSummary(
         endpoint = "https://example.test/v1",
         model = "test-model",
+        imageInputEnabled = imageInputEnabled,
         hasApiKey = true,
     )
 
@@ -558,6 +585,7 @@ private class ProviderSettingsRepositoryFake : ProviderSettingsRepository {
             endpoint = summary.endpoint,
             apiKey = "test-key",
             model = summary.model,
+            imageInputEnabled = summary.imageInputEnabled,
         )
 }
 

@@ -12,6 +12,8 @@ import com.example.mochi_pet.core.skills.DownloadedSkill
 import com.example.mochi_pet.core.skills.LoadSkillTool
 import com.example.mochi_pet.core.skills.RoomSkillRepository
 import com.example.mochi_pet.core.skills.SkillOrigin
+import com.example.mochi_pet.core.skills.requiredToolNames
+import com.example.mochi_pet.core.skills.readiness
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
@@ -146,7 +148,7 @@ class MochiDatabaseTest {
         assertEquals(false, installed.enabled)
         assertEquals(true, edited.modified)
         val skills = repository.listSkills()
-        assertEquals(12, skills.size)
+        assertEquals(13, skills.size)
         assertEquals(
             listOf("Web Search"),
             skills.filter { it.id.contains("web-search") }.map { it.name },
@@ -197,11 +199,24 @@ class MochiDatabaseTest {
                 true,
                 initial.first { it.name == "Merchant Discovery" }.enabled,
             )
+            val miHome = initial.first {
+                it.name == "Mi Home Smart Home"
+            }
+            assertEquals(false, miHome.enabled)
+            assertEquals(
+                8,
+                miHome.requiredToolNames.size,
+            )
+            assertFalse(miHome.readiness(emptySet()).isReady)
+            assertTrue(
+                miHome.readiness(miHome.requiredToolNames).isReady,
+            )
             assertEquals(
                 true,
                 initial.filter {
                     it.origin == SkillOrigin.BUILT_IN &&
-                        !it.name.endsWith("Knowledge")
+                        !it.name.endsWith("Knowledge") &&
+                        it.name != "Mi Home Smart Home"
                 }.all { it.enabled },
             )
 

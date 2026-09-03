@@ -22,6 +22,7 @@ class ProviderSettingsRepositoryTest {
                 endpoint = "https://example.test/v1",
                 model = "test-model",
                 apiVersion = "2024-10-21",
+                imageInputEnabled = true,
                 apiKeyReplacement = "first-secret",
             ),
         )
@@ -31,6 +32,7 @@ class ProviderSettingsRepositoryTest {
                 endpoint = "https://example.test/v1",
                 model = "updated-model",
                 apiVersion = "2025-01-01-preview",
+                imageInputEnabled = true,
                 apiKeyReplacement = "   ",
             ),
         )
@@ -42,6 +44,8 @@ class ProviderSettingsRepositoryTest {
         assertEquals("updated-model", runtime.model)
         assertEquals("2025-01-01-preview", runtime.apiVersion)
         assertEquals("first-secret", runtime.apiKey)
+        assertTrue(summary.imageInputEnabled)
+        assertTrue(runtime.imageInputEnabled)
     }
 
     @Test(expected = ProviderSettingsIncompleteException::class)

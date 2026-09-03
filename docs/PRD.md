@@ -152,8 +152,10 @@ support is an optional import/export adapter.
   explicitly enables them.
 - Skills follow the Agent Skills `SKILL.md` format. Only enabled Skill metadata
   appears in the initial Agent context; full instructions load on demand.
-- Skill enablement never bypasses provider or individual Tool switches. A
-  disabled Tool is unavailable even when an enabled Skill refers to it.
+- A Skill with required Tools can be enabled only while every required Tool is
+  installed, connected, provider-enabled, and individually enabled. If a
+  dependency later becomes unavailable, the saved Skill preference remains but
+  the Skill is suspended from Agent discovery until readiness is restored.
 - Bundled scripts and dependencies are never executed automatically.
 
 ### 3.9 Language
@@ -195,9 +197,12 @@ support is an optional import/export adapter.
   card mutation, robot-vacuum maps, arbitrary private device protocols, locks,
   alarms, garage doors, and scale body measurements are outside the initial
   scope.
-- Camera event images are foreground-only ephemeral local attachments. They
-  are not persisted to conversation history, copied to the gallery, exposed to
-  scheduled runs or Subagents, or sent to the configured model provider.
+- Camera event images are foreground-only ephemeral attachments. With the
+  current provider's explicit camera-image setting enabled, one host-validated
+  image may be sent to that provider in the same foreground Main-Agent run for
+  a user's explicit view, description, or analysis request. Images are never
+  persisted to conversation history, memory, logs, export, or sharing, copied
+  to the gallery, or exposed to scheduled runs or Subagents.
 - Xiaomi session credentials remain inside the extension's Keystore-backed
   storage and never enter Mochi prompts, logs, exports, provider sharing, or
   Binder payloads.
@@ -264,4 +269,6 @@ settings without exposing API keys.
   signature, protocol version, connection, provider switch, and individual
   Tool selection all validate.
 - A successful latest-camera-event image request renders a trusted local image
-  card without putting image bytes in the model request or persisted history.
+  card. With explicit provider permission, the same bounded image can also be
+  attached once to the current foreground model run, but never to persisted
+  history, memory, logs, export, scheduled runs, or Subagents.
