@@ -31,7 +31,9 @@ android/
 
 Both applications use `minSdk 26`, the same release version, and the same
 signing key. The extension is one universal APK because it contains no native
-ABI libraries.
+ABI libraries. The host both defines and requests the shared signature-level
+bind permission; defining the permission alone does not authorize the host to
+start the protected extension Service or configuration Activity.
 
 ## 3. Installation and discovery
 
