@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpRemoteTool
 import com.example.mochi_pet.core.mcp.McpServerRuntime
+import com.example.mochi_pet.core.mcp.NOTION_SERVER_ID
 import com.example.mochi_pet.core.mcp.McpStreamableHttpClient
 import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
 import com.example.mochi_pet.core.settings.ApiKeyCipher
@@ -85,6 +86,115 @@ class ToolCatalogTest {
             summary.copy(
                 mijia = summary.mijia.copy(enabled = false),
             ).readyToolNames().contains("mijia_on"),
+        )
+    }
+
+    @Test
+    fun `Skill readiness aggregates required Tools by provider`() {
+        val summary = ToolCatalogSummary(
+            agentBrowser = AgentBrowserProviderSummary(
+                enabled = true,
+                tools = listOf(
+                    BuiltInToolSummary(
+                        "browser_read",
+                        "Read browser page",
+                        "",
+                        true,
+                    ),
+                    BuiltInToolSummary(
+                        "browser_navigate",
+                        "Navigate browser",
+                        "",
+                        false,
+                    ),
+                ),
+            ),
+            servers = listOf(
+                McpServerSummary(
+                    id = TENCENT_DOCS_SERVER_ID,
+                    name = "Tencent Docs MCP",
+                    endpoint = "https://docs.qq.com/openapi/mcp",
+                    builtIn = true,
+                    enabled = true,
+                    connected = true,
+                    authMode = McpAuthMode.TOKEN,
+                    tools = listOf(
+                        McpToolSummary(
+                            remoteName = "query_space_node",
+                            alias = "tencent_docs_query_space_node",
+                            description = "",
+                            enabled = true,
+                        ),
+                        McpToolSummary(
+                            remoteName = "get_content",
+                            alias = "tencent_docs_get_content",
+                            description = "",
+                            enabled = false,
+                        ),
+                    ),
+                ),
+                McpServerSummary(
+                    id = NOTION_SERVER_ID,
+                    name = "Notion MCP",
+                    endpoint = "https://mcp.notion.com/mcp",
+                    builtIn = true,
+                    enabled = false,
+                    connected = false,
+                    authMode = McpAuthMode.OAUTH,
+                    tools = emptyList(),
+                ),
+            ),
+        )
+
+        val readiness = summary.skillReadiness(
+            setOf(
+                "browser_read",
+                "browser_navigate",
+                "tencent_docs_query_space_node",
+                "tencent_docs_get_content",
+                "notion_search",
+            ),
+        )
+
+        assertEquals(
+            setOf("Agent Browser", "Notion MCP", "Tencent Docs MCP"),
+            readiness.requirements.keys,
+        )
+        assertEquals(
+            setOf("Agent Browser", "Notion MCP", "Tencent Docs MCP"),
+            readiness.missingRequirements,
+        )
+        assertFalse(readiness.isReady)
+        assertTrue(
+            summary.copy(
+                agentBrowser = summary.agentBrowser.copy(
+                    tools = summary.agentBrowser.tools.map {
+                        it.copy(enabled = true)
+                    },
+                ),
+                servers = summary.servers.map { server ->
+                    when (server.id) {
+                        TENCENT_DOCS_SERVER_ID -> server.copy(
+                            tools = server.tools.map {
+                                it.copy(enabled = true)
+                            },
+                        )
+                        NOTION_SERVER_ID -> server.copy(
+                            enabled = true,
+                            connected = true,
+                            tools = listOf(
+                                McpToolSummary(
+                                    remoteName = "search",
+                                    alias = "notion_search",
+                                    description = "",
+                                    enabled = true,
+                                ),
+                            ),
+                        )
+                        else -> server
+                    }
+                },
+            ).skillReadiness(readiness.requiredTools).isReady,
         )
     }
 

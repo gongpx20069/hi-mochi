@@ -159,8 +159,11 @@ support is an optional import/export adapter.
   explicitly enables them.
 - Skills follow the Agent Skills `SKILL.md` format. Only enabled Skill metadata
   appears in the initial Agent context; full instructions load on demand.
-- A Skill with required Tools can be enabled only while every required Tool is
-  installed, connected, provider-enabled, and individually enabled. If a
+- A Skill's prerequisites are presented and evaluated as aggregate Tool groups
+  such as Agent Browser, Amap Maps, Tencent Docs MCP, or the Mi Home extension,
+  rather than as a list of raw Tool IDs. A group is ready only while its
+  provider is installed when applicable, connected, enabled, and every Tool
+  from that group required by the Skill is individually enabled. If a
   dependency later becomes unavailable, the saved Skill preference remains but
   the Skill is suspended from Agent discovery until readiness is restored.
 - Bundled scripts and dependencies are never executed automatically.

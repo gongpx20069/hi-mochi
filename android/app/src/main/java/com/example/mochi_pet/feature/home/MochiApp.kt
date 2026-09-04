@@ -168,6 +168,7 @@ import com.example.mochi_pet.core.wake.WakeRuntimeState
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import com.example.mochi_pet.core.web.WebContentException
 import com.example.mochi_pet.platform.browser.AgentBrowserUiState
+import com.example.mochi_extension.MochiExtensionProtocol
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -514,6 +515,9 @@ private fun MochiAppContent(
             extensionActivityLauncher.launch(
                 Intent().setComponent(
                     ComponentName(target.packageName, target.className),
+                ).putExtra(
+                    MochiExtensionProtocol.EXTRA_UI_LANGUAGE_TAG,
+                    AppLanguage.resolveContentLocale().toLanguageTag(),
                 ),
             )
         } catch (_: ActivityNotFoundException) {
@@ -4021,29 +4025,6 @@ private fun ToolsSurface(
                 }
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Extensions",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            item {
-                MijiaExtensionCard(
-                    summary = state.catalog.mijia,
-                    toolsExpanded = mijiaToolsExpanded,
-                    disabled = state.isLoading,
-                    onToggleTools = {
-                        mijiaToolsExpanded = !mijiaToolsExpanded
-                    },
-                    onInstall = onInstallMijia,
-                    onConfigure = onConfigureMijia,
-                    onDisconnect = onDisconnectMijia,
-                    onSetEnabled = onSetMijiaEnabled,
-                    onSetToolEnabled = onSetMijiaToolEnabled,
-                )
-            }
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -4082,6 +4063,29 @@ private fun ToolsSurface(
                     onSetToolEnabled = { remoteName, enabled ->
                         onSetToolEnabled(server.id, remoteName, enabled)
                     },
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Extensions",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            item {
+                MijiaExtensionCard(
+                    summary = state.catalog.mijia,
+                    toolsExpanded = mijiaToolsExpanded,
+                    disabled = state.isLoading,
+                    onToggleTools = {
+                        mijiaToolsExpanded = !mijiaToolsExpanded
+                    },
+                    onInstall = onInstallMijia,
+                    onConfigure = onConfigureMijia,
+                    onDisconnect = onDisconnectMijia,
+                    onSetEnabled = onSetMijiaEnabled,
+                    onSetToolEnabled = onSetMijiaToolEnabled,
                 )
             }
         }
@@ -4268,7 +4272,7 @@ private fun MijiaExtensionCard(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = tool.name,
+                                    text = tool.displayName,
                                     fontWeight = FontWeight.Medium,
                                 )
                                 Text(
@@ -4277,6 +4281,13 @@ private fun MijiaExtensionCard(
                                         .onSurfaceVariant,
                                     style = MaterialTheme.typography.bodySmall,
                                     maxLines = 2,
+                                )
+                                Text(
+                                    text = tool.name,
+                                    color = MaterialTheme.colorScheme
+                                        .onSurfaceVariant,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
                                 )
                                 Text(
                                     text = tool.riskLevel,
@@ -4762,8 +4773,8 @@ private fun InstalledSkillCard(
             }
             if (readiness?.isReady == false) {
                 Text(
-                    text = "Enable required Tools first: " +
-                        readiness.missingTools.sorted().joinToString(),
+                    text = "Enable required Tool groups first: " +
+                        readiness.missingRequirements.sorted().joinToString(),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
                 )

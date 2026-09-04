@@ -13,9 +13,12 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.set
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
+import com.example.mochi_extension.MochiExtensionProtocol
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +37,13 @@ class MijiaConfigurationActivity : AppCompatActivity() {
     private val checkBoxes = LinkedHashMap<String, CheckBox>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        intent.getStringExtra(MochiExtensionProtocol.EXTRA_UI_LANGUAGE_TAG)
+            ?.takeIf(String::isNotBlank)
+            ?.let { languageTag ->
+                AppCompatDelegate.setApplicationLocales(
+                    LocaleListCompat.forLanguageTags(languageTag),
+                )
+            }
         super.onCreate(savedInstanceState)
         buildContent()
         refresh()
@@ -182,9 +192,8 @@ class MijiaConfigurationActivity : AppCompatActivity() {
                 )
                 qrView.visibility = View.GONE
                 showDeviceSelection()
-            } catch (error: Exception) {
-                statusView.text = error.message
-                    ?: getString(R.string.connection_failed)
+            } catch (_: Exception) {
+                statusView.text = getString(R.string.connection_failed)
                 qrView.visibility = View.GONE
                 primaryButton.isEnabled = true
                 primaryButton.text = getString(R.string.generate_new_qr)
@@ -229,7 +238,7 @@ class MijiaConfigurationActivity : AppCompatActivity() {
                     device.name,
                     device.homeName,
                     device.roomName ?: getString(R.string.no_room),
-                    device.category.wireName.replace('_', ' '),
+                    deviceCategoryLabel(device.category),
                 )
                 val checkBox = CheckBox(this).apply {
                     text = label
@@ -243,9 +252,8 @@ class MijiaConfigurationActivity : AppCompatActivity() {
             saveButton.visibility =
                 if (supported.isEmpty()) View.GONE else View.VISIBLE
             disconnectButton.visibility = View.VISIBLE
-        } catch (error: Exception) {
-            statusView.text =
-                error.message ?: getString(R.string.load_devices_failed)
+        } catch (_: Exception) {
+            statusView.text = getString(R.string.load_devices_failed)
             disconnectButton.visibility = View.VISIBLE
         }
     }
@@ -262,9 +270,8 @@ class MijiaConfigurationActivity : AppCompatActivity() {
                 }
                 setResult(Activity.RESULT_OK)
                 finish()
-            } catch (error: Exception) {
-                statusView.text =
-                    error.message ?: getString(R.string.save_devices_failed)
+            } catch (_: Exception) {
+                statusView.text = getString(R.string.save_devices_failed)
                 saveButton.isEnabled = true
             }
         }
@@ -279,6 +286,29 @@ class MijiaConfigurationActivity : AppCompatActivity() {
             finish()
         }
     }
+
+    private fun deviceCategoryLabel(category: MijiaDeviceCategory): String =
+        getString(
+            when (category) {
+                MijiaDeviceCategory.LIGHT -> R.string.category_light
+                MijiaDeviceCategory.SWITCH -> R.string.category_switch
+                MijiaDeviceCategory.PLUG -> R.string.category_plug
+                MijiaDeviceCategory.FAN -> R.string.category_fan
+                MijiaDeviceCategory.AIR_CONDITIONER ->
+                    R.string.category_air_conditioner
+                MijiaDeviceCategory.AIR_PURIFIER ->
+                    R.string.category_air_purifier
+                MijiaDeviceCategory.HUMIDIFIER ->
+                    R.string.category_humidifier
+                MijiaDeviceCategory.CURTAIN -> R.string.category_curtain
+                MijiaDeviceCategory.SENSOR -> R.string.category_sensor
+                MijiaDeviceCategory.TELEVISION ->
+                    R.string.category_television
+                MijiaDeviceCategory.CAMERA -> R.string.category_camera
+                MijiaDeviceCategory.SCALE -> R.string.category_scale
+                MijiaDeviceCategory.UNKNOWN -> R.string.category_unknown
+            },
+        )
 
     private fun qrBitmap(value: String): Bitmap {
         val matrix = MultiFormatWriter().encode(

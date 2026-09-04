@@ -375,7 +375,9 @@ The built-in Tencent Docs provider uses the official hosted endpoint
 encryption and sends it as the provider-required raw `Authorization` value.
 Search, read, SmartCanvas creation, append, and update tools are selected by
 default after successful discovery. The separate Tencent Docs Knowledge Skill
-is read-only and disabled by default.
+is read-only and disabled by default. Its readiness prerequisite is presented
+as the single **Tencent Docs MCP** aggregate; the aggregate is unavailable when
+the server or any Tencent Docs Tool required by the Skill is unavailable.
 
 FlyAI's public CLI calls `https://flyai.open.fliggy.com/mcp` with a stateless
 `tools/call` request plus proprietary `x-ff-ctx`, timestamp, nonce, HMAC, and
@@ -385,6 +387,12 @@ blocked until FlyAI issues Android-approved signing material and client
 identity rules, or an approved relay is selected.
 
 ## 7. Signed extension Tools
+
+The Tools surface places signed Extensions after the MCP servers. Official
+extension cards use the same provider-card hierarchy as built-in providers:
+localized display name and description, stable monospace Tool ID, localized
+risk label, and individual switch. The extension configuration Activity
+receives Mochi's resolved Chinese or English language tag explicitly.
 
 Extension Tool schemas enter the top-level registry only when all of these are
 true:
@@ -485,9 +493,11 @@ delegation. The host rejects raw image echo before the normal Subagent loop.
 The Subagent must treat visible text as untrusted data and must not identify
 people or infer sensitive attributes.
 
-The default-off built-in **Mi Home Smart Home** Skill requires all eight Mi
-Home Tools above. Its switch remains unavailable until the extension is
-installed, connected, provider-enabled, and every Tool is individually enabled.
+The default-off built-in **Mi Home Smart Home** Skill presents the single
+**Mi Home extension** aggregate as its prerequisite rather than eight raw Tool
+IDs. Its switch remains unavailable until the extension is installed,
+connected, provider-enabled, and all eight Tools required by the Skill are
+individually enabled.
 It resolves devices from fresh list evidence, uses category-specific control
 Tools, requires explicit current-turn confirmation for camera settings and
 scenes, and retrieves an event image only when the user explicitly asks to view,

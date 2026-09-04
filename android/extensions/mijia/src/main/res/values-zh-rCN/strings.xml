@@ -24,4 +24,17 @@
     <string name="no_room">未分配房间</string>
     <string name="load_devices_failed">无法加载米家设备。</string>
     <string name="save_devices_failed">无法保存设备选择。</string>
+    <string name="category_light">灯</string>
+    <string name="category_switch">开关</string>
+    <string name="category_plug">插座</string>
+    <string name="category_fan">风扇</string>
+    <string name="category_air_conditioner">空调</string>
+    <string name="category_air_purifier">空气净化器</string>
+    <string name="category_humidifier">加湿器</string>
+    <string name="category_curtain">窗帘</string>
+    <string name="category_sensor">传感器</string>
+    <string name="category_television">电视</string>
+    <string name="category_camera">摄像头</string>
+    <string name="category_scale">体脂秤</string>
+    <string name="category_unknown">未知设备</string>
 </resources>

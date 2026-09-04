@@ -14,6 +14,8 @@ object MochiExtensionProtocol {
         "com.example.mochi_mijia.MijiaExtensionService"
     const val MIJIA_CONFIGURATION_ACTIVITY =
         "com.example.mochi_mijia.MijiaConfigurationActivity"
+    const val EXTRA_UI_LANGUAGE_TAG =
+        "com.example.mochi_extension.extra.UI_LANGUAGE_TAG"
 }
 
 object ExtensionConnectionStatus {

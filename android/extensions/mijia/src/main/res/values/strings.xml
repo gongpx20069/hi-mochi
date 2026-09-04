@@ -26,4 +26,17 @@
     <string name="no_room">No room</string>
     <string name="load_devices_failed">Could not load Mi Home devices.</string>
     <string name="save_devices_failed">Could not save device selection.</string>
+    <string name="category_light">Light</string>
+    <string name="category_switch">Switch</string>
+    <string name="category_plug">Plug</string>
+    <string name="category_fan">Fan</string>
+    <string name="category_air_conditioner">Air conditioner</string>
+    <string name="category_air_purifier">Air purifier</string>
+    <string name="category_humidifier">Humidifier</string>
+    <string name="category_curtain">Curtain</string>
+    <string name="category_sensor">Sensor</string>
+    <string name="category_television">Television</string>
+    <string name="category_camera">Camera</string>
+    <string name="category_scale">Scale</string>
+    <string name="category_unknown">Unknown</string>
 </resources>

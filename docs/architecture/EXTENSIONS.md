@@ -68,6 +68,11 @@ callbacks for:
 - launching extension configuration through an explicit Activity intent;
 - opening one bounded read-only attachment by opaque ID.
 
+The configuration intent may carry only the host's resolved Chinese or English
+UI language tag under the shared protocol constant. This keeps a separate
+extension APK aligned with Mochi's in-app language selection without exposing
+host settings or storage.
+
 Binder calls never carry account passwords, service tokens, encryption keys,
 raw cookies, image byte arrays, filesystem paths, executable code, Android
 `Context`, Room entities, model prompts, or navigation directives.

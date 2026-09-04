@@ -337,11 +337,15 @@ bounded resources are accessed relative to the Skill root. Disabled Skills are
 absent from discovery and cannot be activated. A Skill never enables a Tool:
 provider and individual Tool switches still determine ToolRegistry membership,
 and activation reports missing required Tools. The UI also derives a readiness
-set from actual ToolRegistry prerequisites and blocks enablement until every
-required Tool is installed, connected, provider-enabled, and individually
-enabled. If readiness later fails, the saved preference remains but the Skill
-is omitted from discovery and activation. Android never runs downloaded scripts
-or package-install instructions.
+set from actual ToolRegistry prerequisites, groups those requirements by their
+owning provider or Tool group, and blocks enablement until every aggregate is
+ready. Provider-backed groups require the provider to be installed when
+applicable, connected, and enabled; every member Tool used by that Skill must
+also remain individually enabled. The UI reports the aggregate label, such as
+`Tencent Docs MCP`, rather than raw Tool IDs. If readiness later fails, the
+saved preference remains but the Skill is omitted from discovery and
+activation. Android never runs downloaded scripts or package-install
+instructions.
 
 The unauthenticated Explore default parses the public skills.sh Trending (24h)
 leaderboard and falls back to install-ranked public search if the page shape

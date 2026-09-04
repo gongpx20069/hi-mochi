@@ -166,10 +166,13 @@ Installed/Explore uses a dark selected segment. Explore opens with the public
 skills.sh Trending (24h) leaderboard, then switches to search results after a
 query. Cards show rank, source, install count, and a derived popularity label.
 Every installed Skill, including read-only built-ins, can be enabled or
-disabled. A Skill cannot be enabled until all of its required Tools are ready;
-its card names missing Tools and keeps the switch off. A previously enabled
-Skill whose dependencies become unavailable remains switchable off but is
-suspended from Agent discovery. Existing built-ins default to enabled; the
+disabled. A Skill cannot be enabled until all of its required aggregate Tool
+groups are ready; its card names missing provider/group labels such as
+**Tencent Docs MCP**, never a list of raw Tool IDs, and keeps the switch off.
+A group is ready only when its provider and every member Tool required by that
+Skill are ready. A previously enabled Skill whose dependencies become
+unavailable remains switchable off but is suspended from Agent discovery.
+Existing built-ins default to enabled; the
 Notion Knowledge, Tencent Docs Knowledge, and Mi Home Smart Home built-ins
 default to disabled.
 Each MCP server's detailed Tool list starts collapsed and can be expanded
@@ -199,8 +202,9 @@ switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
 
-Tools also contains an Extensions section. The Mi Home card always occupies
-one stable position and moves through these states:
+Tools places its Extensions section after all MCP server cards. The Mi Home
+card always occupies one stable position there, follows Mochi's selected
+Chinese or English UI language, and moves through these states:
 
 1. **Not installed**: describe the optional unofficial connector, its
    approximate download size, and open the trusted GitHub Release page through

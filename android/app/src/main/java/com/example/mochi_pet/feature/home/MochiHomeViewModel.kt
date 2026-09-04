@@ -72,12 +72,12 @@ import com.example.mochi_pet.core.skills.SkillOrigin
 import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_pet.core.skills.SkillRepository
 import com.example.mochi_pet.core.skills.LoadSkillTool
-import com.example.mochi_pet.core.skills.readiness
+import com.example.mochi_pet.core.skills.requiredToolNames
 import com.example.mochi_pet.core.location.DeviceLocationException
 import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.ToolCatalogRepository
 import com.example.mochi_pet.core.tools.ToolCatalogSummary
-import com.example.mochi_pet.core.tools.readyToolNames
+import com.example.mochi_pet.core.tools.skillReadiness
 import com.example.mochi_pet.core.weather.CurrentWeather
 import com.example.mochi_pet.core.weather.CurrentWeatherTool
 import com.example.mochi_pet.core.weather.WeatherException
@@ -1219,12 +1219,14 @@ class MochiHomeViewModel(
                         )
                     val catalog = toolCatalogRepository?.loadSummary()
                         ?: ToolCatalogSummary()
-                    val readiness = skill.readiness(
-                        catalog.readyToolNames(),
+                    val readiness = catalog.skillReadiness(
+                        skill.requiredToolNames,
                     )
                     require(readiness.isReady) {
-                        "Enable required Tools first: " +
-                            readiness.missingTools.sorted().joinToString()
+                        "Enable required Tool groups first: " +
+                            readiness.missingRequirements
+                                .sorted()
+                                .joinToString()
                     }
                     mutableToolsState.value = ToolsUiState(
                         catalog = catalog,
@@ -1765,13 +1767,14 @@ class MochiHomeViewModel(
         val repository = skillRepository ?: return
         try {
             val skills = repository.listSkills()
-            val readyToolNames = mutableToolsState.value.catalog
-                .readyToolNames()
+            val catalog = mutableToolsState.value.catalog
             mutableSkillsState.update {
                 it.copy(
                     skills = skills,
                     readinessById = skills.associate { skill ->
-                        skill.id to skill.readiness(readyToolNames)
+                        skill.id to catalog.skillReadiness(
+                            skill.requiredToolNames,
+                        )
                     },
                     isLoading = false,
                     feedback = feedback,
@@ -1783,11 +1786,12 @@ class MochiHomeViewModel(
     }
 
     private fun refreshSkillReadiness(catalog: ToolCatalogSummary) {
-        val readyToolNames = catalog.readyToolNames()
         mutableSkillsState.update { state ->
             state.copy(
                 readinessById = state.skills.associate { skill ->
-                    skill.id to skill.readiness(readyToolNames)
+                    skill.id to catalog.skillReadiness(
+                        skill.requiredToolNames,
+                    )
                 },
             )
         }

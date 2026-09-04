@@ -49,12 +49,19 @@ data class AgentSkillMetadata(
 data class SkillReadiness(
     val requiredTools: Set<String>,
     val readyTools: Set<String>,
+    val requirements: Map<String, Set<String>> =
+        requiredTools.associateWith { setOf(it) },
 ) {
     val missingTools: Set<String>
         get() = requiredTools - readyTools
 
+    val missingRequirements: Set<String>
+        get() = requirements
+            .filterValues { tools -> !readyTools.containsAll(tools) }
+            .keys
+
     val isReady: Boolean
-        get() = missingTools.isEmpty()
+        get() = missingRequirements.isEmpty()
 }
 
 interface SkillRepository {

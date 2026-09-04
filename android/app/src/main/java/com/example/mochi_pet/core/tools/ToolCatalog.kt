@@ -22,6 +22,7 @@ import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
 import com.example.mochi_pet.core.mcp.mcpToolAlias
 import com.example.mochi_pet.core.settings.ApiKeyCipher
 import com.example.mochi_pet.core.settings.EncryptedSecret
+import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -92,6 +93,7 @@ data class MijiaToolSummary(
     val description: String,
     val riskLevel: String,
     val enabled: Boolean,
+    val displayName: String = name,
 )
 
 data class BuiltInToolSummary(
@@ -134,6 +136,42 @@ fun ToolCatalogSummary.readyToolNames(): Set<String> =
         servers.filter { it.connected && it.enabled }.forEach { server ->
             server.tools.filter { it.enabled }.mapTo(this) { it.alias }
         }
+    }
+
+fun ToolCatalogSummary.skillReadiness(
+    requiredToolNames: Set<String>,
+): SkillReadiness {
+    val readyToolNames = readyToolNames()
+    return SkillReadiness(
+        requiredTools = requiredToolNames,
+        readyTools = requiredToolNames.intersect(readyToolNames),
+        requirements = requiredToolNames
+            .groupBy { skillRequirementName(it) }
+            .mapValues { (_, tools) -> tools.toSet() },
+    )
+}
+
+private fun ToolCatalogSummary.skillRequirementName(
+    toolName: String,
+): String =
+    when {
+        toolName.startsWith("browser_") -> "Agent Browser"
+        toolName.startsWith("amap_") -> "Amap Maps"
+        toolName.startsWith("mijia_") -> "Mi Home extension"
+        toolName.startsWith("notion_") ->
+            servers.firstOrNull { it.id == NOTION_SERVER_ID }?.name
+                ?: "Notion MCP"
+        toolName.startsWith("tencent_docs_") ->
+            servers.firstOrNull { it.id == TENCENT_DOCS_SERVER_ID }?.name
+                ?: "Tencent Docs MCP"
+        else -> servers.firstNotNullOfOrNull { server ->
+            server.tools
+                .firstOrNull { it.alias == toolName }
+                ?.let { server.name }
+        } ?: builtInTools
+            .firstOrNull { it.name == toolName }
+            ?.displayName
+            ?: toolName
     }
 
 private fun List<BuiltInToolSummary>.filterToReadyNames(
@@ -982,6 +1020,7 @@ class DataStoreToolCatalogRepository(
                         riskLevel = definition.riskLevel,
                         enabled = mijiaToolsEnabled[definition.name]
                             ?: definition.defaultEnabled,
+                        displayName = mijiaToolDisplayName(definition.name),
                     )
                 },
             ),
@@ -1117,6 +1156,20 @@ class DataStoreToolCatalogRepository(
                 iv = value.iv,
             ),
         )
+
+    private fun mijiaToolDisplayName(name: String): String =
+        when (name) {
+            "mijia_list_devices" -> "List Mi Home Devices"
+            "mijia_get_device_state" -> "Read Mi Home Device State"
+            "mijia_control_device" -> "Control Mi Home Device"
+            "mijia_control_television" -> "Control Mi Home Television"
+            "mijia_configure_camera" -> "Configure Mi Home Camera"
+            "mijia_get_latest_camera_event_image" ->
+                "Get Latest Camera Event Image"
+            "mijia_list_scenes" -> "List Mi Home Scenes"
+            "mijia_run_scene" -> "Run Mi Home Scene"
+            else -> name
+        }
 
     private fun PersistedToolCatalog.toBuiltInToolSummary(
         descriptor: BuiltInToolDescriptor,
