@@ -48,9 +48,15 @@ Before binding, the host validates:
 1. exact application ID;
 2. exact exported service class;
 3. same signing-certificate lineage as the host;
-4. the signature-level bind permission;
-5. supported API version and minimum host version;
-6. bounded metadata and Tool definitions.
+4. the signature-level bind permission and protected configuration Activity.
+
+Once those static checks pass, the card reports the package as installed and
+trusted even if Android has not started its process yet. **Connect Mi Home**
+remains available and launches the protected configuration Activity directly;
+this is required on systems that keep a newly installed no-launcher package in
+the stopped state or block its first background Binder start. Binder metadata
+then validates the supported API version, minimum host version, identity, and
+bounded Tool definitions before any Tool becomes available.
 
 Package install, replacement, removal, force-stop, Binder death, and host
 restart trigger rediscovery. No discovered extension is automatically enabled.

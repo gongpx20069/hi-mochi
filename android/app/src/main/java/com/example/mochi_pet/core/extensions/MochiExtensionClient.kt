@@ -90,10 +90,11 @@ data class MijiaExtensionSnapshot(
             connectionState.status == ExtensionConnectionStatus.CONNECTED
 
     val configurationTarget: ExtensionActivityTarget?
-        get() = metadata?.takeIf { trusted }?.let {
+        get() = takeIf { trusted }?.let {
             ExtensionActivityTarget(
-                packageName = it.packageName,
-                className = it.configurationActivityClassName,
+                packageName = MochiExtensionProtocol.MIJIA_PACKAGE,
+                className =
+                    MochiExtensionProtocol.MIJIA_CONFIGURATION_ACTIVITY,
             )
         }
 }
@@ -198,11 +199,13 @@ class AndroidMijiaExtensionClient(
             } catch (error: ExtensionBindingException) {
                 MijiaExtensionSnapshot(
                     installed = true,
+                    trusted = true,
                     detail = error.message,
                 )
             } catch (error: SecurityException) {
                 MijiaExtensionSnapshot(
                     installed = true,
+                    trusted = true,
                     detail = "Android rejected the extension connection.",
                 )
             }

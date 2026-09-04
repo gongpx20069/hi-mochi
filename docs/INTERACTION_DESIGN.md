@@ -225,6 +225,13 @@ Chinese or English UI language, and moves through these states:
    in-place package update; stored authorization and device selections remain
    unless the extension rejects an incompatible state version.
 
+Static package, signing, Service, Activity, and signature-permission checks are
+enough to enter **Installed, not connected**. A failed first Binder start must
+not relabel that trusted package as untrusted or send the user back to
+installation. **Connect Mi Home** explicitly launches the configuration
+Activity, allowing Android and OEM background-start controls to start a newly
+installed extension that has no launcher entry.
+
 The extension has no launcher activity, so the Android launcher continues to
 show only Mochi. Android Settings and the system package installer identify it
 as **Mochi Mi Home Extension** so users can inspect or uninstall it.
