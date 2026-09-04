@@ -21,7 +21,7 @@ class MijiaToolContractTest {
             MijiaToolExecutor.DEFINITIONS.size,
             MijiaToolExecutor.DEFINITIONS.map { it.name }.distinct().size,
         )
-        assertTrue(MijiaToolExecutor.DEFINITIONS.none { it.defaultEnabled })
+        assertTrue(MijiaToolExecutor.DEFINITIONS.all { it.defaultEnabled })
     }
 
     @Test

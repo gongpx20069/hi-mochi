@@ -20,7 +20,8 @@
         <item quantity="other">已连接 %1$d 个家庭，但没有找到支持的设备。</item>
     </plurals>
     <string name="choose_devices">选择允许 Mochi 访问的设备。不支持或高风险设备不会显示。</string>
-    <string name="device_label">%1$s · %2$s / %3$s · %4$s</string>
+    <string name="device_location">%1$s · %2$s</string>
+    <string name="select_device">选择%1$s</string>
     <string name="no_room">未分配房间</string>
     <string name="load_devices_failed">无法加载米家设备。</string>
     <string name="save_devices_failed">无法保存设备选择。</string>

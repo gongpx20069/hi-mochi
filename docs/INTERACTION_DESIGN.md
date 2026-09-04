@@ -216,7 +216,9 @@ Chinese or English UI language, and moves through these states:
    cancellation. Copy explains that another phone already signed into Mi Home
    must scan and confirm the code.
 4. **Connected, disabled**: show the selected homes and device count without
-   registering any Agent Tools.
+   registering any Agent Tools. This is the default after connection; all
+   child Tool switches start checked so enabling the aggregate provider makes
+   the full supported Tool set available.
 5. **Connected, enabled**: show one provider switch and one collapsed list of
    individually selectable Mi Home Tools.
 6. **Authorization expired**: remove every Mi Home Tool from the Agent
@@ -240,6 +242,10 @@ After QR connection, users select homes and supported devices. Lights,
 switches, plugs, fans, air conditioners, air purifiers, humidifiers, curtains,
 read-only sensors, televisions, cameras, and scales derive capabilities from
 each device's MIoT specification rather than from a fixed model allowlist.
+Each selectable device uses a full-width rounded card with a primary device
+name, separate home/room and category lines, and a checkbox. The whole card is
+clickable; selected cards use both a highlighted background and stronger
+outline so selection never relies on the checkbox or color alone.
 Locks, alarms, garage doors, robot-vacuum maps, camera storage mutation, and
 unsupported capabilities never appear. Ambiguous duplicate device names are
 displayed with home and room labels.

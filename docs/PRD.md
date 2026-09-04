@@ -192,6 +192,10 @@ support is an optional import/export adapter.
   password.
 - Mi Home is explicitly labeled as an unofficial cloud integration. It may
   stop working when Xiaomi changes undocumented account or device interfaces.
+- After connection, the Mi Home provider remains disabled by default while
+  every discovered child Tool defaults to enabled. Enabling the aggregate
+  provider therefore makes all child Tools available unless the user
+  explicitly disables individual Tools.
 - The initial Mi Home scope covers:
   - common specification-driven devices such as lights, switches, plugs,
     fans, air conditioners, air purifiers, humidifiers, and curtains;

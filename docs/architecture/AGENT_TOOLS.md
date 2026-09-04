@@ -404,6 +404,11 @@ true:
 - the provider is enabled;
 - the individual Tool is enabled.
 
+The Mi Home aggregate provider remains disabled by default after connection.
+Every child Tool definition defaults to enabled, so turning on the provider
+activates the complete discovered Tool set; later individual Tool selections
+remain explicit persisted user choices.
+
 The initial Mi Home extension may expose:
 
 - `mijia_list_devices`

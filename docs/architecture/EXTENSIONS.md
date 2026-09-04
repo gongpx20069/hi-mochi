@@ -97,6 +97,11 @@ individual Tool enablement. Definitions are loaded before each top-level Agent
 registry is assembled so install, update, logout, and switch changes take
 effect without restarting Mochi.
 
+Mi Home keeps its aggregate provider disabled by default after connection, but
+all child Tool definitions default to enabled. The first provider enablement
+therefore activates all supported Tools while preserving the user's ability to
+disable individual Tools afterward.
+
 The host validates Tool names and JSON Schema, then wraps each remote definition
 in an `ExtensionToolAdapter`. Arguments and results pass through the same
 bounded typed envelopes as native Tools. Extensions cannot directly navigate,

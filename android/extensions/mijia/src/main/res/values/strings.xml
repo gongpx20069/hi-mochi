@@ -22,7 +22,8 @@
         <item quantity="other">Connected to %1$d homes, but no supported devices were found.</item>
     </plurals>
     <string name="choose_devices">Choose the devices Mochi may access. Unsupported and high-risk devices are hidden.</string>
-    <string name="device_label">%1$s · %2$s / %3$s · %4$s</string>
+    <string name="device_location">%1$s · %2$s</string>
+    <string name="select_device">Select %1$s</string>
     <string name="no_room">No room</string>
     <string name="load_devices_failed">Could not load Mi Home devices.</string>
     <string name="save_devices_failed">Could not save device selection.</string>

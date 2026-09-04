@@ -443,7 +443,7 @@ class MijiaToolExecutor(
             description = description,
             inputSchemaJson = schema,
             riskLevel = risk,
-            defaultEnabled = false,
+            defaultEnabled = true,
         )
 
         private fun deviceSchema() =

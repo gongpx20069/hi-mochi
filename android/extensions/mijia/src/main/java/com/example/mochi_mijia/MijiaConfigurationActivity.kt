@@ -1,8 +1,11 @@
 package com.example.mochi_mijia
 
 import android.app.Activity
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -50,8 +53,6 @@ class MijiaConfigurationActivity : AppCompatActivity() {
     }
 
     private fun buildContent() {
-        val density = resources.displayMetrics.density
-        fun dp(value: Int) = (value * density).toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -233,20 +234,20 @@ class MijiaConfigurationActivity : AppCompatActivity() {
             checkBoxes.clear()
             deviceContainer.removeAllViews()
             supported.forEach { device ->
-                val label = getString(
-                    R.string.device_label,
-                    device.name,
-                    device.homeName,
-                    device.roomName ?: getString(R.string.no_room),
-                    deviceCategoryLabel(device.category),
+                val (card, checkBox) = deviceSelectionCard(
+                    device = device,
+                    selected = device.id in session.selectedDeviceIds,
                 )
-                val checkBox = CheckBox(this).apply {
-                    text = label
-                    isChecked = device.id in session.selectedDeviceIds
-                    setTextColor(Color.WHITE)
-                }
                 checkBoxes[device.id] = checkBox
-                deviceContainer.addView(checkBox)
+                deviceContainer.addView(
+                    card,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        bottomMargin = dp(10)
+                    },
+                )
             }
             deviceContainer.visibility = View.VISIBLE
             saveButton.visibility =
@@ -257,6 +258,120 @@ class MijiaConfigurationActivity : AppCompatActivity() {
             disconnectButton.visibility = View.VISIBLE
         }
     }
+
+    private fun deviceSelectionCard(
+        device: MijiaDevice,
+        selected: Boolean,
+    ): Pair<View, CheckBox> {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(88)
+            isClickable = true
+            isFocusable = true
+            elevation = dp(2).toFloat()
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }
+        val checkBox = CheckBox(this).apply {
+            isChecked = selected
+            buttonTintList = ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_checked),
+                    intArrayOf(),
+                ),
+                intArrayOf(
+                    DEVICE_CARD_ACCENT,
+                    DEVICE_CARD_SECONDARY_TEXT,
+                ),
+            )
+            contentDescription = getString(
+                R.string.select_device,
+                device.name,
+            )
+        }
+        card.addView(
+            checkBox,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginEnd = dp(12)
+            },
+        )
+        val details = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            isDuplicateParentStateEnabled = true
+        }
+        details.addView(
+            TextView(this).apply {
+                text = device.name
+                textSize = 17f
+                setTextColor(Color.WHITE)
+                setTypeface(typeface, Typeface.BOLD)
+            },
+        )
+        details.addView(
+            TextView(this).apply {
+                text = getString(
+                    R.string.device_location,
+                    device.homeName,
+                    device.roomName ?: getString(R.string.no_room),
+                )
+                textSize = 13f
+                setTextColor(DEVICE_CARD_SECONDARY_TEXT)
+                setPadding(0, dp(4), 0, 0)
+            },
+        )
+        details.addView(
+            TextView(this).apply {
+                text = deviceCategoryLabel(device.category)
+                textSize = 12f
+                setTextColor(DEVICE_CARD_ACCENT)
+                setTypeface(typeface, Typeface.BOLD)
+                setPadding(0, dp(5), 0, 0)
+            },
+        )
+        card.addView(
+            details,
+            LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f,
+            ),
+        )
+        fun updateSelectionStyle(isSelected: Boolean) {
+            card.background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(18).toFloat()
+                setColor(
+                    if (isSelected) {
+                        DEVICE_CARD_SELECTED_BACKGROUND
+                    } else {
+                        DEVICE_CARD_BACKGROUND
+                    },
+                )
+                setStroke(
+                    dp(if (isSelected) 2 else 1),
+                    if (isSelected) {
+                        DEVICE_CARD_ACCENT
+                    } else {
+                        DEVICE_CARD_OUTLINE
+                    },
+                )
+            }
+        }
+        checkBox.setOnCheckedChangeListener { _, isChecked ->
+            updateSelectionStyle(isChecked)
+        }
+        card.setOnClickListener {
+            checkBox.isChecked = !checkBox.isChecked
+        }
+        updateSelectionStyle(selected)
+        return card to checkBox
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun saveSelection() {
         saveButton.isEnabled = false
@@ -329,5 +444,13 @@ class MijiaConfigurationActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private companion object {
+        val DEVICE_CARD_BACKGROUND = 0xFF211F26.toInt()
+        val DEVICE_CARD_SELECTED_BACKGROUND = 0xFF2B2440.toInt()
+        val DEVICE_CARD_OUTLINE = 0xFF49454F.toInt()
+        val DEVICE_CARD_ACCENT = 0xFFD0BCFF.toInt()
+        val DEVICE_CARD_SECONDARY_TEXT = 0xFFCAC4D0.toInt()
     }
 }
