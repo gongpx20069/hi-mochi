@@ -88,6 +88,10 @@ raw cookies, image byte arrays, filesystem paths, executable code, Android
 Each request has a unique ID. Exactly one terminal callback is accepted.
 Cancellation, timeout, Binder death, or stale Agent session invalidates later
 callbacks. The service must not keep a Tool call running after cancellation.
+The Host deadline includes a short callback-delivery grace period beyond the
+request deadline so the service owns the terminal timeout result. Camera event
+image retrieval may use the protocol's 120-second maximum; other current Mi
+Home Tools use 60 seconds.
 
 ## 5. Tool lifecycle
 

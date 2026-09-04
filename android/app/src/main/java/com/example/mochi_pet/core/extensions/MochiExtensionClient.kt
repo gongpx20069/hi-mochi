@@ -316,7 +316,7 @@ class AndroidMijiaExtensionClient(
             requestId = "request-${UUID.randomUUID()}",
             toolName = definition.name,
             argumentsJson = arguments.toString(),
-            timeoutMillis = EXTENSION_TOOL_TIMEOUT_MILLIS,
+            timeoutMillis = extensionToolTimeoutMillis(definition.name),
             executionContext = ExtensionExecutionContext.FOREGROUND_MAIN,
         )
         ExtensionApiValidator.requestError(request)?.let {
@@ -324,7 +324,7 @@ class AndroidMijiaExtensionClient(
         }
         return try {
             val result = withService { service ->
-                withTimeout(request.timeoutMillis) {
+                withTimeout(extensionHostTimeoutMillis(request.timeoutMillis)) {
                     suspendCancellableCoroutine { continuation ->
                         continuation.invokeOnCancellation {
                             runCatching { service.cancelTool(request.requestId) }
@@ -744,13 +744,27 @@ class AndroidMijiaExtensionClient(
     private companion object {
         const val MOCHI_EXTENSION_ACTION =
             "com.example.mochi_extension.BIND_EXTENSION"
-        const val EXTENSION_TOOL_TIMEOUT_MILLIS = 60_000L
         const val EXTENSION_OPERATION_TIMEOUT_MILLIS = 15_000L
         const val MODEL_IMAGE_MAX_DIMENSION = 2_048
         const val MODEL_IMAGE_MAX_PIXELS = 4_194_304L
         const val MODEL_IMAGE_MAX_BYTES = 2 * 1_024 * 1_024
     }
 }
+
+internal fun extensionToolTimeoutMillis(toolName: String): Long =
+    if (toolName == MIJIA_CAMERA_EVENT_IMAGE_TOOL) {
+        com.example.mochi_extension.ExtensionApiLimits.MAX_TIMEOUT_MILLIS
+    } else {
+        DEFAULT_EXTENSION_TOOL_TIMEOUT_MILLIS
+    }
+
+internal fun extensionHostTimeoutMillis(toolTimeoutMillis: Long): Long =
+    toolTimeoutMillis + EXTENSION_CALLBACK_GRACE_MILLIS
+
+private const val MIJIA_CAMERA_EVENT_IMAGE_TOOL =
+    "mijia_get_latest_camera_event_image"
+private const val DEFAULT_EXTENSION_TOOL_TIMEOUT_MILLIS = 60_000L
+private const val EXTENSION_CALLBACK_GRACE_MILLIS = 5_000L
 
 private data class ConsumedExtensionImage(
     val descriptor: ExtensionAttachmentDescriptor,

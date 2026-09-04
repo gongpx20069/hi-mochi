@@ -11,6 +11,17 @@ import org.junit.Test
 
 class MijiaToolContractTest {
     @Test
+    fun cameraTimeoutDoesNotClaimTheSessionDisconnected() {
+        assertEquals(
+            "The latest camera event image timed out. " +
+                "Mi Home is still connected.",
+            mijiaToolTimeoutMessage(
+                "mijia_get_latest_camera_event_image",
+            ),
+        )
+    }
+
+    @Test
     fun allToolDefinitionsSatisfyExtensionContract() {
         assertNull(
             ExtensionApiValidator.toolDefinitionsError(

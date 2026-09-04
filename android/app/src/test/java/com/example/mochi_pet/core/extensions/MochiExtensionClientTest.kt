@@ -3,6 +3,7 @@ package com.example.mochi_pet.core.extensions
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
+import com.example.mochi_extension.ExtensionApiLimits
 import com.example.mochi_extension.MochiExtensionProtocol
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -15,6 +16,26 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class MochiExtensionClientTest {
+    @Test
+    fun `camera event images receive the maximum extension timeout`() {
+        assertEquals(
+            ExtensionApiLimits.MAX_TIMEOUT_MILLIS,
+            extensionToolTimeoutMillis(
+                "mijia_get_latest_camera_event_image",
+            ),
+        )
+        assertEquals(
+            60_000L,
+            extensionToolTimeoutMillis("mijia_list_devices"),
+        )
+        assertEquals(
+            ExtensionApiLimits.MAX_TIMEOUT_MILLIS + 5_000L,
+            extensionHostTimeoutMillis(
+                ExtensionApiLimits.MAX_TIMEOUT_MILLIS,
+            ),
+        )
+    }
+
     @Test
     fun `host requests its extension signature permission`() {
         val context = ApplicationProvider.getApplicationContext<Context>()

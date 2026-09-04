@@ -168,7 +168,7 @@ class MijiaExtensionService : Service() {
                         delivered,
                         request.requestId,
                         "TIMEOUT",
-                        "The Mi Home Tool call timed out.",
+                        mijiaToolTimeoutMessage(request.toolName),
                     )
                 } catch (error: CancellationException) {
                     deliverError(
@@ -233,6 +233,7 @@ class MijiaExtensionService : Service() {
                     )
                 }
             }
+
             if (jobs.putIfAbsent(request.requestId, job) != null) {
                 job.cancel()
                 deliverError(
@@ -344,3 +345,10 @@ class MijiaExtensionService : Service() {
         }
     }
 }
+
+internal fun mijiaToolTimeoutMessage(toolName: String): String =
+    if (toolName == "mijia_get_latest_camera_event_image") {
+        "The latest camera event image timed out. Mi Home is still connected."
+    } else {
+        "The Mi Home Tool call timed out."
+    }
