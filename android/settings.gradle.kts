@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Mochi"
 include(":app")
+include(":extension-api")
+include(":extensions:mijia")

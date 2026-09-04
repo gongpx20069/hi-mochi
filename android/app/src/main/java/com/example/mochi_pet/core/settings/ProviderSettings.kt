@@ -5,6 +5,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -28,6 +29,7 @@ data class ProviderSettingsSummary(
     val apiVersion: String = DEFAULT_AZURE_API_VERSION,
     val timeoutSeconds: Int = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
     val maxResponseBytes: Long = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
+    val imageInputEnabled: Boolean = false,
     val hasApiKey: Boolean = false,
 ) {
     val isReady: Boolean
@@ -41,8 +43,29 @@ data class ProviderSettingsInput(
     val apiVersion: String = DEFAULT_AZURE_API_VERSION,
     val timeoutSeconds: Int = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
     val maxResponseBytes: Long = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
+    val imageInputEnabled: Boolean = false,
     val apiKeyReplacement: String? = null,
 )
+
+internal fun ProviderSettingsInput.validate() {
+    require(endpoint.trim().isNotEmpty()) {
+        "Provider endpoint must not be empty"
+    }
+    require(model.trim().isNotEmpty()) {
+        "Provider model must not be empty"
+    }
+    if (providerType == ProviderType.AZURE_OPENAI) {
+        require(apiVersion.trim().isNotEmpty()) {
+            "Azure OpenAI API version must not be empty"
+        }
+    }
+    require(timeoutSeconds in 1..300) {
+        "Provider timeout must be between 1 and 300 seconds"
+    }
+    require(maxResponseBytes in 1..10L * 1024L * 1024L) {
+        "Provider response limit must be between 1 byte and 10 MiB"
+    }
+}
 
 data class EncryptedSecret(
     val ciphertext: String,
@@ -156,22 +179,10 @@ class DataStoreProviderSettingsRepository(
     override suspend fun save(
         input: ProviderSettingsInput,
     ): ProviderSettingsSummary {
+        input.validate()
         val endpoint = input.endpoint.trim()
         val model = input.model.trim()
         val apiVersion = input.apiVersion.trim()
-        require(endpoint.isNotEmpty()) { "Provider endpoint must not be empty" }
-        require(model.isNotEmpty()) { "Provider model must not be empty" }
-        if (input.providerType == ProviderType.AZURE_OPENAI) {
-            require(apiVersion.isNotEmpty()) {
-                "Azure OpenAI API version must not be empty"
-            }
-        }
-        require(input.timeoutSeconds in 1..300) {
-            "Provider timeout must be between 1 and 300 seconds"
-        }
-        require(input.maxResponseBytes in 1..10L * 1024L * 1024L) {
-            "Provider response limit must be between 1 byte and 10 MiB"
-        }
         val replacement = input.apiKeyReplacement
             ?.trim()
             ?.takeIf(String::isNotEmpty)
@@ -184,6 +195,7 @@ class DataStoreProviderSettingsRepository(
             preferences[API_VERSION] = apiVersion
             preferences[TIMEOUT_SECONDS] = input.timeoutSeconds
             preferences[MAX_RESPONSE_BYTES] = input.maxResponseBytes
+            preferences[IMAGE_INPUT_ENABLED] = input.imageInputEnabled
             replacement?.let {
                 preferences[API_KEY_CIPHERTEXT] = it.ciphertext
                 preferences[API_KEY_IV] = it.iv
@@ -222,6 +234,7 @@ class DataStoreProviderSettingsRepository(
             apiVersion = summary.apiVersion,
             timeoutSeconds = summary.timeoutSeconds.toLong(),
             maxResponseBytes = summary.maxResponseBytes,
+            imageInputEnabled = summary.imageInputEnabled,
         )
     }
 
@@ -239,6 +252,7 @@ class DataStoreProviderSettingsRepository(
                 ?: DEFAULT_PROVIDER_TIMEOUT_SECONDS,
             maxResponseBytes = this[MAX_RESPONSE_BYTES]
                 ?: DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
+            imageInputEnabled = this[IMAGE_INPUT_ENABLED] ?: false,
             hasApiKey =
                 !this[API_KEY_CIPHERTEXT].isNullOrBlank() &&
                     !this[API_KEY_IV].isNullOrBlank(),
@@ -251,6 +265,8 @@ class DataStoreProviderSettingsRepository(
         val API_VERSION = stringPreferencesKey("provider.api_version")
         val TIMEOUT_SECONDS = intPreferencesKey("provider.timeout_seconds")
         val MAX_RESPONSE_BYTES = longPreferencesKey("provider.max_response_bytes")
+        val IMAGE_INPUT_ENABLED =
+            booleanPreferencesKey("provider.image_input_enabled")
         val API_KEY_CIPHERTEXT =
             stringPreferencesKey("provider.api_key_ciphertext")
         val API_KEY_IV = stringPreferencesKey("provider.api_key_iv")

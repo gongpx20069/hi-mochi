@@ -92,3 +92,30 @@ or verification in earlier phases.
 - [x] Restrict children to Browser, read-only MCP, Skills, and Analyst JS.
 - [x] Reuse the active Browser session and identify the child on its card.
 - [ ] Add end-to-end provider and real-device Subagent validation.
+
+## P2 - Optional signed extensions
+
+- [x] Add the versioned `:extension-api` Binder contract.
+- [x] Add same-signer explicit package discovery, binding, cancellation, and
+  Tool adaptation to the base app.
+- [x] Add the no-launcher optional Mi Home extension APK and QR connection UI.
+- [x] Add encrypted Xiaomi sessions, region discovery, MIoT state/control, and
+  user-selected homes/devices.
+- [x] Add common MIoT lights, switches/plugs, climate/air devices, curtains,
+  and read-only sensors.
+- [x] Add television controls, camera state/settings, scale device status, and
+  manual scenes.
+- [x] Add foreground-only latest camera event images and the deterministic
+  trusted Camera Snapshot card.
+- [x] Add Tool-readiness-gated Mi Home Smart Home Skill activation.
+- [x] Add default-off, same-run model image input with bounded normalization and
+  no history, memory, log, export, or Scheduled Agent persistence.
+- [x] Allow one explicit serial Subagent handoff of the current validated image
+  through a no-Tool visual prepass without exposing extension Tools,
+  descriptors, URLs, raw bytes, or reusable image capability to its Tool loop.
+- [x] Build, sign, validate, checksum, and publish the universal extension APK
+  with the normal Android Release.
+- [ ] Validate Xiaomi QR authorization, region discovery, device control, and
+  camera event retrieval against real accounts and devices.
+- [ ] Validate in-place base/extension installation, Binder recovery, and
+  configuration UX on real Android hardware.

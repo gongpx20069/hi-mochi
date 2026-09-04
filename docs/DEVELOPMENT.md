@@ -6,10 +6,19 @@ defined by the documents linked from [`docs/README.md`](README.md).
 ## Repository layout
 
 ```text
-android/   Kotlin and Jetpack Compose application
+android/   Kotlin applications, shared extension API, and Gradle wrapper
 docs/      Product, architecture, delivery, and development documentation
 AGENTS.md  Harness entry point and documentation routing
 README.md  User-facing project introduction
+```
+
+Android modules:
+
+```text
+android/
+├── app/                 Mochi base application and ABI APKs
+├── extension-api/       AIDL and immutable extension contracts
+└── extensions/mijia/    optional universal Mi Home extension APK
 ```
 
 ## Prerequisites
@@ -33,8 +42,9 @@ Set-Location android
 ```
 
 `verifyNative` checks architecture rules, formatting, Android Lint, JVM tests,
-and the debug APK. `verifyRelease` runs the release checks and assembles the
-release APK.
+the debug APK, and extension contract/provider tests. `verifyRelease` runs the
+release checks and assembles the five base APKs plus the universal signed Mi
+Home extension APK.
 
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
@@ -57,6 +67,13 @@ adb -s <device-id> install -r `
 The default release artifact is unsigned unless a local signing configuration
 is supplied.
 
+Install or update the optional extension without uninstalling either package:
+
+```powershell
+adb -s <device-id> install -r `
+  extensions\mijia\build\outputs\apk\release\mijia-release.apk
+```
+
 ## Publish an Android release
 
 Android releases use the next unused monotonic `1.0.x` tag. The tag is the
@@ -78,15 +95,16 @@ GitHub CLI with `gh auth login`, then run:
 ```
 
 The build script calculates the next remote version and embeds it in five
-signed APKs: `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`, and `universal`.
-It writes them to one versioned directory with release metadata and a shared
-SHA-256 manifest. Use the exact directory printed by that script in the
-publish command. Local builds require a clean worktree. The publish script
-verifies every APK's metadata, signature, embedded version, ABI set, and hash,
-then uploads the APKs and checksum manifest to a new GitHub Release. If another
-release wins the version race, rebuild with the newly allocated version
-instead of overwriting or reusing a tag. Once a publisher reserves a remote
-tag it is never deleted automatically; an interrupted publication may
+signed base APKs: `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`, and `universal`,
+plus one signed universal `Mochi-Mijia-Extension` APK. It writes them to one
+versioned directory with release metadata and a shared SHA-256 manifest. Use
+the exact directory printed by that script in the publish command. Local builds
+require a clean worktree. The publish script verifies every APK's application
+ID, metadata, signature, embedded version, expected ABI set, launcher policy,
+and hash, then uploads the APKs and checksum manifest to a new GitHub Release.
+If another release wins the version race, rebuild with the newly allocated
+version instead of overwriting or reusing a tag. Once a publisher reserves a
+remote tag it is never deleted automatically; an interrupted publication may
 therefore leave a skipped `1.0.x` value, but can never make a released version
 move backward or be silently replaced.
 

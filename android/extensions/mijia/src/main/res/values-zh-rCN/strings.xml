@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mochi 米家扩展</string>
+    <string name="extension_description">非官方连接器。小米凭据只保存在此扩展中，并由 Android Keystore 保护。</string>
+    <string name="qr_content_description">米家登录二维码</string>
+    <string name="generate_qr">生成二维码</string>
+    <string name="generate_new_qr">生成新二维码</string>
+    <string name="save_selected_devices">保存所选设备</string>
+    <string name="disconnect_mijia">断开米家</string>
+    <string name="scan_instructions">请使用另一台已登录米家的手机扫描二维码。</string>
+    <string name="requesting_qr">正在请求小米登录二维码…</string>
+    <plurals name="qr_expires">
+        <item quantity="other">请在米家中扫描并确认。二维码将在 %1$d 秒后失效。</item>
+    </plurals>
+    <string name="detecting_region">登录已确认，正在检测米家区域…</string>
+    <string name="connected_as">已连接 Xiaomi %1$s。</string>
+    <string name="connection_failed">米家连接失败，请生成新二维码。</string>
+    <string name="loading_devices">正在加载支持的米家设备…</string>
+    <plurals name="no_supported_devices">
+        <item quantity="other">已连接 %1$d 个家庭，但没有找到支持的设备。</item>
+    </plurals>
+    <string name="choose_devices">选择允许 Mochi 访问的设备。不支持或高风险设备不会显示。</string>
+    <string name="device_location">%1$s · %2$s</string>
+    <string name="select_device">选择%1$s</string>
+    <string name="no_room">未分配房间</string>
+    <string name="load_devices_failed">无法加载米家设备。</string>
+    <string name="save_devices_failed">无法保存设备选择。</string>
+    <string name="category_light">灯</string>
+    <string name="category_switch">开关</string>
+    <string name="category_plug">插座</string>
+    <string name="category_fan">风扇</string>
+    <string name="category_air_conditioner">空调</string>
+    <string name="category_air_purifier">空气净化器</string>
+    <string name="category_humidifier">加湿器</string>
+    <string name="category_curtain">窗帘</string>
+    <string name="category_sensor">传感器</string>
+    <string name="category_television">电视</string>
+    <string name="category_camera">摄像头</string>
+    <string name="category_scale">体脂秤</string>
+    <string name="category_unknown">未知设备</string>
+</resources>

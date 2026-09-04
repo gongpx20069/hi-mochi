@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mochi Mi Home Extension</string>
+    <string name="extension_description">Unofficial connector. Xiaomi credentials stay inside this extension and are protected by Android Keystore.</string>
+    <string name="qr_content_description">Mi Home login QR code</string>
+    <string name="generate_qr">Generate QR code</string>
+    <string name="generate_new_qr">Generate a new QR code</string>
+    <string name="save_selected_devices">Save selected devices</string>
+    <string name="disconnect_mijia">Disconnect Mi Home</string>
+    <string name="scan_instructions">Scan the QR code with another phone already signed into Mi Home.</string>
+    <string name="requesting_qr">Requesting a Xiaomi login QR code…</string>
+    <plurals name="qr_expires">
+        <item quantity="one">Scan and confirm in Mi Home. The QR code expires in %1$d second.</item>
+        <item quantity="other">Scan and confirm in Mi Home. The QR code expires in %1$d seconds.</item>
+    </plurals>
+    <string name="detecting_region">Login confirmed. Detecting Mi Home region…</string>
+    <string name="connected_as">Connected as Xiaomi %1$s.</string>
+    <string name="connection_failed">Mi Home connection failed. Generate a new QR code.</string>
+    <string name="loading_devices">Loading supported Mi Home devices…</string>
+    <plurals name="no_supported_devices">
+        <item quantity="one">Connected to %1$d home, but no supported devices were found.</item>
+        <item quantity="other">Connected to %1$d homes, but no supported devices were found.</item>
+    </plurals>
+    <string name="choose_devices">Choose the devices Mochi may access. Unsupported and high-risk devices are hidden.</string>
+    <string name="device_location">%1$s · %2$s</string>
+    <string name="select_device">Select %1$s</string>
+    <string name="no_room">No room</string>
+    <string name="load_devices_failed">Could not load Mi Home devices.</string>
+    <string name="save_devices_failed">Could not save device selection.</string>
+    <string name="category_light">Light</string>
+    <string name="category_switch">Switch</string>
+    <string name="category_plug">Plug</string>
+    <string name="category_fan">Fan</string>
+    <string name="category_air_conditioner">Air conditioner</string>
+    <string name="category_air_purifier">Air purifier</string>
+    <string name="category_humidifier">Humidifier</string>
+    <string name="category_curtain">Curtain</string>
+    <string name="category_sensor">Sensor</string>
+    <string name="category_television">Television</string>
+    <string name="category_camera">Camera</string>
+    <string name="category_scale">Scale</string>
+    <string name="category_unknown">Unknown</string>
+</resources>

@@ -113,6 +113,34 @@ function Get-AndroidApkVersion {
     $version
 }
 
+function Get-AndroidApkApplicationId {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ApkPath
+    )
+
+    $analyzer = Resolve-AndroidSdkTool 'apkanalyzer'
+    $applicationId = (& $analyzer manifest application-id $ApkPath).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $applicationId) {
+        throw "Could not read the APK application ID from '$ApkPath'."
+    }
+    $applicationId
+}
+
+function Get-AndroidApkManifest {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ApkPath
+    )
+
+    $analyzer = Resolve-AndroidSdkTool 'apkanalyzer'
+    $manifest = (& $analyzer manifest print $ApkPath) -join "`n"
+    if ($LASTEXITCODE -ne 0 -or -not $manifest) {
+        throw "Could not read the APK manifest from '$ApkPath'."
+    }
+    $manifest
+}
+
 function Assert-AndroidApkSignature {
     param(
         [Parameter(Mandatory)]
@@ -123,6 +151,64 @@ function Assert-AndroidApkSignature {
     & $signer verify $ApkPath
     if ($LASTEXITCODE -ne 0) {
         throw "APK signature verification failed for '$ApkPath'."
+    }
+}
+
+function Get-AndroidApkSignerSha256 {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ApkPath
+    )
+
+    $signer = Resolve-AndroidSdkTool 'apksigner'
+    $details = (& $signer verify --print-certs $ApkPath) -join "`n"
+    if ($LASTEXITCODE -ne 0) {
+        throw "APK signature verification failed for '$ApkPath'."
+    }
+    $digests = @(
+        [regex]::Matches(
+            $details,
+            'Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-fA-F]+)'
+        ) |
+            ForEach-Object {
+                $_.Groups[1].Value.ToLowerInvariant()
+            } |
+            Sort-Object -Unique
+    )
+    if ($digests.Count -eq 0) {
+        throw "Could not read the APK signer digest from '$ApkPath'."
+    }
+    $digests
+}
+
+function Assert-AndroidApkIdentity {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ApkPath,
+        [Parameter(Mandatory)]
+        [string] $ExpectedApplicationId,
+        [Parameter(Mandatory)]
+        [bool] $ShouldHaveLauncher
+    )
+
+    $applicationId = Get-AndroidApkApplicationId $ApkPath
+    if ($applicationId -ne $ExpectedApplicationId) {
+        throw (
+            "APK '$ApkPath' application ID '$applicationId' does not " +
+            "match '$ExpectedApplicationId'."
+        )
+    }
+    $manifest = Get-AndroidApkManifest $ApkPath
+    $hasMain = $manifest -match 'android\.intent\.action\.MAIN'
+    $hasLauncher = $manifest -match 'android\.intent\.category\.LAUNCHER'
+    $hasLauncherEntry = $hasMain -and $hasLauncher
+    if ($hasLauncherEntry -ne $ShouldHaveLauncher) {
+        $expectation = if ($ShouldHaveLauncher) {
+            'must expose'
+        } else {
+            'must not expose'
+        }
+        throw "APK '$ApkPath' $expectation a launcher activity."
     }
 }
 
@@ -196,6 +282,8 @@ function New-MochiReleaseAssets {
         [Parameter(Mandatory)]
         [string] $SourceOutputDirectory,
         [Parameter(Mandatory)]
+        [string] $ExtensionSourceOutputDirectory,
+        [Parameter(Mandatory)]
         [string] $DestinationDirectory
     )
 
@@ -211,6 +299,7 @@ function New-MochiReleaseAssets {
     $artifacts = @()
     New-Item -ItemType Directory -Path $DestinationDirectory | Out-Null
     try {
+        $baseSignerDigests = $null
         foreach (
             $output in Get-MochiReleaseApkOutputs $SourceOutputDirectory
         ) {
@@ -225,6 +314,16 @@ function New-MochiReleaseAssets {
                 )
             }
             Assert-AndroidApkSignature $output.path
+            Assert-AndroidApkIdentity `
+                -ApkPath $output.path `
+                -ExpectedApplicationId 'com.example.mochi_pet' `
+                -ShouldHaveLauncher $true
+            $signerDigests = @(Get-AndroidApkSignerSha256 $output.path)
+            if ($null -eq $baseSignerDigests) {
+                $baseSignerDigests = $signerDigests
+            } elseif (Compare-Object $baseSignerDigests $signerDigests) {
+                throw "Base APK '$($output.path)' uses a different signer."
+            }
 
             $fileName = "Mochi-$tag-$($output.abi).apk"
             $destination = Join-Path $DestinationDirectory $fileName
@@ -233,10 +332,49 @@ function New-MochiReleaseAssets {
                 Get-FileHash -Algorithm SHA256 $destination
             ).Hash.ToLowerInvariant()
             $artifacts += [ordered]@{
+                kind = 'base'
                 abi = $output.abi
                 file = $fileName
                 sha256 = $hash
             }
+        }
+
+        $extensionOutputs = @(
+            Get-MochiReleaseApkOutputsSingle $ExtensionSourceOutputDirectory
+        )
+        if ($extensionOutputs.Count -ne 1) {
+            throw "Expected exactly one Mi Home extension APK."
+        }
+        $extensionPath = $extensionOutputs[0]
+        $embeddedVersion = Get-AndroidApkVersion $extensionPath
+        if ($embeddedVersion -ne $Version) {
+            throw (
+                "Extension APK '$extensionPath' version '$embeddedVersion' " +
+                "does not match '$Version'."
+            )
+        }
+        Assert-AndroidApkSignature $extensionPath
+        Assert-AndroidApkIdentity `
+            -ApkPath $extensionPath `
+            -ExpectedApplicationId 'com.example.mochi_pet.extension.mijia' `
+            -ShouldHaveLauncher $false
+        $extensionSignerDigests = @(Get-AndroidApkSignerSha256 $extensionPath)
+        if (Compare-Object $baseSignerDigests $extensionSignerDigests) {
+            throw "The Mi Home extension APK must use the base APK signer."
+        }
+        $extensionFileName = "Mochi-Mijia-Extension-$tag.apk"
+        $extensionDestination = Join-Path (
+            $DestinationDirectory
+        ) $extensionFileName
+        Copy-Item $extensionPath $extensionDestination
+        $extensionHash = (
+            Get-FileHash -Algorithm SHA256 $extensionDestination
+        ).Hash.ToLowerInvariant()
+        $artifacts += [ordered]@{
+            kind = 'extension'
+            abi = 'universal'
+            file = $extensionFileName
+            sha256 = $extensionHash
         }
 
         $checksumName = "Mochi-$tag-SHA256SUMS.txt"
@@ -262,4 +400,27 @@ function New-MochiReleaseAssets {
             -ErrorAction SilentlyContinue
         throw
     }
+}
+
+function Get-MochiReleaseApkOutputsSingle {
+    param(
+        [Parameter(Mandatory)]
+        [string] $OutputDirectory
+    )
+
+    $metadataPath = Join-Path $OutputDirectory 'output-metadata.json'
+    if (-not (Test-Path $metadataPath)) {
+        throw "Android output metadata was not found at '$metadataPath'."
+    }
+    $metadata = Get-Content $metadataPath -Raw | ConvertFrom-Json
+    $outputs = @(
+        $metadata.elements |
+            ForEach-Object {
+                Join-Path $OutputDirectory $_.outputFile
+            }
+    )
+    if ($outputs.Count -ne 1 -or -not (Test-Path $outputs[0])) {
+        throw "Expected exactly one APK output in '$OutputDirectory'."
+    }
+    $outputs
 }

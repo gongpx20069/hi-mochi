@@ -3,6 +3,7 @@ package com.example.mochi_pet.feature.home
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
 import android.content.res.Configuration
 import android.content.pm.PackageManager
@@ -35,6 +36,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -67,6 +69,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -98,6 +101,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -113,6 +117,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -132,6 +137,7 @@ import com.example.mochi_pet.core.model.CalendarEvent
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.model.MochiTodo
 import com.example.mochi_pet.core.model.TodoStatus
+import com.example.mochi_pet.core.mcp.NOTION_SERVER_ID
 import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
 import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import com.example.mochi_pet.core.presentation.CardAction
@@ -141,6 +147,7 @@ import com.example.mochi_pet.core.presentation.CardType
 import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.ALLOWED_FOCUS_STANDBY_DELAYS_SECONDS
 import com.example.mochi_pet.core.settings.ProviderSettingsInput
+import com.example.mochi_pet.core.settings.ProviderShareSelection
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.settings.SpeechSettingsInput
 import com.example.mochi_pet.core.schedule.AgentSchedule
@@ -150,10 +157,13 @@ import com.example.mochi_pet.core.skills.MochiSkill
 import com.example.mochi_pet.core.skills.DownloadedSkill
 import com.example.mochi_pet.core.skills.InstallWindow
 import com.example.mochi_pet.core.skills.SkillOrigin
+import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_pet.core.tools.BuiltInToolSummary
 import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.McpAuthMode
 import com.example.mochi_pet.core.tools.McpServerSummary
+import com.example.mochi_pet.core.tools.MijiaProviderSummary
+import com.example.mochi_pet.core.tools.ToolShareSelection
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
@@ -162,6 +172,7 @@ import com.example.mochi_pet.core.wake.WakeRuntimeState
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import com.example.mochi_pet.core.web.WebContentException
 import com.example.mochi_pet.platform.browser.AgentBrowserUiState
+import com.example.mochi_extension.MochiExtensionProtocol
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -357,6 +368,8 @@ private fun MochiAppContent(
     val toolsState by viewModel.toolsState.collectAsStateWithLifecycle()
     val weatherState by viewModel.weatherState.collectAsStateWithLifecycle()
     val homeCard by viewModel.homeCard.collectAsStateWithLifecycle()
+    val cameraSnapshot by
+        viewModel.cameraSnapshot.collectAsStateWithLifecycle()
     val browserState by viewModel.browserState.collectAsStateWithLifecycle()
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
     var focusMode by rememberSaveable { mutableStateOf(false) }
@@ -378,6 +391,11 @@ private fun MochiAppContent(
         } else {
             pipelineState
         }
+    val toggleFocusMode: () -> Unit = {
+        focusStandby = false
+        standbyResetVersion += 1
+        focusMode = focusModeAfterToggle(focusMode)
+    }
 
     LaunchedEffect(homePresentation) {
         if (!homePresentation) {
@@ -494,6 +512,39 @@ private fun MochiAppContent(
             viewModel.consumeToolAuthorizationUrl()
         }
     }
+    val extensionActivityLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        viewModel.refreshTools()
+    }
+    LaunchedEffect(toolsState.extensionActivityTarget) {
+        val target = toolsState.extensionActivityTarget
+            ?: return@LaunchedEffect
+        try {
+            extensionActivityLauncher.launch(
+                Intent().setComponent(
+                    ComponentName(target.packageName, target.className),
+                ).putExtra(
+                    MochiExtensionProtocol.EXTRA_UI_LANGUAGE_TAG,
+                    AppLanguage.resolveContentLocale().toLanguageTag(),
+                ),
+            )
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(
+                context,
+                localizeUiText("The Mi Home extension is unavailable"),
+                Toast.LENGTH_SHORT,
+            ).show()
+        } catch (_: SecurityException) {
+            Toast.makeText(
+                context,
+                localizeUiText("Android blocked the Mi Home extension"),
+                Toast.LENGTH_SHORT,
+            ).show()
+        } finally {
+            viewModel.consumeExtensionActivityTarget()
+        }
+    }
 
     val renderSurface: @Composable (Modifier) -> Unit = { modifier ->
         val performCardAction:
@@ -574,6 +625,7 @@ private fun MochiAppContent(
             toolsState = toolsState,
             weatherState = weatherState,
             homeCard = homeCard,
+            cameraSnapshot = cameraSnapshot,
             onNavigate = viewModel::navigate,
             onSendMessage = viewModel::sendConversation,
             onCancelMessage = viewModel::cancelConversation,
@@ -613,6 +665,11 @@ private fun MochiAppContent(
             onDisconnectAmap = viewModel::disconnectAmap,
             onSetAmapEnabled = viewModel::setAmapEnabled,
             onSetAgentBrowserEnabled = viewModel::setAgentBrowserEnabled,
+            onInstallMijia = viewModel::installMijiaExtension,
+            onConfigureMijia = viewModel::configureMijiaExtension,
+            onDisconnectMijia = viewModel::disconnectMijia,
+            onSetMijiaEnabled = viewModel::setMijiaEnabled,
+            onSetMijiaToolEnabled = viewModel::setMijiaToolEnabled,
             onAddMcpServer = viewModel::addManualMcpServer,
             onRemoveMcpServer = viewModel::removeManualMcpServer,
             onSetMcpServerEnabled = viewModel::setMcpServerEnabled,
@@ -625,11 +682,8 @@ private fun MochiAppContent(
             onRunSchedule = viewModel::runSchedule,
             onRemoveSchedule = viewModel::removeSchedule,
             onCardAction = performCardAction,
-            onFocus = {
-                focusStandby = false
-                standbyResetVersion += 1
-                focusMode = true
-            },
+            onDismissCameraSnapshot = viewModel::dismissCameraSnapshot,
+            onFocus = toggleFocusMode,
             modifier = modifier,
         )
     }
@@ -802,10 +856,11 @@ private fun MochiAppContent(
             title = { Text("Import shared Providers?") },
             text = {
                 Text(
-                    "This link grants access to another user's LLM and speech " +
-                        "API resources. Importing replaces this device's " +
-                        "current LLM and speech Provider configuration. " +
-                        "Only continue if you trust the sender.",
+                    "This link grants access to another user's selected API " +
+                        "resources. Importing replaces only included " +
+                        "connections, stores their credentials on this " +
+                        "device, and enables their selected Providers and " +
+                        "Tools. Only continue if you trust the sender.",
                 )
             },
             confirmButton = {
@@ -1494,6 +1549,7 @@ private fun SurfaceContent(
     toolsState: ToolsUiState,
     weatherState: WeatherUiState,
     homeCard: CardPresentation?,
+    cameraSnapshot: CameraSnapshotUiState?,
     onNavigate: (MochiNavigationIntent) -> Unit,
     onSendMessage: (String) -> Unit,
     onCancelMessage: () -> Unit,
@@ -1503,7 +1559,7 @@ private fun SurfaceContent(
     onDisableWake: () -> Unit,
     onSaveProviderSettings: (ProviderSettingsInput) -> Unit,
     onSaveSpeechSettings: (SpeechSettingsInput) -> Unit,
-    onCreateProviderShareLink: () -> Unit,
+    onCreateProviderShareLink: (ProviderShareSelection) -> Unit,
     onReceiveProviderShareLink: (String) -> Unit,
     onSetRecentConversationTurns: (Int) -> Unit,
     onSetFocusStandby: (Boolean, Int) -> Unit,
@@ -1529,6 +1585,11 @@ private fun SurfaceContent(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onInstallMijia: () -> Unit,
+    onConfigureMijia: () -> Unit,
+    onDisconnectMijia: () -> Unit,
+    onSetMijiaEnabled: (Boolean) -> Unit,
+    onSetMijiaToolEnabled: (String, Boolean) -> Unit,
     onAddMcpServer: (ManualMcpServerInput) -> Unit,
     onRemoveMcpServer: (String) -> Unit,
     onSetMcpServerEnabled: (String, Boolean) -> Unit,
@@ -1539,6 +1600,7 @@ private fun SurfaceContent(
     onRunSchedule: (String) -> Unit,
     onRemoveSchedule: (String) -> Unit,
     onCardAction: (CardPresentation, CardAction) -> Unit,
+    onDismissCameraSnapshot: () -> Unit,
     onFocus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1556,8 +1618,10 @@ private fun SurfaceContent(
                 pipelineState = pipelineState,
                 weatherState = weatherState,
                 card = homeCard,
+                cameraSnapshot = cameraSnapshot,
                 onNavigate = onNavigate,
                 onCardAction = onCardAction,
+                onDismissCameraSnapshot = onDismissCameraSnapshot,
                 onFocus = onFocus,
             )
             MochiSurface.Conversation -> ConversationSurface(
@@ -1577,6 +1641,7 @@ private fun SurfaceContent(
                 state = providerSettingsState,
                 speechState = speechSettingsState,
                 providerShareState = providerShareState,
+                toolsState = toolsState,
                 agentSettingsState = agentSettingsState,
                 personaState = personaState,
                 wakeState = wakeState,
@@ -1621,6 +1686,11 @@ private fun SurfaceContent(
                 onDisconnectAmap = onDisconnectAmap,
                 onSetAmapEnabled = onSetAmapEnabled,
                 onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
+                onInstallMijia = onInstallMijia,
+                onConfigureMijia = onConfigureMijia,
+                onDisconnectMijia = onDisconnectMijia,
+                onSetMijiaEnabled = onSetMijiaEnabled,
+                onSetMijiaToolEnabled = onSetMijiaToolEnabled,
                 onAddServer = onAddMcpServer,
                 onRemoveServer = onRemoveMcpServer,
                 onSetServerEnabled = onSetMcpServerEnabled,
@@ -1695,8 +1765,10 @@ private fun HomePresentationSurface(
     pipelineState: ChatPipelineUiState,
     weatherState: WeatherUiState,
     card: CardPresentation?,
+    cameraSnapshot: CameraSnapshotUiState?,
     onNavigate: (MochiNavigationIntent) -> Unit,
     onCardAction: (CardPresentation, CardAction) -> Unit,
+    onDismissCameraSnapshot: () -> Unit,
     onFocus: () -> Unit,
 ) {
     AnimatedContent(
@@ -1748,16 +1820,100 @@ private fun HomePresentationSurface(
                     onNavigate(MochiNavigationIntent.ShowWeather)
                 },
             )
-            MochiSurface.Card -> card?.let {
-                MochiGeneratedCard(
-                    card = it,
-                    onAction = { action -> onCardAction(it, action) },
-                    onRestoreFace = {
-                        onNavigate(MochiNavigationIntent.ShowFace)
-                    },
-                )
+            MochiSurface.Card -> {
+                if (cameraSnapshot != null) {
+                    CameraSnapshotCard(
+                        snapshot = cameraSnapshot,
+                        onDismiss = onDismissCameraSnapshot,
+                    )
+                } else {
+                    card?.let {
+                        MochiGeneratedCard(
+                            card = it,
+                            onAction = { action -> onCardAction(it, action) },
+                            onRestoreFace = {
+                                onNavigate(MochiNavigationIntent.ShowFace)
+                            },
+                        )
+                    }
+                }
             }
             else -> Unit
+        }
+    }
+}
+
+@Composable
+private fun CameraSnapshotCard(
+    snapshot: CameraSnapshotUiState,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(20.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        PlannerCard {
+            Text(
+                text = "Latest camera event",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = buildString {
+                    append(snapshot.cameraName)
+                    snapshot.home?.let {
+                        append(" · ")
+                        append(it)
+                    }
+                    snapshot.room?.let {
+                        append(" / ")
+                        append(it)
+                    }
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Image(
+                bitmap = snapshot.bitmap.asImageBitmap(),
+                contentDescription = "Latest Mi Home camera event",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp)
+                    .clip(RoundedCornerShape(18.dp)),
+                contentScale = ContentScale.Fit,
+            )
+            snapshot.eventType?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            snapshot.capturedAt?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+            Text(
+                text = if (snapshot.readyForModel) {
+                    "Available only in this Agent run, including one explicit " +
+                        "Subagent handoff. " +
+                        "Not saved to conversation history."
+                } else {
+                    "Displayed only on this device. Camera image input is " +
+                        "disabled for the configured model."
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Button(onClick = onDismiss) {
+                Text("Dismiss")
+            }
         }
     }
 }
@@ -1945,27 +2101,38 @@ private fun MochiFace(
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-                OutlinedButton(
+                FocusModeButton(
                     onClick = onFocus,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = 3.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = "Focus mode",
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "Full screen · stays awake",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                }
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun FocusModeButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "Focus mode",
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Full screen · stays awake",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
     }
 }
@@ -3355,6 +3522,7 @@ private fun SkillsSurface(
                 items(state.skills, key = MochiSkill::id) { skill ->
                     InstalledSkillCard(
                         skill = skill,
+                        readiness = state.readinessById[skill.id],
                         onView = { selectedSkill = skill },
                         onSetEnabled = onSetEnabled,
                         onDelete = { pendingDelete = skill },
@@ -3566,6 +3734,11 @@ private fun ToolsSurface(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onInstallMijia: () -> Unit,
+    onConfigureMijia: () -> Unit,
+    onDisconnectMijia: () -> Unit,
+    onSetMijiaEnabled: (Boolean) -> Unit,
+    onSetMijiaToolEnabled: (String, Boolean) -> Unit,
     onAddServer: (ManualMcpServerInput) -> Unit,
     onRemoveServer: (String) -> Unit,
     onSetServerEnabled: (String, Boolean) -> Unit,
@@ -3578,6 +3751,9 @@ private fun ToolsSurface(
         mutableStateOf(false)
     }
     var browserToolsExpanded by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var mijiaToolsExpanded by rememberSaveable {
         mutableStateOf(false)
     }
     var mochiToolsExpanded by rememberSaveable {
@@ -3907,6 +4083,29 @@ private fun ToolsSurface(
                     },
                 )
             }
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Extensions",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            item {
+                MijiaExtensionCard(
+                    summary = state.catalog.mijia,
+                    toolsExpanded = mijiaToolsExpanded,
+                    disabled = state.isLoading,
+                    onToggleTools = {
+                        mijiaToolsExpanded = !mijiaToolsExpanded
+                    },
+                    onInstall = onInstallMijia,
+                    onConfigure = onConfigureMijia,
+                    onDisconnect = onDisconnectMijia,
+                    onSetEnabled = onSetMijiaEnabled,
+                    onSetToolEnabled = onSetMijiaToolEnabled,
+                )
+            }
         }
     }
     if (showAddServer) {
@@ -3937,6 +4136,196 @@ private fun ToolsSurface(
                 showAmapCredentials = false
             },
         )
+    }
+}
+
+@Composable
+private fun MijiaExtensionCard(
+    summary: MijiaProviderSummary,
+    toolsExpanded: Boolean,
+    disabled: Boolean,
+    onToggleTools: () -> Unit,
+    onInstall: () -> Unit,
+    onConfigure: () -> Unit,
+    onDisconnect: () -> Unit,
+    onSetEnabled: (Boolean) -> Unit,
+    onSetToolEnabled: (String, Boolean) -> Unit,
+) {
+    PlannerCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Mi Home",
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = when {
+                        !summary.installed ->
+                            "Optional unofficial extension · not installed"
+                        !summary.trusted ->
+                            "Installed package could not be trusted"
+                        summary.connected ->
+                            "${summary.selectedDeviceCount} selected devices"
+                        summary.status == "authorization_expired" ->
+                            "Authorization expired"
+                        else -> "Installed · connection required"
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                summary.versionName?.let { version ->
+                    Text(
+                        text = "Extension $version",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+            if (summary.connected) {
+                Switch(
+                    checked = summary.enabled,
+                    onCheckedChange = onSetEnabled,
+                    enabled = !disabled,
+                )
+            }
+        }
+        Text(
+            text = "Lights, switches, climate and air devices, curtains, " +
+                "sensors, televisions, camera event images, scales, and scenes.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        summary.detail?.let { detail ->
+            Text(
+                text = detail,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        when {
+            !summary.installed || !summary.trusted -> {
+                Button(
+                    onClick = onInstall,
+                    enabled = !disabled,
+                ) {
+                    Text(
+                        if (summary.installed) {
+                            "Get trusted extension"
+                        } else {
+                            "Install extension"
+                        },
+                    )
+                }
+            }
+            !summary.connected -> {
+                Button(
+                    onClick = onConfigure,
+                    enabled = !disabled,
+                ) {
+                    Text(
+                        if (summary.status == "authorization_expired") {
+                            "Reconnect Mi Home"
+                        } else {
+                            "Connect Mi Home"
+                        },
+                    )
+                }
+            }
+            else -> {
+                Text(
+                    text = buildString {
+                        summary.accountLabel?.let {
+                            append(it)
+                            append(" · ")
+                        }
+                        append(summary.selectedHomeCount)
+                        append(" homes · ")
+                        append(summary.selectedDeviceCount)
+                        append(" devices")
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onConfigure,
+                        enabled = !disabled,
+                    ) {
+                        Text("Manage")
+                    }
+                    TextButton(
+                        onClick = onDisconnect,
+                        enabled = !disabled,
+                    ) {
+                        Text("Disconnect")
+                    }
+                }
+            }
+        }
+        if (summary.tools.isNotEmpty()) {
+            TextButton(
+                onClick = onToggleTools,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (toolsExpanded) {
+                        "Hide tools (${summary.tools.size})"
+                    } else {
+                        "Show tools (${summary.tools.size})"
+                    },
+                )
+            }
+            AnimatedVisibility(visible = toolsExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    summary.tools.forEach { tool ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tool.displayName,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Text(
+                                    text = tool.description,
+                                    color = MaterialTheme.colorScheme
+                                        .onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                )
+                                Text(
+                                    text = tool.name,
+                                    color = MaterialTheme.colorScheme
+                                        .onSurfaceVariant,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                )
+                                Text(
+                                    text = tool.riskLevel,
+                                    color = MaterialTheme.colorScheme
+                                        .onSurfaceVariant,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                            Switch(
+                                checked = tool.enabled,
+                                onCheckedChange = {
+                                    onSetToolEnabled(tool.name, it)
+                                },
+                                enabled = summary.enabled && !disabled,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -4312,6 +4701,7 @@ private fun SkillSectionTab(
 @Composable
 private fun InstalledSkillCard(
     skill: MochiSkill,
+    readiness: SkillReadiness?,
     onView: () -> Unit,
     onSetEnabled: (String, Boolean) -> Unit,
     onDelete: () -> Unit,
@@ -4374,6 +4764,7 @@ private fun InstalledSkillCard(
                         onCheckedChange = {
                             onSetEnabled(skill.id, it)
                         },
+                        enabled = skill.enabled || readiness?.isReady != false,
                     )
                     if (skill.updateAvailable) {
                         Text(
@@ -4396,6 +4787,14 @@ private fun InstalledSkillCard(
                     text = skill.description,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (readiness?.isReady == false) {
+                Text(
+                    text = "Enable required Tool groups first: " +
+                        readiness.missingRequirements.sorted().joinToString(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
                 )
             }
         }
@@ -5571,6 +5970,7 @@ private fun ProviderSettingsSurface(
     state: ProviderSettingsUiState,
     speechState: SpeechSettingsUiState,
     providerShareState: ProviderShareUiState,
+    toolsState: ToolsUiState,
     agentSettingsState: AgentSettingsUiState,
     personaState: PersonaUiState,
     wakeState: WakeRuntimeState,
@@ -5579,7 +5979,7 @@ private fun ProviderSettingsSurface(
     onDisableWake: () -> Unit,
     onSave: (ProviderSettingsInput) -> Unit,
     onSaveSpeech: (SpeechSettingsInput) -> Unit,
-    onCreateProviderShareLink: () -> Unit,
+    onCreateProviderShareLink: (ProviderShareSelection) -> Unit,
     onReceiveProviderShareLink: (String) -> Unit,
     onSetRecentConversationTurns: (Int) -> Unit,
     onSetFocusStandby: (Boolean, Int) -> Unit,
@@ -5626,6 +6026,9 @@ private fun ProviderSettingsSurface(
         mutableStateOf(personaState.context.agents)
     }
     var apiKeyReplacement by remember(summary) { mutableStateOf("") }
+    var imageInputEnabled by remember(summary) {
+        mutableStateOf(summary.imageInputEnabled)
+    }
     val speechSummary = speechState.summary
     var speechProvider by remember(speechSummary) {
         mutableStateOf(speechSummary.provider)
@@ -5640,6 +6043,14 @@ private fun ProviderSettingsSurface(
     }
     var azureSpeechApiKey by remember(speechSummary) {
         mutableStateOf("")
+    }
+    var showShareProviders by remember { mutableStateOf(false) }
+    var shareLlm by remember { mutableStateOf(true) }
+    var shareSpeech by remember { mutableStateOf(true) }
+    var shareAmap by remember { mutableStateOf(false) }
+    var shareTencentDocs by remember { mutableStateOf(false) }
+    var sharedManualMcpIds by remember {
+        mutableStateOf(emptySet<String>())
     }
     var showReceiveProviders by remember { mutableStateOf(false) }
     var receivedProviderLink by remember { mutableStateOf("") }
@@ -5709,17 +6120,23 @@ private fun ProviderSettingsSurface(
                 PlannerCard {
                     Text(
                         text = "Creates an encrypted link containing the " +
-                            "current LLM and speech Provider credentials. " +
-                            "The decryption key is part of the link, so anyone " +
-                            "who receives or copies it can use those API " +
-                            "resources and consume their quota.",
+                            "Providers and Tool connections selected for this " +
+                            "share. LLM and speech are selected by default; " +
+                            "Tool credentials are not.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        text = "The link does not include persona, memories, " +
-                            "Tools credentials, planner data, or Android " +
-                            "permissions.",
+                        text = "The decryption key is part of the link. Anyone " +
+                            "who receives or copies it can use the selected " +
+                            "API resources and consume their quota.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        text = "Notion OAuth, Mi Home sessions, Android " +
+                            "permissions, persona, memories, and planner data " +
+                            "are never included.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -5738,10 +6155,24 @@ private fun ProviderSettingsSurface(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Button(
-                            onClick = onCreateProviderShareLink,
+                            onClick = {
+                                shareLlm = state.summary.isReady
+                                shareSpeech = speechState.summary.isReady
+                                shareAmap = false
+                                shareTencentDocs = false
+                                sharedManualMcpIds = emptySet()
+                                showShareProviders = true
+                            },
                             enabled = !providerShareState.isWorking &&
-                                state.summary.isReady &&
-                                speechState.summary.isReady,
+                                (
+                                    state.summary.isReady ||
+                                        speechState.summary.isReady ||
+                                        toolsState.catalog.amap.connected ||
+                                        toolsState.catalog.servers.any {
+                                            it.connected &&
+                                                it.id != NOTION_SERVER_ID
+                                        }
+                                    ),
                             modifier = Modifier.weight(1f),
                         ) {
                             Text(
@@ -6263,6 +6694,32 @@ private fun ProviderSettingsSurface(
                 }
             }
             item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Camera image input",
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "Allow validated Mi Home camera event " +
+                                "images in the current Main Agent run and one " +
+                                "explicit Subagent handoff. Enable only when " +
+                                "the configured model supports images.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(
+                        checked = imageInputEnabled,
+                        onCheckedChange = { imageInputEnabled = it },
+                    )
+                }
+            }
+            item {
                 OutlinedTextField(
                     value = apiKeyReplacement,
                     onValueChange = { apiKeyReplacement = it },
@@ -6409,6 +6866,7 @@ private fun ProviderSettingsSurface(
                         apiVersion = apiVersion,
                         timeoutSeconds = timeout.toIntOrNull() ?: 0,
                         maxResponseBytes = summary.maxResponseBytes,
+                        imageInputEnabled = imageInputEnabled,
                         apiKeyReplacement = apiKeyReplacement,
                     ),
                 )
@@ -6428,6 +6886,112 @@ private fun ProviderSettingsSurface(
             )
         }
     }
+    if (showShareProviders) {
+        val tencentDocs = toolsState.catalog.servers.firstOrNull {
+            it.id == TENCENT_DOCS_SERVER_ID
+        }
+        val manualServers = toolsState.catalog.servers.filter {
+            !it.builtIn && it.connected
+        }
+        AlertDialog(
+            onDismissRequest = { showShareProviders = false },
+            title = { Text("Choose what to share") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 480.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        "Providers are selected by default. Tool credentials " +
+                            "start unselected each time.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    ShareConnectionOption(
+                        title = "LLM Provider",
+                        detail = state.summary.providerType.shareDisplayName(),
+                        checked = shareLlm,
+                        enabled = state.summary.isReady,
+                        onCheckedChange = { shareLlm = it },
+                    )
+                    ShareConnectionOption(
+                        title = "Speech Provider",
+                        detail = speechState.summary.provider.displayName(),
+                        checked = shareSpeech,
+                        enabled = speechState.summary.isReady,
+                        onCheckedChange = { shareSpeech = it },
+                    )
+                    Text(
+                        "Tool credentials",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    ShareConnectionOption(
+                        title = "Amap Maps",
+                        detail = "Credential and selected Tools",
+                        checked = shareAmap,
+                        enabled = toolsState.catalog.amap.connected,
+                        onCheckedChange = { shareAmap = it },
+                    )
+                    ShareConnectionOption(
+                        title = "Tencent Docs MCP",
+                        detail = "Token and selected Tools",
+                        checked = shareTencentDocs,
+                        enabled = tencentDocs?.connected == true,
+                        onCheckedChange = { shareTencentDocs = it },
+                    )
+                    manualServers.forEach { server ->
+                        ShareConnectionOption(
+                            title = server.name,
+                            detail = "MCP connection and selected Tools",
+                            checked = server.id in sharedManualMcpIds,
+                            enabled = true,
+                            onCheckedChange = { checked ->
+                                sharedManualMcpIds = if (checked) {
+                                    sharedManualMcpIds + server.id
+                                } else {
+                                    sharedManualMcpIds - server.id
+                                }
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onCreateProviderShareLink(
+                            ProviderShareSelection(
+                                includeLlm = shareLlm,
+                                includeSpeech = shareSpeech,
+                                tools = ToolShareSelection(
+                                    includeAmap = shareAmap,
+                                    includeTencentDocs = shareTencentDocs,
+                                    manualMcpServerIds =
+                                        sharedManualMcpIds,
+                                ),
+                            ),
+                        )
+                        showShareProviders = false
+                    },
+                    enabled = shareLlm ||
+                        shareSpeech ||
+                        shareAmap ||
+                        shareTencentDocs ||
+                        sharedManualMcpIds.isNotEmpty(),
+                ) {
+                    Text("Share selected")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showShareProviders = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
     if (showReceiveProviders) {
         AlertDialog(
             onDismissRequest = {
@@ -6439,17 +7003,18 @@ private fun ProviderSettingsSurface(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         "Paste the complete Mochi Provider link received from " +
-                            "someone you trust. Importing it will replace this " +
-                            "device's current LLM and speech Providers.",
+                            "someone you trust. Importing replaces only the " +
+                            "included connections and immediately enables " +
+                            "their selected Providers and Tools.",
                     )
                     OutlinedTextField(
                         value = receivedProviderLink,
                         onValueChange = {
-                            receivedProviderLink = it.trim().take(16_384)
+                            receivedProviderLink = it.trim().take(32_768)
                         },
                         label = { Text("Mochi Provider link") },
                         placeholder = {
-                            Text("mochi://provider/import#v1...")
+                            Text("mochi://provider/import#v2...")
                         },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
@@ -6464,7 +7029,7 @@ private fun ProviderSettingsSurface(
                         receivedProviderLink = ""
                     },
                     enabled = receivedProviderLink.startsWith(
-                        "mochi://provider/import#v1.",
+                        "mochi://provider/import#v2.",
                     ),
                 ) {
                     Text("Continue")
@@ -6484,11 +7049,63 @@ private fun ProviderSettingsSurface(
     }
 }
 
+@Composable
+private fun ShareConnectionOption(
+    title: String,
+    detail: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled) {
+                onCheckedChange(!checked)
+            }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = detail,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
 private fun AppLanguage.displayName(): String =
     when (this) {
         AppLanguage.SYSTEM -> "Follow system"
         AppLanguage.CHINESE -> "Chinese"
         AppLanguage.ENGLISH -> "English"
+    }
+
+private fun ProviderType.shareDisplayName(): String =
+    when (this) {
+        ProviderType.OPENAI -> "OpenAI"
+        ProviderType.AZURE_OPENAI -> "Azure OpenAI"
+        ProviderType.CUSTOM -> "OpenAI-compatible"
+    }
+
+private fun SpeechProvider.displayName(): String =
+    when (this) {
+        SpeechProvider.SYSTEM -> "Android SpeechRecognizer"
+        SpeechProvider.IFLYTEK -> "iFlytek"
+        SpeechProvider.AZURE -> "Azure Speech"
     }
 
 @Composable

@@ -44,6 +44,45 @@ class AgentToolRegistryTest {
     }
 
     @Test
+    fun `camera image input requires explicit camera and image intent`() {
+        assertTrue(
+            allowsCameraEventImageInput(
+                "Show the latest door camera event image",
+            ),
+        )
+        assertTrue(
+            allowsCameraEventImageInput(
+                "看看门铃摄像头最新事件画面",
+            ),
+        )
+        assertFalse(
+            allowsCameraEventImageInput(
+                "Turn on camera motion detection",
+            ),
+        )
+        assertFalse(
+            allowsCameraEventImageInput(
+                "Disable camera event notifications",
+            ),
+        )
+        assertFalse(
+            allowsCameraEventImageInput(
+                "Show camera event settings",
+            ),
+        )
+        assertFalse(
+            allowsCameraEventImageInput(
+                "Can you see whether the latest camera event notification is enabled?",
+            ),
+        )
+        assertFalse(
+            allowsCameraEventImageInput(
+                "Show me the latest image",
+            ),
+        )
+    }
+
+    @Test
     fun `todo tool creates dated local todo`() = runBlocking {
         val store = RecordingPlannerStore()
         val registry = ToolRegistry(listOf(ManageMochiTodoTool(store)))

@@ -136,6 +136,13 @@ internal fun localizeUiText(
             "${localizeUiText(parts[0], language)} · " +
                 "${parts[1].removeSuffix(" tools")} 个工具"
         }
+        text.matches(Regex("\\d+ selected devices")) ->
+            "${text.substringBefore(' ')} 个已选设备"
+        text.startsWith("Extension ") ->
+            "扩展 ${text.removePrefix("Extension ")}"
+        text.matches(Regex(".*\\d+ homes · \\d+ devices")) ->
+            text.replace(Regex("(\\d+) homes"), "$1 个家庭")
+                .replace(Regex("(\\d+) devices"), "$1 个设备")
         text.endsWith(" installs in 24h") ->
             "${text.removeSuffix(" installs in 24h")} 次安装（24 小时）"
         text.contains(" installs in 24h · ") -> {
@@ -150,6 +157,15 @@ internal fun localizeUiText(
             "默认：${text.removePrefix("Default: ")}"
         text.endsWith(" · Modified") ->
             "${text.removeSuffix(" · Modified")} · 已修改"
+        text.startsWith("Requires enabled Tools: ") ->
+            "需要先启用以下工具：${text.removePrefix("Requires enabled Tools: ")}"
+        text.startsWith("Enable required Tool groups first: ") -> {
+            val requirements = text
+                .removePrefix("Enable required Tool groups first: ")
+                .split(", ")
+                .joinToString("、") { localizeUiText(it, language) }
+            "请先启用所需的工具组：$requirements"
+        }
         else -> text
     }
 }
@@ -161,19 +177,31 @@ private val ZH_UI_TEXT = mapOf(
         "分别配置 Persona、语音和 AI 连接。",
     "Share Providers" to "共享 Providers",
     "Receive Providers" to "接收 Providers",
-    "Creates an encrypted link containing the current LLM and speech Provider credentials. The decryption key is part of the link, so anyone who receives or copies it can use those API resources and consume their quota." to
-        "创建包含当前 LLM 与语音 Provider 凭据的加密链接。解密密钥也在链接中，因此任何收到或复制完整链接的人都能使用这些 API 资源并消耗其额度。",
-    "The link does not include persona, memories, Tools credentials, planner data, or Android permissions." to
-        "链接不包含 Persona、记忆、Tools 凭据、计划数据或 Android 权限。",
+    "Creates an encrypted link containing the Providers and Tool connections selected for this share. LLM and speech are selected by default; Tool credentials are not." to
+        "创建包含本次所选 Providers 与工具连接的加密链接。默认选择 LLM 和语音 Provider，工具凭据默认不选。",
+    "The decryption key is part of the link. Anyone who receives or copies it can use the selected API resources and consume their quota." to
+        "解密密钥包含在链接中。任何收到或复制完整链接的人都能使用所选 API 资源并消耗其额度。",
+    "Notion OAuth, Mi Home sessions, Android permissions, persona, memories, and planner data are never included." to
+        "始终不会包含 Notion OAuth、米家会话、Android 权限、Persona、记忆和计划数据。",
+    "Choose what to share" to "选择共享内容",
+    "Providers are selected by default. Tool credentials start unselected each time." to
+        "Providers 默认选中；每次打开时，工具凭据均默认不选。",
+    "LLM Provider" to "LLM Provider",
+    "Speech Provider" to "语音 Provider",
+    "Tool credentials" to "工具凭据",
+    "Credential and selected Tools" to "凭据和已选工具",
+    "Token and selected Tools" to "Token 和已选工具",
+    "MCP connection and selected Tools" to "MCP 连接和已选工具",
+    "Share selected" to "共享所选项目",
     "Preparing..." to "正在准备...",
     "Shared Providers imported" to "共享的 Providers 已导入",
-    "Paste the complete Mochi Provider link received from someone you trust. Importing it will replace this device's current LLM and speech Providers." to
-        "粘贴从可信任的人那里收到的完整 Mochi Provider 链接。导入后会替换本设备当前的 LLM 与语音 Providers。",
+    "Paste the complete Mochi Provider link received from someone you trust. Importing replaces only the included connections and immediately enables their selected Providers and Tools." to
+        "粘贴从可信任的人那里收到的完整 Mochi Provider 链接。导入只会替换其中包含的连接，并立即启用其所选 Providers 和工具。",
     "Mochi Provider link" to "Mochi Provider 链接",
     "Continue" to "继续",
     "Import shared Providers?" to "导入共享的 Providers？",
-    "This link grants access to another user's LLM and speech API resources. Importing replaces this device's current LLM and speech Provider configuration. Only continue if you trust the sender." to
-        "此链接允许使用另一位用户的 LLM 与语音 API 资源。导入会替换本设备当前的 LLM 与语音 Provider 配置。只有信任发送者时才继续。",
+    "This link grants access to another user's selected API resources. Importing replaces only included connections, stores their credentials on this device, and enables their selected Providers and Tools. Only continue if you trust the sender." to
+        "此链接允许使用另一位用户所选的 API 资源。导入只会替换其中包含的连接，将凭据存入本设备，并启用其所选 Providers 和工具。只有信任发送者时才继续。",
     "Import" to "导入",
     "Mochi persona" to "Mochi Persona",
     "Local prompt files can be edited before connecting any AI provider." to
@@ -305,6 +333,23 @@ private val ZH_UI_TEXT = mapOf(
     "Configure Amap" to "配置高德地图",
     "MCP servers" to "MCP 服务",
     "Add MCP" to "添加 MCP",
+    "Extensions" to "扩展",
+    "Mi Home" to "米家",
+    "Optional unofficial extension · not installed" to
+        "可选非官方扩展 · 未安装",
+    "Installed package could not be trusted" to "已安装的软件包不受信任",
+    "Authorization expired" to "授权已过期",
+    "Installed · connection required" to "已安装 · 需要连接",
+    "Lights, switches, climate and air devices, curtains, sensors, televisions, camera event images, scales, and scenes." to
+        "支持灯、开关、温控与空气设备、窗帘、传感器、电视、摄像头事件图片、体脂秤和场景。",
+    "Get trusted extension" to "获取可信扩展",
+    "Install extension" to "安装扩展",
+    "Reconnect Mi Home" to "重新连接米家",
+    "Connect Mi Home" to "连接米家",
+    "Manage" to "管理",
+    "read" to "读取",
+    "write" to "写入",
+    "sensitive" to "敏感操作",
     "Connected" to "已连接",
     "Authorization required" to "需要授权",
     "Personal token required" to "需要个人令牌",
@@ -499,13 +544,65 @@ private val ZH_UI_TEXT = mapOf(
     "Navigate to the relevant native surface by intent." to "根据意图导航到相关原生页面。",
     "Notion Knowledge" to "Notion 知识",
     "Tencent Docs Knowledge" to "腾讯文档知识",
+    "Tencent Docs MCP" to "腾讯文档 MCP",
+    "Agent Browser" to "代理浏览器",
     "Amap Maps" to "高德地图",
+    "Mi Home extension" to "米家扩展",
     "Travel Planning" to "出行规划",
     "Plan routes and research public train or flight options without logging in." to
         "规划路线并调研无需登录的公开火车票或机票信息。",
     "Merchant Discovery" to "商家发现",
     "Find and compare merchants using Amap ratings, cost, hours, and details." to
         "使用高德评分、人均、营业时间和详情发现并比较商家。",
+    "Mi Home Smart Home" to "米家智能家居",
+    "Control selected Mi Home devices, inspect state, run scenes, and review the latest supported camera event." to
+        "控制已选择的米家设备、查看状态、执行场景并查看支持的最新摄像头事件。",
+    "List Mi Home Devices" to "列出米家设备",
+    "Read Mi Home Device State" to "读取米家设备状态",
+    "Control Mi Home Device" to "控制米家设备",
+    "Control Mi Home Television" to "控制米家电视",
+    "Configure Mi Home Camera" to "配置米家摄像头",
+    "Get Latest Camera Event Image" to "获取最新摄像头事件图片",
+    "List Mi Home Scenes" to "列出米家场景",
+    "Run Mi Home Scene" to "执行米家场景",
+    "List user-selected supported Mi Home devices and operations." to
+        "列出用户选择且受支持的米家设备和操作。",
+    "Read supported state from one selected Mi Home device." to
+        "读取一个已选择米家设备的受支持状态。",
+    "Control one selected light, switch, plug, fan, climate, air, or curtain device." to
+        "控制一个已选择的灯、开关、插座、风扇、温控、空气或窗帘设备。",
+    "Control one selected television using only declared MIoT capabilities." to
+        "仅使用已声明的 MIoT 能力控制一个已选择的电视。",
+    "Change one explicitly confirmed supported camera setting." to
+        "更改一项已明确确认且受支持的摄像头设置。",
+    "Retrieve the newest available motion or doorbell event image from one selected camera." to
+        "从一个已选择的摄像头获取最新可用的移动或门铃事件图片。",
+    "List enabled manually triggered scenes from selected homes." to
+        "列出所选家庭中已启用的手动触发场景。",
+    "Run one exact Mi Home scene after explicit confirmation." to
+        "在明确确认后执行一个指定的米家场景。",
+    "Reconnect Mi Home." to "请重新连接米家。",
+    "Select devices to complete setup." to "请选择设备以完成设置。",
+    "Android rejected the extension connection." to "Android 拒绝了扩展连接。",
+    "Extension signature does not match Mochi." to "扩展签名与 Mochi 不匹配。",
+    "Expected extension service is missing." to "缺少预期的扩展服务。",
+    "Extension service permission is invalid." to "扩展服务权限无效。",
+    "Expected extension configuration activity is missing." to
+        "缺少预期的扩展配置页面。",
+    "Extension configuration permission is invalid." to "扩展配置权限无效。",
+    "Extension protocol version is unsupported." to "不支持此扩展协议版本。",
+    "Update Mochi before using this extension." to "请先更新 Mochi 再使用此扩展。",
+    "Extension identity is invalid." to "扩展身份无效。",
+    "Extension package version metadata is invalid." to "扩展软件包版本元数据无效。",
+    "The Mi Home extension is unavailable" to "米家扩展不可用",
+    "Android blocked the Mi Home extension" to "Android 阻止了米家扩展",
+    "Camera image input" to "摄像头图片输入",
+    "Allow validated Mi Home camera event images in the current Main Agent run and one explicit Subagent handoff. Enable only when the configured model supports images." to
+        "允许在当前主 Agent 运行和一次明确的子 Agent 委派中使用已验证的米家摄像头事件图片。仅在配置的模型支持图片时启用。",
+    "Available only in this Agent run, including one explicit Subagent handoff. Not saved to conversation history." to
+        "仅可用于本次 Agent 运行，包括一次明确的子 Agent 委派；不会保存到对话历史。",
+    "Displayed only on this device. Camera image input is disabled for the configured model." to
+        "仅在此设备上显示；已配置模型的摄像头图片输入未启用。",
     "Could not load persisted conversation history" to "无法加载已保存的对话历史",
     "Could not load persona files" to "无法加载 Persona 文件",
     "Reply succeeded, but conversation memory was not saved" to "回答已完成，但未能保存对话记忆",

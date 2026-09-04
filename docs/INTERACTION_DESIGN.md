@@ -91,10 +91,12 @@ in bottom navigation throughout.
 
 Home also offers Focus mode for the Face, date-time, and weather presentations.
 Focus hides app navigation and Android system bars, keeps the display awake,
-and fills the screen with the active Home presentation until the user taps
-Exit focus, presses Back, or navigates away from Home. Focus survives device
-rotation, and date-time and weather switch to two-column landscape layouts so
-their primary facts and supporting metrics remain balanced and unclipped.
+and fills the screen with the active Home presentation. The **Focus mode**
+control in that presentation remains available and toggles Focus off when
+tapped again. A separate top-right **Exit focus** action exits immediately.
+Back and navigation away from Home also exit. Focus survives device rotation,
+and date-time and weather switch to two-column landscape layouts so their
+primary facts and supporting metrics remain balanced and unclipped.
 
 When enabled, an idle Focus presentation enters low-power standby after 30
 seconds by default. Settings places this low-priority option last and offers
@@ -161,14 +163,30 @@ Azure OpenAI explains that the model field is the deployment name and exposes
 the API version separately. Saving a blank API-key replacement preserves the
 existing encrypted key.
 
+Share Providers always opens a checklist before Android's share sheet. The
+configured LLM and speech Providers begin selected; every Tool credential
+entry begins unselected on each opening. Available Tool entries are Amap,
+Tencent Docs, and each configured manual MCP server. The confirmation screen
+warns that possession of the complete link grants access to the selected API
+resources. Import replaces only included connections and then enables their
+Provider switches and the Tool selections carried by the share. Notion OAuth,
+Mi Home sessions, and Android permissions require setup on the receiving
+device and never appear in the checklist.
+
 Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
 Installed/Explore uses a dark selected segment. Explore opens with the public
 skills.sh Trending (24h) leaderboard, then switches to search results after a
 query. Cards show rank, source, install count, and a derived popularity label.
 Every installed Skill, including read-only built-ins, can be enabled or
-disabled. Existing built-ins default to enabled; the Notion Knowledge built-in
-and Tencent Docs Knowledge built-in default to disabled and guide search,
-reading, creation, and updates through their configured MCP tools.
+disabled. A Skill cannot be enabled until all of its required aggregate Tool
+groups are ready; its card names missing provider/group labels such as
+**Tencent Docs MCP**, never a list of raw Tool IDs, and keeps the switch off.
+A group is ready only when its provider and every member Tool required by that
+Skill are ready. A previously enabled Skill whose dependencies become
+unavailable remains switchable off but is suspended from Agent discovery.
+Existing built-ins default to enabled; the
+Notion Knowledge, Tencent Docs Knowledge, and Mi Home Smart Home built-ins
+default to disabled.
 Each MCP server's detailed Tool list starts collapsed and can be expanded
 without disabling the server or changing individual Tool selections. Built-in
 knowledge providers enable their core search, listing, and reading Tools on
@@ -195,6 +213,84 @@ Agent Browser uses the same provider-card pattern. Its provider-level enable
 switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
+
+Tools places its Extensions section after all MCP server cards. The Mi Home
+card always occupies one stable position there, follows Mochi's selected
+Chinese or English UI language, and moves through these states:
+
+1. **Not installed**: describe the optional unofficial connector, its
+   approximate download size, and open the trusted GitHub Release page through
+   an **Install extension** action.
+2. **Installed, not connected**: show extension version and a **Connect Mi
+   Home** action.
+3. **Waiting for QR confirmation**: open the extension-owned connection
+   activity, show a bounded QR expiry countdown, refresh on expiry, and allow
+   cancellation. Copy explains that another phone already signed into Mi Home
+   must scan and confirm the code.
+4. **Connected, disabled**: show the selected homes and device count without
+   registering any Agent Tools. This is the default after connection; all
+   child Tool switches start checked so enabling the aggregate provider makes
+   the full supported Tool set available.
+5. **Connected, enabled**: show one provider switch and one collapsed list of
+   individually selectable Mi Home Tools.
+6. **Authorization expired**: remove every Mi Home Tool from the Agent
+   registry and show **Reconnect**.
+7. **Update available**: open the trusted replacement APK. Android performs an
+   in-place package update; stored authorization and device selections remain
+   unless the extension rejects an incompatible state version.
+
+Static package, signing, Service, Activity, and signature-permission checks are
+enough to enter **Installed, not connected**. A failed first Binder start must
+not relabel that trusted package as untrusted or send the user back to
+installation. **Connect Mi Home** explicitly launches the configuration
+Activity, allowing Android and OEM background-start controls to start a newly
+installed extension that has no launcher entry.
+
+The extension has no launcher activity, so the Android launcher continues to
+show only Mochi. Android Settings and the system package installer identify it
+as **Mochi Mi Home Extension** so users can inspect or uninstall it.
+
+After QR connection, users select homes and supported devices. Lights,
+switches, plugs, fans, air conditioners, air purifiers, humidifiers, curtains,
+read-only sensors, televisions, cameras, and scales derive capabilities from
+each device's MIoT specification rather than from a fixed model allowlist.
+Each selectable device uses a full-width rounded card with a primary device
+name, separate home/room and category lines, and a checkbox. The whole card is
+clickable; selected cards use both a highlighted background and stronger
+outline so selection never relies on the checkbox or color alone.
+Locks, alarms, garage doors, robot-vacuum maps, camera storage mutation, and
+unsupported capabilities never appear. Ambiguous duplicate device names are
+displayed with home and room labels.
+
+Ordinary use remains voice-first:
+
+- “Turn on the living-room television” may execute an available power action.
+- “Turn the television volume down” invokes a bounded television control.
+- “Set the bedroom air conditioner to 26 degrees” invokes only the declared
+  temperature and mode properties for that selected device.
+- “Set the dining-room light to 40 percent” invokes only declared power and
+  brightness properties.
+- “What is the study temperature?” reads the selected sensor without exposing
+  unrelated devices.
+- “Show the latest door-camera event” retrieves the newest available event
+  image and presents it locally.
+- “How much battery does the scale have?” reads only exposed device state.
+
+Television commands report **sent** unless a later state read proves the new
+state. Camera setting changes and scene execution require explicit current-turn
+intent; ambiguous devices or scenes produce a clarification instead of a
+guess.
+
+A successful latest-camera-event request creates a deterministic trusted
+Camera Snapshot card. The image remains local and ephemeral, with device,
+home/room, event type, and capture time shown from Tool evidence. The card does
+not imply that the image is live. It states whether the image is available only
+inside the current run, including at most one explicit Subagent handoff, or
+remained device-only. Provider settings contain a default-off **Camera image
+input** switch and tell the user to enable it only
+for an image-capable model. The card has Dismiss but no source, share, or save
+action. Leaving the card, cancelling the turn, process death, or attachment
+expiry releases the image.
 
 When a Browser Tool runs while Home is selected, Home transforms into a trusted
 `BrowserSessionCard` containing the live WebView, origin, loading state, current

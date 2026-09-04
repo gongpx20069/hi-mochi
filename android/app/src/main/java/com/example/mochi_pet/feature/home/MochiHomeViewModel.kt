@@ -2,6 +2,8 @@ package com.example.mochi_pet.feature.home
 
 import android.database.sqlite.SQLiteException
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.webkit.WebView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -18,8 +20,12 @@ import com.example.mochi_pet.core.agent.AgentRunRequest
 import com.example.mochi_pet.core.agent.AgentRunner
 import com.example.mochi_pet.core.agent.tool.ManageMochiCalendarTool
 import com.example.mochi_pet.core.agent.tool.ManageMochiTodoTool
+import com.example.mochi_pet.core.agent.tool.AgentToolJson
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.agent.tool.allowsCameraEventImageInput
+import com.example.mochi_pet.core.extensions.ExtensionActivityTarget
+import com.example.mochi_pet.core.extensions.MochiExtensionClient
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.database.PlannerStore
@@ -32,6 +38,7 @@ import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.model.MochiTodo
 import com.example.mochi_pet.core.model.MochiTodoDraft
 import com.example.mochi_pet.core.model.TodoStatus
+import com.example.mochi_pet.core.mcp.McpException
 import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import com.example.mochi_pet.core.navigation.MochiNavigationReducer
 import com.example.mochi_pet.core.navigation.NavigateMochiUiTool
@@ -49,6 +56,7 @@ import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.ProviderSettingsInput
 import com.example.mochi_pet.core.settings.ProviderSettingsRepository
 import com.example.mochi_pet.core.settings.ProviderShareManager
+import com.example.mochi_pet.core.settings.ProviderShareSelection
 import com.example.mochi_pet.core.settings.ProviderSettingsSummary
 import com.example.mochi_pet.core.settings.SpeechSettingsInput
 import com.example.mochi_pet.core.settings.SpeechSettingsRepository
@@ -63,16 +71,20 @@ import com.example.mochi_pet.core.skills.DownloadedSkill
 import com.example.mochi_pet.core.skills.SkillMarketClient
 import com.example.mochi_pet.core.skills.SkillMarketException
 import com.example.mochi_pet.core.skills.SkillOrigin
+import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_pet.core.skills.SkillRepository
 import com.example.mochi_pet.core.skills.LoadSkillTool
+import com.example.mochi_pet.core.skills.requiredToolNames
 import com.example.mochi_pet.core.location.DeviceLocationException
 import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.ToolCatalogRepository
 import com.example.mochi_pet.core.tools.ToolCatalogSummary
+import com.example.mochi_pet.core.tools.skillReadiness
 import com.example.mochi_pet.core.weather.CurrentWeather
 import com.example.mochi_pet.core.weather.CurrentWeatherTool
 import com.example.mochi_pet.core.weather.WeatherException
 import com.example.mochi_pet.core.weather.WeatherRepository
+import com.example.mochi_pet.core.web.WebContentException
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeRuntime
@@ -105,6 +117,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class PlannerSurfaceState(
     val isLoading: Boolean = false,
@@ -194,6 +209,7 @@ data class ProviderShareUiState(
 
 data class SkillsUiState(
     val skills: List<MochiSkill> = emptyList(),
+    val readinessById: Map<String, SkillReadiness> = emptyMap(),
     val searchResults: List<MarketSkillSummary> = emptyList(),
     val isLoading: Boolean = true,
     val isSearching: Boolean = false,
@@ -207,6 +223,17 @@ data class ToolsUiState(
     val isLoading: Boolean = true,
     val feedback: String? = null,
     val authorizationUrl: String? = null,
+    val extensionActivityTarget: ExtensionActivityTarget? = null,
+)
+
+data class CameraSnapshotUiState(
+    val bitmap: Bitmap,
+    val readyForModel: Boolean,
+    val cameraName: String,
+    val home: String?,
+    val room: String?,
+    val eventType: String?,
+    val capturedAt: String?,
 )
 
 data class WeatherUiState(
@@ -245,6 +272,7 @@ class MochiHomeViewModel(
     private val skillRepository: SkillRepository? = null,
     private val skillMarketClient: SkillMarketClient? = null,
     private val toolCatalogRepository: ToolCatalogRepository? = null,
+    private val extensionClient: MochiExtensionClient? = null,
     private val agentBrowserRuntime: AgentBrowserRuntime? = null,
     private val weatherRepository: WeatherRepository? = null,
     private val locationPermissionGate: LocationPermissionGate? = null,
@@ -272,6 +300,8 @@ class MochiHomeViewModel(
     private val mutableToolsState = MutableStateFlow(ToolsUiState())
     private val mutableWeatherState = MutableStateFlow(WeatherUiState())
     private val mutableHomeCard = MutableStateFlow<CardPresentation?>(null)
+    private val mutableCameraSnapshot =
+        MutableStateFlow<CameraSnapshotUiState?>(null)
     private val unavailableLocationPermissionRequest = MutableStateFlow(false)
     private val unavailableBrowserState =
         MutableStateFlow(AgentBrowserUiState())
@@ -306,6 +336,8 @@ class MochiHomeViewModel(
     val weatherState: StateFlow<WeatherUiState> =
         mutableWeatherState.asStateFlow()
     val homeCard: StateFlow<CardPresentation?> = mutableHomeCard.asStateFlow()
+    val cameraSnapshot: StateFlow<CameraSnapshotUiState?> =
+        mutableCameraSnapshot.asStateFlow()
     val browserState: StateFlow<AgentBrowserUiState> =
         agentBrowserRuntime?.state ?: unavailableBrowserState.asStateFlow()
     val locationPermissionRequest: StateFlow<Boolean> =
@@ -318,6 +350,7 @@ class MochiHomeViewModel(
         loadAgentContext()
         loadSkills()
         loadTools()
+        observeExtensionAttachments()
     }
 
     fun browserWebView(context: Context): WebView? =
@@ -335,6 +368,9 @@ class MochiHomeViewModel(
             target == MochiSurface.Weather
         ) {
             mutableHomeCard.value = null
+        }
+        if (target != MochiSurface.Card) {
+            mutableCameraSnapshot.value = null
         }
         mutableSurface.value = target
         load(target)
@@ -541,6 +577,9 @@ class MochiHomeViewModel(
                             context = ToolExecutionContext(
                                 currentDate = LocalDate.now(clock),
                                 currentSurface = mutableSurface.value,
+                                modelImageInputAllowed =
+                                    provider.imageInputEnabled &&
+                                        allowsCameraEventImageInput(query),
                             ),
                             history = memoryContext?.recentMessages.orEmpty(),
                             personaSections = persona?.sections.orEmpty(),
@@ -870,14 +909,14 @@ class MochiHomeViewModel(
         }
     }
 
-    fun createProviderShareLink() {
+    fun createProviderShareLink(selection: ProviderShareSelection) {
         val manager = providerShareManager ?: return
         mutableProviderShareState.value =
             ProviderShareUiState(isWorking = true)
         viewModelScope.launch(ioDispatcher) {
             try {
                 mutableProviderShareState.value = ProviderShareUiState(
-                    shareLink = manager.createShareLink(),
+                    shareLink = manager.createShareLink(selection),
                 )
             } catch (error: IllegalStateException) {
                 mutableProviderShareState.value = ProviderShareUiState(
@@ -931,6 +970,13 @@ class MochiHomeViewModel(
                             isLoading = false,
                         )
                 }
+                toolCatalogRepository?.loadSummary()?.let { catalog ->
+                    mutableToolsState.value = ToolsUiState(
+                        catalog = catalog,
+                        isLoading = false,
+                    )
+                    refreshSkillReadiness(catalog)
+                }
                 mutableProviderShareState.value = ProviderShareUiState(
                     feedback = "Shared Providers imported",
                 )
@@ -943,6 +989,16 @@ class MochiHomeViewModel(
                 mutableProviderShareState.value = ProviderShareUiState(
                     feedback = error.message
                         ?: "Provider share link could not be imported",
+                )
+            } catch (error: McpException) {
+                mutableProviderShareState.value = ProviderShareUiState(
+                    feedback = error.message
+                        ?: "Shared MCP Tools could not be connected",
+                )
+            } catch (error: WebContentException) {
+                mutableProviderShareState.value = ProviderShareUiState(
+                    feedback = error.message
+                        ?: "Shared MCP endpoint is not allowed",
                 )
             }
         }
@@ -1162,6 +1218,8 @@ class MochiHomeViewModel(
                 showSkillError(error, "Skill update failed")
             } catch (error: SQLiteException) {
                 showSkillError(error, "Skill update failed")
+            } catch (error: IOException) {
+                showSkillError(error, "Skill update failed")
             }
         }
     }
@@ -1173,6 +1231,28 @@ class MochiHomeViewModel(
         val repository = skillRepository ?: return
         viewModelScope.launch(ioDispatcher) {
             try {
+                if (enabled) {
+                    val skill = repository.listSkills()
+                        .firstOrNull { it.id == id }
+                        ?: throw IllegalArgumentException(
+                            "Skill was not found",
+                        )
+                    val catalog = toolCatalogRepository?.loadSummary()
+                        ?: ToolCatalogSummary()
+                    val readiness = catalog.skillReadiness(
+                        skill.requiredToolNames,
+                    )
+                    require(readiness.isReady) {
+                        "Enable required Tool groups first: " +
+                            readiness.missingRequirements
+                                .sorted()
+                                .joinToString()
+                    }
+                    mutableToolsState.value = ToolsUiState(
+                        catalog = catalog,
+                        isLoading = false,
+                    )
+                }
                 repository.setEnabled(id, enabled)
                 refreshSkills(if (enabled) "Skill enabled" else "Skill disabled")
             } catch (error: IllegalArgumentException) {
@@ -1345,6 +1425,71 @@ class MochiHomeViewModel(
         updateTools {
             requireRepository().setAgentBrowserEnabled(enabled)
         }
+    }
+
+    fun installMijiaExtension() {
+        mutableToolsState.update {
+            it.copy(
+                feedback = "Download the trusted Mi Home extension APK",
+                authorizationUrl = MIJIA_RELEASE_URL,
+            )
+        }
+    }
+
+    fun configureMijiaExtension() {
+        val mijia = mutableToolsState.value.catalog.mijia
+        val packageName = mijia.configurationPackage
+        val activity = mijia.configurationActivity
+        if (packageName == null || activity == null) {
+            mutableToolsState.update {
+                it.copy(feedback = "The Mi Home extension is unavailable")
+            }
+            return
+        }
+        mutableToolsState.update {
+            it.copy(
+                extensionActivityTarget = ExtensionActivityTarget(
+                    packageName = packageName,
+                    className = activity,
+                ),
+            )
+        }
+    }
+
+    fun consumeExtensionActivityTarget() {
+        mutableToolsState.update {
+            it.copy(extensionActivityTarget = null)
+        }
+    }
+
+    fun refreshTools() {
+        loadTools()
+    }
+
+    fun setMijiaEnabled(enabled: Boolean) {
+        updateTools {
+            requireRepository().setMijiaEnabled(enabled)
+        }
+    }
+
+    fun setMijiaToolEnabled(
+        name: String,
+        enabled: Boolean,
+    ) {
+        updateTools {
+            requireRepository().setMijiaToolEnabled(name, enabled)
+        }
+    }
+
+    fun disconnectMijia() {
+        updateTools("Mi Home disconnected") {
+            requireRepository().disconnectMijia()
+        }
+    }
+
+    fun dismissCameraSnapshot() {
+        mutableCameraSnapshot.value = null
+        mutableSurface.value = MochiSurface.Face
     }
 
     fun addManualMcpServer(input: ManualMcpServerInput) {
@@ -1544,8 +1689,63 @@ class MochiHomeViewModel(
                         catalog = catalog,
                         isLoading = false,
                     )
+                    refreshSkillReadiness(catalog)
                 }
                 .onFailure(::showToolError)
+        }
+    }
+
+    private fun observeExtensionAttachments() {
+        val client = extensionClient ?: return
+        viewModelScope.launch {
+            client.attachmentEvents.collect { attachment ->
+                runCatching {
+                    withContext(ioDispatcher) {
+                        val bitmap = BitmapFactory.decodeByteArray(
+                            attachment.bytes,
+                            0,
+                            attachment.bytes.size,
+                        ) ?: throw IllegalStateException(
+                            "Camera event image could not be decoded.",
+                        )
+                        if (
+                            bitmap.width !=
+                            attachment.descriptor.widthPixels ||
+                            bitmap.height !=
+                            attachment.descriptor.heightPixels
+                        ) {
+                            bitmap.recycle()
+                            throw IllegalStateException(
+                                "Camera event image dimensions are invalid.",
+                            )
+                        }
+                        val metadata = AgentToolJson.format
+                            .parseToJsonElement(
+                                attachment.descriptor.metadataJson,
+                            ).jsonObject
+                        CameraSnapshotUiState(
+                            bitmap = bitmap,
+                            readyForModel = attachment.readyForModel,
+                            cameraName = metadata.stringValue("camera_name")
+                                ?: "Mi Home camera",
+                            home = metadata.stringValue("home"),
+                            room = metadata.stringValue("room"),
+                            eventType = metadata.stringValue("event_type"),
+                            capturedAt = metadata.stringValue("captured_at"),
+                        )
+                    }
+                }.onSuccess { snapshot ->
+                    mutableCameraSnapshot.value = snapshot
+                    mutableSurface.value = MochiSurface.Card
+                }.onFailure { error ->
+                    mutableConversationState.update {
+                        it.copy(
+                            errorMessage = error.message
+                                ?: "Camera event image could not be opened.",
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -1564,6 +1764,7 @@ class MochiHomeViewModel(
                         isLoading = false,
                         feedback = successFeedback,
                     )
+                    refreshSkillReadiness(catalog)
                 }
                 .onFailure(::showToolError)
         }
@@ -1585,15 +1786,34 @@ class MochiHomeViewModel(
     private suspend fun refreshSkills(feedback: String? = null) {
         val repository = skillRepository ?: return
         try {
+            val skills = repository.listSkills()
+            val catalog = mutableToolsState.value.catalog
             mutableSkillsState.update {
                 it.copy(
-                    skills = repository.listSkills(),
+                    skills = skills,
+                    readinessById = skills.associate { skill ->
+                        skill.id to catalog.skillReadiness(
+                            skill.requiredToolNames,
+                        )
+                    },
                     isLoading = false,
                     feedback = feedback,
                 )
             }
         } catch (error: SQLiteException) {
             showSkillError(error, "Could not load Skills")
+        }
+    }
+
+    private fun refreshSkillReadiness(catalog: ToolCatalogSummary) {
+        mutableSkillsState.update { state ->
+            state.copy(
+                readinessById = state.skills.associate { skill ->
+                    skill.id to catalog.skillReadiness(
+                        skill.requiredToolNames,
+                    )
+                },
+            )
         }
     }
 
@@ -1887,6 +2107,7 @@ class MochiHomeViewModel(
     override fun onCleared() {
         interactionVersion += 1
         agentJob?.cancel()
+        mutableCameraSnapshot.value = null
         voiceRuntime?.stopListening()
         voiceRuntime?.stopSpeaking()
         wakeRuntime?.resume()
@@ -1898,6 +2119,8 @@ class MochiHomeViewModel(
         private val AGENT_LOGGER = Logger.getLogger(AGENT_LOG_TAG)
         private const val TENCENT_DOCS_TOKEN_URL =
             "https://docs.qq.com/open/auth/mcp.html"
+        private const val MIJIA_RELEASE_URL =
+            "https://github.com/gongpx20069/hi-mochi/releases/latest"
 
         fun factory(
             application: MochiApplication,
@@ -1936,6 +2159,7 @@ class MochiHomeViewModel(
                         skillMarketClient = application.skillMarketClient,
                         toolCatalogRepository =
                             application.toolCatalogRepository,
+                        extensionClient = application.extensionClient,
                         agentBrowserRuntime = application.agentBrowserRuntime,
                         weatherRepository = application.weatherRepository,
                         locationPermissionGate =
@@ -1955,3 +2179,8 @@ private fun AgentPipelineStage.toUiStage(): ChatPipelineStage =
         AgentPipelineStage.TOOL -> ChatPipelineStage.TOOL
         AgentPipelineStage.SUMMARY -> ChatPipelineStage.SUMMARY
     }
+
+private fun kotlinx.serialization.json.JsonObject.stringValue(
+    name: String,
+): String? =
+    this[name]?.jsonPrimitive?.contentOrNull

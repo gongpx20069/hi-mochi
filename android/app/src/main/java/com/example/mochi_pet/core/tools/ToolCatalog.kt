@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.extensions.MijiaExtensionSnapshot
+import com.example.mochi_pet.core.extensions.MochiExtensionClient
+import com.example.mochi_pet.core.extensions.UnavailableMijiaExtensionClient
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpAgentTool
 import com.example.mochi_pet.core.mcp.McpRemoteTool
@@ -19,6 +22,7 @@ import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
 import com.example.mochi_pet.core.mcp.mcpToolAlias
 import com.example.mochi_pet.core.settings.ApiKeyCipher
 import com.example.mochi_pet.core.settings.EncryptedSecret
+import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -51,6 +55,7 @@ data class ToolCatalogSummary(
     val builtInTools: List<BuiltInToolSummary> = emptyList(),
     val amap: AmapProviderSummary = AmapProviderSummary(),
     val agentBrowser: AgentBrowserProviderSummary = AgentBrowserProviderSummary(),
+    val mijia: MijiaProviderSummary = MijiaProviderSummary(),
     val servers: List<McpServerSummary> = emptyList(),
     val isLoading: Boolean = false,
     val feedback: String? = null,
@@ -65,6 +70,30 @@ data class AmapProviderSummary(
 data class AgentBrowserProviderSummary(
     val enabled: Boolean = true,
     val tools: List<BuiltInToolSummary> = emptyList(),
+)
+
+data class MijiaProviderSummary(
+    val installed: Boolean = false,
+    val trusted: Boolean = false,
+    val connected: Boolean = false,
+    val enabled: Boolean = false,
+    val status: String = "disconnected",
+    val detail: String? = null,
+    val versionName: String? = null,
+    val accountLabel: String? = null,
+    val selectedHomeCount: Int = 0,
+    val selectedDeviceCount: Int = 0,
+    val configurationPackage: String? = null,
+    val configurationActivity: String? = null,
+    val tools: List<MijiaToolSummary> = emptyList(),
+)
+
+data class MijiaToolSummary(
+    val name: String,
+    val description: String,
+    val riskLevel: String,
+    val enabled: Boolean,
+    val displayName: String = name,
 )
 
 data class BuiltInToolSummary(
@@ -92,10 +121,117 @@ data class McpToolSummary(
     val enabled: Boolean,
 )
 
+fun ToolCatalogSummary.readyToolNames(): Set<String> =
+    buildSet {
+        builtInTools.filterToReadyNames(this)
+        if (agentBrowser.enabled) {
+            agentBrowser.tools.filterToReadyNames(this)
+        }
+        if (amap.connected && amap.enabled) {
+            amap.tools.filterToReadyNames(this)
+        }
+        if (mijia.connected && mijia.enabled) {
+            mijia.tools.filter { it.enabled }.mapTo(this) { it.name }
+        }
+        servers.filter { it.connected && it.enabled }.forEach { server ->
+            server.tools.filter { it.enabled }.mapTo(this) { it.alias }
+        }
+    }
+
+fun ToolCatalogSummary.skillReadiness(
+    requiredToolNames: Set<String>,
+): SkillReadiness {
+    val readyToolNames = readyToolNames()
+    return SkillReadiness(
+        requiredTools = requiredToolNames,
+        readyTools = requiredToolNames.intersect(readyToolNames),
+        requirements = requiredToolNames
+            .groupBy { skillRequirementName(it) }
+            .mapValues { (_, tools) -> tools.toSet() },
+    )
+}
+
+private fun ToolCatalogSummary.skillRequirementName(
+    toolName: String,
+): String =
+    when {
+        toolName.startsWith("browser_") -> "Agent Browser"
+        toolName.startsWith("amap_") -> "Amap Maps"
+        toolName.startsWith("mijia_") -> "Mi Home extension"
+        toolName.startsWith("notion_") ->
+            servers.firstOrNull { it.id == NOTION_SERVER_ID }?.name
+                ?: "Notion MCP"
+        toolName.startsWith("tencent_docs_") ->
+            servers.firstOrNull { it.id == TENCENT_DOCS_SERVER_ID }?.name
+                ?: "Tencent Docs MCP"
+        else -> servers.firstNotNullOfOrNull { server ->
+            server.tools
+                .firstOrNull { it.alias == toolName }
+                ?.let { server.name }
+        } ?: builtInTools
+            .firstOrNull { it.name == toolName }
+            ?.displayName
+            ?: toolName
+    }
+
+private fun List<BuiltInToolSummary>.filterToReadyNames(
+    destination: MutableSet<String>,
+) {
+    filter { it.enabled }.mapTo(destination) { it.name }
+}
+
 data class ManualMcpServerInput(
     val name: String,
     val endpoint: String,
     val bearerToken: String?,
+)
+
+data class ToolShareSelection(
+    val includeAmap: Boolean = false,
+    val includeTencentDocs: Boolean = false,
+    val manualMcpServerIds: Set<String> = emptySet(),
+)
+
+@Serializable
+data class SharedToolProviders(
+    val amap: SharedAmapProvider? = null,
+    val tencentDocs: SharedTencentDocsProvider? = null,
+    val manualMcpServers: List<SharedManualMcpServer> = emptyList(),
+)
+
+@Serializable
+data class SharedAmapProvider(
+    val credentials: AmapCredentials,
+    val enabledToolNames: Set<String>,
+)
+
+@Serializable
+data class SharedTencentDocsProvider(
+    val token: String,
+    val enabledToolNames: Set<String>,
+)
+
+@Serializable
+data class SharedManualMcpServer(
+    val name: String,
+    val endpoint: String,
+    val bearerToken: String? = null,
+    val enabledToolNames: Set<String>,
+)
+
+class PreparedSharedToolImport internal constructor(
+    internal val providers: SharedToolProviders,
+    internal val tencentTools: List<McpRemoteTool>?,
+    internal val manualServers: List<PreparedSharedManualMcpServer>,
+)
+
+internal data class PreparedSharedManualMcpServer(
+    val id: String,
+    val name: String,
+    val endpoint: String,
+    val bearerToken: String?,
+    val enabledToolNames: Set<String>,
+    val tools: List<McpRemoteTool>,
 )
 
 enum class McpAuthMode {
@@ -134,7 +270,28 @@ interface ToolCatalogRepository {
 
     suspend fun setAgentBrowserEnabled(enabled: Boolean): ToolCatalogSummary
 
+    suspend fun setMijiaEnabled(enabled: Boolean): ToolCatalogSummary
+
+    suspend fun setMijiaToolEnabled(
+        name: String,
+        enabled: Boolean,
+    ): ToolCatalogSummary
+
+    suspend fun disconnectMijia(): ToolCatalogSummary
+
     suspend fun loadAmapCredentials(): AmapCredentials?
+
+    suspend fun exportSharedTools(
+        selection: ToolShareSelection,
+    ): SharedToolProviders
+
+    suspend fun prepareSharedTools(
+        providers: SharedToolProviders,
+    ): PreparedSharedToolImport
+
+    suspend fun applySharedTools(
+        prepared: PreparedSharedToolImport,
+    ): ToolCatalogSummary
 
     suspend fun addManualServer(input: ManualMcpServerInput): ToolCatalogSummary
 
@@ -156,6 +313,8 @@ interface ToolCatalogRepository {
     suspend fun loadEnabledMcpTools(): List<AgentTool>
 
     suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool>
+
+    suspend fun loadEnabledExtensionTools(): List<AgentTool>
 }
 
 class DataStoreToolCatalogRepository(
@@ -164,6 +323,8 @@ class DataStoreToolCatalogRepository(
     private val mcpClient: McpStreamableHttpClient,
     private val oauthClient: McpOAuthClient = McpOAuthClient(),
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val extensionClient: MochiExtensionClient =
+        UnavailableMijiaExtensionClient,
 ) : ToolCatalogRepository {
     private val json = Json {
         encodeDefaults = true
@@ -174,7 +335,7 @@ class DataStoreToolCatalogRepository(
     override suspend fun loadSummary(): ToolCatalogSummary {
         repairTruncatedTencentDocsCatalog()
         updateCatalog { it }
-        return loadCatalog().toSummary()
+        return loadCatalog().toSummary(extensionClient.snapshot())
     }
 
     override suspend fun setBuiltInEnabled(
@@ -478,11 +639,299 @@ class DataStoreToolCatalogRepository(
         }
     }
 
+    override suspend fun exportSharedTools(
+        selection: ToolShareSelection,
+    ): SharedToolProviders {
+        val catalog = loadCatalog().withBuiltInServers()
+        val manualServers = catalog.servers.filter {
+            it.id in selection.manualMcpServerIds
+        }
+        require(
+            manualServers.size == selection.manualMcpServerIds.size &&
+                manualServers.none(PersistedMcpServer::builtIn),
+        ) {
+            "A selected MCP server is not available"
+        }
+        val amap = if (selection.includeAmap) {
+            val raw = catalog.amapCredentials?.let(::decrypt)
+                ?: throw IllegalArgumentException(
+                    "Configure Amap before sharing it",
+                )
+            val credentials = try {
+                json.decodeFromString<AmapCredentials>(raw)
+            } catch (error: SerializationException) {
+                throw IllegalStateException(
+                    "Stored Amap credentials are invalid",
+                    error,
+                )
+            }
+            SharedAmapProvider(
+                credentials = credentials,
+                enabledToolNames = BUILT_IN_TOOLS
+                    .filter(BuiltInToolDescriptor::isAmapTool)
+                    .filter {
+                        catalog.builtInEnabled[it.name] ?: it.defaultEnabled
+                    }
+                    .mapTo(mutableSetOf(), BuiltInToolDescriptor::name),
+            )
+        } else {
+            null
+        }
+        val tencentDocs = if (selection.includeTencentDocs) {
+            val server = catalog.servers.first {
+                it.id == TENCENT_DOCS_SERVER_ID
+            }
+            val token = server.accessToken?.let(::decrypt)
+                ?: throw IllegalArgumentException(
+                    "Configure Tencent Docs before sharing it",
+                )
+            SharedTencentDocsProvider(
+                token = token,
+                enabledToolNames = server.tools
+                    .filter(PersistedMcpTool::enabled)
+                    .mapTo(mutableSetOf()) { it.definition.name },
+            )
+        } else {
+            null
+        }
+        return SharedToolProviders(
+            amap = amap,
+            tencentDocs = tencentDocs,
+            manualMcpServers = manualServers.map { server ->
+                SharedManualMcpServer(
+                    name = server.name,
+                    endpoint = server.endpoint,
+                    bearerToken = server.accessToken?.let(::decrypt),
+                    enabledToolNames = server.tools
+                        .filter(PersistedMcpTool::enabled)
+                        .mapTo(mutableSetOf()) { it.definition.name },
+                )
+            },
+        )
+    }
+
+    override suspend fun prepareSharedTools(
+        providers: SharedToolProviders,
+    ): PreparedSharedToolImport {
+        require(providers.manualMcpServers.size <= MAX_SHARED_MCP_SERVERS) {
+            "Too many shared MCP servers"
+        }
+        providers.amap?.credentials?.let(::validateAmapCredentials)
+        val normalizedTencent = providers.tencentDocs?.let { shared ->
+            val token = shared.token.trim()
+            require(token.isNotEmpty()) {
+                "Shared Tencent Docs token is required"
+            }
+            require(token.length <= MAX_MCP_TOKEN_CHARS) {
+                "Shared Tencent Docs token is too long"
+            }
+            val runtime = McpServerRuntime(
+                id = TENCENT_DOCS_SERVER_ID,
+                name = "Tencent Docs",
+                endpoint = TENCENT_DOCS_MCP_ENDPOINT,
+                accessToken = token,
+                authorizationHeader = token,
+            )
+            shared.copy(token = token) to
+                selectTencentDocsTools(mcpClient.listTools(runtime))
+        }
+        val preparedManual = providers.manualMcpServers.map { shared ->
+            val name = shared.name.trim()
+            require(name.isNotEmpty() && name.length <= MAX_SERVER_NAME_CHARS) {
+                "Shared MCP server name is invalid"
+            }
+            val endpoint = PublicWebUrlPolicy.validate(shared.endpoint).toString()
+            val token = shared.bearerToken?.trim()?.takeIf(String::isNotEmpty)
+            require((token?.length ?: 0) <= MAX_MCP_TOKEN_CHARS) {
+                "Shared MCP token is too long"
+            }
+            val runtime = McpServerRuntime(
+                id = "manual-${UUID.randomUUID()}",
+                name = name,
+                endpoint = endpoint,
+                accessToken = token,
+            )
+            val tools = mcpClient.listTools(runtime)
+            PreparedSharedManualMcpServer(
+                id = runtime.id,
+                name = name,
+                endpoint = endpoint,
+                bearerToken = token,
+                enabledToolNames = shared.enabledToolNames,
+                tools = tools,
+            )
+        }
+        require(
+            preparedManual.map { it.endpoint }.distinct().size ==
+                preparedManual.size,
+        ) {
+            "Shared MCP servers contain duplicate endpoints"
+        }
+        val normalizedAmap = providers.amap?.let { shared ->
+            shared.copy(
+                credentials = AmapCredentials(
+                    webServiceKey =
+                        shared.credentials.webServiceKey.trim(),
+                    securityKey = shared.credentials.securityKey
+                        ?.trim()
+                        ?.takeIf(String::isNotEmpty),
+                ),
+            )
+        }
+        return PreparedSharedToolImport(
+            providers = providers.copy(
+                amap = normalizedAmap,
+                tencentDocs = normalizedTencent?.first,
+                manualMcpServers = preparedManual.map { server ->
+                    SharedManualMcpServer(
+                        name = server.name,
+                        endpoint = server.endpoint,
+                        bearerToken = server.bearerToken,
+                        enabledToolNames = server.enabledToolNames,
+                    )
+                },
+            ),
+            tencentTools = normalizedTencent?.second,
+            manualServers = preparedManual,
+        )
+    }
+
+    override suspend fun applySharedTools(
+        prepared: PreparedSharedToolImport,
+    ): ToolCatalogSummary {
+        val providers = prepared.providers
+        val importedTencent = prepared.tencentTools?.map { tool ->
+            PersistedMcpTool(
+                definition = tool.withTencentEnglishDescription(),
+                enabled = tool.name in
+                    providers.tencentDocs.orEmptyEnabledToolNames(),
+            )
+        }
+        val importedManual = prepared.manualServers.map { shared ->
+            PersistedMcpServer(
+                id = shared.id,
+                name = shared.name,
+                endpoint = shared.endpoint,
+                builtIn = false,
+                enabled = true,
+                authMode = if (shared.bearerToken == null) {
+                    McpAuthMode.NONE
+                } else {
+                    McpAuthMode.BEARER
+                },
+                accessToken = shared.bearerToken?.let(::encrypt),
+                tools = shared.tools.map { tool ->
+                    PersistedMcpTool(
+                        definition = tool,
+                        enabled = tool.name in shared.enabledToolNames,
+                    )
+                },
+            )
+        }
+        updateCatalog { existing ->
+            val catalog = existing.withBuiltInServers()
+            val importedEndpoints = importedManual.mapTo(mutableSetOf()) {
+                it.endpoint
+            }
+            val servers = catalog.servers
+                .filter { it.builtIn || it.endpoint !in importedEndpoints }
+                .map { server ->
+                    if (
+                        server.id == TENCENT_DOCS_SERVER_ID &&
+                        providers.tencentDocs != null &&
+                        importedTencent != null
+                    ) {
+                        server.copy(
+                            enabled = true,
+                            accessToken = encrypt(providers.tencentDocs.token),
+                            toolDefaultsVersion =
+                                BUILT_IN_TOOL_DEFAULTS_VERSION,
+                            tools = importedTencent,
+                        )
+                    } else {
+                        server
+                    }
+                } + importedManual
+            val amapEnabled = providers.amap != null || catalog.amapEnabled
+            val amapCredentials = providers.amap?.credentials?.let {
+                encrypt(json.encodeToString(it))
+            } ?: catalog.amapCredentials
+            val builtInEnabled = providers.amap?.let { shared ->
+                catalog.builtInEnabled + BUILT_IN_TOOLS
+                    .filter(BuiltInToolDescriptor::isAmapTool)
+                    .associate { descriptor ->
+                        descriptor.name to
+                            (descriptor.name in shared.enabledToolNames)
+                    }
+            } ?: catalog.builtInEnabled
+            catalog.copy(
+                builtInEnabled = builtInEnabled,
+                amapCredentials = amapCredentials,
+                amapEnabled = amapEnabled,
+                servers = servers,
+            )
+        }
+        return loadSummary()
+    }
+
+    private fun SharedTencentDocsProvider?.orEmptyEnabledToolNames():
+        Set<String> = this?.enabledToolNames.orEmpty()
+
+    private fun validateAmapCredentials(credentials: AmapCredentials) {
+        require(credentials.webServiceKey.isNotBlank()) {
+            "Shared Amap Web Service Key is required"
+        }
+        require(
+            credentials.webServiceKey.length <= MAX_MAP_CREDENTIAL_CHARS &&
+                (credentials.securityKey?.length ?: 0) <=
+                MAX_MAP_CREDENTIAL_CHARS,
+        ) {
+            "Shared Amap credentials are too long"
+        }
+    }
+
     override suspend fun setAgentBrowserEnabled(
         enabled: Boolean,
     ): ToolCatalogSummary {
         updateCatalog { catalog ->
             catalog.copy(agentBrowserEnabled = enabled)
+        }
+        return loadSummary()
+    }
+
+    override suspend fun setMijiaEnabled(enabled: Boolean): ToolCatalogSummary {
+        if (enabled) {
+            require(extensionClient.snapshot().connected) {
+                "Connect Mi Home before enabling its Tools"
+            }
+        }
+        updateCatalog { catalog ->
+            catalog.copy(mijiaEnabled = enabled)
+        }
+        return loadSummary()
+    }
+
+    override suspend fun setMijiaToolEnabled(
+        name: String,
+        enabled: Boolean,
+    ): ToolCatalogSummary {
+        val snapshot = extensionClient.snapshot()
+        require(snapshot.tools.any { it.name == name }) {
+            "Unknown Mi Home Tool"
+        }
+        updateCatalog { catalog ->
+            catalog.copy(
+                mijiaToolsEnabled = catalog.mijiaToolsEnabled +
+                    (name to enabled),
+            )
+        }
+        return loadSummary()
+    }
+
+    override suspend fun disconnectMijia(): ToolCatalogSummary {
+        extensionClient.disconnect()
+        updateCatalog { catalog ->
+            catalog.copy(mijiaEnabled = false)
         }
         return loadSummary()
     }
@@ -624,6 +1073,19 @@ class DataStoreToolCatalogRepository(
                 else -> emptySet()
             }
         }
+    }
+
+    override suspend fun loadEnabledExtensionTools(): List<AgentTool> {
+        val catalog = loadCatalog()
+        if (!catalog.mijiaEnabled) return emptyList()
+        val snapshot = extensionClient.snapshot()
+        if (!snapshot.connected) return emptyList()
+        return snapshot.tools
+            .filter { definition ->
+                catalog.mijiaToolsEnabled[definition.name]
+                    ?: definition.defaultEnabled
+            }
+            .map(extensionClient::agentTool)
     }
 
     private fun PersistedToolCatalog.loadEnabledMcpTools(
@@ -817,7 +1279,9 @@ class DataStoreToolCatalogRepository(
         }
     }
 
-    private fun PersistedToolCatalog.toSummary(): ToolCatalogSummary =
+    private fun PersistedToolCatalog.toSummary(
+        extension: MijiaExtensionSnapshot,
+    ): ToolCatalogSummary =
         ToolCatalogSummary(
             builtInTools = BUILT_IN_TOOLS
                 .filterNot {
@@ -842,6 +1306,34 @@ class DataStoreToolCatalogRepository(
                     .map { descriptor ->
                         toBuiltInToolSummary(descriptor)
                     },
+            ),
+            mijia = MijiaProviderSummary(
+                installed = extension.installed,
+                trusted = extension.trusted,
+                connected = extension.connected,
+                enabled = mijiaEnabled && extension.connected,
+                status = extension.connectionState.status,
+                detail = extension.detail ?: extension.connectionState.detail,
+                versionName = extension.metadata?.versionName,
+                accountLabel = extension.connectionState.accountLabel,
+                selectedHomeCount =
+                    extension.connectionState.selectedHomeCount,
+                selectedDeviceCount =
+                    extension.connectionState.selectedDeviceCount,
+                configurationPackage =
+                    extension.configurationTarget?.packageName,
+                configurationActivity =
+                    extension.configurationTarget?.className,
+                tools = extension.tools.map { definition ->
+                    MijiaToolSummary(
+                        name = definition.name,
+                        description = definition.description,
+                        riskLevel = definition.riskLevel,
+                        enabled = mijiaToolsEnabled[definition.name]
+                            ?: definition.defaultEnabled,
+                        displayName = mijiaToolDisplayName(definition.name),
+                    )
+                },
             ),
             servers = withBuiltInServers().servers.map { server ->
                 McpServerSummary(
@@ -975,6 +1467,20 @@ class DataStoreToolCatalogRepository(
                 iv = value.iv,
             ),
         )
+
+    private fun mijiaToolDisplayName(name: String): String =
+        when (name) {
+            "mijia_list_devices" -> "List Mi Home Devices"
+            "mijia_get_device_state" -> "Read Mi Home Device State"
+            "mijia_control_device" -> "Control Mi Home Device"
+            "mijia_control_television" -> "Control Mi Home Television"
+            "mijia_configure_camera" -> "Configure Mi Home Camera"
+            "mijia_get_latest_camera_event_image" ->
+                "Get Latest Camera Event Image"
+            "mijia_list_scenes" -> "List Mi Home Scenes"
+            "mijia_run_scene" -> "Run Mi Home Scene"
+            else -> name
+        }
 
     private fun PersistedToolCatalog.toBuiltInToolSummary(
         descriptor: BuiltInToolDescriptor,
@@ -1215,6 +1721,8 @@ private data class PersistedToolCatalog(
     val amapCredentials: StoredSecret? = null,
     val amapEnabled: Boolean = false,
     val agentBrowserEnabled: Boolean = true,
+    val mijiaEnabled: Boolean = false,
+    val mijiaToolsEnabled: Map<String, Boolean> = emptyMap(),
     val servers: List<PersistedMcpServer> = emptyList(),
     val pendingNotionOAuth: PendingOAuthRecord? = null,
 )
@@ -1616,6 +2124,7 @@ private const val NOTION_REDIRECT_URI = "mochi://oauth/notion"
 private const val NOTION_MCP_RESOURCE = "https://mcp.notion.com/mcp"
 private const val MAX_SERVER_NAME_CHARS = 64
 private const val MAX_MCP_TOKEN_CHARS = 4_096
+private const val MAX_SHARED_MCP_SERVERS = 32
 private const val MAX_MAP_CREDENTIAL_CHARS = 512
 private const val LEGACY_DIANPING_SERVER_ID = "dianping"
 private const val OAUTH_TIMEOUT_SECONDS = 30L

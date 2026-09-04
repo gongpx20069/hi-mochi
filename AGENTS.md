@@ -12,6 +12,7 @@ smallest relevant authoritative documents before changing the repository.
 | Modules, state, storage, or dependencies | `docs/architecture/APP_ARCHITECTURE.md` |
 | Runtime, providers, memory, or Skills | `docs/architecture/TECHNICAL.md` |
 | Tools, MCP, navigation directives | `docs/architecture/AGENT_TOOLS.md` |
+| Optional signed extension APKs | `docs/architecture/EXTENSIONS.md` |
 | Trusted cards | `docs/architecture/CARD_PRESENTATION.md` |
 | Wake word, STT, TTS, or audio | `docs/architecture/VOICE_RUNTIME.md` |
 | Build, tests, installation, repository layout | `docs/DEVELOPMENT.md` |

@@ -29,7 +29,8 @@ runtime.
 - Listening, thinking, speaking, and emotional states.
 - Touch and gesture navigation remain available alongside voice navigation.
 - Focus mode hides navigation and system chrome, keeps the screen awake, and
-  dedicates the full display to the active Home presentation.
+  dedicates the full display to the active Home presentation. The same Focus
+  mode control toggles the presentation into and out of full screen.
 - Focus mode enters an optional low-power standby presentation after 30 seconds
   of idle time by default. Standby uses pure black with a minimal Mochi, local
   date, and large local time, and restores the prior Home presentation on
@@ -107,6 +108,14 @@ support is an optional import/export adapter.
 - OpenAI and custom OpenAI-compatible endpoints remain available.
 - Settings is always discoverable from the primary app shell.
 - API keys are never displayed again after saving.
+- Every Provider share opens a selection step. The configured LLM and speech
+  Providers are selected by default; Amap, Tencent Docs, and manual MCP Tool
+  credentials default to unselected.
+- Import requires one explicit confirmation, replaces only included
+  connections, stores imported secrets with the receiver's Keystore-backed
+  storage, and immediately enables the shared Providers and selected Tools.
+- Notion OAuth, Mi Home sessions and device selection, Android permissions,
+  persona, memories, and planner data are never shared.
 
 ### 3.6 Agent Browser
 
@@ -137,6 +146,13 @@ support is an optional import/export adapter.
 - Researcher receives enabled Browser Tools, read-only MCP Tools, and Skills.
   Analyst receives the same capabilities plus sandboxed JavaScript.
 - Subagents receive no parent conversation history, memories, or persona.
+- When a foreground request explicitly asks to view, describe, or analyze a
+  camera event and provider image input is enabled, the Main Agent may attach
+  the one host-validated image to one serial Subagent delegation by setting
+  `include_image=true`. A dedicated no-Tool multimodal prepass converts it to
+  bounded text observations presented as untrusted user-role evidence; the
+  normal Subagent loop receives no extension Tool, raw image, file descriptor,
+  attachment URL, or reusable capability.
 - Subagent Browser work reuses the current per-turn session. Home keeps the
   Browser Card visible and identifies the active Subagent.
 
@@ -152,8 +168,13 @@ support is an optional import/export adapter.
   explicitly enables them.
 - Skills follow the Agent Skills `SKILL.md` format. Only enabled Skill metadata
   appears in the initial Agent context; full instructions load on demand.
-- Skill enablement never bypasses provider or individual Tool switches. A
-  disabled Tool is unavailable even when an enabled Skill refers to it.
+- A Skill's prerequisites are presented and evaluated as aggregate Tool groups
+  such as Agent Browser, Amap Maps, Tencent Docs MCP, or the Mi Home extension,
+  rather than as a list of raw Tool IDs. A group is ready only while its
+  provider is installed when applicable, connected, enabled, and every Tool
+  from that group required by the Skill is individually enabled. If a
+  dependency later becomes unavailable, the saved Skill preference remains but
+  the Skill is suspended from Agent discovery until readiness is restored.
 - Bundled scripts and dependencies are never executed automatically.
 
 ### 3.9 Language
@@ -164,6 +185,52 @@ support is an optional import/export adapter.
 - Settings can explicitly select Follow system, Chinese, or English.
 - Default model-facing instructions, including SOUL, USER, AGENTS, Tool
   contracts, and the system prompt, remain English in every UI language.
+
+### 3.10 Optional signed extensions
+
+- Mochi may expose optional Android capabilities through separately installed
+  APK extensions rather than increasing every base APK.
+- The first extension is the optional Mi Home connector. It has no launcher
+  entry and is installed, connected, enabled, updated, and disconnected from
+  the Mochi Tools surface.
+- The base app accepts only extension packages signed by the same trusted
+  release certificate and implementing the versioned Mochi Extension API.
+  Installing an extension never enables it or grants device access implicitly.
+- Mi Home connection uses a QR code scanned and confirmed through an already
+  authenticated Mi Home app. Mochi never asks for or stores the Xiaomi account
+  password.
+- Mi Home is explicitly labeled as an unofficial cloud integration. It may
+  stop working when Xiaomi changes undocumented account or device interfaces.
+- After connection, the Mi Home provider remains disabled by default while
+  every discovered child Tool defaults to enabled. Enabling the aggregate
+  provider therefore makes all child Tools available unless the user
+  explicitly disables individual Tools.
+- The initial Mi Home scope covers:
+  - common specification-driven devices such as lights, switches, plugs,
+    fans, air conditioners, air purifiers, humidifiers, and curtains;
+  - read-only temperature, humidity, air-quality, contact, motion, and battery
+    sensor state when exposed by the device;
+  - television state, input, volume, mute, navigation, and playback controls
+    when exposed by the device's MIoT specification;
+  - camera state and selected settings, plus the newest available motion or
+    doorbell event image;
+  - scale identity, connectivity, and battery state when exposed;
+  - manually triggered scenes selected by the user.
+- Camera live view, playback, two-way audio, PTZ, current-frame capture, memory
+  card mutation, robot-vacuum maps, arbitrary private device protocols, locks,
+  alarms, garage doors, and scale body measurements are outside the initial
+  scope.
+- Camera event images are foreground-only ephemeral attachments. With the
+  current provider's explicit camera-image setting enabled, one host-validated
+  image may be sent to that provider in the same foreground Main-Agent run for
+  a user's explicit view, description, or analysis request. Images are never
+  persisted to conversation history, memory, logs, export, or sharing, copied
+  to the gallery, or exposed to scheduled runs. The Main Agent may hand the
+  same normalized image to at most one explicitly requested serial Subagent in
+  the same foreground run.
+- Xiaomi session credentials remain inside the extension's Keystore-backed
+  storage and never enter Mochi prompts, logs, exports, provider sharing, or
+  Binder payloads.
 
 ## 4. Local agent
 
@@ -205,6 +272,10 @@ settings without exposing API keys.
 - Silent phone calls, SMS sending, contact mutation, or destructive deletion.
 - System calendar as required storage.
 - Arbitrary shell or filesystem access from model-generated scripts.
+- Downloaded executable code, unsigned extension packages, or dynamically
+  loaded DEX/JAR plugins.
+- Generic camera streaming or body-composition history in the first Mi Home
+  extension release.
 
 ## 7. Acceptance criteria
 
@@ -219,3 +290,10 @@ settings without exposing API keys.
   date formatting without translating model-facing instructions.
 - Automated tests cover date resolution, navigation policy, tool validation,
   Room migrations, and agent cancellation.
+- Optional extensions remain absent from the Agent registry until the package,
+  signature, protocol version, connection, provider switch, and individual
+  Tool selection all validate.
+- A successful latest-camera-event image request renders a trusted local image
+  card. With explicit provider permission, the same bounded image can also be
+  attached once to the current foreground model run, but never to persisted
+  history, memory, logs, export, scheduled runs, or Subagents.

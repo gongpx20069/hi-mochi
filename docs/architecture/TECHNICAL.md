@@ -34,13 +34,18 @@ patch number but cannot roll back or overwrite a released version. At startup,
 Mochi checks only the latest stable release and opens its GitHub page after
 explicit user confirmation; Android remains responsible for APK installation.
 
-Provider sharing covers only the complete LLM and Speech Provider runtime
-configuration. Mochi serializes those credentials, encrypts them with a fresh
-AES-256-GCM key, and places ciphertext and key in a `mochi://provider/import`
-link. No password or backend is required, but possession of the complete link
-grants the API access and quota of the sender. Import requires confirmation and
-replaces the receiver's LLM and Speech Provider configuration. Persona,
-memories, planner data, Tools/MCP credentials, and Android permissions are
+Provider sharing uses one current, non-backward-compatible bundle format.
+Each share selects any configured LLM and speech Provider plus optional Amap,
+Tencent Docs, and manual MCP connections. LLM and speech default selected;
+Tool credentials default unselected every time. MCP shares contain endpoint,
+credential, and enabled remote Tool names rather than cached schemas. Mochi
+encrypts the bundle with a fresh AES-256-GCM key and places ciphertext and key
+in a `mochi://provider/import#v2` link. No password or backend is required, but
+possession of the complete link grants the selected API access and quota.
+Import requires confirmation, rediscovers shared MCP schemas, writes secrets
+through the receiver's Keystore-backed repositories, replaces only included
+connections, and enables their Providers and selected Tools. Notion OAuth,
+Mi Home sessions, Android permissions, persona, memories, and planner data are
 excluded.
 
 ## 2. Runtime
@@ -184,6 +189,54 @@ remains the TTS, history, and rendering-failure fallback. Action targets are
 bound to same-run evidence, and state changes are applied to every placement
 sharing the card ID.
 
+## 2.1 Optional extension runtime
+
+Mochi supports separately installed Android extension APKs through the
+versioned Binder contract in `:extension-api`. The initial host accepts only
+explicit official package IDs signed by the same release certificate as the
+base application. It does not scan for arbitrary plugins, load foreign DEX,
+execute extension-provided UI inside Mochi, or grant network/filesystem access
+through a generic bridge.
+
+The host discovers the optional Mi Home package through PackageManager, binds
+its explicit service, negotiates the protocol version, loads bounded Tool
+definitions, and adapts selected definitions into `ToolRegistry`. Provider and
+individual Tool switches remain authoritative. The extension Activity handles
+QR login; the service handles Tool calls. Neither interface returns Xiaomi
+session credentials.
+
+Binder calls use request IDs and callbacks rather than blocking the main
+thread. Cancellation propagates from the active Agent coroutine to the
+extension service. Binder death, package replacement, timeout, disabled state,
+or stale session causes a typed Tool error and removes unavailable definitions
+from the next registry assembly.
+
+The Mi Home extension reuses Android Keystore, OkHttp, coroutines, and
+kotlinx.serialization. It implements only the independently documented Xiaomi
+Passport and MIoT request behavior needed for interoperability. It does not
+copy Xiaomi's Home Assistant integration, whose license limits that work and
+its related cloud interfaces to non-commercial Home Assistant use.
+
+Camera event images are bounded ephemeral attachments. The extension retrieves
+the latest available event metadata and encrypted image, decrypts it into its
+private cache, and returns metadata plus a read-only file descriptor. Mochi
+validates and normalizes the image locally for one trusted card. When the
+provider's default-off image-input permission is enabled, the user explicitly
+requests the latest event to be viewed, described, or analyzed, and the model
+supports images, the Orchestrator adds one temporary OpenAI-compatible
+`image_url` data part to the same foreground Main-Agent run. Image bytes never
+enter Tool JSON, diagnostic logs, Room history, memory recall, provider
+sharing, export, scheduled execution, or TTS. After the Main Agent receives the
+image, an in-memory single-use relay may attach it to the first
+`delegate_agent` call that explicitly requests `include_image=true`. That
+delegation performs a dedicated no-Tool multimodal prepass. The host rejects
+Tool calls, empty output, data URLs, and raw encoded-image echo, bounds the
+plain-text observations, and then supplies only JSON-escaped, explicitly
+untrusted user-role evidence to the normal Subagent Tool loop. Image-derived
+text is never promoted to persona or system instructions. The Subagent cannot
+forward the image, reopen the extension attachment, or access Mi Home Tools. A
+second delegation cannot reuse the image.
+
 ## 3. Agent response
 
 ```json
@@ -288,8 +341,16 @@ enabled Skill metadata. `load_skill` activates full instructions on demand;
 bounded resources are accessed relative to the Skill root. Disabled Skills are
 absent from discovery and cannot be activated. A Skill never enables a Tool:
 provider and individual Tool switches still determine ToolRegistry membership,
-and activation reports missing required Tools. Android never runs downloaded
-scripts or package-install instructions.
+and activation reports missing required Tools. The UI also derives a readiness
+set from actual ToolRegistry prerequisites, groups those requirements by their
+owning provider or Tool group, and blocks enablement until every aggregate is
+ready. Provider-backed groups require the provider to be installed when
+applicable, connected, and enabled; every member Tool used by that Skill must
+also remain individually enabled. The UI reports the aggregate label, such as
+`Tencent Docs MCP`, rather than raw Tool IDs. If readiness later fails, the
+saved preference remains but the Skill is omitted from discovery and
+activation. Android never runs downloaded scripts or package-install
+instructions.
 
 The unauthenticated Explore default parses the public skills.sh Trending (24h)
 leaderboard and falls back to install-ranked public search if the page shape
@@ -365,6 +426,11 @@ Navigation is a local deterministic policy, not an unrestricted model action.
 - Require explicit confirmation for destructive or sensitive operations,
   except the documented default-allow Agent Browser Tool provider.
 - Keep model API keys out of prompts, logs, exports, and JavaScript.
+- Keep extension credentials and camera attachments out of prompts, logs,
+  exports, Room, JavaScript, MCP, Browser, and provider-sharing links.
+- Bind only same-signer extension packages with the expected explicit package
+  and service identity. Never relax the public web URL policy to implement a
+  local plugin.
 - Bound tool rounds, network response size, script time, and script output.
 - Do not expose shell/process execution or arbitrary filesystem access.
 

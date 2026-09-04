@@ -42,6 +42,17 @@ data class SpeechSettingsInput(
     val azureApiKeyReplacement: String? = null,
 )
 
+internal fun SpeechSettingsInput.validate() {
+    if (provider == SpeechProvider.IFLYTEK) {
+        require(iFlytekAppId.trim().isNotEmpty()) {
+            "iFlytek AppID must not be empty"
+        }
+    }
+    if (provider == SpeechProvider.AZURE) {
+        requireValidHttpsEndpoint(azureEndpoint.trim().trimEnd('/'))
+    }
+}
+
 sealed interface SpeechRuntimeConfig {
     data object System : SpeechRuntimeConfig
 
@@ -75,16 +86,9 @@ class DataStoreSpeechSettingsRepository(
     override suspend fun save(
         input: SpeechSettingsInput,
     ): SpeechSettingsSummary {
+        input.validate()
         val appId = input.iFlytekAppId.trim()
         val azureEndpoint = input.azureEndpoint.trim().trimEnd('/')
-        if (input.provider == SpeechProvider.IFLYTEK) {
-            require(appId.isNotEmpty()) {
-                "iFlytek AppID must not be empty"
-            }
-        }
-        if (input.provider == SpeechProvider.AZURE) {
-            requireValidHttpsEndpoint(azureEndpoint)
-        }
         val iFlytekApiKey = input.iFlytekApiKeyReplacement.toSecret()
         val iFlytekApiSecret =
             input.iFlytekApiSecretReplacement.toSecret()

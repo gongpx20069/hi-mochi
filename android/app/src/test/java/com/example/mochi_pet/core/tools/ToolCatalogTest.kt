@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpRemoteTool
 import com.example.mochi_pet.core.mcp.McpServerRuntime
+import com.example.mochi_pet.core.mcp.NOTION_SERVER_ID
 import com.example.mochi_pet.core.mcp.McpStreamableHttpClient
 import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
 import com.example.mochi_pet.core.settings.ApiKeyCipher
@@ -58,6 +59,143 @@ class ToolCatalogTest {
     fun tearDown() {
         scope.cancel()
         directory.deleteRecursively()
+    }
+
+    @Test
+    fun `ready Tool names require provider and individual switches`() {
+        val summary = ToolCatalogSummary(
+            builtInTools = listOf(
+                BuiltInToolSummary("native_on", "On", "", true),
+                BuiltInToolSummary("native_off", "Off", "", false),
+            ),
+            mijia = MijiaProviderSummary(
+                connected = true,
+                enabled = true,
+                tools = listOf(
+                    MijiaToolSummary("mijia_on", "", "read", true),
+                    MijiaToolSummary("mijia_off", "", "read", false),
+                ),
+            ),
+        )
+
+        assertEquals(
+            setOf("native_on", "mijia_on"),
+            summary.readyToolNames(),
+        )
+        assertFalse(
+            summary.copy(
+                mijia = summary.mijia.copy(enabled = false),
+            ).readyToolNames().contains("mijia_on"),
+        )
+    }
+
+    @Test
+    fun `Skill readiness aggregates required Tools by provider`() {
+        val summary = ToolCatalogSummary(
+            agentBrowser = AgentBrowserProviderSummary(
+                enabled = true,
+                tools = listOf(
+                    BuiltInToolSummary(
+                        "browser_read",
+                        "Read browser page",
+                        "",
+                        true,
+                    ),
+                    BuiltInToolSummary(
+                        "browser_navigate",
+                        "Navigate browser",
+                        "",
+                        false,
+                    ),
+                ),
+            ),
+            servers = listOf(
+                McpServerSummary(
+                    id = TENCENT_DOCS_SERVER_ID,
+                    name = "Tencent Docs MCP",
+                    endpoint = "https://docs.qq.com/openapi/mcp",
+                    builtIn = true,
+                    enabled = true,
+                    connected = true,
+                    authMode = McpAuthMode.TOKEN,
+                    tools = listOf(
+                        McpToolSummary(
+                            remoteName = "query_space_node",
+                            alias = "tencent_docs_query_space_node",
+                            description = "",
+                            enabled = true,
+                        ),
+                        McpToolSummary(
+                            remoteName = "get_content",
+                            alias = "tencent_docs_get_content",
+                            description = "",
+                            enabled = false,
+                        ),
+                    ),
+                ),
+                McpServerSummary(
+                    id = NOTION_SERVER_ID,
+                    name = "Notion MCP",
+                    endpoint = "https://mcp.notion.com/mcp",
+                    builtIn = true,
+                    enabled = false,
+                    connected = false,
+                    authMode = McpAuthMode.OAUTH,
+                    tools = emptyList(),
+                ),
+            ),
+        )
+
+        val readiness = summary.skillReadiness(
+            setOf(
+                "browser_read",
+                "browser_navigate",
+                "tencent_docs_query_space_node",
+                "tencent_docs_get_content",
+                "notion_search",
+            ),
+        )
+
+        assertEquals(
+            setOf("Agent Browser", "Notion MCP", "Tencent Docs MCP"),
+            readiness.requirements.keys,
+        )
+        assertEquals(
+            setOf("Agent Browser", "Notion MCP", "Tencent Docs MCP"),
+            readiness.missingRequirements,
+        )
+        assertFalse(readiness.isReady)
+        assertTrue(
+            summary.copy(
+                agentBrowser = summary.agentBrowser.copy(
+                    tools = summary.agentBrowser.tools.map {
+                        it.copy(enabled = true)
+                    },
+                ),
+                servers = summary.servers.map { server ->
+                    when (server.id) {
+                        TENCENT_DOCS_SERVER_ID -> server.copy(
+                            tools = server.tools.map {
+                                it.copy(enabled = true)
+                            },
+                        )
+                        NOTION_SERVER_ID -> server.copy(
+                            enabled = true,
+                            connected = true,
+                            tools = listOf(
+                                McpToolSummary(
+                                    remoteName = "search",
+                                    alias = "notion_search",
+                                    description = "",
+                                    enabled = true,
+                                ),
+                            ),
+                        )
+                        else -> server
+                    }
+                },
+            ).skillReadiness(readiness.requiredTools).isReady,
+        )
     }
 
     @Test
@@ -177,6 +315,101 @@ class ToolCatalogTest {
         val disconnected = repository.disconnectAmap()
         assertFalse(disconnected.amap.connected)
     }
+
+    @Test
+    fun `selected Tool connections export secrets and enabled Tools`() =
+        runBlocking {
+            repository.configureAmap("map-key", "security-key")
+            repository.configureTencentDocs("personal-token")
+            val manual = repository.addManualServer(
+                ManualMcpServerInput(
+                    name = "Example MCP",
+                    endpoint = "https://example.com/mcp",
+                    bearerToken = "mcp-token",
+                ),
+            ).servers.first { !it.builtIn }
+            repository.setMcpToolEnabled(
+                serverId = manual.id,
+                remoteName = "get_content",
+                enabled = true,
+            )
+
+            val shared = repository.exportSharedTools(
+                ToolShareSelection(
+                    includeAmap = true,
+                    includeTencentDocs = true,
+                    manualMcpServerIds = setOf(manual.id),
+                ),
+            )
+
+            assertEquals("map-key", shared.amap?.credentials?.webServiceKey)
+            assertEquals("personal-token", shared.tencentDocs?.token)
+            assertEquals(
+                setOf("get_content", "query_space_node", "search_space_file"),
+                shared.tencentDocs?.enabledToolNames,
+            )
+            assertEquals(
+                "mcp-token",
+                shared.manualMcpServers.single().bearerToken,
+            )
+            assertEquals(
+                setOf("get_content"),
+                shared.manualMcpServers.single().enabledToolNames,
+            )
+        }
+
+    @Test
+    fun `imported Tool connections are enabled with selected Tools`() =
+        runBlocking {
+            val prepared = repository.prepareSharedTools(
+                SharedToolProviders(
+                    amap = SharedAmapProvider(
+                        credentials = AmapCredentials("map-key", null),
+                        enabledToolNames = setOf("amap_weather"),
+                    ),
+                    tencentDocs = SharedTencentDocsProvider(
+                        token = "personal-token",
+                        enabledToolNames = setOf("get_content"),
+                    ),
+                    manualMcpServers = listOf(
+                        SharedManualMcpServer(
+                            name = "Example MCP",
+                            endpoint = "https://example.com/mcp",
+                            bearerToken = "mcp-token",
+                            enabledToolNames = setOf("get_content"),
+                        ),
+                    ),
+                ),
+            )
+            val imported = repository.applySharedTools(prepared)
+
+            assertTrue(imported.amap.connected)
+            assertTrue(imported.amap.enabled)
+            assertEquals(
+                setOf("amap_weather"),
+                imported.amap.tools
+                    .filter(BuiltInToolSummary::enabled)
+                    .mapTo(mutableSetOf(), BuiltInToolSummary::name),
+            )
+            val tencent = imported.servers.first {
+                it.id == TENCENT_DOCS_SERVER_ID
+            }
+            assertTrue(tencent.enabled)
+            assertEquals(
+                setOf("get_content"),
+                tencent.tools
+                    .filter(McpToolSummary::enabled)
+                    .mapTo(mutableSetOf(), McpToolSummary::remoteName),
+            )
+            val manual = imported.servers.single { !it.builtIn }
+            assertTrue(manual.enabled)
+            assertEquals(
+                setOf("get_content"),
+                manual.tools
+                    .filter(McpToolSummary::enabled)
+                    .mapTo(mutableSetOf(), McpToolSummary::remoteName),
+            )
+        }
 
     @Test
     fun `legacy map and Dianping settings are removed`() = runBlocking {
