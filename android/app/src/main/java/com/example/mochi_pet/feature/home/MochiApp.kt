@@ -387,6 +387,11 @@ private fun MochiAppContent(
         } else {
             pipelineState
         }
+    val toggleFocusMode: () -> Unit = {
+        focusStandby = false
+        standbyResetVersion += 1
+        focusMode = focusModeAfterToggle(focusMode)
+    }
 
     LaunchedEffect(homePresentation) {
         if (!homePresentation) {
@@ -674,11 +679,7 @@ private fun MochiAppContent(
             onRemoveSchedule = viewModel::removeSchedule,
             onCardAction = performCardAction,
             onDismissCameraSnapshot = viewModel::dismissCameraSnapshot,
-            onFocus = {
-                focusStandby = false
-                standbyResetVersion += 1
-                focusMode = true
-            },
+            onFocus = toggleFocusMode,
             modifier = modifier,
         )
     }
@@ -737,15 +738,10 @@ private fun MochiAppContent(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
                         ) {
-                            OutlinedButton(
-                                onClick = {
-                                    focusStandby = false
-                                    focusMode = false
-                                },
-                                shape = RoundedCornerShape(18.dp),
-                            ) {
-                                Text("Exit focus")
-                            }
+                            FocusModeButton(
+                                active = true,
+                                onClick = toggleFocusMode,
+                            )
                         }
                         ChatPipelineIndicator(state = visiblePipelineState)
                     }
@@ -2094,27 +2090,44 @@ private fun MochiFace(
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-                OutlinedButton(
+                FocusModeButton(
+                    active = false,
                     onClick = onFocus,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = 3.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = "Focus mode",
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "Full screen · stays awake",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                }
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun FocusModeButton(
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "Focus mode",
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = if (active) {
+                    "Tap to exit full screen"
+                } else {
+                    "Full screen · stays awake"
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
     }
 }

@@ -5,6 +5,8 @@ internal data class FocusStandbyOffset(
     val yDp: Int,
 )
 
+internal fun focusModeAfterToggle(focusMode: Boolean): Boolean = !focusMode
+
 internal fun isFocusStandbyEligible(
     focusMode: Boolean,
     homePresentation: Boolean,

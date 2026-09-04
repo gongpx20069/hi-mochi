@@ -7,6 +7,12 @@ import org.junit.Test
 
 class FocusStandbyTest {
     @Test
+    fun `Focus mode control toggles full screen on and off`() {
+        assertTrue(focusModeAfterToggle(false))
+        assertFalse(focusModeAfterToggle(true))
+    }
+
+    @Test
     fun `standby requires idle enabled Focus presentation`() {
         assertTrue(
             isFocusStandbyEligible(
