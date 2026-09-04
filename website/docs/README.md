@@ -38,6 +38,13 @@ GitHub Pages project path. The fixed `/hi-mochi/` paths in `404.html` are
 intentional because GitHub Pages serves that document for arbitrary missing
 URLs.
 
+English and Simplified Chinese homepages keep the same product feature
+structure. The smart-home feature describes the optional signed Mi Home
+extension, its supported device categories, and foreground-only latest camera
+event images. It must not imply support for camera live view, playback, PTZ,
+two-way audio, locks, alarms, body-composition measurements, or sharing Xiaomi
+session credentials.
+
 Download controls include a checked-in current-release fallback. On page load,
 `scripts.js` reads GitHub's public `releases/latest` API, validates the returned
 repository URLs, and updates the displayed version, ARM64 download, and release

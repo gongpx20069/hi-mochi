@@ -98,6 +98,19 @@ def main() -> None:
 
         if page.name == "index.html":
             source = page.read_text(encoding="utf-8")
+            if source.count("data-smart-home-feature") != 1:
+                errors.append(
+                    f"{relative_page}: expected one smart-home feature",
+                )
+            smart_home_label = (
+                "智能家居 · 米家"
+                if "zh-CN" in page.parts
+                else "Smart home · Mi Home"
+            )
+            if smart_home_label not in source:
+                errors.append(
+                    f"{relative_page}: missing localized smart-home label",
+                )
             download_versions = re.findall(
                 r'data-release-download href="[^"]+/download/'
                 r'(v1\.0\.[1-9][0-9]*)/Mochi-\1-arm64-v8a\.apk"',
@@ -135,6 +148,17 @@ def main() -> None:
     ):
         if marker not in scripts:
             errors.append(f"scripts.js: missing release updater marker {marker}")
+
+    styles = (SITE_ROOT / "styles.css").read_text(encoding="utf-8")
+    for marker in (
+        ".smart-home-feature",
+        ".smart-home-visual",
+        ".smart-device-camera",
+    ):
+        if marker not in styles:
+            errors.append(f"styles.css: missing smart-home style {marker}")
+    if styles.count(".smart-home-feature") < 3:
+        errors.append("styles.css: missing responsive smart-home sizing")
 
     if errors:
         raise SystemExit("\n".join(errors))

@@ -1125,6 +1125,178 @@ img {
   gap: 45px;
 }
 
+.smart-home-feature {
+  min-height: 500px;
+  background:
+    linear-gradient(145deg, rgba(151, 215, 197, 0.055), rgba(213, 193, 255, 0.025)),
+    var(--ink-soft);
+}
+
+.smart-home-feature::after {
+  top: 50%;
+  right: 40px;
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle, rgba(151, 215, 197, 0.14), rgba(213, 193, 255, 0.055) 44%, transparent 70%);
+  transform: translateY(-50%);
+}
+
+.smart-home-copy,
+.smart-home-visual {
+  position: relative;
+  z-index: 2;
+}
+
+.smart-home-icon span {
+  width: 23px;
+  height: 19px;
+  margin-top: 7px;
+  border: 2px solid var(--mint);
+  border-top: 0;
+  border-radius: 3px 3px 7px 7px;
+}
+
+.smart-home-icon span::before {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-top: 2px solid var(--mint);
+  border-left: 2px solid var(--mint);
+  content: "";
+  transform: translate(1px, -9px) rotate(45deg);
+}
+
+.smart-home-icon i {
+  position: absolute;
+  right: 7px;
+  bottom: 8px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--peach);
+  border-radius: 50%;
+  background: var(--panel);
+}
+
+.smart-home-visual {
+  min-height: 360px;
+}
+
+.smart-home-visual::before,
+.smart-home-visual::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px solid rgba(151, 215, 197, 0.14);
+  border-radius: 50%;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.smart-home-visual::before {
+  width: 280px;
+  height: 280px;
+}
+
+.smart-home-visual::after {
+  width: 190px;
+  height: 190px;
+  border-style: dashed;
+}
+
+.smart-home-hub,
+.smart-device {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid var(--line);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+}
+
+.smart-home-hub {
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: 116px;
+  height: 116px;
+  align-items: center;
+  border-color: rgba(151, 215, 197, 0.28);
+  border-radius: 38px;
+  background: linear-gradient(145deg, rgba(151, 215, 197, 0.16), rgba(213, 193, 255, 0.1));
+  transform: translate(-50%, -50%) rotate(4deg);
+}
+
+.smart-home-hub i {
+  width: 28px;
+  height: 25px;
+  margin-bottom: 8px;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #fff8f3, var(--peach) 60%, var(--lavender));
+}
+
+.smart-home-hub b,
+.smart-device b {
+  font-size: 0.78rem;
+}
+
+.smart-home-hub small,
+.smart-device small {
+  color: var(--muted);
+  font-size: 0.64rem;
+}
+
+.smart-home-hub small {
+  color: var(--mint);
+}
+
+.smart-device {
+  z-index: 1;
+  width: 150px;
+  min-height: 82px;
+  padding: 13px 15px;
+  border-radius: 18px;
+  background: rgba(32, 27, 40, 0.92);
+  backdrop-filter: blur(12px);
+}
+
+.smart-device i {
+  align-self: flex-start;
+  min-width: 28px;
+  margin-bottom: 6px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  background: rgba(151, 215, 197, 0.1);
+  color: var(--mint);
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.smart-device-tv {
+  top: 12px;
+  left: 8px;
+  transform: rotate(-3deg);
+}
+
+.smart-device-camera {
+  top: 25px;
+  right: 0;
+  transform: rotate(3deg);
+}
+
+.smart-device-scale {
+  bottom: 15px;
+  left: 20px;
+  transform: rotate(2deg);
+}
+
+.smart-device-scene {
+  right: 16px;
+  bottom: 2px;
+  transform: rotate(-2deg);
+}
+
 .tools-feature::after {
   top: 50%;
   right: 70px;
@@ -1945,6 +2117,16 @@ img {
     min-height: 690px;
   }
 
+  .smart-home-feature {
+    min-height: 850px;
+  }
+
+  .smart-home-visual {
+    width: min(100%, 480px);
+    min-height: 390px;
+    margin: 48px auto 0;
+  }
+
   .tool-stack {
     margin-top: 45px;
   }
@@ -2006,6 +2188,14 @@ img {
 
   .feature-wide {
     min-height: 720px;
+  }
+
+  .smart-home-feature {
+    min-height: 900px;
+  }
+
+  .smart-device {
+    width: 132px;
   }
 
   .date-strip > span {
