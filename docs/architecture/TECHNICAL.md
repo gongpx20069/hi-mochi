@@ -34,13 +34,18 @@ patch number but cannot roll back or overwrite a released version. At startup,
 Mochi checks only the latest stable release and opens its GitHub page after
 explicit user confirmation; Android remains responsible for APK installation.
 
-Provider sharing covers only the complete LLM and Speech Provider runtime
-configuration. Mochi serializes those credentials, encrypts them with a fresh
-AES-256-GCM key, and places ciphertext and key in a `mochi://provider/import`
-link. No password or backend is required, but possession of the complete link
-grants the API access and quota of the sender. Import requires confirmation and
-replaces the receiver's LLM and Speech Provider configuration. Persona,
-memories, planner data, Tools/MCP credentials, and Android permissions are
+Provider sharing uses one current, non-backward-compatible bundle format.
+Each share selects any configured LLM and speech Provider plus optional Amap,
+Tencent Docs, and manual MCP connections. LLM and speech default selected;
+Tool credentials default unselected every time. MCP shares contain endpoint,
+credential, and enabled remote Tool names rather than cached schemas. Mochi
+encrypts the bundle with a fresh AES-256-GCM key and places ciphertext and key
+in a `mochi://provider/import#v2` link. No password or backend is required, but
+possession of the complete link grants the selected API access and quota.
+Import requires confirmation, rediscovers shared MCP schemas, writes secrets
+through the receiver's Keystore-backed repositories, replaces only included
+connections, and enables their Providers and selected Tools. Notion OAuth,
+Mi Home sessions, Android permissions, persona, memories, and planner data are
 excluded.
 
 ## 2. Runtime

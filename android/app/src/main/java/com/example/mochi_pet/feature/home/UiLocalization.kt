@@ -177,19 +177,31 @@ private val ZH_UI_TEXT = mapOf(
         "分别配置 Persona、语音和 AI 连接。",
     "Share Providers" to "共享 Providers",
     "Receive Providers" to "接收 Providers",
-    "Creates an encrypted link containing the current LLM and speech Provider credentials. The decryption key is part of the link, so anyone who receives or copies it can use those API resources and consume their quota." to
-        "创建包含当前 LLM 与语音 Provider 凭据的加密链接。解密密钥也在链接中，因此任何收到或复制完整链接的人都能使用这些 API 资源并消耗其额度。",
-    "The link does not include persona, memories, Tools credentials, planner data, or Android permissions." to
-        "链接不包含 Persona、记忆、Tools 凭据、计划数据或 Android 权限。",
+    "Creates an encrypted link containing the Providers and Tool connections selected for this share. LLM and speech are selected by default; Tool credentials are not." to
+        "创建包含本次所选 Providers 与工具连接的加密链接。默认选择 LLM 和语音 Provider，工具凭据默认不选。",
+    "The decryption key is part of the link. Anyone who receives or copies it can use the selected API resources and consume their quota." to
+        "解密密钥包含在链接中。任何收到或复制完整链接的人都能使用所选 API 资源并消耗其额度。",
+    "Notion OAuth, Mi Home sessions, Android permissions, persona, memories, and planner data are never included." to
+        "始终不会包含 Notion OAuth、米家会话、Android 权限、Persona、记忆和计划数据。",
+    "Choose what to share" to "选择共享内容",
+    "Providers are selected by default. Tool credentials start unselected each time." to
+        "Providers 默认选中；每次打开时，工具凭据均默认不选。",
+    "LLM Provider" to "LLM Provider",
+    "Speech Provider" to "语音 Provider",
+    "Tool credentials" to "工具凭据",
+    "Credential and selected Tools" to "凭据和已选工具",
+    "Token and selected Tools" to "Token 和已选工具",
+    "MCP connection and selected Tools" to "MCP 连接和已选工具",
+    "Share selected" to "共享所选项目",
     "Preparing..." to "正在准备...",
     "Shared Providers imported" to "共享的 Providers 已导入",
-    "Paste the complete Mochi Provider link received from someone you trust. Importing it will replace this device's current LLM and speech Providers." to
-        "粘贴从可信任的人那里收到的完整 Mochi Provider 链接。导入后会替换本设备当前的 LLM 与语音 Providers。",
+    "Paste the complete Mochi Provider link received from someone you trust. Importing replaces only the included connections and immediately enables their selected Providers and Tools." to
+        "粘贴从可信任的人那里收到的完整 Mochi Provider 链接。导入只会替换其中包含的连接，并立即启用其所选 Providers 和工具。",
     "Mochi Provider link" to "Mochi Provider 链接",
     "Continue" to "继续",
     "Import shared Providers?" to "导入共享的 Providers？",
-    "This link grants access to another user's LLM and speech API resources. Importing replaces this device's current LLM and speech Provider configuration. Only continue if you trust the sender." to
-        "此链接允许使用另一位用户的 LLM 与语音 API 资源。导入会替换本设备当前的 LLM 与语音 Provider 配置。只有信任发送者时才继续。",
+    "This link grants access to another user's selected API resources. Importing replaces only included connections, stores their credentials on this device, and enables their selected Providers and Tools. Only continue if you trust the sender." to
+        "此链接允许使用另一位用户所选的 API 资源。导入只会替换其中包含的连接，将凭据存入本设备，并启用其所选 Providers 和工具。只有信任发送者时才继续。",
     "Import" to "导入",
     "Mochi persona" to "Mochi Persona",
     "Local prompt files can be edited before connecting any AI provider." to

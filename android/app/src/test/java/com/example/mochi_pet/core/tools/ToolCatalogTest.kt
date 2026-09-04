@@ -317,6 +317,101 @@ class ToolCatalogTest {
     }
 
     @Test
+    fun `selected Tool connections export secrets and enabled Tools`() =
+        runBlocking {
+            repository.configureAmap("map-key", "security-key")
+            repository.configureTencentDocs("personal-token")
+            val manual = repository.addManualServer(
+                ManualMcpServerInput(
+                    name = "Example MCP",
+                    endpoint = "https://example.com/mcp",
+                    bearerToken = "mcp-token",
+                ),
+            ).servers.first { !it.builtIn }
+            repository.setMcpToolEnabled(
+                serverId = manual.id,
+                remoteName = "get_content",
+                enabled = true,
+            )
+
+            val shared = repository.exportSharedTools(
+                ToolShareSelection(
+                    includeAmap = true,
+                    includeTencentDocs = true,
+                    manualMcpServerIds = setOf(manual.id),
+                ),
+            )
+
+            assertEquals("map-key", shared.amap?.credentials?.webServiceKey)
+            assertEquals("personal-token", shared.tencentDocs?.token)
+            assertEquals(
+                setOf("get_content", "query_space_node", "search_space_file"),
+                shared.tencentDocs?.enabledToolNames,
+            )
+            assertEquals(
+                "mcp-token",
+                shared.manualMcpServers.single().bearerToken,
+            )
+            assertEquals(
+                setOf("get_content"),
+                shared.manualMcpServers.single().enabledToolNames,
+            )
+        }
+
+    @Test
+    fun `imported Tool connections are enabled with selected Tools`() =
+        runBlocking {
+            val prepared = repository.prepareSharedTools(
+                SharedToolProviders(
+                    amap = SharedAmapProvider(
+                        credentials = AmapCredentials("map-key", null),
+                        enabledToolNames = setOf("amap_weather"),
+                    ),
+                    tencentDocs = SharedTencentDocsProvider(
+                        token = "personal-token",
+                        enabledToolNames = setOf("get_content"),
+                    ),
+                    manualMcpServers = listOf(
+                        SharedManualMcpServer(
+                            name = "Example MCP",
+                            endpoint = "https://example.com/mcp",
+                            bearerToken = "mcp-token",
+                            enabledToolNames = setOf("get_content"),
+                        ),
+                    ),
+                ),
+            )
+            val imported = repository.applySharedTools(prepared)
+
+            assertTrue(imported.amap.connected)
+            assertTrue(imported.amap.enabled)
+            assertEquals(
+                setOf("amap_weather"),
+                imported.amap.tools
+                    .filter(BuiltInToolSummary::enabled)
+                    .mapTo(mutableSetOf(), BuiltInToolSummary::name),
+            )
+            val tencent = imported.servers.first {
+                it.id == TENCENT_DOCS_SERVER_ID
+            }
+            assertTrue(tencent.enabled)
+            assertEquals(
+                setOf("get_content"),
+                tencent.tools
+                    .filter(McpToolSummary::enabled)
+                    .mapTo(mutableSetOf(), McpToolSummary::remoteName),
+            )
+            val manual = imported.servers.single { !it.builtIn }
+            assertTrue(manual.enabled)
+            assertEquals(
+                setOf("get_content"),
+                manual.tools
+                    .filter(McpToolSummary::enabled)
+                    .mapTo(mutableSetOf(), McpToolSummary::remoteName),
+            )
+        }
+
+    @Test
     fun `legacy map and Dianping settings are removed`() = runBlocking {
         val catalogKey = stringPreferencesKey("tools.catalog")
         dataStore.edit { preferences ->

@@ -186,6 +186,54 @@ data class ManualMcpServerInput(
     val bearerToken: String?,
 )
 
+data class ToolShareSelection(
+    val includeAmap: Boolean = false,
+    val includeTencentDocs: Boolean = false,
+    val manualMcpServerIds: Set<String> = emptySet(),
+)
+
+@Serializable
+data class SharedToolProviders(
+    val amap: SharedAmapProvider? = null,
+    val tencentDocs: SharedTencentDocsProvider? = null,
+    val manualMcpServers: List<SharedManualMcpServer> = emptyList(),
+)
+
+@Serializable
+data class SharedAmapProvider(
+    val credentials: AmapCredentials,
+    val enabledToolNames: Set<String>,
+)
+
+@Serializable
+data class SharedTencentDocsProvider(
+    val token: String,
+    val enabledToolNames: Set<String>,
+)
+
+@Serializable
+data class SharedManualMcpServer(
+    val name: String,
+    val endpoint: String,
+    val bearerToken: String? = null,
+    val enabledToolNames: Set<String>,
+)
+
+class PreparedSharedToolImport internal constructor(
+    internal val providers: SharedToolProviders,
+    internal val tencentTools: List<McpRemoteTool>?,
+    internal val manualServers: List<PreparedSharedManualMcpServer>,
+)
+
+internal data class PreparedSharedManualMcpServer(
+    val id: String,
+    val name: String,
+    val endpoint: String,
+    val bearerToken: String?,
+    val enabledToolNames: Set<String>,
+    val tools: List<McpRemoteTool>,
+)
+
 enum class McpAuthMode {
     NONE,
     BEARER,
@@ -232,6 +280,18 @@ interface ToolCatalogRepository {
     suspend fun disconnectMijia(): ToolCatalogSummary
 
     suspend fun loadAmapCredentials(): AmapCredentials?
+
+    suspend fun exportSharedTools(
+        selection: ToolShareSelection,
+    ): SharedToolProviders
+
+    suspend fun prepareSharedTools(
+        providers: SharedToolProviders,
+    ): PreparedSharedToolImport
+
+    suspend fun applySharedTools(
+        prepared: PreparedSharedToolImport,
+    ): ToolCatalogSummary
 
     suspend fun addManualServer(input: ManualMcpServerInput): ToolCatalogSummary
 
@@ -576,6 +636,257 @@ class DataStoreToolCatalogRepository(
             json.decodeFromString<AmapCredentials>(raw)
         } catch (error: SerializationException) {
             throw IllegalStateException("Stored Amap credentials are invalid", error)
+        }
+    }
+
+    override suspend fun exportSharedTools(
+        selection: ToolShareSelection,
+    ): SharedToolProviders {
+        val catalog = loadCatalog().withBuiltInServers()
+        val manualServers = catalog.servers.filter {
+            it.id in selection.manualMcpServerIds
+        }
+        require(
+            manualServers.size == selection.manualMcpServerIds.size &&
+                manualServers.none(PersistedMcpServer::builtIn),
+        ) {
+            "A selected MCP server is not available"
+        }
+        val amap = if (selection.includeAmap) {
+            val raw = catalog.amapCredentials?.let(::decrypt)
+                ?: throw IllegalArgumentException(
+                    "Configure Amap before sharing it",
+                )
+            val credentials = try {
+                json.decodeFromString<AmapCredentials>(raw)
+            } catch (error: SerializationException) {
+                throw IllegalStateException(
+                    "Stored Amap credentials are invalid",
+                    error,
+                )
+            }
+            SharedAmapProvider(
+                credentials = credentials,
+                enabledToolNames = BUILT_IN_TOOLS
+                    .filter(BuiltInToolDescriptor::isAmapTool)
+                    .filter {
+                        catalog.builtInEnabled[it.name] ?: it.defaultEnabled
+                    }
+                    .mapTo(mutableSetOf(), BuiltInToolDescriptor::name),
+            )
+        } else {
+            null
+        }
+        val tencentDocs = if (selection.includeTencentDocs) {
+            val server = catalog.servers.first {
+                it.id == TENCENT_DOCS_SERVER_ID
+            }
+            val token = server.accessToken?.let(::decrypt)
+                ?: throw IllegalArgumentException(
+                    "Configure Tencent Docs before sharing it",
+                )
+            SharedTencentDocsProvider(
+                token = token,
+                enabledToolNames = server.tools
+                    .filter(PersistedMcpTool::enabled)
+                    .mapTo(mutableSetOf()) { it.definition.name },
+            )
+        } else {
+            null
+        }
+        return SharedToolProviders(
+            amap = amap,
+            tencentDocs = tencentDocs,
+            manualMcpServers = manualServers.map { server ->
+                SharedManualMcpServer(
+                    name = server.name,
+                    endpoint = server.endpoint,
+                    bearerToken = server.accessToken?.let(::decrypt),
+                    enabledToolNames = server.tools
+                        .filter(PersistedMcpTool::enabled)
+                        .mapTo(mutableSetOf()) { it.definition.name },
+                )
+            },
+        )
+    }
+
+    override suspend fun prepareSharedTools(
+        providers: SharedToolProviders,
+    ): PreparedSharedToolImport {
+        require(providers.manualMcpServers.size <= MAX_SHARED_MCP_SERVERS) {
+            "Too many shared MCP servers"
+        }
+        providers.amap?.credentials?.let(::validateAmapCredentials)
+        val normalizedTencent = providers.tencentDocs?.let { shared ->
+            val token = shared.token.trim()
+            require(token.isNotEmpty()) {
+                "Shared Tencent Docs token is required"
+            }
+            require(token.length <= MAX_MCP_TOKEN_CHARS) {
+                "Shared Tencent Docs token is too long"
+            }
+            val runtime = McpServerRuntime(
+                id = TENCENT_DOCS_SERVER_ID,
+                name = "Tencent Docs",
+                endpoint = TENCENT_DOCS_MCP_ENDPOINT,
+                accessToken = token,
+                authorizationHeader = token,
+            )
+            shared.copy(token = token) to
+                selectTencentDocsTools(mcpClient.listTools(runtime))
+        }
+        val preparedManual = providers.manualMcpServers.map { shared ->
+            val name = shared.name.trim()
+            require(name.isNotEmpty() && name.length <= MAX_SERVER_NAME_CHARS) {
+                "Shared MCP server name is invalid"
+            }
+            val endpoint = PublicWebUrlPolicy.validate(shared.endpoint).toString()
+            val token = shared.bearerToken?.trim()?.takeIf(String::isNotEmpty)
+            require((token?.length ?: 0) <= MAX_MCP_TOKEN_CHARS) {
+                "Shared MCP token is too long"
+            }
+            val runtime = McpServerRuntime(
+                id = "manual-${UUID.randomUUID()}",
+                name = name,
+                endpoint = endpoint,
+                accessToken = token,
+            )
+            val tools = mcpClient.listTools(runtime)
+            PreparedSharedManualMcpServer(
+                id = runtime.id,
+                name = name,
+                endpoint = endpoint,
+                bearerToken = token,
+                enabledToolNames = shared.enabledToolNames,
+                tools = tools,
+            )
+        }
+        require(
+            preparedManual.map { it.endpoint }.distinct().size ==
+                preparedManual.size,
+        ) {
+            "Shared MCP servers contain duplicate endpoints"
+        }
+        val normalizedAmap = providers.amap?.let { shared ->
+            shared.copy(
+                credentials = AmapCredentials(
+                    webServiceKey =
+                        shared.credentials.webServiceKey.trim(),
+                    securityKey = shared.credentials.securityKey
+                        ?.trim()
+                        ?.takeIf(String::isNotEmpty),
+                ),
+            )
+        }
+        return PreparedSharedToolImport(
+            providers = providers.copy(
+                amap = normalizedAmap,
+                tencentDocs = normalizedTencent?.first,
+                manualMcpServers = preparedManual.map { server ->
+                    SharedManualMcpServer(
+                        name = server.name,
+                        endpoint = server.endpoint,
+                        bearerToken = server.bearerToken,
+                        enabledToolNames = server.enabledToolNames,
+                    )
+                },
+            ),
+            tencentTools = normalizedTencent?.second,
+            manualServers = preparedManual,
+        )
+    }
+
+    override suspend fun applySharedTools(
+        prepared: PreparedSharedToolImport,
+    ): ToolCatalogSummary {
+        val providers = prepared.providers
+        val importedTencent = prepared.tencentTools?.map { tool ->
+            PersistedMcpTool(
+                definition = tool.withTencentEnglishDescription(),
+                enabled = tool.name in
+                    providers.tencentDocs.orEmptyEnabledToolNames(),
+            )
+        }
+        val importedManual = prepared.manualServers.map { shared ->
+            PersistedMcpServer(
+                id = shared.id,
+                name = shared.name,
+                endpoint = shared.endpoint,
+                builtIn = false,
+                enabled = true,
+                authMode = if (shared.bearerToken == null) {
+                    McpAuthMode.NONE
+                } else {
+                    McpAuthMode.BEARER
+                },
+                accessToken = shared.bearerToken?.let(::encrypt),
+                tools = shared.tools.map { tool ->
+                    PersistedMcpTool(
+                        definition = tool,
+                        enabled = tool.name in shared.enabledToolNames,
+                    )
+                },
+            )
+        }
+        updateCatalog { existing ->
+            val catalog = existing.withBuiltInServers()
+            val importedEndpoints = importedManual.mapTo(mutableSetOf()) {
+                it.endpoint
+            }
+            val servers = catalog.servers
+                .filter { it.builtIn || it.endpoint !in importedEndpoints }
+                .map { server ->
+                    if (
+                        server.id == TENCENT_DOCS_SERVER_ID &&
+                        providers.tencentDocs != null &&
+                        importedTencent != null
+                    ) {
+                        server.copy(
+                            enabled = true,
+                            accessToken = encrypt(providers.tencentDocs.token),
+                            toolDefaultsVersion =
+                                BUILT_IN_TOOL_DEFAULTS_VERSION,
+                            tools = importedTencent,
+                        )
+                    } else {
+                        server
+                    }
+                } + importedManual
+            val amapEnabled = providers.amap != null || catalog.amapEnabled
+            val amapCredentials = providers.amap?.credentials?.let {
+                encrypt(json.encodeToString(it))
+            } ?: catalog.amapCredentials
+            val builtInEnabled = providers.amap?.let { shared ->
+                catalog.builtInEnabled + BUILT_IN_TOOLS
+                    .filter(BuiltInToolDescriptor::isAmapTool)
+                    .associate { descriptor ->
+                        descriptor.name to
+                            (descriptor.name in shared.enabledToolNames)
+                    }
+            } ?: catalog.builtInEnabled
+            catalog.copy(
+                builtInEnabled = builtInEnabled,
+                amapCredentials = amapCredentials,
+                amapEnabled = amapEnabled,
+                servers = servers,
+            )
+        }
+        return loadSummary()
+    }
+
+    private fun SharedTencentDocsProvider?.orEmptyEnabledToolNames():
+        Set<String> = this?.enabledToolNames.orEmpty()
+
+    private fun validateAmapCredentials(credentials: AmapCredentials) {
+        require(credentials.webServiceKey.isNotBlank()) {
+            "Shared Amap Web Service Key is required"
+        }
+        require(
+            credentials.webServiceKey.length <= MAX_MAP_CREDENTIAL_CHARS &&
+                (credentials.securityKey?.length ?: 0) <=
+                MAX_MAP_CREDENTIAL_CHARS,
+        ) {
+            "Shared Amap credentials are too long"
         }
     }
 
@@ -1813,6 +2124,7 @@ private const val NOTION_REDIRECT_URI = "mochi://oauth/notion"
 private const val NOTION_MCP_RESOURCE = "https://mcp.notion.com/mcp"
 private const val MAX_SERVER_NAME_CHARS = 64
 private const val MAX_MCP_TOKEN_CHARS = 4_096
+private const val MAX_SHARED_MCP_SERVERS = 32
 private const val MAX_MAP_CREDENTIAL_CHARS = 512
 private const val LEGACY_DIANPING_SERVER_ID = "dianping"
 private const val OAUTH_TIMEOUT_SECONDS = 30L

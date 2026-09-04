@@ -47,6 +47,26 @@ data class ProviderSettingsInput(
     val apiKeyReplacement: String? = null,
 )
 
+internal fun ProviderSettingsInput.validate() {
+    require(endpoint.trim().isNotEmpty()) {
+        "Provider endpoint must not be empty"
+    }
+    require(model.trim().isNotEmpty()) {
+        "Provider model must not be empty"
+    }
+    if (providerType == ProviderType.AZURE_OPENAI) {
+        require(apiVersion.trim().isNotEmpty()) {
+            "Azure OpenAI API version must not be empty"
+        }
+    }
+    require(timeoutSeconds in 1..300) {
+        "Provider timeout must be between 1 and 300 seconds"
+    }
+    require(maxResponseBytes in 1..10L * 1024L * 1024L) {
+        "Provider response limit must be between 1 byte and 10 MiB"
+    }
+}
+
 data class EncryptedSecret(
     val ciphertext: String,
     val iv: String,
@@ -159,22 +179,10 @@ class DataStoreProviderSettingsRepository(
     override suspend fun save(
         input: ProviderSettingsInput,
     ): ProviderSettingsSummary {
+        input.validate()
         val endpoint = input.endpoint.trim()
         val model = input.model.trim()
         val apiVersion = input.apiVersion.trim()
-        require(endpoint.isNotEmpty()) { "Provider endpoint must not be empty" }
-        require(model.isNotEmpty()) { "Provider model must not be empty" }
-        if (input.providerType == ProviderType.AZURE_OPENAI) {
-            require(apiVersion.isNotEmpty()) {
-                "Azure OpenAI API version must not be empty"
-            }
-        }
-        require(input.timeoutSeconds in 1..300) {
-            "Provider timeout must be between 1 and 300 seconds"
-        }
-        require(input.maxResponseBytes in 1..10L * 1024L * 1024L) {
-            "Provider response limit must be between 1 byte and 10 MiB"
-        }
         val replacement = input.apiKeyReplacement
             ?.trim()
             ?.takeIf(String::isNotEmpty)

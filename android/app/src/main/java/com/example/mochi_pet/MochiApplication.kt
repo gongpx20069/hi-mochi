@@ -124,6 +124,7 @@ class MochiApplication : Application() {
         ProviderShareManager(
             providerRepository = providerSettingsRepository,
             speechRepository = speechSettingsRepository,
+            toolCatalogRepository = toolCatalogRepository,
         )
     }
 

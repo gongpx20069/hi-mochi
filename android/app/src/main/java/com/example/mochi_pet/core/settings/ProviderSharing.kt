@@ -2,6 +2,9 @@ package com.example.mochi_pet.core.settings
 
 import com.example.mochi_pet.core.agent.llm.OpenAiProviderConfig
 import com.example.mochi_pet.core.agent.llm.ProviderType
+import com.example.mochi_pet.core.tools.SharedToolProviders
+import com.example.mochi_pet.core.tools.ToolCatalogRepository
+import com.example.mochi_pet.core.tools.ToolShareSelection
 import java.nio.charset.StandardCharsets
 import java.security.GeneralSecurityException
 import java.security.SecureRandom
@@ -19,10 +22,24 @@ class ProviderShareException(message: String) : IllegalArgumentException(message
 
 @Serializable
 internal data class SharedProviderBundle(
-    val version: Int = 1,
-    val llm: SharedLlmProvider,
-    val speech: SharedSpeechProvider,
+    val version: Int = 2,
+    val llm: SharedLlmProvider? = null,
+    val speech: SharedSpeechProvider? = null,
+    val tools: SharedToolProviders = SharedToolProviders(),
 )
+
+data class ProviderShareSelection(
+    val includeLlm: Boolean = true,
+    val includeSpeech: Boolean = true,
+    val tools: ToolShareSelection = ToolShareSelection(),
+) {
+    val isEmpty: Boolean
+        get() = !includeLlm &&
+            !includeSpeech &&
+            !tools.includeAmap &&
+            !tools.includeTencentDocs &&
+            tools.manualMcpServerIds.isEmpty()
+}
 
 @Serializable
 internal data class SharedLlmProvider(
@@ -48,36 +65,76 @@ internal data class SharedSpeechProvider(
 class ProviderShareManager(
     private val providerRepository: ProviderSettingsRepository,
     private val speechRepository: SpeechSettingsRepository,
+    private val toolCatalogRepository: ToolCatalogRepository,
 ) {
-    suspend fun createShareLink(): String {
-        val llm = providerRepository.loadRuntimeConfig()
-        val speech = speechRepository.loadRuntimeConfig()
+    suspend fun createShareLink(selection: ProviderShareSelection): String {
+        require(!selection.isEmpty) {
+            "Select at least one Provider or Tool connection"
+        }
         return ProviderShareCodec.encode(
             SharedProviderBundle(
-                llm = llm.toShared(),
-                speech = speech.toShared(),
+                llm = if (selection.includeLlm) {
+                    providerRepository.loadRuntimeConfig().toShared()
+                } else {
+                    null
+                },
+                speech = if (selection.includeSpeech) {
+                    speechRepository.loadRuntimeConfig().toShared()
+                } else {
+                    null
+                },
+                tools = toolCatalogRepository.exportSharedTools(
+                    selection.tools,
+                ),
             ),
         )
     }
 
     suspend fun importShareLink(link: String) {
         val bundle = ProviderShareCodec.decode(link)
-        require(bundle.version == 1) {
+        require(bundle.version == 2) {
             "This Provider share version is not supported"
         }
-        providerRepository.save(
+        require(
+            bundle.llm != null ||
+                bundle.speech != null ||
+                bundle.tools != SharedToolProviders(),
+        ) {
+            "Provider share link does not contain any connections"
+        }
+        val providerInput = bundle.llm?.let { llm ->
+            require(llm.apiKey.isNotBlank()) {
+                "Shared LLM API key is required"
+            }
+            require(llm.timeoutSeconds in 1..300) {
+                "Shared Provider timeout is invalid"
+            }
             ProviderSettingsInput(
-                providerType = bundle.llm.providerType,
-                endpoint = bundle.llm.endpoint,
-                model = bundle.llm.model,
-                apiVersion = bundle.llm.apiVersion,
-                timeoutSeconds = bundle.llm.timeoutSeconds.toInt(),
-                maxResponseBytes = bundle.llm.maxResponseBytes,
-                apiKeyReplacement = bundle.llm.apiKey,
-            ),
-        )
-        val speech = bundle.speech
-        speechRepository.save(
+                providerType = llm.providerType,
+                endpoint = llm.endpoint,
+                model = llm.model,
+                apiVersion = llm.apiVersion,
+                timeoutSeconds = llm.timeoutSeconds.toInt(),
+                maxResponseBytes = llm.maxResponseBytes,
+                apiKeyReplacement = llm.apiKey,
+            )
+        }
+        providerInput?.validate()
+        val speechInput = bundle.speech?.let { speech ->
+            when (speech.provider) {
+                SpeechProvider.SYSTEM -> Unit
+                SpeechProvider.IFLYTEK -> require(
+                    speech.iFlytekApiKey.isNotBlank() &&
+                        speech.iFlytekApiSecret.isNotBlank(),
+                ) {
+                    "Shared iFlytek credentials are incomplete"
+                }
+                SpeechProvider.AZURE -> require(
+                    speech.azureApiKey.isNotBlank(),
+                ) {
+                    "Shared Azure Speech API key is required"
+                }
+            }
             SpeechSettingsInput(
                 provider = speech.provider,
                 iFlytekAppId = speech.iFlytekAppId,
@@ -88,8 +145,15 @@ class ProviderShareManager(
                 azureEndpoint = speech.azureEndpoint,
                 azureApiKeyReplacement =
                     speech.azureApiKey.takeIf(String::isNotBlank),
-            ),
-        )
+            )
+        }
+        speechInput?.validate()
+        val preparedTools =
+            toolCatalogRepository.prepareSharedTools(bundle.tools)
+
+        providerInput?.let { providerRepository.save(it) }
+        speechInput?.let { speechRepository.save(it) }
+        toolCatalogRepository.applySharedTools(preparedTools)
     }
 
     private fun OpenAiProviderConfig.toShared(): SharedLlmProvider =
@@ -149,8 +213,14 @@ internal object ProviderShareCodec {
                 "Provider share link could not be encrypted",
             )
         }
-        return "$LINK_PREFIX${key.urlBase64()}.${iv.urlBase64()}." +
+        val link = "$LINK_PREFIX${key.urlBase64()}.${iv.urlBase64()}." +
             ciphertext.urlBase64()
+        if (link.length > MAX_LINK_CHARS) {
+            throw ProviderShareException(
+                "Selected Provider share is too large; share fewer Tool connections",
+            )
+        }
+        return link
     }
 
     fun decode(link: String): SharedProviderBundle {
@@ -212,13 +282,13 @@ internal object ProviderShareCodec {
             )
         }
 
-    private const val LINK_PREFIX = "mochi://provider/import#v1."
-    private const val MAX_LINK_CHARS = 16_384
+    private const val LINK_PREFIX = "mochi://provider/import#v2."
+    private const val MAX_LINK_CHARS = 32_768
     private const val KEY_BYTES = 32
     private const val IV_BYTES = 12
     private const val GCM_TAG_BITS = 128
     private const val KEY_ALGORITHM = "AES"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
-    private val AAD = "mochi-provider-share-v1"
+    private val AAD = "mochi-provider-share-v2"
         .toByteArray(StandardCharsets.UTF_8)
 }

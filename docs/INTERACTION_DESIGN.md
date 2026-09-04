@@ -163,6 +163,16 @@ Azure OpenAI explains that the model field is the deployment name and exposes
 the API version separately. Saving a blank API-key replacement preserves the
 existing encrypted key.
 
+Share Providers always opens a checklist before Android's share sheet. The
+configured LLM and speech Providers begin selected; every Tool credential
+entry begins unselected on each opening. Available Tool entries are Amap,
+Tencent Docs, and each configured manual MCP server. The confirmation screen
+warns that possession of the complete link grants access to the selected API
+resources. Import replaces only included connections and then enables their
+Provider switches and the Tool selections carried by the share. Notion OAuth,
+Mi Home sessions, and Android permissions require setup on the receiving
+device and never appear in the checklist.
+
 Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
 Installed/Explore uses a dark selected segment. Explore opens with the public
 skills.sh Trending (24h) leaderboard, then switches to search results after a

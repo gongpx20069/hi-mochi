@@ -38,6 +38,7 @@ import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.model.MochiTodo
 import com.example.mochi_pet.core.model.MochiTodoDraft
 import com.example.mochi_pet.core.model.TodoStatus
+import com.example.mochi_pet.core.mcp.McpException
 import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import com.example.mochi_pet.core.navigation.MochiNavigationReducer
 import com.example.mochi_pet.core.navigation.NavigateMochiUiTool
@@ -55,6 +56,7 @@ import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.ProviderSettingsInput
 import com.example.mochi_pet.core.settings.ProviderSettingsRepository
 import com.example.mochi_pet.core.settings.ProviderShareManager
+import com.example.mochi_pet.core.settings.ProviderShareSelection
 import com.example.mochi_pet.core.settings.ProviderSettingsSummary
 import com.example.mochi_pet.core.settings.SpeechSettingsInput
 import com.example.mochi_pet.core.settings.SpeechSettingsRepository
@@ -82,6 +84,7 @@ import com.example.mochi_pet.core.weather.CurrentWeather
 import com.example.mochi_pet.core.weather.CurrentWeatherTool
 import com.example.mochi_pet.core.weather.WeatherException
 import com.example.mochi_pet.core.weather.WeatherRepository
+import com.example.mochi_pet.core.web.WebContentException
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeRuntime
@@ -906,14 +909,14 @@ class MochiHomeViewModel(
         }
     }
 
-    fun createProviderShareLink() {
+    fun createProviderShareLink(selection: ProviderShareSelection) {
         val manager = providerShareManager ?: return
         mutableProviderShareState.value =
             ProviderShareUiState(isWorking = true)
         viewModelScope.launch(ioDispatcher) {
             try {
                 mutableProviderShareState.value = ProviderShareUiState(
-                    shareLink = manager.createShareLink(),
+                    shareLink = manager.createShareLink(selection),
                 )
             } catch (error: IllegalStateException) {
                 mutableProviderShareState.value = ProviderShareUiState(
@@ -967,6 +970,13 @@ class MochiHomeViewModel(
                             isLoading = false,
                         )
                 }
+                toolCatalogRepository?.loadSummary()?.let { catalog ->
+                    mutableToolsState.value = ToolsUiState(
+                        catalog = catalog,
+                        isLoading = false,
+                    )
+                    refreshSkillReadiness(catalog)
+                }
                 mutableProviderShareState.value = ProviderShareUiState(
                     feedback = "Shared Providers imported",
                 )
@@ -979,6 +989,16 @@ class MochiHomeViewModel(
                 mutableProviderShareState.value = ProviderShareUiState(
                     feedback = error.message
                         ?: "Provider share link could not be imported",
+                )
+            } catch (error: McpException) {
+                mutableProviderShareState.value = ProviderShareUiState(
+                    feedback = error.message
+                        ?: "Shared MCP Tools could not be connected",
+                )
+            } catch (error: WebContentException) {
+                mutableProviderShareState.value = ProviderShareUiState(
+                    feedback = error.message
+                        ?: "Shared MCP endpoint is not allowed",
                 )
             }
         }

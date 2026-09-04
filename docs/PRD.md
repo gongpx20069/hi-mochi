@@ -108,6 +108,14 @@ support is an optional import/export adapter.
 - OpenAI and custom OpenAI-compatible endpoints remain available.
 - Settings is always discoverable from the primary app shell.
 - API keys are never displayed again after saving.
+- Every Provider share opens a selection step. The configured LLM and speech
+  Providers are selected by default; Amap, Tencent Docs, and manual MCP Tool
+  credentials default to unselected.
+- Import requires one explicit confirmation, replaces only included
+  connections, stores imported secrets with the receiver's Keystore-backed
+  storage, and immediately enables the shared Providers and selected Tools.
+- Notion OAuth, Mi Home sessions and device selection, Android permissions,
+  persona, memories, and planner data are never shared.
 
 ### 3.6 Agent Browser
 
