@@ -161,17 +161,29 @@ function Get-AndroidApkSignerSha256 {
     )
 
     $signer = Resolve-AndroidSdkTool 'apksigner'
-    $details = (& $signer verify --print-certs $ApkPath) -join "`n"
+    $details = (& $signer verify --print-certs-pem $ApkPath) -join "`n"
     if ($LASTEXITCODE -ne 0) {
         throw "APK signature verification failed for '$ApkPath'."
     }
+    $certificateMatches = [regex]::Matches(
+        $details,
+        '(?ms)-----BEGIN CERTIFICATE-----\s*(.*?)\s*' +
+            '-----END CERTIFICATE-----'
+    )
     $digests = @(
-        [regex]::Matches(
-            $details,
-            'Signer #[0-9]+ certificate SHA-256 digest: ([0-9a-fA-F]+)'
-        ) |
+        $certificateMatches |
             ForEach-Object {
-                $_.Groups[1].Value.ToLowerInvariant()
+                $certificateBytes = [Convert]::FromBase64String(
+                    ($_.Groups[1].Value -replace '\s', '')
+                )
+                $hasher = [Security.Cryptography.SHA256]::Create()
+                try {
+                    $hash = $hasher.ComputeHash($certificateBytes)
+                    $hex = [BitConverter]::ToString($hash).Replace('-', '')
+                    $hex.ToLowerInvariant()
+                } finally {
+                    $hasher.Dispose()
+                }
             } |
             Sort-Object -Unique
     )
