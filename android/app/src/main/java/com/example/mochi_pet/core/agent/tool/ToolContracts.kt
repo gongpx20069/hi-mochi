@@ -5,7 +5,6 @@ import com.example.mochi_pet.core.schedule.AgentScheduleNotFoundException
 import com.example.mochi_pet.core.model.MochiSurface
 import java.time.DateTimeException
 import java.time.LocalDate
-import java.util.Locale
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.SerializationException
@@ -96,80 +95,6 @@ data class ToolExecutionContext(
     val modelImageInputAllowed: Boolean = false,
     val modelImageRelay: ModelImageRelay = ModelImageRelay(),
 )
-
-fun allowsCameraEventImageInput(query: String): Boolean {
-    val normalized = query.lowercase(Locale.ROOT)
-    val cameraTerms = listOf(
-        "camera",
-        "doorbell",
-        "security cam",
-        "door cam",
-        "摄像头",
-        "门铃",
-        "监控",
-    )
-    val directImageTerms = listOf(
-        "image",
-        "photo",
-        "picture",
-        "snapshot",
-        "footage",
-        "图片",
-        "照片",
-        "截图",
-        "画面",
-    )
-    val eventTerms = listOf(
-        "event",
-        "what happened",
-        "事件",
-        "发生了什么",
-    )
-    val recencyTerms = listOf(
-        "latest",
-        "newest",
-        "most recent",
-        "最新",
-        "最近",
-    )
-    val viewTerms = listOf(
-        "show",
-        "view",
-        "see",
-        "describe",
-        "analyze",
-        "what happened",
-        "查看",
-        "看看",
-        "描述",
-        "分析",
-        "发生了什么",
-    )
-    val settingsTerms = listOf(
-        "setting",
-        "configuration",
-        "notification",
-        "enabled",
-        "disabled",
-        "status",
-        "设置",
-        "配置",
-        "通知",
-        "启用",
-        "关闭",
-        "状态",
-    )
-    val hasCamera = cameraTerms.any(normalized::contains)
-    val hasDirectImage = directImageTerms.any(normalized::contains)
-    val hasEvent = eventTerms.any(normalized::contains)
-    val hasRecency = recencyTerms.any(normalized::contains)
-    val hasViewRequest = viewTerms.any(normalized::contains)
-    val isSettingsRequest = settingsTerms.any(normalized::contains)
-    return !isSettingsRequest &&
-        hasCamera &&
-        hasViewRequest &&
-        (hasDirectImage || (hasEvent && hasRecency))
-}
 
 class ToolInputException(message: String) : IllegalArgumentException(message)
 

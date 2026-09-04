@@ -294,6 +294,9 @@ settings without exposing API keys.
   signature, protocol version, connection, provider switch, and individual
   Tool selection all validate.
 - A successful latest-camera-event image request renders a trusted local image
-  card. With explicit provider permission, the same bounded image can also be
-  attached once to the current foreground model run, but never to persisted
-  history, memory, logs, export, scheduled runs, or Subagents.
+  card that adapts to portrait and landscape viewports, keeps the photo primary,
+  overlays event context, and states that the source is not live. With explicit
+  provider permission, the same bounded image is attached once to the current
+  foreground model run and may be relayed to at most one explicitly requested
+  serial Subagent, but never persisted to history, memory, logs, export, or
+  scheduled runs.

@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -1848,73 +1849,146 @@ private fun CameraSnapshotCard(
     snapshot: CameraSnapshotUiState,
     onDismiss: () -> Unit,
 ) {
+    val imageAspectRatio = (
+        snapshot.bitmap.width.toFloat() /
+            snapshot.bitmap.height.toFloat()
+        ).coerceIn(0.55f, 2.2f)
+    val location = listOfNotNull(snapshot.home, snapshot.room)
+        .joinToString(" · ")
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(20.dp),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = 12.dp, vertical = 16.dp),
     ) {
-        PlannerCard {
-            Text(
-                text = "Latest camera event",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = buildString {
-                    append(snapshot.cameraName)
-                    snapshot.home?.let {
-                        append(" · ")
-                        append(it)
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.Black,
+            shape = RoundedCornerShape(24.dp),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .aspectRatio(imageAspectRatio)
+                        .clip(RoundedCornerShape(18.dp)),
+                ) {
+                    Image(
+                        bitmap = snapshot.bitmap.asImageBitmap(),
+                        contentDescription = localizeUiText(
+                            "Latest Mi Home camera event",
+                        ),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CameraSnapshotOverlayChip("LATEST EVENT · NOT LIVE")
+                        Spacer(modifier = Modifier.weight(1f))
+                        Surface(
+                            modifier = Modifier.clickable(onClick = onDismiss),
+                            color = Color.Black.copy(alpha = 0.68f),
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Text(
+                                text = "Dismiss",
+                                modifier = Modifier.padding(
+                                    horizontal = 12.dp,
+                                    vertical = 7.dp,
+                                ),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
-                    snapshot.room?.let {
-                        append(" / ")
-                        append(it)
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.88f),
+                                    ),
+                                ),
+                            )
+                            .padding(
+                                start = 16.dp,
+                                top = 56.dp,
+                                end = 16.dp,
+                                bottom = 16.dp,
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = snapshot.cameraName,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        if (location.isNotBlank()) {
+                            Text(
+                                text = location,
+                                color = Color.White.copy(alpha = 0.78f),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        snapshot.eventType?.let {
+                            Text(
+                                text = "Event: $it",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                        snapshot.capturedAt?.let {
+                            Text(
+                                text = "Captured: $it",
+                                color = Color.White.copy(alpha = 0.78f),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Text(
+                            text = if (snapshot.readyForModel) {
+                                "Mochi image analysis on · current run only"
+                            } else {
+                                "Device-only · model image input is off"
+                            },
+                            color = Color.White.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
                     }
-                },
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Image(
-                bitmap = snapshot.bitmap.asImageBitmap(),
-                contentDescription = "Latest Mi Home camera event",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 480.dp)
-                    .clip(RoundedCornerShape(18.dp)),
-                contentScale = ContentScale.Fit,
-            )
-            snapshot.eventType?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-            snapshot.capturedAt?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-            Text(
-                text = if (snapshot.readyForModel) {
-                    "Available only in this Agent run, including one explicit " +
-                        "Subagent handoff. " +
-                        "Not saved to conversation history."
-                } else {
-                    "Displayed only on this device. Camera image input is " +
-                        "disabled for the configured model."
-                },
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Button(onClick = onDismiss) {
-                Text("Dismiss")
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun CameraSnapshotOverlayChip(label: String) {
+    Surface(
+        color = Color.Black.copy(alpha = 0.68f),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(
+                horizontal = 10.dp,
+                vertical = 6.dp,
+            ),
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

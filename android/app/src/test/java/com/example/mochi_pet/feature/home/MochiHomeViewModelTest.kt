@@ -44,7 +44,7 @@ import org.junit.Test
 
 class MochiHomeViewModelTest {
     @Test
-    fun `camera model input permission is scoped to explicit current query`() {
+    fun `provider image permission reaches every foreground agent run`() {
         val permissions = mutableListOf<Boolean>()
         val viewModel = MochiHomeViewModel(
             plannerStore = PlannerStoreFake(),
@@ -64,7 +64,7 @@ class MochiHomeViewModelTest {
         viewModel.sendConversation("Turn on camera motion detection")
         viewModel.sendConversation("Show the latest door camera event image")
 
-        assertEquals(listOf(false, true), permissions)
+        assertEquals(listOf(true, true), permissions)
     }
 
     @Test

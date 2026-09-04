@@ -23,7 +23,6 @@ import com.example.mochi_pet.core.agent.tool.ManageMochiTodoTool
 import com.example.mochi_pet.core.agent.tool.AgentToolJson
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
-import com.example.mochi_pet.core.agent.tool.allowsCameraEventImageInput
 import com.example.mochi_pet.core.extensions.ExtensionActivityTarget
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
@@ -578,8 +577,7 @@ class MochiHomeViewModel(
                                 currentDate = LocalDate.now(clock),
                                 currentSurface = mutableSurface.value,
                                 modelImageInputAllowed =
-                                    provider.imageInputEnabled &&
-                                        allowsCameraEventImageInput(query),
+                                    provider.imageInputEnabled,
                             ),
                             history = memoryContext?.recentMessages.orEmpty(),
                             personaSections = persona?.sections.orEmpty(),

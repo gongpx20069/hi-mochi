@@ -87,14 +87,17 @@ and is rendered as the normal assistant bubble.
 `camera_snapshot` is not model-authored general content. A successful
 foreground `mijia_get_latest_camera_event_image` result creates it
 deterministically after the host validates same-run evidence and an attachment
-from the official extension. The renderer shows only:
+from the official extension. The renderer prioritizes the image inside the
+available portrait or landscape viewport. Event provenance, metadata,
+model-input state, and Dismiss are overlaid on the image so the photo remains
+the primary card content. It shows only:
 
 - the locally decoded image;
 - camera name;
 - home and room;
 - event type when available;
 - event capture time;
-- a clear **latest event** label.
+- a clear **latest event / not live** label.
 
 The card permits Dismiss and the existing placement/expand behavior, but no
 Save, Share, or Open source action. It states whether the normalized image is

@@ -155,6 +155,10 @@ internal fun localizeUiText(
         }
         text.startsWith("Default: ") ->
             "默认：${text.removePrefix("Default: ")}"
+        text.startsWith("Event: ") ->
+            "事件：${text.removePrefix("Event: ")}"
+        text.startsWith("Captured: ") ->
+            "拍摄时间：${text.removePrefix("Captured: ")}"
         text.endsWith(" · Modified") ->
             "${text.removeSuffix(" · Modified")} · 已修改"
         text.startsWith("Requires enabled Tools: ") ->
@@ -599,10 +603,12 @@ private val ZH_UI_TEXT = mapOf(
     "Camera image input" to "摄像头图片输入",
     "Allow validated Mi Home camera event images in the current Main Agent run and one explicit Subagent handoff. Enable only when the configured model supports images." to
         "允许在当前主 Agent 运行和一次明确的子 Agent 委派中使用已验证的米家摄像头事件图片。仅在配置的模型支持图片时启用。",
-    "Available only in this Agent run, including one explicit Subagent handoff. Not saved to conversation history." to
-        "仅可用于本次 Agent 运行，包括一次明确的子 Agent 委派；不会保存到对话历史。",
-    "Displayed only on this device. Camera image input is disabled for the configured model." to
-        "仅在此设备上显示；已配置模型的摄像头图片输入未启用。",
+    "Latest Mi Home camera event" to "米家摄像头最新事件",
+    "LATEST EVENT · NOT LIVE" to "最新事件 · 非实时画面",
+    "Mochi image analysis on · current run only" to
+        "已开启 Mochi 图像分析 · 仅限当前会话",
+    "Device-only · model image input is off" to
+        "仅本机显示 · 模型图片输入未开启",
     "Could not load persisted conversation history" to "无法加载已保存的对话历史",
     "Could not load persona files" to "无法加载 Persona 文件",
     "Reply succeeded, but conversation memory was not saved" to "回答已完成，但未能保存对话记忆",

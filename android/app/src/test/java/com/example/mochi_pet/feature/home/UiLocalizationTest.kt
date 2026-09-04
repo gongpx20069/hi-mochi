@@ -66,6 +66,21 @@ class UiLocalizationTest {
             localizeUiText("7 selected devices", "zh"),
         )
         assertEquals(
+            "最新事件 · 非实时画面",
+            localizeUiText("LATEST EVENT · NOT LIVE", "zh"),
+        )
+        assertEquals(
+            "事件：motion",
+            localizeUiText("Event: motion", "zh"),
+        )
+        assertEquals(
+            "已开启 Mochi 图像分析 · 仅限当前会话",
+            localizeUiText(
+                "Mochi image analysis on · current run only",
+                "zh",
+            ),
+        )
+        assertEquals(
             "Get Latest Camera Event Image",
             localizeUiText("Get Latest Camera Event Image", "en"),
         )
