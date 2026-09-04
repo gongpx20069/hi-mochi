@@ -244,7 +244,6 @@ private val ZH_UI_TEXT = mapOf(
     "Focus mode" to "专注模式",
     "Full screen" to "全屏",
     "Full screen · stays awake" to "全屏 · 保持唤醒",
-    "Tap to exit full screen" to "点击退出全屏",
     "Fullscreen standby" to "全屏待机",
     "Low-power standby" to "低功耗待机",
     "After Focus is idle, show a dim Mochi, date, and time on pure black." to

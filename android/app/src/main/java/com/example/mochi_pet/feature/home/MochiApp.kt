@@ -738,10 +738,15 @@ private fun MochiAppContent(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
                         ) {
-                            FocusModeButton(
-                                active = true,
-                                onClick = toggleFocusMode,
-                            )
+                            OutlinedButton(
+                                onClick = {
+                                    focusStandby = false
+                                    focusMode = false
+                                },
+                                shape = RoundedCornerShape(18.dp),
+                            ) {
+                                Text("Exit focus")
+                            }
                         }
                         ChatPipelineIndicator(state = visiblePipelineState)
                     }
@@ -2091,7 +2096,6 @@ private fun MochiFace(
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 FocusModeButton(
-                    active = false,
                     onClick = onFocus,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -2102,7 +2106,6 @@ private fun MochiFace(
 
 @Composable
 private fun FocusModeButton(
-    active: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -2120,11 +2123,7 @@ private fun FocusModeButton(
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = if (active) {
-                    "Tap to exit full screen"
-                } else {
-                    "Full screen · stays awake"
-                },
+                text = "Full screen · stays awake",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelSmall,
             )

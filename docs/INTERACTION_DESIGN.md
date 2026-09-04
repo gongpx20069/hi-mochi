@@ -92,11 +92,11 @@ in bottom navigation throughout.
 Home also offers Focus mode for the Face, date-time, and weather presentations.
 Focus hides app navigation and Android system bars, keeps the display awake,
 and fills the screen with the active Home presentation. The **Focus mode**
-control remains visible with an exit hint; tapping the same control again
-leaves full screen. Back and navigation away from Home also exit. Focus
-survives device rotation, and date-time and weather switch to two-column
-landscape layouts so their primary facts and supporting metrics remain
-balanced and unclipped.
+control in that presentation remains available and toggles Focus off when
+tapped again. A separate top-right **Exit focus** action exits immediately.
+Back and navigation away from Home also exit. Focus survives device rotation,
+and date-time and weather switch to two-column landscape layouts so their
+primary facts and supporting metrics remain balanced and unclipped.
 
 When enabled, an idle Focus presentation enters low-power standby after 30
 seconds by default. Settings places this low-priority option last and offers
