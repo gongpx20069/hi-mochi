@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.example.mochi_pet.core.voice.VoiceInputTrigger
 import com.example.mochi_pet.feature.home.MochiApp
 import com.example.mochi_pet.platform.wake.WakeCaptureService
 import com.example.mochi_pet.ui.theme.MochiTheme
@@ -20,7 +21,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 
 class MainActivity : AppCompatActivity() {
-    private val voiceTriggers = Channel<Unit>(Channel.BUFFERED)
+    private val voiceTriggers = Channel<VoiceInputTrigger>(Channel.BUFFERED)
     private val oauthCallbacks = Channel<String>(Channel.BUFFERED)
     private val providerShareCallbacks = Channel<String>(Channel.BUFFERED)
     private val wakeTriggerReceiver = object : BroadcastReceiver() {
@@ -29,7 +30,11 @@ class MainActivity : AppCompatActivity() {
             intent: Intent?,
         ) {
             if (intent?.action == WakeCaptureService.ACTION_VOICE_TRIGGERED) {
-                acceptVoiceTrigger()
+                acceptVoiceTrigger(
+                    intent.getStringExtra(
+                        WakeCaptureService.EXTRA_TRIGGER_SOURCE,
+                    ),
+                )
             }
         }
     }
@@ -86,7 +91,7 @@ class MainActivity : AppCompatActivity() {
             event.repeatCount == 0 &&
             keyCode in WAKE_MEDIA_KEYS
         ) {
-            voiceTriggers.trySend(Unit)
+            voiceTriggers.trySend(VoiceInputTrigger.DIRECT)
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -114,13 +119,21 @@ class MainActivity : AppCompatActivity() {
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
             )
         }
-        acceptVoiceTrigger()
+        acceptVoiceTrigger(
+            intent.getStringExtra(WakeCaptureService.EXTRA_TRIGGER_SOURCE),
+        )
     }
 
-    private fun acceptVoiceTrigger() {
+    private fun acceptVoiceTrigger(source: String?) {
         getSystemService(NotificationManager::class.java)
             .cancel(WakeCaptureService.DETECTED_NOTIFICATION_ID)
-        voiceTriggers.trySend(Unit)
+        voiceTriggers.trySend(
+            if (source?.startsWith("wake:") == true) {
+                VoiceInputTrigger.WAKE_WORD
+            } else {
+                VoiceInputTrigger.DIRECT
+            },
+        )
     }
 
     private fun handleOAuthIntent(intent: Intent?) {

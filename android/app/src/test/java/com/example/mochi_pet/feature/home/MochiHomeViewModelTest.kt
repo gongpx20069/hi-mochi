@@ -358,12 +358,45 @@ class MochiHomeViewModelTest {
                 .map(ConversationMessage::text),
         )
         assertEquals("Opening tomorrow.", voiceRuntime.spokenText)
+        assertEquals(
+            listOf("Opening tomorrow."),
+            voiceRuntime.spokenTexts,
+        )
         assertEquals(2, voiceRuntime.listenCount)
         assertEquals(2, wakeRuntime.pauseCount)
         assertEquals(2, wakeRuntime.resumeCount)
         assertEquals(
             ChatPipelineStage.IDLE,
             viewModel.pipelineState.value.stage,
+        )
+    }
+
+    @Test
+    fun `wake word acknowledgement is spoken but not added to history`() {
+        val voiceRuntime = VoiceRuntimeFake("Turn on the light")
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ ->
+                AgentRunner { AgentReply("Done.", "neutral") }
+            },
+            voiceRuntime = voiceRuntime,
+            wakeRuntime = WakeRuntimeFake(),
+            clock = fixedClock(),
+            ioDispatcher = Dispatchers.Unconfined,
+            wakeAcknowledgement = { "在呢" },
+        )
+
+        viewModel.startVoiceInput(acknowledgeWake = true)
+
+        assertEquals(
+            listOf("在呢", "Done."),
+            voiceRuntime.spokenTexts,
+        )
+        assertEquals(
+            listOf("Turn on the light", "Done."),
+            viewModel.conversationState.value.messages
+                .map(ConversationMessage::text),
         )
     }
 
@@ -623,6 +656,7 @@ private class VoiceRuntimeFake(
         VoiceRuntimeState(recognitionAvailable = true, ttsReady = true),
     )
     var spokenText: String? = null
+    val spokenTexts = mutableListOf<String>()
     var listenCount = 0
 
     override fun startListening(
@@ -645,6 +679,7 @@ private class VoiceRuntimeFake(
         onCompleted: () -> Unit,
     ) {
         spokenText = text
+        spokenTexts += text
         onCompleted()
     }
 

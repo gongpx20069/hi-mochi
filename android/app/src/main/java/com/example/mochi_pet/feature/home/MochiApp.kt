@@ -166,6 +166,7 @@ import com.example.mochi_pet.core.tools.McpServerSummary
 import com.example.mochi_pet.core.tools.MijiaProviderSummary
 import com.example.mochi_pet.core.tools.ToolShareSelection
 import com.example.mochi_pet.core.voice.VoiceRuntime
+import com.example.mochi_pet.core.voice.VoiceInputTrigger
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import com.example.mochi_pet.core.wake.WakeRuntime
@@ -226,7 +227,7 @@ private sealed interface MarkdownBlock {
 fun MochiApp(
     voiceRuntime: VoiceRuntime,
     wakeRuntime: WakeRuntime,
-    voiceTriggers: Flow<Unit>,
+    voiceTriggers: Flow<VoiceInputTrigger>,
     oauthCallbacks: Flow<String>,
     providerShareCallbacks: Flow<String>,
 ) {
@@ -237,14 +238,21 @@ fun MochiApp(
         MochiHomeViewModel.factory(application, voiceRuntime, wakeRuntime)
     }
     val viewModel: MochiHomeViewModel = viewModel(factory = factory)
+    var pendingVoiceTrigger by remember {
+        mutableStateOf(VoiceInputTrigger.DIRECT)
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            viewModel.startVoiceInput()
+            viewModel.startVoiceInput(
+                acknowledgeWake =
+                    pendingVoiceTrigger == VoiceInputTrigger.WAKE_WORD,
+            )
         } else {
             viewModel.reportMicrophonePermissionDenied()
         }
+        pendingVoiceTrigger = VoiceInputTrigger.DIRECT
     }
     val wakePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -265,15 +273,18 @@ fun MochiApp(
                 grants[Manifest.permission.ACCESS_FINE_LOCATION] == true,
         )
     }
-    val startVoice = {
+    val startVoice = { trigger: VoiceInputTrigger ->
         if (
             ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.RECORD_AUDIO,
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            viewModel.startVoiceInput()
+            viewModel.startVoiceInput(
+                acknowledgeWake = trigger == VoiceInputTrigger.WAKE_WORD,
+            )
         } else {
+            pendingVoiceTrigger = trigger
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -297,9 +308,7 @@ fun MochiApp(
     }
 
     LaunchedEffect(voiceTriggers) {
-        voiceTriggers.collect {
-            startVoice()
-        }
+        voiceTriggers.collect(startVoice)
     }
     LaunchedEffect(oauthCallbacks) {
         oauthCallbacks.collect(viewModel::completeNotionAuthorization)
@@ -337,7 +346,7 @@ fun MochiApp(
 
     MochiAppContent(
         viewModel = viewModel,
-        onStartVoice = startVoice,
+        onStartVoice = { startVoice(VoiceInputTrigger.DIRECT) },
         onEnableWake = enableWake,
     )
 }

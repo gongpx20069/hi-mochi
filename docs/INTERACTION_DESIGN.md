@@ -69,6 +69,11 @@ When Mochi is visible, wake and media triggers start listening without changing
 the current surface.
 When it is backgrounded or locked, wake detection posts a lock-screen-visible
 notification; tapping it starts the same permission-checked voice path.
+After a confirmed “Hi Mochi” wake, Mochi speaks one short randomized
+acknowledgement in the selected language before listening. The acknowledgement
+is transient feedback, not a conversation message, and is excluded from
+history and model context. Microphone-button and media-button starts do not add
+this acknowledgement.
 
 An app-wide compact pipeline card appears above the active surface during
 Listening, Skilling, Thinking, Tool, Summarizing, and Speaking stages. It uses

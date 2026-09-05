@@ -56,6 +56,10 @@ outside the audio thread.
 - Background thread; never block the main thread.
 - Bounded chunk cadence and two-second duplicate suppression.
 - Stop wake capture before STT obtains the microphone.
+- After a confirmed `HI MOCHI` keyword detection, speak one short randomized
+  acknowledgement in the selected app language before STT starts. This
+  acknowledgement is transient audio only and never enters conversation
+  history or model context. Direct microphone and media-button triggers skip it.
 - Android SpeechRecognizer remains the default and requires no cloud setup.
 - Settings may optionally select iFlytek or Azure Speech for STT only; Android
   TextToSpeech remains the TTS implementation.

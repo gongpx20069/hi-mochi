@@ -11,6 +11,11 @@ data class VoiceRuntimeState(
     val offerSpeechSettings: Boolean = false,
 )
 
+enum class VoiceInputTrigger {
+    DIRECT,
+    WAKE_WORD,
+}
+
 sealed interface VoiceRuntimeEvent {
     data class Availability(
         val recognitionAvailable: Boolean,

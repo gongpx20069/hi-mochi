@@ -103,6 +103,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
+import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -277,6 +278,8 @@ class MochiHomeViewModel(
     private val locationPermissionGate: LocationPermissionGate? = null,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val wakeAcknowledgement: () -> String =
+        ::randomWakeAcknowledgement,
 ) : ViewModel() {
     private val mutableSurface = MutableStateFlow<MochiSurface>(MochiSurface.Face)
     private val mutablePlannerState = MutableStateFlow(PlannerSurfaceState())
@@ -733,7 +736,7 @@ class MochiHomeViewModel(
         wakeRuntime?.resume()
     }
 
-    fun startVoiceInput() {
+    fun startVoiceInput(acknowledgeWake: Boolean = false) {
         val runtime = voiceRuntime ?: return
         cancelAgentInteraction()
         val version = interactionVersion
@@ -763,11 +766,23 @@ class MochiHomeViewModel(
                 },
             )
         }
+        val beginVoiceInput = {
+            if (acknowledgeWake && version == interactionVersion) {
+                mutablePipelineState.value = ChatPipelineUiState(
+                    stage = ChatPipelineStage.SPEAKING,
+                )
+                runtime.speak(wakeAcknowledgement()) {
+                    startListening()
+                }
+            } else {
+                startListening()
+            }
+        }
         val wake = wakeRuntime
         if (wake == null) {
-            startListening()
+            beginVoiceInput()
         } else {
-            wake.pause(startListening)
+            wake.pause(beginVoiceInput)
         }
     }
 
@@ -2168,6 +2183,30 @@ class MochiHomeViewModel(
 
     }
 }
+
+internal fun randomWakeAcknowledgement(
+    locale: Locale = when (AppLanguage.current()) {
+        AppLanguage.SYSTEM -> AppLanguage.resolveContentLocale()
+        AppLanguage.CHINESE -> Locale.SIMPLIFIED_CHINESE
+        AppLanguage.ENGLISH -> Locale.ENGLISH
+    },
+    random: Random = Random.Default,
+): String =
+    if (locale.language == Locale.CHINESE.language) {
+        listOf(
+            "在呢",
+            "我在，请说",
+            "听着呢",
+            "嗯，我在",
+        )
+    } else {
+        listOf(
+            "I'm here.",
+            "Yes?",
+            "I'm listening.",
+            "Ready.",
+        )
+    }.random(random)
 
 private fun AgentPipelineStage.toUiStage(): ChatPipelineStage =
     when (this) {
