@@ -600,9 +600,9 @@ private val ZH_UI_TEXT = mapOf(
     "Extension package version metadata is invalid." to "扩展软件包版本元数据无效。",
     "The Mi Home extension is unavailable" to "米家扩展不可用",
     "Android blocked the Mi Home extension" to "Android 阻止了米家扩展",
-    "Camera image input" to "摄像头图片输入",
-    "Allow validated Mi Home camera event images in the current Main Agent run and one explicit Subagent handoff. Enable only when the configured model supports images." to
-        "允许在当前主 Agent 运行和一次明确的子 Agent 委派中使用已验证的米家摄像头事件图片。仅在配置的模型支持图片时启用。",
+    "Multimodal input" to "多模态输入",
+    "Allow supported images, currently validated Mi Home camera event images, in the current Main Agent run and one explicit Subagent handoff. Enable only when the configured model supports images." to
+        "允许在当前主 Agent 运行和一次明确的子 Agent 委派中使用受支持的图片，目前包括已验证的米家摄像头事件图片。仅在配置的模型支持图片时启用。",
     "Latest Mi Home camera event" to "米家摄像头最新事件",
     "LATEST EVENT · NOT LIVE" to "最新事件 · 非实时画面",
     "Mochi image analysis on · current run only" to

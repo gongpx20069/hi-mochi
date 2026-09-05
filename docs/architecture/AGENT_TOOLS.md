@@ -482,9 +482,10 @@ enter the normal Subagent Tool loop as delimited untrusted user-role evidence,
 not system instructions. The Subagent receives no Mi Home Tool, descriptor,
 image URL, raw bytes, or reusable attachment.
 Because device resolution, event lookup, and encrypted image download are
-separate bounded cloud operations, this Tool may use the protocol's 120-second
-maximum. The Host waits a short callback grace period beyond the Extension
-deadline so a typed timeout cannot be misreported as a lost Mi Home session.
+separate cloud operations, the camera event image path has a 15-second
+end-to-end user-facing deadline. The Extension receives 14 seconds and the Host
+reserves one second for its terminal callback, so a typed timeout cannot be
+misreported as a lost Mi Home session.
 
 `mijia_list_scenes` returns only enabled manually triggered scenes from selected
 homes. `mijia_run_scene` requires an exact stable scene ID selected from that

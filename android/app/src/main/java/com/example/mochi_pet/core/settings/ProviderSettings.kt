@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.agent.llm.DEFAULT_AZURE_API_VERSION
+import com.example.mochi_pet.core.agent.llm.DEFAULT_MULTIMODAL_INPUT_ENABLED
 import com.example.mochi_pet.core.agent.llm.OpenAiProviderConfig
 import com.example.mochi_pet.core.agent.llm.ProviderType
 import java.nio.charset.StandardCharsets
@@ -29,7 +30,7 @@ data class ProviderSettingsSummary(
     val apiVersion: String = DEFAULT_AZURE_API_VERSION,
     val timeoutSeconds: Int = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
     val maxResponseBytes: Long = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
-    val imageInputEnabled: Boolean = false,
+    val imageInputEnabled: Boolean = DEFAULT_MULTIMODAL_INPUT_ENABLED,
     val hasApiKey: Boolean = false,
 ) {
     val isReady: Boolean
@@ -43,7 +44,7 @@ data class ProviderSettingsInput(
     val apiVersion: String = DEFAULT_AZURE_API_VERSION,
     val timeoutSeconds: Int = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
     val maxResponseBytes: Long = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
-    val imageInputEnabled: Boolean = false,
+    val imageInputEnabled: Boolean = DEFAULT_MULTIMODAL_INPUT_ENABLED,
     val apiKeyReplacement: String? = null,
 )
 
@@ -252,7 +253,8 @@ class DataStoreProviderSettingsRepository(
                 ?: DEFAULT_PROVIDER_TIMEOUT_SECONDS,
             maxResponseBytes = this[MAX_RESPONSE_BYTES]
                 ?: DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
-            imageInputEnabled = this[IMAGE_INPUT_ENABLED] ?: false,
+            imageInputEnabled = this[IMAGE_INPUT_ENABLED]
+                ?: DEFAULT_MULTIMODAL_INPUT_ENABLED,
             hasApiKey =
                 !this[API_KEY_CIPHERTEXT].isNullOrBlank() &&
                     !this[API_KEY_IV].isNullOrBlank(),

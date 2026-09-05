@@ -6768,32 +6768,6 @@ private fun ProviderSettingsSurface(
                 }
             }
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Camera image input",
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "Allow validated Mi Home camera event " +
-                                "images in the current Main Agent run and one " +
-                                "explicit Subagent handoff. Enable only when " +
-                                "the configured model supports images.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Switch(
-                        checked = imageInputEnabled,
-                        onCheckedChange = { imageInputEnabled = it },
-                    )
-                }
-            }
-            item {
                 OutlinedTextField(
                     value = apiKeyReplacement,
                     onValueChange = { apiKeyReplacement = it },
@@ -6849,6 +6823,33 @@ private fun ProviderSettingsSurface(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Save conversation context")
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Multimodal input",
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "Allow supported images, currently " +
+                                "validated Mi Home camera event images, in " +
+                                "the current Main Agent run and one explicit " +
+                                "Subagent handoff. Enable only when the " +
+                                "configured model supports images.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(
+                        checked = imageInputEnabled,
+                        onCheckedChange = { imageInputEnabled = it },
+                    )
                 }
             }
             item {

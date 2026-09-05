@@ -221,7 +221,7 @@ Camera event images are bounded ephemeral attachments. The extension retrieves
 the latest available event metadata and encrypted image, decrypts it into its
 private cache, and returns metadata plus a read-only file descriptor. Mochi
 validates and normalizes the image locally for one trusted card. When the
-provider's default-off image-input permission is enabled, the user explicitly
+provider's default-on multimodal-input permission is enabled, the user explicitly
 requests the latest event to be viewed, described, or analyzed, and the model
 supports images, the Orchestrator adds one temporary OpenAI-compatible
 `image_url` data part to the same foreground Main-Agent run. Image bytes never

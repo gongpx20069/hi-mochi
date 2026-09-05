@@ -90,8 +90,9 @@ Cancellation, timeout, Binder death, or stale Agent session invalidates later
 callbacks. The service must not keep a Tool call running after cancellation.
 The Host deadline includes a short callback-delivery grace period beyond the
 request deadline so the service owns the terminal timeout result. Camera event
-image retrieval may use the protocol's 120-second maximum; other current Mi
-Home Tools use 60 seconds.
+image retrieval receives 14 seconds plus one second of Host callback grace,
+bounding the user-visible wait to 15 seconds. Other current Mi Home Tools use
+60 seconds plus the same callback grace.
 
 ## 5. Tool lifecycle
 
@@ -210,7 +211,7 @@ delete pending images.
 The normalized image never enters Tool JSON, TTS, Room, conversation history,
 Agent Memory, diagnostic logs, export, sharing, Browser, JavaScript, MCP,
 or scheduled runs. It may be attached once to the current foreground
-Main-Agent provider request when the provider's default-off image-input
+Main-Agent provider request when the provider's default-on multimodal-input
 permission is enabled and the camera Tool successfully returns it. The camera
 Tool remains restricted to explicit requests to view, describe, or analyze the
 latest event; the host does not repeat that intent decision with a brittle

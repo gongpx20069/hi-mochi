@@ -81,6 +81,10 @@ class UiLocalizationTest {
             ),
         )
         assertEquals(
+            "多模态输入",
+            localizeUiText("Multimodal input", "zh"),
+        )
+        assertEquals(
             "Get Latest Camera Event Image",
             localizeUiText("Get Latest Camera Event Image", "en"),
         )

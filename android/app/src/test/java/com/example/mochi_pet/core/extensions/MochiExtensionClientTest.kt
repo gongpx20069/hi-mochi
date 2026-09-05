@@ -3,7 +3,6 @@ package com.example.mochi_pet.core.extensions
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
-import com.example.mochi_extension.ExtensionApiLimits
 import com.example.mochi_extension.MochiExtensionProtocol
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -17,9 +16,9 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class MochiExtensionClientTest {
     @Test
-    fun `camera event images receive the maximum extension timeout`() {
+    fun `camera event image wait is bounded to fifteen seconds`() {
         assertEquals(
-            ExtensionApiLimits.MAX_TIMEOUT_MILLIS,
+            14_000L,
             extensionToolTimeoutMillis(
                 "mijia_get_latest_camera_event_image",
             ),
@@ -29,9 +28,11 @@ class MochiExtensionClientTest {
             extensionToolTimeoutMillis("mijia_list_devices"),
         )
         assertEquals(
-            ExtensionApiLimits.MAX_TIMEOUT_MILLIS + 5_000L,
+            15_000L,
             extensionHostTimeoutMillis(
-                ExtensionApiLimits.MAX_TIMEOUT_MILLIS,
+                extensionToolTimeoutMillis(
+                    "mijia_get_latest_camera_event_image",
+                ),
             ),
         )
     }

@@ -286,11 +286,12 @@ Camera Snapshot card. The image remains local and ephemeral, with device,
 home/room, event type, and capture time shown from Tool evidence. The card does
 not imply that the image is live. It states whether the image is available only
 inside the current run, including at most one explicit Subagent handoff, or
-remained device-only. Provider settings contain a default-off **Camera image
-input** switch and tell the user to enable it only
-for an image-capable model. The card has Dismiss but no source, share, or save
-action. Leaving the card, cancelling the turn, process death, or attachment
-expiry releases the image.
+remained device-only. Provider settings contain a default-on **Multimodal
+input** switch immediately after the conversation-context settings and tell the
+user to enable it only for an image-capable model. The setting governs supported
+model media input, not camera retrieval itself. The card has Dismiss but no
+source, share, or save action. Leaving the card, cancelling the turn, process
+death, or attachment expiry releases the image.
 
 When a Browser Tool runs while Home is selected, Home transforms into a trusted
 `BrowserSessionCard` containing the live WebView, origin, loading state, current

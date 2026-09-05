@@ -7,10 +7,31 @@ import com.example.mochi_pet.core.agent.llm.ProviderType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProviderSettingsRepositoryTest {
+    @Test
+    fun `multimodal input defaults on and preserves an explicit opt out`() =
+        runBlocking {
+            val repository = repository(FakeApiKeyCipher())
+
+            assertTrue(repository.loadSummary().imageInputEnabled)
+
+            repository.save(
+                ProviderSettingsInput(
+                    endpoint = "https://example.test/v1",
+                    model = "test-model",
+                    imageInputEnabled = false,
+                    apiKeyReplacement = "secret",
+                ),
+            )
+
+            assertFalse(repository.loadSummary().imageInputEnabled)
+            assertFalse(repository.loadRuntimeConfig().imageInputEnabled)
+        }
+
     @Test
     fun `blank API key replacement preserves encrypted key`() = runBlocking {
         val cipher = FakeApiKeyCipher()

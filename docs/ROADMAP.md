@@ -108,7 +108,7 @@ or verification in earlier phases.
 - [x] Add foreground-only latest camera event images and the deterministic
   trusted Camera Snapshot card.
 - [x] Add Tool-readiness-gated Mi Home Smart Home Skill activation.
-- [x] Add default-off, same-run model image input with bounded normalization and
+- [x] Add default-on, same-run multimodal model input with bounded normalization and
   no history, memory, log, export, or Scheduled Agent persistence.
 - [x] Allow one explicit serial Subagent handoff of the current validated image
   through a no-Tool visual prepass without exposing extension Tools,

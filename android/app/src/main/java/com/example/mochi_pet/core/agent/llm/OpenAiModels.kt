@@ -26,6 +26,8 @@ enum class ProviderType {
     CUSTOM,
 }
 
+const val DEFAULT_MULTIMODAL_INPUT_ENABLED = true
+
 class OpenAiProviderConfig(
     val providerType: ProviderType = ProviderType.CUSTOM,
     val endpoint: String,
@@ -34,7 +36,7 @@ class OpenAiProviderConfig(
     val apiVersion: String = DEFAULT_AZURE_API_VERSION,
     val timeoutSeconds: Long = 60,
     val maxResponseBytes: Long = 2L * 1024L * 1024L,
-    val imageInputEnabled: Boolean = false,
+    val imageInputEnabled: Boolean = DEFAULT_MULTIMODAL_INPUT_ENABLED,
 ) {
     init {
         require(endpoint.isNotBlank()) { "Provider endpoint must not be empty" }

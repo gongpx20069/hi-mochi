@@ -753,7 +753,7 @@ class AndroidMijiaExtensionClient(
 
 internal fun extensionToolTimeoutMillis(toolName: String): Long =
     if (toolName == MIJIA_CAMERA_EVENT_IMAGE_TOOL) {
-        com.example.mochi_extension.ExtensionApiLimits.MAX_TIMEOUT_MILLIS
+        CAMERA_EVENT_IMAGE_REQUEST_TIMEOUT_MILLIS
     } else {
         DEFAULT_EXTENSION_TOOL_TIMEOUT_MILLIS
     }
@@ -763,8 +763,9 @@ internal fun extensionHostTimeoutMillis(toolTimeoutMillis: Long): Long =
 
 private const val MIJIA_CAMERA_EVENT_IMAGE_TOOL =
     "mijia_get_latest_camera_event_image"
+private const val CAMERA_EVENT_IMAGE_REQUEST_TIMEOUT_MILLIS = 14_000L
 private const val DEFAULT_EXTENSION_TOOL_TIMEOUT_MILLIS = 60_000L
-private const val EXTENSION_CALLBACK_GRACE_MILLIS = 5_000L
+private const val EXTENSION_CALLBACK_GRACE_MILLIS = 1_000L
 
 private data class ConsumedExtensionImage(
     val descriptor: ExtensionAttachmentDescriptor,
