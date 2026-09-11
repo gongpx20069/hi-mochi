@@ -3,6 +3,7 @@ package com.example.mochi_pet.feature.home
 import com.example.mochi_pet.core.agent.AgentReply
 import com.example.mochi_pet.core.agent.AgentRunner
 import com.example.mochi_pet.core.agent.llm.OpenAiProviderConfig
+import com.example.mochi_pet.core.agent.llm.ProviderNetworkException
 import com.example.mochi_pet.core.database.PlannerStore
 import com.example.mochi_pet.core.model.CalendarEvent
 import com.example.mochi_pet.core.model.CalendarEventDraft
@@ -31,6 +32,7 @@ import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
 import java.time.Clock
+import java.io.InterruptedIOException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -43,6 +45,38 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test
+    fun `provider timeout appears as an error without adding assistant history`() {
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ ->
+                AgentRunner {
+                    throw ProviderNetworkException(
+                        "Provider network request failed",
+                        InterruptedIOException("timeout"),
+                    )
+                }
+            },
+            clock = fixedClock(),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.sendConversation("Turn off the television")
+
+        assertEquals(
+            "The AI service timed out. Check your network and provider status.",
+            viewModel.conversationState.value.errorMessage,
+        )
+        assertEquals(
+            listOf("Turn off the television"),
+            viewModel.conversationState.value.messages
+                .map(ConversationMessage::text),
+        )
+        assertFalse(viewModel.conversationState.value.isSending)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+    }
+
     @Test
     fun `provider image permission reaches every foreground agent run`() {
         val permissions = mutableListOf<Boolean>()

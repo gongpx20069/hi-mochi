@@ -663,8 +663,7 @@ class MochiHomeViewModel(
                         mutableConversationState.update {
                             it.copy(
                                 isSending = false,
-                                errorMessage =
-                                    "Mochi could not complete this request",
+                                errorMessage = conversationErrorMessage(error),
                             )
                         }
                         mutablePipelineState.value = ChatPipelineUiState()

@@ -454,6 +454,24 @@ private val ZH_UI_TEXT = mapOf(
     "The browser blocked this source" to "浏览器阻止了此来源",
     "Agent runtime is unavailable" to "Agent 运行时不可用",
     "Mochi could not complete this request" to "Mochi 无法完成此请求",
+    "The AI service timed out. Check your network and provider status." to
+        "AI 服务响应超时，请检查网络和 AI 服务状态。",
+    "Could not connect to the AI service. Check your network, proxy, and provider endpoint." to
+        "无法连接 AI 服务，请检查网络、代理和服务地址。",
+    "AI service access was denied. Check your API key and model permissions in Settings." to
+        "AI 服务拒绝访问，请在设置中检查 API Key 和模型权限。",
+    "The AI service is rate-limited or out of quota. Check your quota or try again later." to
+        "AI 服务请求受限或额度不足，请检查额度或稍后重试。",
+    "The AI service is temporarily unavailable. Try again later." to
+        "AI 服务暂时不可用，请稍后重试。",
+    "The AI service rejected this request. Check your provider and model settings." to
+        "AI 服务拒绝了此请求，请检查提供商和模型设置。",
+    "The AI provider configuration is invalid. Check the endpoint and model in Settings." to
+        "AI 提供商配置无效，请在设置中检查服务地址和模型。",
+    "The AI service returned an unsupported response. Check model compatibility." to
+        "AI 服务返回了不支持的响应，请检查模型兼容性。",
+    "The AI service response exceeded the size limit. Try a smaller request." to
+        "AI 服务响应超出大小限制，请缩小请求范围。",
     "Microphone permission is required" to "需要麦克风权限",
     "Microphone and notification permissions are required" to "需要麦克风和通知权限",
     "Provider settings saved" to "提供商设置已保存",

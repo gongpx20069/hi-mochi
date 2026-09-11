@@ -61,6 +61,11 @@ keeps text and voice actions distinct. Restored history and Scheduled Agent
 results retain their persisted timestamps. Errors and partial speech appear as
 separate status cards rather than conversation messages. The validated
 directive is applied before the accepted Agent reply is sent to TextToSpeech.
+Provider failures use localized, actionable status messages distinguishing
+timeout, connectivity, access denial, rate/quota limits, service availability,
+configuration, and response errors. Raw provider error text is not displayed.
+These messages do not claim that device actions were skipped or rolled back:
+an earlier Tool may already have executed before a later model request failed.
 
 The native `HI MOCHI` foreground wake service is enabled by default once the
 required Android permissions are granted. Settings can disable it, and that
