@@ -156,6 +156,21 @@ rolled back; stale replies, cards, navigation, and TTS callbacks are ignored.
 
 ## 4. Manual navigation
 
+The Tools surface has a stable **AgentLink** provider card even before connection.
+Tap **Connect/Open AgentLink**, confirm the scoped native authorization page,
+then return through its Activity result. Cancellation does not connect.
+Enable the provider and desired workspace/chat/control switches, then enable
+the AgentLink Skill. Refresh rechecks current authorization/Bridge availability;
+disconnected and incompatible states are not displayed as cached-live.
+**Manage access** and **Revoke** remain explicit user actions.
+
+Successful shared-chat reads and control results retain non-secret linked-chat
+buttons in this provider card. Tapping one opens the trusted AgentLink native
+chat, never a model URL. These links are not live task monitors: use tools to
+read remote changes and current task state. Closing Mochi does not stop remote
+tasks. A human override conflict stops Mochi automatic follow-ups and requires
+new user direction rather than silently retrying or overwriting the human.
+
 Voice does not replace touch.
 
 - Face -> swipe/tap to Planner or Conversation.

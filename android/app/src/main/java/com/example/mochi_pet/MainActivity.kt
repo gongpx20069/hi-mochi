@@ -11,19 +11,33 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.example.mochi_pet.core.voice.VoiceInputTrigger
+import com.example.mochi_pet.core.agentlink.AgentLinkAuthorizationResult
 import com.example.mochi_pet.feature.home.MochiApp
 import com.example.mochi_pet.platform.wake.WakeCaptureService
 import com.example.mochi_pet.ui.theme.MochiTheme
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val voiceTriggers = Channel<VoiceInputTrigger>(Channel.BUFFERED)
     private val oauthCallbacks = Channel<String>(Channel.BUFFERED)
     private val providerShareCallbacks = Channel<String>(Channel.BUFFERED)
+    private val agentLinkResults = Channel<AgentLinkAuthorizationResult>(Channel.BUFFERED)
+    private val agentLinkLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        agentLinkResults.trySend(AgentLinkAuthorizationResult(
+            result.data?.getStringExtra("requestId"),
+            result.data?.getIntExtra("protocolVersion", 0) ?: 0,
+            result.resultCode == RESULT_OK,
+        ))
+    }
     private val wakeTriggerReceiver = object : BroadcastReceiver() {
         override fun onReceive(
             context: Context?,
@@ -55,6 +69,16 @@ class MainActivity : AppCompatActivity() {
                     oauthCallbacks = oauthCallbacks.receiveAsFlow(),
                     providerShareCallbacks =
                         providerShareCallbacks.receiveAsFlow(),
+                    agentLinkResults = agentLinkResults.receiveAsFlow(),
+                    launchAgentLink = { request ->
+                        lifecycleScope.launch {
+                            try {
+                                agentLinkLauncher.launch(application.agentLinkClient.activityIntent(request))
+                            } catch (_: Exception) {
+                                agentLinkResults.trySend(AgentLinkAuthorizationResult(null, 0, false))
+                            }
+                        }
+                    },
                 )
             }
         }
@@ -101,6 +125,7 @@ class MainActivity : AppCompatActivity() {
         voiceTriggers.close()
         oauthCallbacks.close()
         providerShareCallbacks.close()
+        agentLinkResults.close()
         super.onDestroy()
     }
 

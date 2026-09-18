@@ -234,6 +234,23 @@ support is an optional import/export adapter.
   storage and never enter Mochi prompts, logs, exports, provider sharing, or
   Binder payloads.
 
+### 3.11 AgentLink shared coding chats
+
+- Mochi is the primary voice/text controller for authorized shared AgentLink
+  CLI/App chats, with explicit native user authorization and one return to Mochi.
+- Tools always shows **Connect/Open AgentLink**, connection status, refresh,
+  access manager/revoke, provider and three individual Tool switches, and
+  trusted linked-chat jumps. Installation alone never authorizes access.
+- Exactly `agentlink_workspace`, `agentlink_chat`, and `agentlink_control`
+  plus the disabled-by-default AgentLink built-in Skill provide discovery,
+  workspace/chat creation, bounded reads, sends, cancellation and configuration.
+- Shared remote chats remain distinct from Mochi's conversation/current draft.
+  Remote tasks survive a Mochi turn and are not silently resubmitted on failure.
+- Human CLI/App input takes precedence: conflicting automatic follow-ups stop.
+  Permission escalation requires AgentLink native confirmation, never auto-approval.
+- AgentLink credentials stay in AgentLink and are excluded from export/share.
+  Subagents, schedules and network/browser workarounds do not gain these Tools.
+
 ## 4. Local agent
 
 The agent uses:

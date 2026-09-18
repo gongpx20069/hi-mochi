@@ -164,6 +164,9 @@ import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.McpAuthMode
 import com.example.mochi_pet.core.tools.McpServerSummary
 import com.example.mochi_pet.core.tools.MijiaProviderSummary
+import com.example.mochi_pet.core.agentlink.AgentLinkActivityRequest
+import com.example.mochi_pet.core.agentlink.AgentLinkAuthorizationResult
+import com.example.mochi_pet.core.agentlink.AgentLinkUiAction
 import com.example.mochi_pet.core.tools.ToolShareSelection
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceInputTrigger
@@ -230,6 +233,8 @@ fun MochiApp(
     voiceTriggers: Flow<VoiceInputTrigger>,
     oauthCallbacks: Flow<String>,
     providerShareCallbacks: Flow<String>,
+    agentLinkResults: Flow<AgentLinkAuthorizationResult>,
+    launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
     val context = LocalContext.current
     val application = context.applicationContext as MochiApplication
@@ -238,6 +243,13 @@ fun MochiApp(
         MochiHomeViewModel.factory(application, voiceRuntime, wakeRuntime)
     }
     val viewModel: MochiHomeViewModel = viewModel(factory = factory)
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshTools()
+        onPauseOrDispose { }
+    }
+    LaunchedEffect(agentLinkResults) {
+        agentLinkResults.collect(viewModel::completeAgentLinkAuthorization)
+    }
     var pendingVoiceTrigger by remember {
         mutableStateOf(VoiceInputTrigger.DIRECT)
     }
@@ -348,6 +360,7 @@ fun MochiApp(
         viewModel = viewModel,
         onStartVoice = { startVoice(VoiceInputTrigger.DIRECT) },
         onEnableWake = enableWake,
+        launchAgentLink = launchAgentLink,
     )
 }
 
@@ -356,6 +369,7 @@ private fun MochiAppContent(
     viewModel: MochiHomeViewModel,
     onStartVoice: () -> Unit,
     onEnableWake: () -> Unit,
+    launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
     val surface by viewModel.surface.collectAsStateWithLifecycle()
     val plannerState by viewModel.plannerState.collectAsStateWithLifecycle()
@@ -527,6 +541,10 @@ private fun MochiAppContent(
     ) {
         viewModel.refreshTools()
     }
+    LaunchedEffect(toolsState.agentLinkActivityRequest) {
+        toolsState.agentLinkActivityRequest?.let(launchAgentLink)
+        viewModel.consumeAgentLinkActivityRequest()
+    }
     LaunchedEffect(toolsState.extensionActivityTarget) {
         val target = toolsState.extensionActivityTarget
             ?: return@LaunchedEffect
@@ -675,6 +693,7 @@ private fun MochiAppContent(
             onDisconnectAmap = viewModel::disconnectAmap,
             onSetAmapEnabled = viewModel::setAmapEnabled,
             onSetAgentBrowserEnabled = viewModel::setAgentBrowserEnabled,
+            onAgentLinkAction = viewModel::onAgentLinkAction,
             onInstallMijia = viewModel::installMijiaExtension,
             onConfigureMijia = viewModel::configureMijiaExtension,
             onDisconnectMijia = viewModel::disconnectMijia,
@@ -1595,6 +1614,7 @@ private fun SurfaceContent(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
     onConfigureMijia: () -> Unit,
     onDisconnectMijia: () -> Unit,
@@ -1696,6 +1716,7 @@ private fun SurfaceContent(
                 onDisconnectAmap = onDisconnectAmap,
                 onSetAmapEnabled = onSetAmapEnabled,
                 onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
+                onAgentLinkAction = onAgentLinkAction,
                 onInstallMijia = onInstallMijia,
                 onConfigureMijia = onConfigureMijia,
                 onDisconnectMijia = onDisconnectMijia,
@@ -3817,6 +3838,7 @@ private fun ToolsSurface(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
     onConfigureMijia: () -> Unit,
     onDisconnectMijia: () -> Unit,
@@ -4187,6 +4209,13 @@ private fun ToolsSurface(
                     onDisconnect = onDisconnectMijia,
                     onSetEnabled = onSetMijiaEnabled,
                     onSetToolEnabled = onSetMijiaToolEnabled,
+                )
+            }
+            item {
+                AgentLinkProviderCard(
+                    state = state.catalog.agentLink,
+                    loading = state.isLoading,
+                    onAction = onAgentLinkAction,
                 )
             }
         }

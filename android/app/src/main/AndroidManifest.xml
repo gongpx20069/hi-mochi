@@ -20,6 +20,7 @@
         android:protectionLevel="signature" />
 
     <queries>
+        <package android:name="com.gongpx.androidacpclient" />
         <package android:name="com.example.mochi_pet.extension.mijia" />
         <intent>
             <action android:name="android.speech.RecognitionService" />

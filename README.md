@@ -86,6 +86,7 @@ therefore much smaller. Developers can check a connected device with
 | Skill | Default | What it does | Required setup |
 | --- | --- | --- | --- |
 | Mochi Planner | Enabled | Manages Mochi calendar events and dated todos | None |
+| AgentLink | Disabled | Controls shared CLI/App coding chats with human-override guards | Install AgentLink; approve native scoped access; enable all three Tools |
 | Voice Navigation | Enabled | Opens the relevant native Mochi surface from conversation intent | None |
 | Scheduled Automations | Enabled | Runs one-time or recurring Agent prompts and writes results to Conversation | Notification permission; exact-alarm access is optional |
 | Web Search | Enabled | Researches public web and WeChat official-account content through Agent Browser | None |
@@ -107,6 +108,7 @@ therefore much smaller. Developers can check a connected device with
 | Group | Included Tools | Purpose and setup |
 | --- | --- | --- |
 | **Planner** | `manage_mochi_calendar`<br>`manage_mochi_todo` | Read and update Mochi-owned events and dated todos. No additional setup. |
+| **AgentLink** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | Authorized shared machine/workspace/chat discovery and control; foreground Main Agent only. |
 | **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
 | **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Research public HTTPS pages in one visible, bounded Android WebView session. |
@@ -125,6 +127,23 @@ research starts from the official 12306 query page; flight research prefers
 official airline sites. Mochi never logs in, bypasses verification, enters
 passenger or payment data, or continues into booking. It stops when a site
 requires authentication, CAPTCHA, identity verification, or checkout.
+
+### Control shared AgentLink coding chats
+
+Install AgentLink Android, then open **Tools > AgentLink > Connect/Open AgentLink**.
+Approve the scoped access request in AgentLink and return to Mochi. Enable the
+provider, its three switches (`agentlink_workspace`, `agentlink_chat`,
+`agentlink_control`), and the built-in **AgentLink** Skill.
+Mochi can discover authorized machines/workspaces, create or continue the same
+CLI/App chat, read changes, send work and request cancellation/configuration.
+Linked chat buttons open the trusted native AgentLink view; Refresh and
+Manage access/Revoke remain available in Tools.
+
+Remote tasks continue when Mochi closes. Human CLI/App changes override stale
+automation: conflicts stop follow-ups instead of retrying. Credentials remain
+in AgentLink, never Mochi exports/share. No browser/network bypass or default
+Subagent/Scheduled Agent access is provided. Linked chats are not cached-live
+task monitors; read again to inspect current state.
 
 ### Serial Subagents
 

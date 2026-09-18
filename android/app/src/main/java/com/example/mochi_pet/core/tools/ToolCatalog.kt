@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.agentlink.AgentLinkClient
+import com.example.mochi_pet.core.agentlink.AgentLinkState
 import com.example.mochi_pet.core.extensions.MijiaExtensionSnapshot
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
 import com.example.mochi_pet.core.extensions.UnavailableMijiaExtensionClient
@@ -56,6 +58,7 @@ data class ToolCatalogSummary(
     val amap: AmapProviderSummary = AmapProviderSummary(),
     val agentBrowser: AgentBrowserProviderSummary = AgentBrowserProviderSummary(),
     val mijia: MijiaProviderSummary = MijiaProviderSummary(),
+    val agentLink: AgentLinkState = AgentLinkState(),
     val servers: List<McpServerSummary> = emptyList(),
     val isLoading: Boolean = false,
     val feedback: String? = null,
@@ -133,6 +136,9 @@ fun ToolCatalogSummary.readyToolNames(): Set<String> =
         if (mijia.connected && mijia.enabled) {
             mijia.tools.filter { it.enabled }.mapTo(this) { it.name }
         }
+        if (agentLink.authorized && agentLink.connected && agentLink.enabled) {
+            addAll(agentLink.enabledTools)
+        }
         servers.filter { it.connected && it.enabled }.forEach { server ->
             server.tools.filter { it.enabled }.mapTo(this) { it.alias }
         }
@@ -158,6 +164,7 @@ private fun ToolCatalogSummary.skillRequirementName(
         toolName.startsWith("browser_") -> "Agent Browser"
         toolName.startsWith("amap_") -> "Amap Maps"
         toolName.startsWith("mijia_") -> "Mi Home extension"
+        toolName.startsWith("agentlink_") -> "AgentLink"
         toolName.startsWith("notion_") ->
             servers.firstOrNull { it.id == NOTION_SERVER_ID }?.name
                 ?: "Notion MCP"
@@ -325,6 +332,7 @@ class DataStoreToolCatalogRepository(
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val extensionClient: MochiExtensionClient =
         UnavailableMijiaExtensionClient,
+    private val agentLinkClient: AgentLinkClient? = null,
 ) : ToolCatalogRepository {
     private val json = Json {
         encodeDefaults = true
@@ -335,7 +343,9 @@ class DataStoreToolCatalogRepository(
     override suspend fun loadSummary(): ToolCatalogSummary {
         repairTruncatedTencentDocsCatalog()
         updateCatalog { it }
-        return loadCatalog().toSummary(extensionClient.snapshot())
+        return loadCatalog().toSummary(extensionClient.snapshot()).copy(
+            agentLink = agentLinkClient?.refresh() ?: AgentLinkState(),
+        )
     }
 
     override suspend fun setBuiltInEnabled(

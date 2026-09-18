@@ -237,6 +237,25 @@ text is never promoted to persona or system instructions. The Subagent cannot
 forward the image, reopen the extension attachment, or access Mi Home Tools. A
 second delegation cannot reuse the image.
 
+## 2.2 AgentLink shared-chat runtime
+
+Mochi can control the same authoritative Bridge chat used by AgentLink CLI and
+Android, rather than creating a hidden parallel session. Three grouped Tools
+use a typed client and a platform-only Messenger adapter. See
+`AGENT_TOOLS.md` for actions and `EXTENSIONS.md` for the separate trust contract.
+The built-in `agentlink` Skill is disabled by default and requires all three
+Tools through the normal readiness and `load_skill` path.
+
+Only fresh reads in the current foreground registry establish a human-revision
+guard. Every control call receives a locally generated operation ID. A conflict
+or uncertain write blocks further control for that chat for the rest of the
+run, including after another read. Successful writes consume the guard. A new
+user-directed run must read again; there is no automatic write retry.
+IPC wait cancellation releases the binding but does not cancel remote work.
+Non-secret links/cursors persist, not message transcripts, authorization
+credentials, or cached-live task state. Remote output remains bounded Tool
+evidence; it is never added wholesale to the system prompt.
+
 ## 3. Agent response
 
 ```json

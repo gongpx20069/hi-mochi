@@ -44,6 +44,7 @@ import com.example.mochi_pet.core.weather.OpenMeteoWeatherRepository
 import com.example.mochi_pet.core.weather.WeatherRepository
 import com.example.mochi_pet.core.update.AppUpdateClient
 import com.example.mochi_pet.platform.browser.AgentBrowserRuntime
+import com.example.mochi_pet.platform.agentlink.AndroidAgentLinkClient
 import com.example.mochi_pet.platform.location.AndroidDeviceLocationProvider
 import com.example.mochi_pet.platform.location.LocationPermissionGate
 import com.example.mochi_pet.platform.voice.AndroidVoiceRuntime
@@ -164,6 +165,10 @@ class MochiApplication : Application() {
         AndroidMijiaExtensionClient(this)
     }
 
+    val agentLinkClient: AndroidAgentLinkClient by lazy {
+        AndroidAgentLinkClient(this, toolDataStore)
+    }
+
     val toolCatalogRepository: ToolCatalogRepository by lazy {
         DataStoreToolCatalogRepository(
             dataStore = toolDataStore,
@@ -172,6 +177,7 @@ class MochiApplication : Application() {
             ),
             mcpClient = mcpClient,
             extensionClient = extensionClient,
+            agentLinkClient = agentLinkClient,
         )
     }
 
@@ -256,6 +262,7 @@ class MochiApplication : Application() {
                     includeBrowser = true,
                     includeBrowserInteractions = false,
                     includeExtensions = false,
+                    includeAgentLink = false,
                 ).run(
                     AgentRunRequest(
                         provider = provider,

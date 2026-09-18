@@ -73,6 +73,48 @@ allowlists for built-in Notion and Tencent Docs providers. Remote
 `readOnlyHint` annotations and manually configured MCP servers do not grant
 Subagent access.
 
+## 1.1 AgentLink companion provider
+
+Exactly three application-defined schemas are registered:
+
+| Tool | Actions |
+| --- | --- |
+| `agentlink_workspace` | `list`, `create` |
+| `agentlink_chat` | `list`, `create`, `read`, `open` |
+| `agentlink_control` | `send`, `cancel`, `configure` |
+
+Workspace list without `machineId` discovers the authorized machines; with
+`machineId` it lists Bridge workspaces. Creation is permission-scoped and must
+not bypass native AgentLink confirmation for directory/register/worktree/clone
+permissions. Ground `machineId`, `workspaceId`, `chatId`, and `agentId` from
+successful discovery. Chat reads use `afterEventId` and `limit` (1–100), returning
+the shared authoritative `chat`, bounded events and cursor, task/config/approval
+state and freshness. Messages distinguish human/CLI/Mochi provenance.
+
+`send` takes `content`; `cancel` takes a `taskId` returned by the latest chat
+read and reports the actual queued/active cancellation outcome. Chat lists accept
+`offset`/`limit`; follow `nextOffset` while `hasMore`. Clone uses `url`, translated
+to the Bridge's `repositoryUrl`. `configure` requires native human confirmation.
+`operationId`, `source=mochi` and
+`expectedHumanRevision` are injected for sends by the client executor, never model fields.
+Cancellation maps the observed task ID to the existing operation, not a new ID.
+Read must return the requested `chat.chatId` and numeric `chat.humanRevision`
+before control becomes eligible. A successful write consumes that read guard;
+CONFLICT, timeout or uncertain write blocks same-run follow-ups even after
+another read. Never automatically resend or approve permission escalation.
+
+`open` after a successful read offers a native linked-chat action in Tools;
+it does not accept or execute a URI, Intent or component from the model.
+Linked task IDs and cursors are not cached-live state. Remote tasks survive
+Mochi cancellation; explicit `cancel` is the only task-cancellation request.
+
+Both provider and individual switches are required, along with fresh connection
+and authorization. Disabled/unavailable definitions and the dependent Skill are
+excluded from discovery. AgentLink is unavailable to Subagents and Scheduled
+Agents. Mid-run revocation returns typed `PERMISSION_DENIED` with a
+Tools > AgentLink connection instruction. Browser, HTTP, JavaScript and MCP
+must never be used as an authorization or disabled-Tool workaround.
+
 ## 2. Planner tools
 
 ### `manage_mochi_calendar`

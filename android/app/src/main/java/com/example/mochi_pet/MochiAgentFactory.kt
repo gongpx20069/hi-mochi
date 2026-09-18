@@ -15,6 +15,8 @@ import com.example.mochi_pet.core.agent.SerialSubagentCoordinator
 import com.example.mochi_pet.core.agent.SubagentExecutor
 import com.example.mochi_pet.core.agent.SubagentType
 import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.agentlink.AgentLinkExecution
+import com.example.mochi_pet.core.agentlink.AgentLinkTool
 import com.example.mochi_pet.core.agent.tool.ManageMochiCalendarTool
 import com.example.mochi_pet.core.agent.tool.ManageMochiTodoTool
 import com.example.mochi_pet.core.agent.tool.ModelImageAttachment
@@ -43,6 +45,7 @@ suspend fun MochiApplication.createAgentRunner(
     includeBrowser: Boolean,
     includeBrowserInteractions: Boolean = includeBrowser,
     includeExtensions: Boolean = true,
+    includeAgentLink: Boolean = true,
 ): AgentRunner {
     val diagnosticLogger = androidAgentDiagnosticLogger()
     val navigationPolicy = NavigationPolicy()
@@ -95,6 +98,13 @@ suspend fun MochiApplication.createAgentRunner(
                 emptyList()
             }
     ).toMutableList()
+    if (includeAgentLink) {
+        val state = agentLinkClient.refresh()
+        if (state.authorized && state.connected && state.enabled) {
+            val execution = AgentLinkExecution()
+            tools += state.enabledTools.map { AgentLinkTool(it, agentLinkClient, execution) }
+        }
+    }
     val availableSkills = skillRepository.listEnabledMetadata(
         tools.mapTo(mutableSetOf()) { it.name },
     )

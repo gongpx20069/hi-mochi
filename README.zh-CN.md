@@ -82,6 +82,7 @@
 | Skill | 默认状态 | 能力 | 所需配置 |
 | --- | --- | --- | --- |
 | Mochi Planner | 启用 | 管理 Mochi 日历事件和带日期的待办 | 无 |
+| AgentLink | 禁用 | 控制 CLI/App 共享编程聊天，检测人工接管冲突 | 安装 AgentLink，在原生页面确认权限并启用三个 Tools |
 | Voice Navigation | 启用 | 根据对话意图打开相关 Mochi 原生页面 | 无 |
 | Scheduled Automations | 启用 | 执行一次性或周期 Agent 任务，并把结果写入 Conversation | 通知权限；精确闹钟权限可选 |
 | Web Search | 启用 | 通过 Agent Browser 搜索公开网页和微信公众号内容 | 无 |
@@ -103,6 +104,7 @@
 | 分组 | 包含的 Tools | 能力与配置 |
 | --- | --- | --- |
 | **计划** | `manage_mochi_calendar`<br>`manage_mochi_todo` | 读取和更新 Mochi 自己的日历事件与带日期待办，无需额外配置。 |
+| **AgentLink** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | 发现和控制已授权的共享机器、工作区与聊天；仅限前台 Main Agent。 |
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
@@ -118,6 +120,20 @@ Tools 页面会将 Agent Browser、Mochi 内建能力和 Provider Tools 分组�
 公开查询页开始，机票优先查询航空公司官网。Mochi 不登录、不绕过验证、不填写
 乘客或支付信息，也不会进入预订流程；遇到登录、验证码、身份验证或结算页面时
 立即停止。
+
+### 控制 AgentLink 共享编程聊天
+
+安装 AgentLink Android 后，进入 **Tools > AgentLink > 连接/打开 AgentLink**，
+在 AgentLink 原生页面确认限定范围的权限后返回 Mochi。启用 Provider、
+`agentlink_workspace`、`agentlink_chat`、`agentlink_control` 三个开关，
+再启用内置 **AgentLink** Skill。Mochi 可发现已授权机器和工作区，创建或继续
+CLI/App 使用的同一个聊天、读取变化、发送任务，以及请求取消或更改配置。
+Tools 中的关联聊天按钮打开可信的原生 AgentLink 页面，也可刷新、管理或撤销权限。
+
+关闭 Mochi 不会停止远程任务。人工 CLI/App 输入优先于过期自动操作；发生冲突后
+停止后续操作，不自动重发。凭据保留在 AgentLink，不进入 Mochi 导出或分享。
+不允许使用网络/浏览器绕过权限，也不默认向 Subagent 或定时 Agent 开放。
+关联记录并非实时任务监控；请重新读取以了解当前状态。
 
 ### 串行 Subagent
 

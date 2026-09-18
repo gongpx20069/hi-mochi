@@ -49,6 +49,19 @@ Home extension APK.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+AgentLink domain/registry regression coverage:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*AgentLinkToolTest" --no-daemon
+```
+
+For device acceptance install both Mochi and the independently signed AgentLink
+APK. Verify nonce-confirmed authorization and cancellation, provider/individual
+switch exclusion, shared CLI/App chat reads, native linked-chat opening, human
+revision conflict, revoke, Binder death, reconnect and unknown-write outcomes.
+Verify a running remote task survives Mochi cancellation. JVM tests do not prove
+cross-APK Android identity, Activity result, or Bridge connectivity behavior.
+
 ## Install on a device
 
 List connected devices:

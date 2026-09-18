@@ -217,7 +217,18 @@ The spoken reply is always the accepted assistant text, except for the existing
 deterministic date/time and weather normalization that guarantees displayed
 facts are also spoken.
 
-## 8. Future extension
+## 8. AgentLink trusted linked-chat controls
+
+The AgentLink Tools provider card shows non-secret machine/chat/task links
+recorded from validated successful Tool evidence. These are native buttons,
+not model-authored card actions or source URLs. Opening one dispatches a typed
+ViewModel event and an application-owned explicit AgentLink component.
+The model's `agentlink_chat open` action can offer this UI path only after
+reading that chat; it cannot supply an intent, component, or arbitrary URI.
+Persisted links are explicitly not live task cards. Current task state must be
+read again through AgentLink, and remote text never becomes system instructions.
+
+## 9. Future extension
 
 If the Agent later moves to a server, AG-UI can transport run, Tool, state, and
 card events without replacing this Card Catalog. The trusted Android

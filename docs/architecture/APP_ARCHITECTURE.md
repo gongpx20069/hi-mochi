@@ -44,6 +44,8 @@ run in local JVM tests.
 | `SkillRepository` | Agent Skills metadata, resources, and enablement |
 | `ToolRegistry` | schema registration, validation, dispatch |
 | `ToolCatalogRepository` | built-in enablement, MCP servers, OAuth, selected schemas |
+| `AgentLinkClient` | typed shared-chat requests, scoped connection state, non-secret links |
+| `AndroidAgentLinkClient` | explicit Activity result authorization, signer pinning, bounded Messenger IPC |
 | `ExtensionManager` | trusted package discovery, signature/version validation, binding, and cancellation |
 | `ExtensionToolAdapter` | bounded extension schema registration and Tool result translation |
 | Mi Home extension process | Xiaomi QR session, cloud requests, MIoT mapping, device selection, and ephemeral images |
@@ -99,6 +101,10 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 
 - Room transactions own planner consistency.
 - DataStore owns non-relational preferences.
+- The Tool DataStore also owns AgentLink provider/individual switches, a
+  user-confirmed package signer digest, and up to 20 non-secret machine/chat/task
+  links with event cursors. No Room schema changes are needed. Human revision
+  guards are run-local and never restored from these links.
 - Android Keystore protects BYOK credentials.
 - A dedicated Tool DataStore owns built-in enablement, MCP configuration, and
   encrypted MCP/OAuth credentials.
@@ -158,6 +164,7 @@ Agent Browser provider -------enabled--> ToolRegistry
 selected MCP definitions -----enabled--> ToolRegistry
 Amap native Tools -----------enabled--> ToolRegistry
 trusted bound extensions ----enabled--> ToolRegistry
+authorized AgentLink --------enabled--> foreground Main-Agent ToolRegistry
 ```
 
 Skill discovery follows the same runtime enablement boundary. Only enabled
@@ -183,6 +190,15 @@ Remote MCP endpoints pass the same public HTTPS policy as web tools. Private,
 loopback, link-local, credential-bearing, and non-standard-port endpoints are
 rejected. JavaScript execution is local but process-isolated and has no bridge
 to Android or network capabilities.
+
+AgentLink is a separate typed companion-app integration, not MCP or a Mi Home
+extension. Agent Tools depend only on `AgentLinkClient`; Android components and
+Binder remain in `platform/agentlink`. Compose sends typed events to the
+ViewModel, which invokes the client/repositories. Only the Activity translates
+validated native launch requests into explicit Android intents. A registry
+refresh and each invocation check current authorization, connection and switches.
+Subagent and scheduled registries do not include AgentLink. Remote task lifetime
+belongs to AgentLink/Bridge, not the calling Mochi coroutine.
 
 ## 9. Optional extension modules
 

@@ -25,6 +25,10 @@ import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.extensions.ExtensionActivityTarget
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
+import com.example.mochi_pet.core.agentlink.AgentLinkClient
+import com.example.mochi_pet.core.agentlink.AgentLinkActivityRequest
+import com.example.mochi_pet.core.agentlink.AgentLinkAuthorizationResult
+import com.example.mochi_pet.core.agentlink.AgentLinkUiAction
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.database.PlannerStore
@@ -224,6 +228,7 @@ data class ToolsUiState(
     val feedback: String? = null,
     val authorizationUrl: String? = null,
     val extensionActivityTarget: ExtensionActivityTarget? = null,
+    val agentLinkActivityRequest: AgentLinkActivityRequest? = null,
 )
 
 data class CameraSnapshotUiState(
@@ -273,6 +278,7 @@ class MochiHomeViewModel(
     private val skillMarketClient: SkillMarketClient? = null,
     private val toolCatalogRepository: ToolCatalogRepository? = null,
     private val extensionClient: MochiExtensionClient? = null,
+    private val agentLinkClient: AgentLinkClient? = null,
     private val agentBrowserRuntime: AgentBrowserRuntime? = null,
     private val weatherRepository: WeatherRepository? = null,
     private val locationPermissionGate: LocationPermissionGate? = null,
@@ -1478,6 +1484,48 @@ class MochiHomeViewModel(
         loadTools()
     }
 
+    fun onAgentLinkAction(action: AgentLinkUiAction) {
+        val client = agentLinkClient ?: return
+        updateTools {
+            when (action) {
+                AgentLinkUiAction.Connect -> {
+                    val request = client.beginAuthorization()
+                    mutableToolsState.update { it.copy(agentLinkActivityRequest = request) }
+                }
+                AgentLinkUiAction.Manager -> mutableToolsState.update {
+                    it.copy(agentLinkActivityRequest = AgentLinkActivityRequest(
+                        requestId = java.util.UUID.randomUUID().toString(), authorize = false,
+                    ))
+                }
+                AgentLinkUiAction.Refresh -> Unit
+                AgentLinkUiAction.Revoke -> client.revoke()
+                is AgentLinkUiAction.Enable -> client.setEnabled(action.enabled)
+                is AgentLinkUiAction.EnableTool -> client.setToolEnabled(action.name, action.enabled)
+                is AgentLinkUiAction.OpenChat -> {
+                    require(action.link in mutableToolsState.value.catalog.agentLink.links)
+                    mutableToolsState.update {
+                        it.copy(agentLinkActivityRequest = AgentLinkActivityRequest(
+                            requestId = java.util.UUID.randomUUID().toString(),
+                            chat = action.link, authorize = false,
+                        ))
+                    }
+                }
+            }
+            requireRepository().loadSummary()
+        }
+    }
+
+    fun consumeAgentLinkActivityRequest() {
+        mutableToolsState.update { it.copy(agentLinkActivityRequest = null) }
+    }
+
+    fun completeAgentLinkAuthorization(result: AgentLinkAuthorizationResult) {
+        updateTools {
+            agentLinkClient?.completeAuthorization(result.requestId, result.version, result.accepted)
+            requireRepository().loadSummary()
+        }
+    }
+
     fun setMijiaEnabled(enabled: Boolean) {
         updateTools {
             requireRepository().setMijiaEnabled(enabled)
@@ -1694,13 +1742,20 @@ class MochiHomeViewModel(
             mutableToolsState.value = ToolsUiState(isLoading = false)
             return
         }
+        mutableToolsState.update {
+            it.copy(
+                isLoading = true,
+                catalog = it.catalog.copy(agentLink = it.catalog.agentLink.copy(
+                    connected = false, status = "stale",
+                )),
+            )
+        }
         viewModelScope.launch(ioDispatcher) {
             runCatching { repository.loadSummary() }
                 .onSuccess { catalog ->
-                    mutableToolsState.value = ToolsUiState(
-                        catalog = catalog,
-                        isLoading = false,
-                    )
+                    mutableToolsState.update {
+                        it.copy(catalog = catalog, isLoading = false)
+                    }
                     refreshSkillReadiness(catalog)
                 }
                 .onFailure(::showToolError)
@@ -1766,16 +1821,22 @@ class MochiHomeViewModel(
         operation: suspend () -> ToolCatalogSummary,
     ) {
         mutableToolsState.update {
-            it.copy(isLoading = true, feedback = null)
+            it.copy(
+                isLoading = true,
+                feedback = null,
+                catalog = it.catalog.copy(agentLink = it.catalog.agentLink.copy(
+                    connected = false, status = "stale",
+                )),
+            )
         }
         viewModelScope.launch(ioDispatcher) {
             runCatching { operation() }
                 .onSuccess { catalog ->
-                    mutableToolsState.value = ToolsUiState(
-                        catalog = catalog,
-                        isLoading = false,
-                        feedback = successFeedback,
-                    )
+                    mutableToolsState.update {
+                        it.copy(
+                            catalog = catalog, isLoading = false, feedback = successFeedback,
+                        )
+                    }
                     refreshSkillReadiness(catalog)
                 }
                 .onFailure(::showToolError)
@@ -2172,6 +2233,7 @@ class MochiHomeViewModel(
                         toolCatalogRepository =
                             application.toolCatalogRepository,
                         extensionClient = application.extensionClient,
+                        agentLinkClient = application.agentLinkClient,
                         agentBrowserRuntime = application.agentBrowserRuntime,
                         weatherRepository = application.weatherRepository,
                         locationPermissionGate =

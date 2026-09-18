@@ -225,7 +225,50 @@ file descriptor, attachment ID, URL, raw bytes, or forwarding capability. The
 host does not infer visual support from a model name. Gallery export remains
 out of scope.
 
-## 9. Release and compatibility
+## 9. Separate AgentLink companion protocol
+
+AgentLink is **not** a dynamically discovered Mochi Extension API provider and
+does not inherit Mi Home's same-signature policy. It is an independently signed,
+explicitly selected companion package, `com.gongpx.androidacpclient`.
+Mochi validates exported/enabled service and authorization Activity identities,
+protocol metadata `com.gongpx.androidacpclient.PROTOCOL_VERSION=1`, and package
+signing certificates. First trust requires a native user authorization result
+for the exact locally generated nonce. Mochi pins that confirmed signer in
+DataStore; changing signers requires a new explicit authorization. AgentLink
+separately authenticates the calling package/signers and owns scoped grants.
+No service is trusted merely because its reply claims a provider ID.
+
+- Service: `com.gongpx.androidacpclient.integration.AgentLinkControlService`.
+- Authorization Activity:
+  `com.gongpx.androidacpclient.integration.AgentLinkAuthorizationActivity`.
+- Action: `com.gongpx.androidacpclient.AUTHORIZE`; input `requestId`; successful
+  Activity result echoes `requestId` and integer `protocolVersion=1`, never credentials.
+- Messenger request `what=1`: Bundle strings `requestId`, `method`, `arguments`
+  (JSON), and `replyTo`; response `what=2` echoes `requestId` with `result` JSON
+  using Mochi's typed success/error envelope.
+- `agentlink_control` with action `status` returns `protocolVersion`,
+  `authorized`, `connected`; action `revoke` removes scoped remote access.
+  Only native UI/client code uses these administrative actions; the model
+  control schema exposes only send/cancel/configure.
+- Workspace list without a machine is translated to the native `machines`
+  action. The adapter strips locally injected provenance because AgentLink
+  itself enforces `source=mochi` rather than accepting a caller value.
+- The same validated Activity handles `com.gongpx.androidacpclient.OPEN_CHAT`
+  with `machineId`/`chatId`, and `com.gongpx.androidacpclient.MANAGE_ACCESS`.
+- Requests are at most 128 KiB, replies 256 KiB, and waits 30 seconds.
+  Android binding/send/replies run off the main thread. Timeout, cancellation,
+  Binder death, null binding and disconnect complete/clean pending waits and
+  unbind. Late callbacks cannot update a completed request. No permanent
+  binding or background keepalive is needed.
+
+Unlike a Mi Home extension call, ending a Messenger wait **does not cancel a
+remote AgentLink task**. Remote state must be read after reconnection; writes
+are never resubmitted automatically. Revocation always disables local access;
+an unconfirmed remote revoke is reported rather than claimed successful.
+Bridge credentials and grants remain in AgentLink and never enter Mochi
+exports, Provider share, logs, or model prompts.
+
+## 10. Release and compatibility
 
 The standard Android release builds and signs:
 
