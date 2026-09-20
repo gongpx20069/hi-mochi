@@ -40,7 +40,7 @@ runtime.
 ### 3.2 Voice interaction
 
 1. Wake with `Hi Mochi`, microphone, media button, or text.
-   A confirmed `Hi Mochi` wake receives a short randomized spoken
+   A confirmed `Hi Mochi` wake receives a one-syllable spoken
    acknowledgement before listening; this feedback is not conversation data.
 2. Recognize speech with Android `SpeechRecognizer` by default, or with an
    optional user-configured iFlytek/Azure Speech connection.

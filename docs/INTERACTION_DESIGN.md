@@ -74,8 +74,8 @@ When Mochi is visible, wake and media triggers start listening without changing
 the current surface.
 When it is backgrounded or locked, wake detection posts a lock-screen-visible
 notification; tapping it starts the same permission-checked voice path.
-After a confirmed “Hi Mochi” wake, Mochi speaks one short randomized
-acknowledgement in the selected language before listening. The acknowledgement
+After a confirmed “Hi Mochi” wake, Mochi speaks a one-syllable acknowledgement
+("嗯？" in Chinese, "Yes?" in English) before listening. The acknowledgement
 is transient feedback, not a conversation message, and is excluded from
 history and model context. Microphone-button and media-button starts do not add
 this acknowledgement.
@@ -157,6 +157,10 @@ rolled back; stale replies, cards, navigation, and TTS callbacks are ignored.
 ## 4. Manual navigation
 
 The Tools surface has a stable **AgentLink** provider card even before connection.
+It reuses the same rounded surface, spacing, localized typography, and Tool rows
+as other providers. The three Tools start collapsed behind **Show tools (3)**;
+each expanded row shows a localized name and description plus its technical ID.
+Action buttons wrap on narrow screens without hiding authorization or chat actions.
 Tap **Connect/Open AgentLink**, confirm the scoped native authorization page,
 then return through its Activity result. Cancellation does not connect.
 Enable the provider and desired workspace/chat/control switches, then enable

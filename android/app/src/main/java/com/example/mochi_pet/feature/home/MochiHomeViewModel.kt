@@ -107,7 +107,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
-import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -285,7 +284,7 @@ class MochiHomeViewModel(
     private val clock: Clock = Clock.systemDefaultZone(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val wakeAcknowledgement: () -> String =
-        ::randomWakeAcknowledgement,
+        ::wakeAcknowledgementText,
 ) : ViewModel() {
     private val mutableSurface = MutableStateFlow<MochiSurface>(MochiSurface.Face)
     private val mutablePlannerState = MutableStateFlow(PlannerSurfaceState())
@@ -2245,29 +2244,18 @@ class MochiHomeViewModel(
     }
 }
 
-internal fun randomWakeAcknowledgement(
+internal fun wakeAcknowledgementText(
     locale: Locale = when (AppLanguage.current()) {
         AppLanguage.SYSTEM -> AppLanguage.resolveContentLocale()
         AppLanguage.CHINESE -> Locale.SIMPLIFIED_CHINESE
         AppLanguage.ENGLISH -> Locale.ENGLISH
     },
-    random: Random = Random.Default,
 ): String =
     if (locale.language == Locale.CHINESE.language) {
-        listOf(
-            "在呢",
-            "我在，请说",
-            "听着呢",
-            "嗯，我在",
-        )
+        "嗯？"
     } else {
-        listOf(
-            "I'm here.",
-            "Yes?",
-            "I'm listening.",
-            "Ready.",
-        )
-    }.random(random)
+        "Yes?"
+    }
 
 private fun AgentPipelineStage.toUiStage(): ChatPipelineStage =
     when (this) {

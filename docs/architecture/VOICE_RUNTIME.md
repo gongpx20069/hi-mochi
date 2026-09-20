@@ -56,8 +56,8 @@ outside the audio thread.
 - Background thread; never block the main thread.
 - Bounded chunk cadence and two-second duplicate suppression.
 - Stop wake capture before STT obtains the microphone.
-- After a confirmed `HI MOCHI` keyword detection, speak one short randomized
-  acknowledgement in the selected app language before STT starts. This
+- After a confirmed `HI MOCHI` keyword detection, speak a fixed one-syllable
+  acknowledgement ("嗯？" in Chinese, "Yes?" in English) before STT starts. This
   acknowledgement is transient audio only and never enters conversation
   history or model context. Direct microphone and media-button triggers skip it.
 - Android SpeechRecognizer remains the default and requires no cloud setup.

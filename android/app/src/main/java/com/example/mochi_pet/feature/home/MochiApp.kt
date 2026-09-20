@@ -3788,7 +3788,7 @@ private fun BuiltInToolCard(
 }
 
 @Composable
-private fun BuiltInToolRow(
+internal fun BuiltInToolRow(
     tool: BuiltInToolSummary,
     disabled: Boolean,
     onSetEnabled: (String, Boolean) -> Unit,
@@ -5634,7 +5634,7 @@ private fun TodoRow(
 }
 
 @Composable
-private fun PlannerCard(content: @Composable ColumnScope.() -> Unit) {
+internal fun PlannerCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceVariant,
