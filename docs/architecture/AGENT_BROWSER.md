@@ -80,7 +80,7 @@ Agent turn starts
   -> Tool loop reads and acts through the five schemas
   -> LLM produces the final response
   -> browser resources are destroyed
-  -> Android TextToSpeech starts
+  -> selected speech synthesis starts
 ```
 
 Cleanup runs in `finally` on success, cancellation, timeout, provider failure,

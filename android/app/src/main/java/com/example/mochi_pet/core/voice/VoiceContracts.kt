@@ -16,6 +16,16 @@ enum class VoiceInputTrigger {
     WAKE_WORD,
 }
 
+enum class SpeechPurpose {
+    REPLY,
+    WAKE_ACKNOWLEDGEMENT,
+}
+
+enum class SpeechPlaybackResult {
+    COMPLETED,
+    FAILED,
+}
+
 sealed interface VoiceRuntimeEvent {
     data class Availability(
         val recognitionAvailable: Boolean,
@@ -23,6 +33,7 @@ sealed interface VoiceRuntimeEvent {
     ) : VoiceRuntimeEvent
 
     data object ListeningStarted : VoiceRuntimeEvent
+    data object SpeakingStarted : VoiceRuntimeEvent
 
     data class PartialTranscript(
         val text: String,
@@ -48,6 +59,10 @@ fun reduceVoiceRuntimeState(
         VoiceRuntimeEvent.ListeningStarted -> state.copy(
             isListening = true,
             partialTranscript = "",
+            errorMessage = null,
+            offerSpeechSettings = false,
+        )
+        VoiceRuntimeEvent.SpeakingStarted -> state.copy(
             errorMessage = null,
             offerSpeechSettings = false,
         )
@@ -78,7 +93,8 @@ interface VoiceRuntime {
 
     fun speak(
         text: String,
-        onCompleted: () -> Unit = {},
+        purpose: SpeechPurpose = SpeechPurpose.REPLY,
+        onCompleted: (SpeechPlaybackResult) -> Unit = {},
     )
 
     fun stopSpeaking()

@@ -5,7 +5,7 @@
 Mochi cards are trusted native visualizations of an Agent reply. For each
 individual assistant message, a valid card replaces only that message's
 duplicate text bubble. Messages without a card use the normal text bubble. The
-accepted reply text remains available for TextToSpeech, conversation history,
+accepted reply text remains available for speech synthesis, conversation history,
 and fallback.
 
 The implementation is intentionally smaller than a general server-driven UI
@@ -209,7 +209,7 @@ Listening
   -> placement resolution
   -> atomic navigation/state update
   -> Compose presentation
-  -> TextToSpeech
+  -> selected speech synthesis
   -> follow-up Listening or wake capture
 ```
 

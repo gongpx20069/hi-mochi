@@ -483,14 +483,15 @@ internal fun iFlytekSignedUrl(
     apiKey: String,
     apiSecret: String,
     clock: Clock,
+    endpoint: HttpUrl = "https://$IFLYTEK_HOST$IFLYTEK_PATH".toHttpUrl(),
 ): HttpUrl {
     val date = IFLYTEK_DATE_FORMATTER.format(
         clock.instant().atZone(ZoneOffset.UTC),
     )
     val signatureOrigin =
-        "host: $IFLYTEK_HOST\n" +
+        "host: ${endpoint.host}\n" +
             "date: $date\n" +
-            "GET $IFLYTEK_PATH HTTP/1.1"
+            "GET ${endpoint.encodedPath} HTTP/1.1"
     val mac = Mac.getInstance("HmacSHA256").apply {
         init(
             SecretKeySpec(
@@ -509,12 +510,11 @@ internal fun iFlytekSignedUrl(
     val authorization = Base64.getEncoder().encodeToString(
         authorizationOrigin.toByteArray(Charsets.UTF_8),
     )
-    return "https://$IFLYTEK_HOST$IFLYTEK_PATH"
-        .toHttpUrl()
+    return endpoint
         .newBuilder()
         .addQueryParameter("authorization", authorization)
         .addQueryParameter("date", date)
-        .addQueryParameter("host", IFLYTEK_HOST)
+        .addQueryParameter("host", endpoint.host)
         .build()
 }
 
@@ -701,7 +701,7 @@ private fun parseJsonObject(
         )
     }
 
-private fun speechLanguageTag(locale: Locale): String =
+internal fun speechLanguageTag(locale: Locale): String =
     if (locale.language.equals("zh", ignoreCase = true)) {
         "zh-CN"
     } else {

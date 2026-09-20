@@ -6070,7 +6070,7 @@ private fun ConversationError(
             )
             onOpenSpeechSettings?.let { openSettings ->
                 TextButton(onClick = openSettings) {
-                    Text("Set up speech recognition")
+                    Text("Set up speech settings")
                 }
             }
         }
@@ -6078,7 +6078,7 @@ private fun ConversationError(
 }
 
 @Composable
-private fun ProviderSettingsSurface(
+internal fun ProviderSettingsSurface(
     state: ProviderSettingsUiState,
     speechState: SpeechSettingsUiState,
     providerShareState: ProviderShareUiState,
@@ -6155,6 +6155,15 @@ private fun ProviderSettingsSurface(
     }
     var azureSpeechApiKey by remember(speechSummary) {
         mutableStateOf("")
+    }
+    var speechSynthesisEnabled by remember(speechSummary) {
+        mutableStateOf(speechSummary.synthesisEnabled)
+    }
+    var iFlytekVoice by remember(speechSummary) {
+        mutableStateOf(speechSummary.iFlytekVoice)
+    }
+    var azureVoice by remember(speechSummary) {
+        mutableStateOf(speechSummary.azureVoice)
     }
     var showShareProviders by remember { mutableStateOf(false) }
     var shareLlm by remember { mutableStateOf(true) }
@@ -6466,7 +6475,7 @@ private fun ProviderSettingsSurface(
         val speechSection: LazyListScope.() -> Unit = {
             item {
                 Text(
-                    text = "Speech recognition",
+                    text = "Speech recognition and synthesis",
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -6626,6 +6635,61 @@ private fun ProviderSettingsSurface(
                             Text("Open Azure Speech setup")
                         }
                     }
+                    if (speechProvider != SpeechProvider.SYSTEM) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(
+                                "Also use this provider for speech synthesis",
+                                modifier = Modifier.weight(1f),
+                            )
+                            Switch(
+                                checked = speechSynthesisEnabled,
+                                onCheckedChange = { speechSynthesisEnabled = it },
+                            )
+                        }
+                        Text(
+                            "Reuses the saved credentials. When enabled, assistant " +
+                                "reply text is sent to this provider. Wake acknowledgements " +
+                                "always use Android speech. Disabled by default.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (speechSynthesisEnabled) {
+                            OutlinedTextField(
+                                value = if (speechProvider == SpeechProvider.IFLYTEK) {
+                                    iFlytekVoice
+                                } else {
+                                    azureVoice
+                                },
+                                onValueChange = {
+                                    if (speechProvider == SpeechProvider.IFLYTEK) {
+                                        iFlytekVoice = it
+                                    } else {
+                                        azureVoice = it
+                                    }
+                                },
+                                label = { Text("Synthesis voice ID (optional)") },
+                                supportingText = {
+                                    Text(
+                                        if (speechProvider == SpeechProvider.IFLYTEK) {
+                                            "Default: x4_xiaoyan. Enable streaming TTS " +
+                                                "and the selected voice in the iFlytek console."
+                                        } else {
+                                            "Default: Xiaoxiao (Chinese) or Jenny (English). " +
+                                                "Enter a full voice ID, e.g. zh-CN-XiaoxiaoNeural. " +
+                                                "The Speech resource must support synthesis."
+                                        },
+                                    )
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(18.dp),
+                            )
+                        }
+                    }
                     speechState.feedback?.let {
                         Text(
                             text = it,
@@ -6649,6 +6713,9 @@ private fun ProviderSettingsSurface(
                                     azureEndpoint = azureSpeechEndpoint,
                                     azureApiKeyReplacement =
                                         azureSpeechApiKey,
+                                    synthesisEnabled = speechSynthesisEnabled,
+                                    iFlytekVoice = iFlytekVoice,
+                                    azureVoice = azureVoice,
                                 ),
                             )
                             iFlytekApiKey = ""
@@ -6664,7 +6731,7 @@ private fun ProviderSettingsSurface(
                             if (speechState.isSaving) {
                                 "Saving..."
                             } else {
-                                "Save speech recognition"
+                                "Save speech settings"
                             },
                         )
                     }

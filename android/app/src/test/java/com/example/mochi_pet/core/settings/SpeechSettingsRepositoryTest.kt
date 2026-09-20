@@ -7,9 +7,79 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class SpeechSettingsRepositoryTest {
+    @Test
+    fun `synthesis is opt in and reuses encrypted iFlytek secrets`() = runBlocking {
+        val repository = repository()
+        val initial = SpeechSettingsInput(
+            provider = SpeechProvider.IFLYTEK,
+            iFlytekAppId = "test-app",
+            iFlytekApiKeyReplacement = "test-key",
+            iFlytekApiSecretReplacement = "test-secret",
+        )
+        repository.save(initial)
+        assertFalse(repository.loadSummary().synthesisEnabled)
+        assertEquals(SpeechRuntimeConfig.System, repository.loadSynthesisConfig())
+
+        repository.save(
+            initial.copy(
+                iFlytekApiKeyReplacement = "",
+                iFlytekApiSecretReplacement = "",
+                synthesisEnabled = true,
+                iFlytekVoice = " x4_xiaoyan ",
+            ),
+        )
+        val config = repository.loadSynthesisConfig() as SpeechRuntimeConfig.IFlytek
+        assertEquals("test-key", config.apiKey)
+        assertEquals("test-secret", config.apiSecret)
+        assertEquals("x4_xiaoyan", config.voice)
+        assertTrue(repository.loadSummary().synthesisEnabled)
+
+        repository.save(SpeechSettingsInput(provider = SpeechProvider.SYSTEM, synthesisEnabled = true))
+        assertFalse(repository.loadSummary().synthesisEnabled)
+        assertEquals(SpeechRuntimeConfig.System, repository.loadSynthesisConfig())
+    }
+
+    @Test
+    fun `azure synthesis voice survives reload without replacing the key`() = runBlocking {
+        val store = SpeechPreferencesDataStore()
+        val repository = DataStoreSpeechSettingsRepository(store, SpeechFakeCipher())
+        val input = SpeechSettingsInput(
+            provider = SpeechProvider.AZURE,
+            azureEndpoint = "https://test.cognitiveservices.azure.com",
+            azureApiKeyReplacement = "test-key",
+            synthesisEnabled = true,
+            azureVoice = "zh-CN-XiaoxiaoNeural",
+        )
+        repository.save(input)
+        repository.save(input.copy(azureApiKeyReplacement = ""))
+        val restored = DataStoreSpeechSettingsRepository(store, SpeechFakeCipher())
+        val config = restored.loadSynthesisConfig() as SpeechRuntimeConfig.Azure
+        assertEquals("test-key", config.apiKey)
+        assertEquals(input.azureVoice, config.voice)
+        assertEquals(input.azureVoice, restored.loadSummary().azureVoice)
+    }
+
+    @Test
+    fun `invalid voice ID is rejected before changing stored settings`() = runBlocking {
+        val repository = repository()
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                repository.save(
+                    SpeechSettingsInput(
+                        provider = SpeechProvider.SYSTEM,
+                        azureVoice = "<voice/>",
+                    ),
+                )
+            }
+        }
+        assertEquals(SpeechSettingsSummary(), repository.loadSummary())
+    }
+
     @Test
     fun `system recognition is the ready default`() = runBlocking {
         val repository = repository()

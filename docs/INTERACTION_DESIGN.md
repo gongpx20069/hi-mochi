@@ -60,7 +60,7 @@ automatic scrolling to the newest message, and a raised rounded composer that
 keeps text and voice actions distinct. Restored history and Scheduled Agent
 results retain their persisted timestamps. Errors and partial speech appear as
 separate status cards rather than conversation messages. The validated
-directive is applied before the accepted Agent reply is sent to TextToSpeech.
+directive is applied before the accepted Agent reply is sent to speech synthesis.
 Provider failures use localized, actionable status messages distinguishing
 timeout, connectivity, access denial, rate/quota limits, service availability,
 configuration, and response errors. Raw provider error text is not displayed.
@@ -126,7 +126,7 @@ window brightness.
 
 The visual transition never replaces the spoken response. Mochi's reply must
 explicitly contain the displayed local date/time or weather facts, and
-TextToSpeech reads that same reply.
+The selected speech-output path reads that same reply.
 
 Trusted generated cards use one data model and Action renderer in both Home and
 Talk. On each message, a valid card replaces only that message's duplicate
@@ -192,6 +192,20 @@ Azure OpenAI explains that the model field is the deployment name and exposes
 the API version separately. Saving a blank API-key replacement preserves the
 existing encrypted key.
 
+**Speech recognition and synthesis** retains Android as the zero-configuration
+default. Selecting iFlytek or Azure exposes a default-off **Also use this provider
+for speech synthesis** switch. It reuses the existing encrypted credentials;
+blank secret fields still preserve them. The adjacent disclosure explains that
+assistant reply text leaves the device when enabled. An optional voice ID appears
+only while enabled, with provider-specific defaults and service-activation guidance.
+This is one shared Provider selection, not independent STT and TTS accounts.
+
+Wake acknowledgement always requests a local Android voice; a missing local voice
+does not prevent listening. Cloud synthesis errors remain visible as status, preserve
+the already accepted reply, and stop the automatic follow-up listening loop. There is
+no silent fallback or automatic retry after partial playback. A new wake or explicit
+microphone action can start another turn.
+
 Share Providers always opens a checklist before Android's share sheet. The
 configured LLM and speech Providers begin selected; every Tool credential
 entry begins unselected on each opening. Available Tool entries are Amap,
@@ -201,6 +215,9 @@ resources. Import replaces only included connections and then enables their
 Provider switches and the Tool selections carried by the share. Notion OAuth,
 Mi Home sessions, and Android permissions require setup on the receiving
 device and never appear in the checklist.
+Speech shares include the synthesis opt-in and selected voice. Older v2 speech
+shares without these fields import with system speech output; receivers need
+an updated app to accept shares carrying the new fields.
 
 Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
 Installed/Explore uses a dark selected segment. Explore opens with the public

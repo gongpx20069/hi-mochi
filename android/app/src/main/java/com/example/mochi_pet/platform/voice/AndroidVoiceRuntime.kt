@@ -17,32 +17,41 @@ import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.SpeechRuntimeConfig
 import com.example.mochi_pet.core.settings.SpeechSettingsRepository
 import com.example.mochi_pet.core.voice.MAX_TRANSCRIPT_CHARS
+import com.example.mochi_pet.core.voice.SpeechPlaybackResult
+import com.example.mochi_pet.core.voice.SpeechPurpose
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceRuntimeEvent
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.voice.reduceVoiceRuntimeState
 import java.io.File
+import java.io.IOException
+import java.security.GeneralSecurityException
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class AndroidVoiceRuntime(
+class AndroidVoiceRuntime internal constructor(
     context: Context,
     private val speechSettingsRepository: SpeechSettingsRepository,
+    private val synthesizer: SpeechSynthesizer = CloudSpeechSynthesizer(),
+    private val pcmPlayer: PcmSpeechPlayer = AndroidPcmSpeechPlayer(),
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : VoiceRuntime, AutoCloseable {
     private val applicationContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
     private val audioFocus = AndroidAudioFocusCoordinator(applicationContext)
     private val mutableState = MutableStateFlow(
         VoiceRuntimeState(
@@ -51,7 +60,8 @@ class AndroidVoiceRuntime(
     )
     private var finalTranscriptCallback: ((String) -> Unit)? = null
     private var noResultCallback: (() -> Unit)? = null
-    private var speechCompletionCallback: (() -> Unit)? = null
+    private var speechCompletionCallback: ((SpeechPlaybackResult) -> Unit)? = null
+    private var synthesisJob: Job? = null
     private var activeUtteranceId: String? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private var textToSpeech: TextToSpeech? = null
@@ -100,6 +110,8 @@ class AndroidVoiceRuntime(
         onNoResult: () -> Unit,
     ) {
         mainHandler.post {
+            textToSpeech?.stop()
+            finishSpeech(invokeCompletion = false)
             if (
                 !audioFocus.requestRecognitionFocus {
                     mainHandler.post {
@@ -172,57 +184,118 @@ class AndroidVoiceRuntime(
 
     override fun speak(
         text: String,
-        onCompleted: () -> Unit,
+        purpose: SpeechPurpose,
+        onCompleted: (SpeechPlaybackResult) -> Unit,
     ) {
-        val bounded = text.trim().take(
-            minOf(
-                MAX_TRANSCRIPT_CHARS,
-                TextToSpeech.getMaxSpeechInputLength(),
-            ),
-        )
-        if (bounded.isEmpty()) {
-            onCompleted()
-            return
-        }
+        val bounded = text.trim().take(MAX_TRANSCRIPT_CHARS)
         mainHandler.post {
-            val tts = textToSpeech
-            if (!mutableState.value.ttsReady || tts == null) {
-                onCompleted()
-                return@post
-            }
-            val languageStatus = tts.setLanguage(
-                AppLanguage.resolveContentLocale(),
-            )
-            if (
-                languageStatus == TextToSpeech.LANG_MISSING_DATA ||
-                languageStatus == TextToSpeech.LANG_NOT_SUPPORTED
-            ) {
-                onCompleted()
-                return@post
-            }
-            if (
-                !audioFocus.requestSpeechFocus {
-                    mainHandler.post {
-                        textToSpeech?.stop()
-                        finishSpeech()
-                    }
-                }
-            ) {
-                onCompleted()
+            textToSpeech?.stop()
+            finishSpeech(invokeCompletion = false)
+            if (bounded.isEmpty()) {
+                onCompleted(SpeechPlaybackResult.COMPLETED)
                 return@post
             }
             val utteranceId = UUID.randomUUID().toString()
             activeUtteranceId = utteranceId
             speechCompletionCallback = onCompleted
-            val result = tts.speak(
-                bounded,
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                utteranceId,
-            )
-            if (result == TextToSpeech.ERROR) {
-                finishSpeech()
+            dispatch(VoiceRuntimeEvent.SpeakingStarted)
+            if (
+                !audioFocus.requestSpeechFocus {
+                    mainHandler.post {
+                        if (utteranceId == activeUtteranceId) {
+                            textToSpeech?.stop()
+                            failSpeech("Speech audio focus was lost")
+                        }
+                    }
+                }
+            ) {
+                failSpeech("Speech audio focus is unavailable")
+                return@post
             }
+            if (purpose == SpeechPurpose.WAKE_ACKNOWLEDGEMENT) {
+                speakSystem(bounded, utteranceId, localOnly = true)
+                return@post
+            }
+            val locale = AppLanguage.resolveContentLocale()
+            synthesisJob = scope.launch {
+                val failure = try {
+                    when (val config = speechSettingsRepository.loadSynthesisConfig()) {
+                        SpeechRuntimeConfig.System -> {
+                            mainHandler.post {
+                                if (utteranceId == activeUtteranceId) {
+                                    speakSystem(bounded, utteranceId)
+                                }
+                            }
+                            return@launch
+                        }
+                        else -> synthesisChunks(bounded).forEach { chunk ->
+                            ensureActive()
+                            if (chunk.isNotBlank()) {
+                                val audio = synthesizer.synthesize(config, chunk, locale)
+                                ensureActive()
+                                pcmPlayer.play(audio)
+                            }
+                        }
+                    }
+                    null
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: SpeechSynthesisException) {
+                    error.failure
+                } catch (_: IOException) {
+                    SynthesisFailure.NETWORK
+                } catch (_: GeneralSecurityException) {
+                    SynthesisFailure.SETTINGS
+                } catch (_: IllegalStateException) {
+                    SynthesisFailure.SETTINGS
+                } catch (_: IllegalArgumentException) {
+                    SynthesisFailure.SETTINGS
+                }
+                mainHandler.post {
+                    if (utteranceId == activeUtteranceId) {
+                        if (failure == null) finishSpeech() else failSpeech(failure.message)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun speakSystem(
+        text: String,
+        utteranceId: String,
+        localOnly: Boolean = false,
+    ) {
+        val tts = textToSpeech
+        if (!mutableState.value.ttsReady || tts == null) {
+            failSpeech(SynthesisFailure.PLAYBACK.message)
+            return
+        }
+        val languageStatus = tts.setLanguage(AppLanguage.resolveContentLocale())
+        if (
+            languageStatus == TextToSpeech.LANG_MISSING_DATA ||
+            languageStatus == TextToSpeech.LANG_NOT_SUPPORTED
+        ) {
+            failSpeech(SynthesisFailure.PLAYBACK.message)
+            return
+        }
+        if (localOnly) {
+            val language = AppLanguage.resolveContentLocale().language
+            val voice = tts.voices?.filter {
+                !it.isNetworkConnectionRequired && it.locale.language == language
+            }?.minByOrNull { it.latency }
+            if (voice == null || tts.setVoice(voice) == TextToSpeech.ERROR) {
+                failSpeech(SynthesisFailure.PLAYBACK.message)
+                return
+            }
+        }
+        val result = tts.speak(
+            text.take(TextToSpeech.getMaxSpeechInputLength()),
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            utteranceId,
+        )
+        if (result == TextToSpeech.ERROR) {
+            failSpeech(SynthesisFailure.PLAYBACK.message)
         }
     }
 
@@ -640,13 +713,23 @@ class AndroidVoiceRuntime(
         speechRecognizer?.cancel()
     }
 
-    private fun finishSpeech(invokeCompletion: Boolean = true) {
+    private fun failSpeech(message: String) {
+        dispatch(VoiceRuntimeEvent.Failed(message, offerSpeechSettings = true))
+        finishSpeech(result = SpeechPlaybackResult.FAILED)
+    }
+
+    private fun finishSpeech(
+        invokeCompletion: Boolean = true,
+        result: SpeechPlaybackResult = SpeechPlaybackResult.COMPLETED,
+    ) {
         val completion = speechCompletionCallback
         activeUtteranceId = null
         speechCompletionCallback = null
+        synthesisJob?.cancel()
+        synthesisJob = null
         audioFocus.abandon()
         if (invokeCompletion) {
-            completion?.invoke()
+            completion?.invoke(result)
         }
     }
 
@@ -715,8 +798,8 @@ class AndroidVoiceRuntime(
         override fun onStart(utteranceId: String?) = Unit
 
         override fun onDone(utteranceId: String?) {
-            if (utteranceId == activeUtteranceId) {
-                mainHandler.post { finishSpeech() }
+            mainHandler.post {
+                if (utteranceId != null && utteranceId == activeUtteranceId) finishSpeech()
             }
         }
 
@@ -733,8 +816,10 @@ class AndroidVoiceRuntime(
         }
 
         private fun handleSpeechError(utteranceId: String?) {
-            if (utteranceId == activeUtteranceId) {
-                mainHandler.post { finishSpeech() }
+            mainHandler.post {
+                if (utteranceId != null && utteranceId == activeUtteranceId) {
+                    failSpeech(SynthesisFailure.PLAYBACK.message)
+                }
             }
         }
     }

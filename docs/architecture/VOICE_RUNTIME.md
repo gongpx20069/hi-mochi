@@ -61,8 +61,11 @@ outside the audio thread.
   acknowledgement is transient audio only and never enters conversation
   history or model context. Direct microphone and media-button triggers skip it.
 - Android SpeechRecognizer remains the default and requires no cloud setup.
-- Settings may optionally select iFlytek or Azure Speech for STT only; Android
-  TextToSpeech remains the TTS implementation.
+- Settings may optionally select iFlytek or Azure Speech for STT. A separate,
+  default-off synthesis opt-in reuses that Provider's encrypted credentials.
+  Android TextToSpeech remains the default output path. Wake acknowledgements
+  bypass settings and cloud requests and require an installed non-network Android
+  voice; if unavailable, listening still starts without waiting on a cloud voice.
 - Cloud STT captures each utterance once as temporary 16 kHz mono PCM16 and
   uses the local sherpa-onnx Silero VAD to detect its endpoint before upload.
   It retries that same audio up to three times for transient failures.
@@ -81,6 +84,36 @@ outside the audio thread.
   available to reduce self-triggering from Mochi's speaker output.
 - Release AudioRecord, streams, and native objects on every stop path.
 - Native initialization errors are visible; no silent slow fallback.
+
+### Optional cloud synthesis
+
+`VoiceRuntime.speak` distinguishes reply output from wake acknowledgement and
+reports typed completed/failed results. The ViewModel opens follow-up STT only
+after completed reply playback. Platform failures expose safe localized status;
+raw provider bodies, signed URLs, credentials, and reply text are not logged.
+
+`AndroidVoiceRuntime` owns synthesis cancellation and audio focus. iFlytek uses
+HMAC-signed `tts-api.xfyun.cn/v2/tts` WebSockets with UTF-8/base64 text and raw
+16 kHz mono PCM16 output. The default voice is `x4_xiaoyan`; the account must
+enable streaming TTS and that voice. Null successful data frames are skipped.
+Azure uses the same Speech resource key with escaped SSML and
+`raw-16khz-16bit-mono-pcm`. Custom subdomains use `/tts/cognitiveservices/v1`;
+regional STT/resource endpoints map to the regional TTS hostname and
+`/cognitiveservices/v1`. Azure defaults to `zh-CN-XiaoxiaoNeural` for Chinese and
+`en-US-JennyNeural` otherwise. Users may override the provider voice ID.
+
+Reply text is split at sentence boundaries where possible, with at most 300
+Unicode code points per request (strictly below iFlytek's 8000-byte limit).
+Each request has a 30-second synthesis deadline and a 4 MiB PCM bound. Chunks
+are synthesized and played sequentially from memory, never written to files,
+history, memory, backup, or Provider shares as audio. Native AudioTrack playback
+is cancellable, bounded by its PCM duration plus five seconds, and completes
+only after the playback head drains the submitted samples.
+
+Interruption, focus loss, or runtime closure cancels the network operation and
+releases playback resources. Late completion/error events are checked against
+the active utterance on the main thread. Failed chunks are not retried, earlier
+audio is not replayed, and cloud failures never silently fall back to Android.
 
 ## 5. Observability
 

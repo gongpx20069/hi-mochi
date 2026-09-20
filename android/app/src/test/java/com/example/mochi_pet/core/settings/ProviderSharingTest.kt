@@ -4,6 +4,7 @@ import com.example.mochi_pet.core.agent.llm.ProviderType
 import com.example.mochi_pet.core.tools.SharedManualMcpServer
 import com.example.mochi_pet.core.tools.SharedTencentDocsProvider
 import com.example.mochi_pet.core.tools.SharedToolProviders
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -12,6 +13,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProviderSharingTest {
+    @Test
+    fun `speech shares without synthesis fields keep system output`() {
+        val speech = Json.decodeFromString<SharedSpeechProvider>(
+            """{"provider":"IFLYTEK","iFlytekAppId":"test-app","iFlytekApiKey":"test-key","iFlytekApiSecret":"test-secret"}""",
+        )
+        assertFalse(speech.synthesisEnabled)
+        assertEquals("", speech.iFlytekVoice)
+        assertEquals("", speech.azureVoice)
+    }
+
     private val bundle = SharedProviderBundle(
         llm = SharedLlmProvider(
             providerType = ProviderType.AZURE_OPENAI,
@@ -27,6 +38,8 @@ class ProviderSharingTest {
             iFlytekAppId = "app-id",
             iFlytekApiKey = "speech-key",
             iFlytekApiSecret = "speech-secret",
+            synthesisEnabled = true,
+            iFlytekVoice = "x4_xiaoyan",
         ),
         tools = SharedToolProviders(
             tencentDocs = SharedTencentDocsProvider(

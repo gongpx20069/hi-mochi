@@ -47,12 +47,17 @@ runtime.
 3. Run the local agent loop against the user's BYOK model.
 4. Execute local tools.
 5. Apply a validated UI directive.
-6. Speak the final response with Android `TextToSpeech`.
+6. Speak the final response with Android `TextToSpeech` by default, or the
+   explicitly enabled synthesis service of the selected speech Provider.
 
 The wake word is enabled by default after Android permissions are granted.
 Users can explicitly disable it in Settings.
 Cloud STT is an optional reliability recommendation, never a prerequisite.
-Android `TextToSpeech` remains the speech-output implementation.
+Cloud synthesis is also optional and default-off. iFlytek and Azure Speech
+reuse their recognition credentials through **Also use this provider for
+speech synthesis**, with an optional voice ID. Enabling it sends assistant
+reply text to that Provider; service/voice access and quota must be available.
+Wake acknowledgements remain local Android speech, not cloud synthesis.
 
 ### 3.3 Mochi Planner
 

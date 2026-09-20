@@ -1,9 +1,22 @@
 package com.example.mochi_pet.feature.home
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import com.example.mochi_pet.platform.voice.SynthesisFailure
 import org.junit.Test
 
 class UiLocalizationTest {
+    @Test
+    fun `synthesis settings and safe errors have Chinese translations`() {
+        assertEquals(
+            "同时用于语音合成",
+            localizeUiText("Also use this provider for speech synthesis", "zh"),
+        )
+        SynthesisFailure.entries.forEach {
+            assertNotEquals(it.message, localizeUiText(it.message, "zh"))
+        }
+    }
+
     @Test
     fun `Chinese locale translates known UI text`() {
         assertEquals("设置", localizeUiText("Settings", "zh"))

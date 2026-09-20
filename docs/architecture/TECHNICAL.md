@@ -18,7 +18,7 @@ This document defines the native Android implementation.
 | Precise reminders | AlarmManager |
 | Wake word/VAD | sherpa-onnx Android AAR |
 | STT | Android SpeechRecognizer by default; optional iFlytek/Azure Speech |
-| TTS | Android TextToSpeech |
+| TTS | Android TextToSpeech by default; opt-in iFlytek/Azure Speech using existing speech credentials |
 
 ## Releases and Provider sharing
 
@@ -60,7 +60,7 @@ Wake / mic / text
   -> Room / Android capability adapters / Agent Browser
   -> validated AgentResponse
   -> SurfaceNavigator
-  -> TextToSpeech
+  -> selected speech synthesis path
 ```
 
 The Main Agent registry adds `delegate_agent` for each top-level run. Its
@@ -133,7 +133,7 @@ weather summary from that structured result, sends it to TTS, and preserves the
 same follow-up Listening behavior as a normal successful voice turn.
 
 The current native slice provides push-to-talk from the Conversation surface.
-`AndroidVoiceRuntime` owns the selected STT path and Android `TextToSpeech`,
+`AndroidVoiceRuntime` owns the selected STT and speech synthesis paths,
 publishes a bounded typed state, releases services with the Activity, and
 forwards the best available transcript to the ViewModel. Android
 `SpeechRecognizer` remains the zero-configuration default. Settings may

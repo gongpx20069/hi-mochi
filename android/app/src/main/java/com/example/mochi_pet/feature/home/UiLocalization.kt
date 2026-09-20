@@ -674,9 +674,29 @@ private val ZH_UI_TEXT = mapOf(
     "Azure Speech endpoint" to "Azure Speech 端点",
     "Azure Speech key" to "Azure Speech 密钥",
     "Open Azure Speech setup" to "打开 Azure Speech 配置页面",
-    "Speech settings saved" to "语音识别设置已保存",
-    "Save speech recognition" to "保存语音识别设置",
-    "Set up speech recognition" to "设置语音识别",
+    "Speech settings saved" to "语音设置已保存",
+    "Save speech settings" to "保存语音设置",
+    "Speech recognition and synthesis" to "语音识别与合成",
+    "Also use this provider for speech synthesis" to "同时用于语音合成",
+    "Reuses the saved credentials. When enabled, assistant reply text is sent to this provider. Wake acknowledgements always use Android speech. Disabled by default." to
+        "复用已保存的密钥。开启后，助手回复文本会发送给此服务商；唤醒提示始终使用 Android 本地播报。默认关闭。",
+    "Synthesis voice ID (optional)" to "合成音色 ID（选填）",
+    "Default: x4_xiaoyan. Enable streaming TTS and the selected voice in the iFlytek console." to
+        "默认：x4_xiaoyan。请在讯飞控制台开通流式语音合成及所选音色。",
+    "Default: Xiaoxiao (Chinese) or Jenny (English). Enter a full voice ID, e.g. zh-CN-XiaoxiaoNeural. The Speech resource must support synthesis." to
+        "默认：中文晓晓、英文 Jenny。可填写完整音色 ID，例如 zh-CN-XiaoxiaoNeural。Speech 资源需支持语音合成。",
+    "Speech voice must be a valid provider voice ID" to "请填写有效的服务商音色 ID",
+    "Cannot connect to the speech synthesis provider." to "无法连接语音合成服务，请检查网络与服务状态。",
+    "Speech synthesis timed out. Please try again." to "语音合成超时，请重试。",
+    "Speech synthesis authorization failed. Check your provider credentials." to "语音合成鉴权失败，请检查服务商密钥。",
+    "Speech synthesis is rate limited or its quota is exhausted." to "语音合成请求过于频繁或额度已用完。",
+    "Speech synthesis was rejected. Check service activation and voice access." to "语音合成请求被拒绝，请检查是否已开通服务及所选音色。",
+    "The speech provider returned invalid or oversized audio." to "语音服务返回的音频无效或过大。",
+    "Speech audio could not be played on this device." to "此设备无法播放合成语音，请检查系统语音引擎与音频设置。",
+    "Speech synthesis settings are incomplete or invalid." to "语音合成设置不完整或无效，请检查语音服务配置。",
+    "Speech audio focus was lost" to "语音播报已被其他音频打断",
+    "Speech audio focus is unavailable" to "暂时无法获取音频焦点进行语音播报",
+    "Set up speech settings" to "设置语音服务",
     "Android speech recognition is busy. Try again." to
         "Android 语音识别正忙，请重试。",
     "Android speech recognition is unstable. Try again, or set up iFlytek/Azure Speech in Settings for more reliable recognition." to

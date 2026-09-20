@@ -90,6 +90,8 @@ import com.example.mochi_pet.core.weather.WeatherRepository
 import com.example.mochi_pet.core.web.WebContentException
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
+import com.example.mochi_pet.core.voice.SpeechPlaybackResult
+import com.example.mochi_pet.core.voice.SpeechPurpose
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
 import com.example.mochi_pet.platform.browser.AgentBrowserRuntime
@@ -720,11 +722,14 @@ class MochiHomeViewModel(
         mutablePipelineState.value = ChatPipelineUiState(
             stage = ChatPipelineStage.SPEAKING,
         )
-        runtime.speak(text) {
+        runtime.speak(text) { result ->
             if (version != interactionVersion) {
                 return@speak
             }
-            if (continueListeningAfterReply) {
+            if (
+                continueListeningAfterReply &&
+                result == SpeechPlaybackResult.COMPLETED
+            ) {
                 startFollowUpListening(version)
             } else {
                 mutablePipelineState.value = ChatPipelineUiState()
@@ -775,7 +780,10 @@ class MochiHomeViewModel(
                 mutablePipelineState.value = ChatPipelineUiState(
                     stage = ChatPipelineStage.SPEAKING,
                 )
-                runtime.speak(wakeAcknowledgement()) {
+                runtime.speak(
+                    wakeAcknowledgement(),
+                    purpose = SpeechPurpose.WAKE_ACKNOWLEDGEMENT,
+                ) {
                     startListening()
                 }
             } else {

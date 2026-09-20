@@ -60,6 +60,9 @@ internal data class SharedSpeechProvider(
     val iFlytekApiSecret: String = "",
     val azureEndpoint: String = "",
     val azureApiKey: String = "",
+    val synthesisEnabled: Boolean = false,
+    val iFlytekVoice: String = "",
+    val azureVoice: String = "",
 )
 
 class ProviderShareManager(
@@ -145,6 +148,9 @@ class ProviderShareManager(
                 azureEndpoint = speech.azureEndpoint,
                 azureApiKeyReplacement =
                     speech.azureApiKey.takeIf(String::isNotBlank),
+                synthesisEnabled = speech.synthesisEnabled,
+                iFlytekVoice = speech.iFlytekVoice,
+                azureVoice = speech.azureVoice,
             )
         }
         speechInput?.validate()
@@ -176,11 +182,15 @@ class ProviderShareManager(
                 iFlytekAppId = appId,
                 iFlytekApiKey = apiKey,
                 iFlytekApiSecret = apiSecret,
+                synthesisEnabled = synthesisEnabled,
+                iFlytekVoice = voice,
             )
             is SpeechRuntimeConfig.Azure -> SharedSpeechProvider(
                 provider = SpeechProvider.AZURE,
                 azureEndpoint = endpoint,
                 azureApiKey = apiKey,
+                synthesisEnabled = synthesisEnabled,
+                azureVoice = voice,
             )
         }
 }

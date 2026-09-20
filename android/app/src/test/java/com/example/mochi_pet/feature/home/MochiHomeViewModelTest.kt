@@ -27,6 +27,8 @@ import com.example.mochi_pet.core.settings.ProviderSettingsSummary
 import com.example.mochi_pet.core.weather.CurrentWeather
 import com.example.mochi_pet.core.weather.WeatherRepository
 import com.example.mochi_pet.core.voice.VoiceRuntime
+import com.example.mochi_pet.core.voice.SpeechPlaybackResult
+import com.example.mochi_pet.core.voice.SpeechPurpose
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import com.example.mochi_pet.core.wake.WakeRuntime
@@ -407,6 +409,33 @@ class MochiHomeViewModelTest {
     }
 
     @Test
+    fun `failed synthesis preserves reply without opening follow up microphone`() {
+        val voiceRuntime = VoiceRuntimeFake(
+            "Turn off the television",
+            speechResult = SpeechPlaybackResult.FAILED,
+        )
+        val wakeRuntime = WakeRuntimeFake()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ ->
+                AgentRunner { AgentReply("Done.", "neutral") }
+            },
+            voiceRuntime = voiceRuntime,
+            wakeRuntime = wakeRuntime,
+            clock = fixedClock(),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.startVoiceInput()
+
+        assertEquals(1, voiceRuntime.listenCount)
+        assertEquals("Done.", viewModel.conversationState.value.messages.last().text)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+        assertTrue(wakeRuntime.resumeCount > 0)
+    }
+
+    @Test
     fun `wake acknowledgement is one syllable in either language`() {
         assertEquals("嗯？", wakeAcknowledgementText(Locale.SIMPLIFIED_CHINESE))
         assertEquals("嗯？", wakeAcknowledgementText(Locale.TRADITIONAL_CHINESE))
@@ -436,6 +465,10 @@ class MochiHomeViewModelTest {
         assertEquals(
             listOf("嗯？", "Done."),
             voiceRuntime.spokenTexts,
+        )
+        assertEquals(
+            listOf(SpeechPurpose.WAKE_ACKNOWLEDGEMENT, SpeechPurpose.REPLY),
+            voiceRuntime.speechPurposes,
         )
         assertEquals(
             listOf("Turn on the light", "Done."),
@@ -694,6 +727,7 @@ private fun cardViewModel(
 
 private class VoiceRuntimeFake(
     transcript: String,
+    private val speechResult: SpeechPlaybackResult = SpeechPlaybackResult.COMPLETED,
 ) : VoiceRuntime {
     private val transcripts = ArrayDeque(listOf(transcript))
     override val state = MutableStateFlow(
@@ -701,6 +735,7 @@ private class VoiceRuntimeFake(
     )
     var spokenText: String? = null
     val spokenTexts = mutableListOf<String>()
+    val speechPurposes = mutableListOf<SpeechPurpose>()
     var listenCount = 0
 
     override fun startListening(
@@ -720,11 +755,13 @@ private class VoiceRuntimeFake(
 
     override fun speak(
         text: String,
-        onCompleted: () -> Unit,
+        purpose: SpeechPurpose,
+        onCompleted: (SpeechPlaybackResult) -> Unit,
     ) {
         spokenText = text
         spokenTexts += text
-        onCompleted()
+        speechPurposes += purpose
+        onCompleted(speechResult)
     }
 
     override fun stopSpeaking() = Unit
@@ -754,8 +791,9 @@ private class HoldingVoiceRuntimeFake : VoiceRuntime {
 
     override fun speak(
         text: String,
-        onCompleted: () -> Unit,
-    ) = onCompleted()
+        purpose: SpeechPurpose,
+        onCompleted: (SpeechPlaybackResult) -> Unit,
+    ) = onCompleted(SpeechPlaybackResult.COMPLETED)
 
     override fun stopSpeaking() = Unit
 }
@@ -779,7 +817,8 @@ private class InterruptibleVoiceRuntimeFake : VoiceRuntime {
 
     override fun speak(
         text: String,
-        onCompleted: () -> Unit,
+        purpose: SpeechPurpose,
+        onCompleted: (SpeechPlaybackResult) -> Unit,
     ) = Unit
 
     override fun stopSpeaking() {
