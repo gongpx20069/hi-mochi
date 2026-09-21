@@ -62,6 +62,28 @@ revision conflict, revoke, Binder death, reconnect and unknown-write outcomes.
 Verify a running remote task survives Mochi cancellation. JVM tests do not prove
 cross-APK Android identity, Activity result, or Bridge connectivity behavior.
 
+To diagnose cloud synthesis against the phone's saved settings, build
+`:app:assembleDebug :app:assembleDebugAndroidTest`, update the matching-signed
+app and test APKs with `adb install -r`, and run:
+
+```powershell
+adb -s <device-id> shell am instrument -w `
+  -e class com.example.mochi_pet.platform.voice.SpeechSynthesisDiagnosticTest `
+  -e mochiSpeechDiagnostic true `
+  com.example.mochi_pet.test/androidx.test.runner.AndroidJUnitRunner
+adb -s <device-id> logcat -d -s MochiSpeech
+```
+
+This explicit opt-in sends only a fixed test greeting and consumes the selected
+Provider's synthesis quota. Credentials stay on the device, returned audio stays
+in memory without playback, and saved settings/history are unchanged. Without
+the opt-in argument the diagnostic test is skipped. Never uninstall the target
+app or clear its data to run diagnostics.
+Optional `-e mochiSpeechDiagnosticExtended true` uses a longer fixed test passage
+to exercise streaming responses. Optional `-e mochiSpeechDiagnosticPlayback true`
+plays the returned test audio through the same media-volume path as replies,
+with transient speech audio focus; it does not change system volume levels.
+
 ## Install on a device
 
 List connected devices:

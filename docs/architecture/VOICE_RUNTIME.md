@@ -96,6 +96,9 @@ raw provider bodies, signed URLs, credentials, and reply text are not logged.
 HMAC-signed `tts-api.xfyun.cn/v2/tts` WebSockets with UTF-8/base64 text and raw
 16 kHz mono PCM16 output. The default voice is `x4_xiaoyan`; the account must
 enable streaming TTS and that voice. Null successful data frames are skipped.
+Read the response error code before decoding its audio payload: error payloads
+can have missing or null audio/status fields. Successful terminal frames may
+carry null audio after earlier frames supplied the PCM.
 Azure uses the same Speech resource key with escaped SSML and
 `raw-16khz-16bit-mono-pcm`. Custom subdomains use `/tts/cognitiveservices/v1`;
 regional STT/resource endpoints map to the regional TTS hostname and
@@ -109,6 +112,9 @@ are synthesized and played sequentially from memory, never written to files,
 history, memory, backup, or Provider shares as audio. Native AudioTrack playback
 is cancellable, bounded by its PCM duration plus five seconds, and completes
 only after the playback head drains the submitted samples.
+Playback and speech audio focus use media usage with speech content, following
+the normal media-volume control rather than an OEM's separately muted assistant
+stream. Do not modify system volumes to make synthesis audible.
 
 Interruption, focus loss, or runtime closure cancels the network operation and
 releases playback resources. Late completion/error events are checked against
@@ -121,6 +127,13 @@ Debug logs may include lifecycle, selected STT path, chunk count, latency,
 retry attempt, and error codes. They must not include credentials, captured
 audio, or recognized conversation text. Temporary recorded utterances remain
 in app-private cache only and are not retained as conversation memory.
+Synthesis failures log only the provider name, typed failure, numeric provider
+code, HTTP status, and typed audio-validation reason/frame status under
+`MochiSpeech`; never log exception causes or raw
+provider messages. A quota-consuming on-device synthesis diagnostic is opt-in,
+uses a fixed test phrase and existing on-device credentials, and does not
+read conversation history or change saved settings. Playback requires its own
+explicit diagnostic argument.
 
 Track:
 

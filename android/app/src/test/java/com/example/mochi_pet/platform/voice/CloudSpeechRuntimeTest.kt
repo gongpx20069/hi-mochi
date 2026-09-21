@@ -1,6 +1,7 @@
 package com.example.mochi_pet.platform.voice
 
 import android.os.Looper
+import android.media.AudioAttributes
 import com.example.mochi_pet.core.settings.SpeechRuntimeConfig
 import com.example.mochi_pet.core.settings.SpeechSettingsInput
 import com.example.mochi_pet.core.settings.SpeechSettingsRepository
@@ -23,6 +24,13 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class CloudSpeechRuntimeTest {
+    @Test
+    fun `speech playback follows media volume rather than hidden assistant stream`() {
+        val attributes = speechPlaybackAudioAttributes()
+        assertEquals(AudioAttributes.USAGE_MEDIA, attributes.usage)
+        assertEquals(AudioAttributes.CONTENT_TYPE_SPEECH, attributes.contentType)
+    }
+
     private var runtime: AndroidVoiceRuntime? = null
     private var settingsReads = 0
 

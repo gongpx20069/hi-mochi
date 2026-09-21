@@ -150,7 +150,41 @@ class CloudSpeechSynthesizerTest {
             parseIFlytekSynthesisFrame("""{"code":11202,"message":"private provider detail"}""")
         }
         assertEquals(SynthesisFailure.QUOTA, error.failure)
+        assertEquals(11202, error.providerCode)
+        assertEquals(
+            "failure=QUOTA providerCode=11202 httpStatus=none audioFailure=none frameStatus=none",
+            error.safeDiagnostic(),
+        )
         assertFalse(error.message!!.contains("private"))
+    }
+
+    @Test
+    fun `provider rejection code survives nullable or malformed error data`() {
+        listOf(
+            """{"audio":null,"status":null}""",
+            """{"audio":null}""",
+            "\"not an audio frame\"",
+            "null",
+        ).forEach { data ->
+            val error = assertThrows(SpeechSynthesisException::class.java) {
+                parseIFlytekSynthesisFrame(
+                    """{"code":11200,"message":"private detail","data":$data}""",
+                )
+            }
+            assertEquals(SynthesisFailure.REJECTED, error.failure)
+            assertEquals(11200, error.providerCode)
+            assertEquals(null, error.audioFailure)
+            assertFalse(error.safeDiagnostic().contains("private"))
+        }
+    }
+
+    @Test
+    fun `successful terminal frame may contain null audio after previous frames`() {
+        val frame = parseIFlytekSynthesisFrame(
+            """{"code":0,"data":{"status":2,"audio":null}}""",
+        )
+        assertTrue(frame.finished)
+        assertTrue(frame.audio.isEmpty())
     }
 
     @Test
@@ -170,6 +204,13 @@ class CloudSpeechSynthesizerTest {
                 runBlocking { azureSynthesizer().synthesize(azure, "test", Locale.ENGLISH) }
             }
             assertEquals(failure, error.failure)
+            if (response.status.contains("401")) {
+                assertEquals(401, error.httpStatus)
+                assertEquals(
+                    "failure=AUTHORIZATION providerCode=none httpStatus=401 audioFailure=none frameStatus=none",
+                    error.safeDiagnostic(),
+                )
+            }
             assertFalse(error.message!!.contains("private"))
         }
     }

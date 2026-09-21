@@ -12,6 +12,12 @@ internal fun interface PcmSpeechPlayer {
     suspend fun play(audio: ByteArray)
 }
 
+internal fun speechPlaybackAudioAttributes(): AudioAttributes =
+    AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_MEDIA)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+
 internal class AndroidPcmSpeechPlayer : PcmSpeechPlayer {
     override suspend fun play(audio: ByteArray) {
         val format = AudioFormat.Builder()
@@ -27,12 +33,7 @@ internal class AndroidPcmSpeechPlayer : PcmSpeechPlayer {
         if (minimumBuffer <= 0) throw SpeechSynthesisException(SynthesisFailure.PLAYBACK)
         val track = try {
             AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build(),
-                )
+                .setAudioAttributes(speechPlaybackAudioAttributes())
                 .setAudioFormat(format)
                 .setBufferSizeInBytes(maxOf(minimumBuffer, 8_192))
                 .setTransferMode(AudioTrack.MODE_STREAM)
@@ -40,6 +41,7 @@ internal class AndroidPcmSpeechPlayer : PcmSpeechPlayer {
         } catch (_: UnsupportedOperationException) {
             throw SpeechSynthesisException(SynthesisFailure.PLAYBACK)
         }
+
         try {
             if (track.state != AudioTrack.STATE_INITIALIZED) {
                 throw SpeechSynthesisException(SynthesisFailure.PLAYBACK)

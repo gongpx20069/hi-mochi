@@ -218,8 +218,12 @@ class AndroidVoiceRuntime internal constructor(
             }
             val locale = AppLanguage.resolveContentLocale()
             synthesisJob = scope.launch {
+                var provider = "settings"
                 val failure = try {
-                    when (val config = speechSettingsRepository.loadSynthesisConfig()) {
+                    val config = speechSettingsRepository.loadSynthesisConfig()
+                    provider = config.synthesisProviderName()
+                    Log.i(SPEECH_LOG_TAG, "synthesis_started provider=$provider")
+                    when (config) {
                         SpeechRuntimeConfig.System -> {
                             mainHandler.post {
                                 if (utteranceId == activeUtteranceId) {
@@ -241,19 +245,27 @@ class AndroidVoiceRuntime internal constructor(
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: SpeechSynthesisException) {
-                    error.failure
+                    error
                 } catch (_: IOException) {
-                    SynthesisFailure.NETWORK
+                    SpeechSynthesisException(SynthesisFailure.NETWORK)
                 } catch (_: GeneralSecurityException) {
-                    SynthesisFailure.SETTINGS
+                    SpeechSynthesisException(SynthesisFailure.SETTINGS)
                 } catch (_: IllegalStateException) {
-                    SynthesisFailure.SETTINGS
+                    SpeechSynthesisException(SynthesisFailure.SETTINGS)
                 } catch (_: IllegalArgumentException) {
-                    SynthesisFailure.SETTINGS
+                    SpeechSynthesisException(SynthesisFailure.SETTINGS)
+                }
+                if (failure != null) {
+                    Log.w(
+                        SPEECH_LOG_TAG,
+                        "synthesis_failed provider=$provider ${failure.safeDiagnostic()}",
+                    )
+                } else {
+                    Log.i(SPEECH_LOG_TAG, "synthesis_completed provider=$provider")
                 }
                 mainHandler.post {
                     if (utteranceId == activeUtteranceId) {
-                        if (failure == null) finishSpeech() else failSpeech(failure.message)
+                        if (failure == null) finishSpeech() else failSpeech(failure.failure.message)
                     }
                 }
             }

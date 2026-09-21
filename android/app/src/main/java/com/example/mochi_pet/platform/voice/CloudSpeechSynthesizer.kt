@@ -14,7 +14,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.put
 import okhttp3.Call
 import okhttp3.Callback
@@ -44,7 +47,35 @@ internal enum class SynthesisFailure(val message: String) {
 
 internal class SpeechSynthesisException(
     val failure: SynthesisFailure,
-) : IOException(failure.message)
+    val providerCode: Int? = null,
+    val httpStatus: Int? = null,
+    val audioFailure: SynthesisAudioFailure? = null,
+    val frameStatus: Int? = null,
+) : IOException(failure.message) {
+    fun safeDiagnostic(): String =
+        "failure=${failure.name} providerCode=${providerCode ?: "none"} " +
+            "httpStatus=${httpStatus ?: "none"} " +
+            "audioFailure=${audioFailure?.name ?: "none"} " +
+            "frameStatus=${frameStatus ?: "none"}"
+}
+
+internal enum class SynthesisAudioFailure {
+    EMPTY,
+    ODD_PCM_SIZE,
+    SIZE_LIMIT,
+    CONTENT_TYPE,
+    EARLY_CLOSE,
+    INVALID_JSON,
+    INVALID_STATUS,
+    INVALID_BASE64,
+}
+
+internal fun SpeechRuntimeConfig.synthesisProviderName(): String =
+    when (this) {
+        SpeechRuntimeConfig.System -> "system"
+        is SpeechRuntimeConfig.IFlytek -> "iflytek"
+        is SpeechRuntimeConfig.Azure -> "azure"
+    }
 
 internal fun interface SpeechSynthesizer {
     suspend fun synthesize(
@@ -81,12 +112,17 @@ internal class CloudSpeechSynthesizer(
                 SpeechRuntimeConfig.System -> error("Cloud speech provider is required")
             }
         } ?: throw SpeechSynthesisException(SynthesisFailure.TIMEOUT)
-        if (
-            audio.isEmpty() ||
-            audio.size > MAX_SYNTHESIS_AUDIO_BYTES ||
-            audio.size % 2 != 0
-        ) {
-            throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+        val audioFailure = when {
+            audio.isEmpty() -> SynthesisAudioFailure.EMPTY
+            audio.size > MAX_SYNTHESIS_AUDIO_BYTES -> SynthesisAudioFailure.SIZE_LIMIT
+            audio.size % 2 != 0 -> SynthesisAudioFailure.ODD_PCM_SIZE
+            else -> null
+        }
+        if (audioFailure != null) {
+            throw SpeechSynthesisException(
+                SynthesisFailure.INVALID_AUDIO,
+                audioFailure = audioFailure,
+            )
         }
         return audio
     }
@@ -122,7 +158,10 @@ internal class CloudSpeechSynthesizer(
                     try {
                         val frame = parseIFlytekSynthesisFrame(text)
                         if (audio.size() + frame.audio.size > MAX_SYNTHESIS_AUDIO_BYTES) {
-                            throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+                            throw SpeechSynthesisException(
+                                SynthesisFailure.INVALID_AUDIO,
+                                audioFailure = SynthesisAudioFailure.SIZE_LIMIT,
+                            )
                         }
                         audio.write(frame.audio)
                         if (frame.finished) {
@@ -138,7 +177,10 @@ internal class CloudSpeechSynthesizer(
                 override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                     if (continuation.isActive) {
                         continuation.resumeWithException(
-                            SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO),
+                            SpeechSynthesisException(
+                                SynthesisFailure.INVALID_AUDIO,
+                                audioFailure = SynthesisAudioFailure.EARLY_CLOSE,
+                            ),
                         )
                     }
                     webSocket.close(code, null)
@@ -151,6 +193,7 @@ internal class CloudSpeechSynthesizer(
                             SpeechSynthesisException(
                                 response?.code?.let(::synthesisHttpFailure)
                                     ?: SynthesisFailure.NETWORK,
+                                httpStatus = response?.code,
                             ),
                         )
                     }
@@ -192,10 +235,16 @@ internal class CloudSpeechSynthesizer(
                     try {
                         val audio = response.use {
                             if (!it.isSuccessful) {
-                                throw SpeechSynthesisException(synthesisHttpFailure(it.code))
+                                throw SpeechSynthesisException(
+                                    synthesisHttpFailure(it.code),
+                                    httpStatus = it.code,
+                                )
                             }
                             if (it.body.contentLength() > MAX_SYNTHESIS_AUDIO_BYTES) {
-                                throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+                                throw SpeechSynthesisException(
+                                    SynthesisFailure.INVALID_AUDIO,
+                                    audioFailure = SynthesisAudioFailure.SIZE_LIMIT,
+                                )
                             }
                             val mediaType = it.body.contentType()
                             if (
@@ -203,7 +252,10 @@ internal class CloudSpeechSynthesizer(
                                 mediaType.type != "audio" &&
                                 mediaType.toString() != "application/octet-stream"
                             ) {
-                                throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+                                throw SpeechSynthesisException(
+                                    SynthesisFailure.INVALID_AUDIO,
+                                    audioFailure = SynthesisAudioFailure.CONTENT_TYPE,
+                                )
                             }
                             val output = ByteArrayOutputStream()
                             it.body.byteStream().use { input ->
@@ -212,7 +264,10 @@ internal class CloudSpeechSynthesizer(
                                     val count = input.read(buffer)
                                     if (count == -1) break
                                     if (output.size() + count > MAX_SYNTHESIS_AUDIO_BYTES) {
-                                        throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+                                        throw SpeechSynthesisException(
+                                            SynthesisFailure.INVALID_AUDIO,
+                                            audioFailure = SynthesisAudioFailure.SIZE_LIMIT,
+                                        )
                                     }
                                     output.write(buffer, 0, count)
                                 }
@@ -269,13 +324,13 @@ internal fun iFlytekSynthesisRequest(
 @Serializable
 private data class IFlytekSynthesisResponse(
     val code: Int,
-    val data: IFlytekSynthesisData? = null,
+    val data: JsonElement? = null,
 )
 
 @Serializable
 private data class IFlytekSynthesisData(
     val status: Int,
-    val audio: String = "",
+    val audio: String? = null,
 )
 
 internal data class SynthesisFrame(val audio: ByteArray, val finished: Boolean)
@@ -284,7 +339,10 @@ private val synthesisJson = Json { ignoreUnknownKeys = true }
 
 internal fun parseIFlytekSynthesisFrame(text: String): SynthesisFrame {
     if (text.length > MAX_SYNTHESIS_AUDIO_BYTES * 2) {
-        throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+        throw SpeechSynthesisException(
+            SynthesisFailure.INVALID_AUDIO,
+            audioFailure = SynthesisAudioFailure.SIZE_LIMIT,
+        )
     }
     try {
         val response = synthesisJson.decodeFromString<IFlytekSynthesisResponse>(text)
@@ -296,21 +354,35 @@ internal fun parseIFlytekSynthesisFrame(text: String): SynthesisFrame {
                     10019, 10200 -> SynthesisFailure.TIMEOUT
                     else -> SynthesisFailure.REJECTED
                 },
+                providerCode = response.code,
             )
         }
-        val data = response.data
-            ?: return SynthesisFrame(ByteArray(0), finished = false)
+        val payload = response.data
+        if (payload == null || payload == JsonNull) {
+            return SynthesisFrame(ByteArray(0), finished = false)
+        }
+        val data = synthesisJson.decodeFromJsonElement<IFlytekSynthesisData>(payload)
         if (data.status !in 1..2) {
-            throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+            throw SpeechSynthesisException(
+                SynthesisFailure.INVALID_AUDIO,
+                audioFailure = SynthesisAudioFailure.INVALID_STATUS,
+                frameStatus = data.status,
+            )
         }
         return SynthesisFrame(
-            audio = Base64.getDecoder().decode(data.audio),
+            audio = Base64.getDecoder().decode(data.audio.orEmpty()),
             finished = data.status == 2,
         )
     } catch (_: SerializationException) {
-        throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+        throw SpeechSynthesisException(
+            SynthesisFailure.INVALID_AUDIO,
+            audioFailure = SynthesisAudioFailure.INVALID_JSON,
+        )
     } catch (_: IllegalArgumentException) {
-        throw SpeechSynthesisException(SynthesisFailure.INVALID_AUDIO)
+        throw SpeechSynthesisException(
+            SynthesisFailure.INVALID_AUDIO,
+            audioFailure = SynthesisAudioFailure.INVALID_BASE64,
+        )
     }
 }
 

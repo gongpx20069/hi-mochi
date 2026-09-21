@@ -24,6 +24,7 @@ class AndroidAudioFocusCoordinator(
     fun requestSpeechFocus(onLost: () -> Unit): Boolean =
         request(
             gainType = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+            attributes = speechPlaybackAudioAttributes(),
             onLost = onLost,
         )
 
@@ -34,6 +35,10 @@ class AndroidAudioFocusCoordinator(
 
     private fun request(
         gainType: Int,
+        attributes: AudioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANT)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build(),
         onLost: () -> Unit,
     ): Boolean {
         abandon()
@@ -46,12 +51,7 @@ class AndroidAudioFocusCoordinator(
             }
         }
         val request = AudioFocusRequest.Builder(gainType)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build(),
-            )
+            .setAudioAttributes(attributes)
             .setAcceptsDelayedFocusGain(false)
             .setWillPauseWhenDucked(true)
             .setOnAudioFocusChangeListener(listener, mainHandler)
