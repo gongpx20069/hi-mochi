@@ -72,7 +72,7 @@ internal enum class SynthesisAudioFailure {
 
 internal fun SpeechRuntimeConfig.synthesisProviderName(): String =
     when (this) {
-        SpeechRuntimeConfig.System -> "system"
+        is SpeechRuntimeConfig.System -> "system"
         is SpeechRuntimeConfig.IFlytek -> "iflytek"
         is SpeechRuntimeConfig.Azure -> "azure"
     }
@@ -109,7 +109,7 @@ internal class CloudSpeechSynthesizer(
             when (config) {
                 is SpeechRuntimeConfig.IFlytek -> synthesizeIFlytek(config, text)
                 is SpeechRuntimeConfig.Azure -> synthesizeAzure(config, text, locale)
-                SpeechRuntimeConfig.System -> error("Cloud speech provider is required")
+                is SpeechRuntimeConfig.System -> error("Cloud speech provider is required")
             }
         } ?: throw SpeechSynthesisException(SynthesisFailure.TIMEOUT)
         val audioFailure = when {

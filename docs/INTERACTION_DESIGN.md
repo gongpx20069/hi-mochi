@@ -196,9 +196,33 @@ existing encrypted key.
 default. Selecting iFlytek or Azure exposes a default-off **Also use this provider
 for speech synthesis** switch. It reuses the existing encrypted credentials;
 blank secret fields still preserve them. The adjacent disclosure explains that
-assistant reply text leaves the device when enabled. An optional voice ID appears
-only while enabled, with provider-specific defaults and service-activation guidance.
+assistant reply text leaves the device when enabled. Cloud voice selection appears
+while enabled; the Android offline voice picker is available for the system Provider.
 This is one shared Provider selection, not independent STT and TTS accounts.
+
+Voice selection uses a common bottom sheet with **Follow app default**, named voice
+rows, single-choice selection, and explicit preview buttons. iFlytek offers the five
+basic presets (`x4_xiaoyan`, `x4_yezi`, `aisjiuxu`, `aisjinger`, `aisbabyxu`). Azure
+loads its region's supported voices using the saved credentials; Azure and Android
+support search, the app-language filter, all languages, and explicit refresh.
+Android lists only installed non-network voices and links to system TTS settings.
+Cloud Providers retain an advanced custom-ID field, including previously saved IDs
+that are not in the catalog. Listing does not imply account authorization or free
+usage; only a completed preview earns a transient **Last preview succeeded** label.
+
+Confirming the sheet changes the draft only; **Save speech settings** applies it.
+Each Provider remembers its own voice, including when other Providers are saved.
+Android voice names are device-local and are not copied in Provider shares.
+Connection edits (Provider, endpoint, AppID, or replacement secrets) must be saved
+before preview; voice-only edits can be previewed without saving. Preview sends
+only a fixed localized greeting, consumes cloud quota when applicable, never calls
+the LLM or writes history, and leaves the saved voice unchanged. It cannot interrupt
+an active conversation. During preview, pause wake and restore its prior enabled
+listening state afterward. Switching voices, stopping, dismissing the sheet, leaving
+Settings, or saving/importing connections cancels preview; stale callbacks cannot
+mark newer previews successful. Synthesizing and playing have distinct cancellable
+button states. Errors include safe provider/HTTP codes where available and never
+silently select a different voice.
 
 Wake acknowledgement always requests a local Android voice; a missing local voice
 does not prevent listening. Cloud synthesis errors remain visible as status, preserve

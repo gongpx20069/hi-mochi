@@ -24,6 +24,7 @@ data class SpeechSettingsSummary(
     val synthesisEnabled: Boolean = false,
     val iFlytekVoice: String = "",
     val azureVoice: String = "",
+    val systemVoice: String = "",
 ) {
     val isReady: Boolean
         get() = when (provider) {
@@ -45,13 +46,17 @@ data class SpeechSettingsInput(
     val azureEndpoint: String = "",
     val azureApiKeyReplacement: String? = null,
     val synthesisEnabled: Boolean = false,
-    val iFlytekVoice: String = "",
-    val azureVoice: String = "",
+    val iFlytekVoice: String? = null,
+    val azureVoice: String? = null,
+    val systemVoice: String? = null,
 )
 
 internal fun SpeechSettingsInput.validate() {
+    require(systemVoice == null || (systemVoice.length <= 256 && systemVoice.none(Char::isISOControl))) {
+        "Invalid system voice ID"
+    }
     require(
-        listOf(iFlytekVoice, azureVoice).all {
+        listOfNotNull(iFlytekVoice, azureVoice).all {
             it.trim().isEmpty() ||
                 it.trim().matches(Regex("[A-Za-z0-9_:-]{1,100}"))
         },
@@ -69,7 +74,7 @@ internal fun SpeechSettingsInput.validate() {
 }
 
 sealed interface SpeechRuntimeConfig {
-    data object System : SpeechRuntimeConfig
+    data class System(val voice: String = "") : SpeechRuntimeConfig
 
     data class IFlytek(
         val appId: String,
@@ -98,7 +103,7 @@ interface SpeechSettingsRepository {
         if (loadSummary().synthesisEnabled) {
             loadRuntimeConfig()
         } else {
-            SpeechRuntimeConfig.System
+            SpeechRuntimeConfig.System(loadSummary().systemVoice)
         }
 }
 
@@ -125,8 +130,9 @@ class DataStoreSpeechSettingsRepository(
             preferences[AZURE_ENDPOINT] = azureEndpoint
             preferences[SYNTHESIS_ENABLED] =
                 input.synthesisEnabled && input.provider != SpeechProvider.SYSTEM
-            preferences[IFLYTEK_VOICE] = input.iFlytekVoice.trim()
-            preferences[AZURE_VOICE] = input.azureVoice.trim()
+            input.iFlytekVoice?.let { preferences[IFLYTEK_VOICE] = it.trim() }
+            input.azureVoice?.let { preferences[AZURE_VOICE] = it.trim() }
+            input.systemVoice?.let { preferences[SYSTEM_VOICE] = it }
             iFlytekApiKey?.let {
                 preferences[IFLYTEK_API_KEY_CIPHERTEXT] = it.ciphertext
                 preferences[IFLYTEK_API_KEY_IV] = it.iv
@@ -155,14 +161,14 @@ class DataStoreSpeechSettingsRepository(
         return if (preferences[SYNTHESIS_ENABLED] == true) {
             runtimeConfig(preferences)
         } else {
-            SpeechRuntimeConfig.System
+            SpeechRuntimeConfig.System(preferences[SYSTEM_VOICE].orEmpty())
         }
     }
 
     private fun runtimeConfig(preferences: Preferences): SpeechRuntimeConfig {
         val summary = preferences.toSummary()
         return when (summary.provider) {
-            SpeechProvider.SYSTEM -> SpeechRuntimeConfig.System
+            SpeechProvider.SYSTEM -> SpeechRuntimeConfig.System(summary.systemVoice)
             SpeechProvider.IFLYTEK -> SpeechRuntimeConfig.IFlytek(
                 appId = summary.iFlytekAppId,
                 apiKey = preferences.decrypt(
@@ -233,6 +239,7 @@ class DataStoreSpeechSettingsRepository(
             synthesisEnabled = this[SYNTHESIS_ENABLED] ?: false,
             iFlytekVoice = this[IFLYTEK_VOICE].orEmpty(),
             azureVoice = this[AZURE_VOICE].orEmpty(),
+            systemVoice = this[SYSTEM_VOICE].orEmpty(),
         )
 
     private fun Preferences.hasSecret(
@@ -247,6 +254,7 @@ class DataStoreSpeechSettingsRepository(
         val SYNTHESIS_ENABLED = booleanPreferencesKey("speech.synthesis_enabled")
         val IFLYTEK_VOICE = stringPreferencesKey("speech.iflytek.voice")
         val AZURE_VOICE = stringPreferencesKey("speech.azure.voice")
+        val SYSTEM_VOICE = stringPreferencesKey("speech.system.voice")
         val IFLYTEK_APP_ID = stringPreferencesKey("speech.iflytek.app_id")
         val IFLYTEK_API_KEY_CIPHERTEXT =
             stringPreferencesKey("speech.iflytek.api_key_ciphertext")

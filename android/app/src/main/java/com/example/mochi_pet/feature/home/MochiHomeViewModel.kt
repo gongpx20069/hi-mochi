@@ -92,6 +92,10 @@ import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.voice.SpeechPlaybackResult
 import com.example.mochi_pet.core.voice.SpeechPurpose
+import com.example.mochi_pet.core.voice.SpeechVoice
+import com.example.mochi_pet.core.settings.SpeechProvider
+import com.example.mochi_pet.core.wake.WakeCaptureStatus
+import java.security.GeneralSecurityException
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
 import com.example.mochi_pet.platform.browser.AgentBrowserRuntime
@@ -203,6 +207,17 @@ data class SpeechSettingsUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val feedback: String? = null,
+)
+
+data class SpeechVoiceUiState(
+    val provider: SpeechProvider? = null,
+    val voices: List<SpeechVoice> = emptyList(),
+    val isLoading: Boolean = false,
+    val catalogError: String? = null,
+    val previewVoiceId: String? = null,
+    val previewError: String? = null,
+    val diagnosticCode: String? = null,
+    val previewedIds: Set<String> = emptySet(),
 )
 
 data class ProviderShareUiState(
@@ -317,6 +332,12 @@ class MochiHomeViewModel(
     private var loadVersion = 0L
     private var interactionVersion = 0L
     private var agentJob: Job? = null
+    private val mutableSpeechVoiceState = MutableStateFlow(SpeechVoiceUiState())
+    val speechVoiceState = mutableSpeechVoiceState.asStateFlow()
+    private var voiceCatalogJob: Job? = null
+    private var voiceCatalogVersion = 0L
+    private var voicePreviewVersion = 0L
+    private var resumeWakeAfterPreview = false
 
     val surface: StateFlow<MochiSurface> = mutableSurface.asStateFlow()
     val plannerState: StateFlow<PlannerSurfaceState> =
@@ -371,6 +392,7 @@ class MochiHomeViewModel(
 
     fun navigate(intent: MochiNavigationIntent) {
         val target = MochiNavigationReducer.reduce(intent)
+        if (target != MochiSurface.Settings) stopVoicePreview()
         if (
             target == MochiSurface.Face ||
             target == MochiSurface.DateTime ||
@@ -505,6 +527,7 @@ class MochiHomeViewModel(
     }
 
     fun sendConversation(query: String) {
+        stopVoicePreview()
         sendConversation(query, continueListeningAfterReply = false)
     }
 
@@ -739,6 +762,7 @@ class MochiHomeViewModel(
     }
 
     fun cancelConversation() {
+        stopVoicePreview()
         cancelAgentInteraction()
         voiceRuntime?.stopListening()
         voiceRuntime?.stopSpeaking()
@@ -746,6 +770,7 @@ class MochiHomeViewModel(
     }
 
     fun startVoiceInput(acknowledgeWake: Boolean = false) {
+        stopVoicePreview()
         val runtime = voiceRuntime ?: return
         cancelAgentInteraction()
         val version = interactionVersion
@@ -900,6 +925,10 @@ class MochiHomeViewModel(
     }
 
     fun saveSpeechSettings(input: SpeechSettingsInput) {
+        stopVoicePreview()
+        voiceCatalogVersion += 1
+        voiceCatalogJob?.cancel()
+        mutableSpeechVoiceState.value = SpeechVoiceUiState()
         val repository = speechSettingsRepository ?: return
         mutableSpeechSettingsState.update {
             it.copy(isSaving = true, feedback = null)
@@ -932,6 +961,123 @@ class MochiHomeViewModel(
                 }
             }
         }
+    }
+
+    fun loadSpeechVoices(provider: SpeechProvider) {
+        voiceCatalogJob?.cancel()
+        val version = ++voiceCatalogVersion
+        val previous = mutableSpeechVoiceState.value
+        mutableSpeechVoiceState.value = if (previous.provider == provider) {
+            previous.copy(isLoading = true, catalogError = null)
+        } else {
+            stopVoicePreview()
+            SpeechVoiceUiState(provider = provider, isLoading = true)
+        }
+        voiceCatalogJob = viewModelScope.launch(ioDispatcher) {
+            try {
+                val runtime = checkNotNull(voiceRuntime) { "Voice catalog is unavailable" }
+                val voices = runtime.availableVoices(provider)
+                if (version == voiceCatalogVersion) {
+                    mutableSpeechVoiceState.update { it.copy(voices = voices, isLoading = false) }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: IOException) {
+                voiceCatalogFailed(version, "Unable to load voices. Check the saved connection and try again.")
+            } catch (_: IllegalStateException) {
+                voiceCatalogFailed(version, "Voice catalog unavailable. Check the saved connection or system speech settings.")
+            } catch (_: IllegalArgumentException) {
+                voiceCatalogFailed(version, "Voice catalog unavailable. Check the saved connection or system speech settings.")
+            } catch (_: GeneralSecurityException) {
+                voiceCatalogFailed(version, "Speech synthesis settings are incomplete or invalid.")
+            }
+        }
+    }
+
+    private fun voiceCatalogFailed(version: Long, message: String) {
+        if (version == voiceCatalogVersion) {
+            mutableSpeechVoiceState.update { it.copy(isLoading = false, catalogError = message) }
+        }
+    }
+
+    fun previewSpeechVoice(provider: SpeechProvider, voiceId: String) {
+        val alreadyPausedForPreview = resumeWakeAfterPreview
+        cancelVoicePreview(restoreWake = false)
+        val runtime = voiceRuntime
+        val summary = mutableSpeechSettingsState.value.summary
+        val error = when {
+            runtime == null -> "Voice preview is unavailable"
+            mutablePipelineState.value.isActive || mutableConversationState.value.isSending ->
+                "Finish the current voice interaction before previewing"
+            summary.provider != provider || !summary.isReady -> "Save the connection settings first"
+            voiceId.length > 256 || voiceId.any(Char::isISOControl) ||
+                (provider != SpeechProvider.SYSTEM && voiceId.isNotEmpty() &&
+                    !voiceId.matches(Regex("[A-Za-z0-9_:-]{1,100}"))) -> "Speech voice must be a valid provider voice ID"
+            else -> null
+        }
+        if (error != null || runtime == null) {
+            restoreWakeAfterPreview()
+            mutableSpeechVoiceState.update { it.copy(previewError = error) }
+            return
+        }
+        val version = ++voicePreviewVersion
+        mutableSpeechVoiceState.update {
+            it.copy(provider = provider, previewVoiceId = voiceId, previewError = null, diagnosticCode = null)
+        }
+        val speak = {
+            if (version == voicePreviewVersion) {
+                runtime.speak(
+                    if (AppLanguage.resolveContentLocale().language == "zh") {
+                        "你好，我是 Mochi，很高兴见到你。"
+                    } else {
+                        "Hello, I am Mochi. Nice to meet you."
+                    },
+                    purpose = SpeechPurpose.PREVIEW,
+                    previewVoiceId = voiceId,
+                ) { result ->
+                    if (version == voicePreviewVersion) {
+                        mutableSpeechVoiceState.update {
+                            it.copy(
+                                previewVoiceId = null,
+                                previewError = if (result == SpeechPlaybackResult.FAILED) {
+                                    runtime.state.value.errorMessage ?: "Voice preview failed"
+                                } else {
+                                    null
+                                },
+                                diagnosticCode = runtime.state.value.diagnosticCode,
+                                previewedIds = if (result == SpeechPlaybackResult.COMPLETED) {
+                                    it.previewedIds + voiceId
+                                } else {
+                                    it.previewedIds
+                                },
+                            )
+                        }
+                        restoreWakeAfterPreview()
+                    }
+                }
+            }
+        }
+        resumeWakeAfterPreview = alreadyPausedForPreview ||
+            wakeRuntime?.state?.value?.status in setOf(WakeCaptureStatus.LISTENING, WakeCaptureStatus.STARTING)
+        if (resumeWakeAfterPreview) wakeRuntime?.pause(speak) else speak()
+    }
+
+    fun stopVoicePreview() {
+        cancelVoicePreview(restoreWake = true)
+    }
+
+    private fun cancelVoicePreview(restoreWake: Boolean) {
+        voicePreviewVersion += 1
+        if (mutableSpeechVoiceState.value.previewVoiceId != null) {
+            voiceRuntime?.stopSpeaking()
+            mutableSpeechVoiceState.update { it.copy(previewVoiceId = null) }
+        }
+        if (restoreWake) restoreWakeAfterPreview()
+    }
+
+    private fun restoreWakeAfterPreview() {
+        if (resumeWakeAfterPreview && wakeRuntime?.state?.value?.enabled == true) wakeRuntime.resume()
+        resumeWakeAfterPreview = false
     }
 
     fun createProviderShareLink(selection: ProviderShareSelection) {
@@ -972,6 +1118,10 @@ class MochiHomeViewModel(
     }
 
     fun confirmProviderImport() {
+        stopVoicePreview()
+        voiceCatalogVersion += 1
+        voiceCatalogJob?.cancel()
+        mutableSpeechVoiceState.value = SpeechVoiceUiState()
         val manager = providerShareManager ?: return
         val link = mutableProviderShareState.value.pendingImportLink ?: return
         mutableProviderShareState.value =
@@ -2185,6 +2335,8 @@ class MochiHomeViewModel(
         }
 
     override fun onCleared() {
+        stopVoicePreview()
+        voiceCatalogJob?.cancel()
         interactionVersion += 1
         agentJob?.cancel()
         mutableCameraSnapshot.value = null

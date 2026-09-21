@@ -1,5 +1,6 @@
 package com.example.mochi_pet.core.voice
 
+import com.example.mochi_pet.core.settings.SpeechProvider
 import kotlinx.coroutines.flow.StateFlow
 
 data class VoiceRuntimeState(
@@ -9,6 +10,8 @@ data class VoiceRuntimeState(
     val partialTranscript: String = "",
     val errorMessage: String? = null,
     val offerSpeechSettings: Boolean = false,
+    val playbackStage: SpeechPlaybackStage = SpeechPlaybackStage.IDLE,
+    val diagnosticCode: String? = null,
 )
 
 enum class VoiceInputTrigger {
@@ -19,7 +22,10 @@ enum class VoiceInputTrigger {
 enum class SpeechPurpose {
     REPLY,
     WAKE_ACKNOWLEDGEMENT,
+    PREVIEW,
 }
+
+enum class SpeechPlaybackStage { IDLE, SYNTHESIZING, PLAYING }
 
 enum class SpeechPlaybackResult {
     COMPLETED,
@@ -34,6 +40,8 @@ sealed interface VoiceRuntimeEvent {
 
     data object ListeningStarted : VoiceRuntimeEvent
     data object SpeakingStarted : VoiceRuntimeEvent
+    data object PlaybackStarted : VoiceRuntimeEvent
+    data object SpeakingStopped : VoiceRuntimeEvent
 
     data class PartialTranscript(
         val text: String,
@@ -44,6 +52,7 @@ sealed interface VoiceRuntimeEvent {
     data class Failed(
         val message: String,
         val offerSpeechSettings: Boolean = false,
+        val diagnosticCode: String? = null,
     ) : VoiceRuntimeEvent
 }
 
@@ -65,7 +74,11 @@ fun reduceVoiceRuntimeState(
         VoiceRuntimeEvent.SpeakingStarted -> state.copy(
             errorMessage = null,
             offerSpeechSettings = false,
+            diagnosticCode = null,
+            playbackStage = SpeechPlaybackStage.SYNTHESIZING,
         )
+        VoiceRuntimeEvent.PlaybackStarted -> state.copy(playbackStage = SpeechPlaybackStage.PLAYING)
+        VoiceRuntimeEvent.SpeakingStopped -> state.copy(playbackStage = SpeechPlaybackStage.IDLE)
         is VoiceRuntimeEvent.PartialTranscript -> state.copy(
             partialTranscript = event.text.take(MAX_TRANSCRIPT_CHARS),
         )
@@ -78,6 +91,8 @@ fun reduceVoiceRuntimeState(
             partialTranscript = "",
             errorMessage = event.message,
             offerSpeechSettings = event.offerSpeechSettings,
+            diagnosticCode = event.diagnosticCode,
+            playbackStage = SpeechPlaybackStage.IDLE,
         )
     }
 
@@ -94,8 +109,12 @@ interface VoiceRuntime {
     fun speak(
         text: String,
         purpose: SpeechPurpose = SpeechPurpose.REPLY,
+        previewVoiceId: String? = null,
         onCompleted: (SpeechPlaybackResult) -> Unit = {},
     )
+
+    suspend fun availableVoices(provider: SpeechProvider): List<SpeechVoice> =
+        throw IllegalStateException("Voice catalog is unavailable")
 
     fun stopSpeaking()
 }

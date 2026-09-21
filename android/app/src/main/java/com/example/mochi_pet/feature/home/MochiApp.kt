@@ -379,6 +379,7 @@ private fun MochiAppContent(
         viewModel.providerSettingsState.collectAsStateWithLifecycle()
     val speechSettingsState by
         viewModel.speechSettingsState.collectAsStateWithLifecycle()
+    val speechVoiceState by viewModel.speechVoiceState.collectAsStateWithLifecycle()
     val providerShareState by
         viewModel.providerShareState.collectAsStateWithLifecycle()
     val agentSettingsState by
@@ -642,6 +643,7 @@ private fun MochiAppContent(
             conversationState = conversationState,
             providerSettingsState = providerSettingsState,
             speechSettingsState = speechSettingsState,
+            speechVoiceState = speechVoiceState,
             providerShareState = providerShareState,
             agentSettingsState = agentSettingsState,
             personaState = personaState,
@@ -663,6 +665,9 @@ private fun MochiAppContent(
             onDisableWake = viewModel::disableWakeWord,
             onSaveProviderSettings = viewModel::saveProviderSettings,
             onSaveSpeechSettings = viewModel::saveSpeechSettings,
+            onLoadSpeechVoices = viewModel::loadSpeechVoices,
+            onPreviewSpeechVoice = viewModel::previewSpeechVoice,
+            onStopVoicePreview = viewModel::stopVoicePreview,
             onCreateProviderShareLink =
                 viewModel::createProviderShareLink,
             onReceiveProviderShareLink =
@@ -1567,6 +1572,7 @@ private fun SurfaceContent(
     conversationState: ConversationUiState,
     providerSettingsState: ProviderSettingsUiState,
     speechSettingsState: SpeechSettingsUiState,
+    speechVoiceState: SpeechVoiceUiState,
     providerShareState: ProviderShareUiState,
     agentSettingsState: AgentSettingsUiState,
     personaState: PersonaUiState,
@@ -1588,6 +1594,9 @@ private fun SurfaceContent(
     onDisableWake: () -> Unit,
     onSaveProviderSettings: (ProviderSettingsInput) -> Unit,
     onSaveSpeechSettings: (SpeechSettingsInput) -> Unit,
+    onLoadSpeechVoices: (SpeechProvider) -> Unit,
+    onPreviewSpeechVoice: (SpeechProvider, String) -> Unit,
+    onStopVoicePreview: () -> Unit,
     onCreateProviderShareLink: (ProviderShareSelection) -> Unit,
     onReceiveProviderShareLink: (String) -> Unit,
     onSetRecentConversationTurns: (Int) -> Unit,
@@ -1670,6 +1679,8 @@ private fun SurfaceContent(
             MochiSurface.Settings -> ProviderSettingsSurface(
                 state = providerSettingsState,
                 speechState = speechSettingsState,
+                speechVoiceState = speechVoiceState,
+                playbackState = voiceState,
                 providerShareState = providerShareState,
                 toolsState = toolsState,
                 agentSettingsState = agentSettingsState,
@@ -1680,6 +1691,9 @@ private fun SurfaceContent(
                 onDisableWake = onDisableWake,
                 onSave = onSaveProviderSettings,
                 onSaveSpeech = onSaveSpeechSettings,
+                onLoadSpeechVoices = onLoadSpeechVoices,
+                onPreviewSpeechVoice = onPreviewSpeechVoice,
+                onStopVoicePreview = onStopVoicePreview,
                 onCreateProviderShareLink =
                     onCreateProviderShareLink,
                 onReceiveProviderShareLink =
@@ -6096,6 +6110,11 @@ internal fun ProviderSettingsSurface(
     onSetRecentConversationTurns: (Int) -> Unit,
     onSetFocusStandby: (Boolean, Int) -> Unit,
     onSavePersona: (String, String, String) -> Unit,
+    speechVoiceState: SpeechVoiceUiState = SpeechVoiceUiState(),
+    playbackState: VoiceRuntimeState = VoiceRuntimeState(),
+    onLoadSpeechVoices: (SpeechProvider) -> Unit = {},
+    onPreviewSpeechVoice: (SpeechProvider, String) -> Unit = { _, _ -> },
+    onStopVoicePreview: () -> Unit = {},
 ) {
     val summary = state.summary
     var providerType by remember(summary) {
@@ -6164,6 +6183,9 @@ internal fun ProviderSettingsSurface(
     }
     var azureVoice by remember(speechSummary) {
         mutableStateOf(speechSummary.azureVoice)
+    }
+    var systemVoice by remember(speechSummary) {
+        mutableStateOf(speechSummary.systemVoice)
     }
     var showShareProviders by remember { mutableStateOf(false) }
     var shareLlm by remember { mutableStateOf(true) }
@@ -6657,38 +6679,45 @@ internal fun ProviderSettingsSurface(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (speechSynthesisEnabled) {
-                            OutlinedTextField(
-                                value = if (speechProvider == SpeechProvider.IFLYTEK) {
-                                    iFlytekVoice
-                                } else {
-                                    azureVoice
-                                },
-                                onValueChange = {
-                                    if (speechProvider == SpeechProvider.IFLYTEK) {
-                                        iFlytekVoice = it
-                                    } else {
-                                        azureVoice = it
-                                    }
-                                },
-                                label = { Text("Synthesis voice ID (optional)") },
-                                supportingText = {
-                                    Text(
-                                        if (speechProvider == SpeechProvider.IFLYTEK) {
-                                            "Default: x4_xiaoyan. Enable streaming TTS " +
-                                                "and the selected voice in the iFlytek console."
-                                        } else {
-                                            "Default: Xiaoxiao (Chinese) or Jenny (English). " +
-                                                "Enter a full voice ID, e.g. zh-CN-XiaoxiaoNeural. " +
-                                                "The Speech resource must support synthesis."
-                                        },
-                                    )
-                                },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(18.dp),
-                            )
-                        }
+                    }
+                    if (speechProvider == SpeechProvider.SYSTEM || speechSynthesisEnabled) {
+                        val connectionReady =
+                            !speechState.isLoading && !speechState.isSaving &&
+                                speechSummary.isReady && speechProvider == speechSummary.provider &&
+                                when (speechProvider) {
+                                    SpeechProvider.SYSTEM -> true
+                                    SpeechProvider.IFLYTEK ->
+                                        iFlytekAppId.trim() == speechSummary.iFlytekAppId &&
+                                            iFlytekApiKey.isBlank() && iFlytekApiSecret.isBlank()
+                                    SpeechProvider.AZURE ->
+                                        azureSpeechEndpoint.trim().trimEnd('/') == speechSummary.azureEndpoint &&
+                                            azureSpeechApiKey.isBlank()
+                                }
+                        SpeechVoicePicker(
+                            provider = speechProvider,
+                            voiceId = when (speechProvider) {
+                                SpeechProvider.SYSTEM -> systemVoice
+                                SpeechProvider.IFLYTEK -> iFlytekVoice
+                                SpeechProvider.AZURE -> azureVoice
+                            },
+                            catalog = if (speechVoiceState.provider == speechProvider) {
+                                speechVoiceState
+                            } else {
+                                SpeechVoiceUiState(provider = speechProvider)
+                            },
+                            playback = playbackState,
+                            connectionReady = connectionReady,
+                            onChoose = {
+                                when (speechProvider) {
+                                    SpeechProvider.SYSTEM -> systemVoice = it
+                                    SpeechProvider.IFLYTEK -> iFlytekVoice = it
+                                    SpeechProvider.AZURE -> azureVoice = it
+                                }
+                            },
+                            onLoad = { onLoadSpeechVoices(speechProvider) },
+                            onPreview = { onPreviewSpeechVoice(speechProvider, it) },
+                            onStop = onStopVoicePreview,
+                        )
                     }
                     speechState.feedback?.let {
                         Text(
@@ -6716,6 +6745,7 @@ internal fun ProviderSettingsSurface(
                                     synthesisEnabled = speechSynthesisEnabled,
                                     iFlytekVoice = iFlytekVoice,
                                     azureVoice = azureVoice,
+                                    systemVoice = systemVoice,
                                 ),
                             )
                             iFlytekApiKey = ""

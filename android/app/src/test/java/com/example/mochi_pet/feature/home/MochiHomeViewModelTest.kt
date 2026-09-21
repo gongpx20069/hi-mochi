@@ -29,6 +29,16 @@ import com.example.mochi_pet.core.weather.WeatherRepository
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.SpeechPlaybackResult
 import com.example.mochi_pet.core.voice.SpeechPurpose
+import com.example.mochi_pet.core.voice.SpeechVoice
+import com.example.mochi_pet.core.voice.IFLYTEK_BASIC_VOICES
+import com.example.mochi_pet.core.settings.SpeechProvider
+import com.example.mochi_pet.core.settings.SpeechSettingsRepository
+import com.example.mochi_pet.core.settings.SpeechSettingsSummary
+import com.example.mochi_pet.core.settings.SpeechSettingsInput
+import com.example.mochi_pet.core.settings.SpeechRuntimeConfig
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import com.example.mochi_pet.core.wake.WakeRuntime
@@ -48,6 +58,102 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test
+    fun `voice preview uses draft ID without saving history or opening recognition`() {
+        val voice = VoiceRuntimeFake("", autoCompleteSpeech = false)
+        val speech = PreviewSpeechSettingsFake()
+        val wake = WakeRuntimeFake()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            speechSettingsRepository = speech,
+            voiceRuntime = voice,
+            wakeRuntime = wake,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.previewSpeechVoice(SpeechProvider.IFLYTEK, "x4_yezi")
+        assertEquals(listOf("x4_yezi"), voice.previewVoiceIds)
+        assertEquals(listOf(SpeechPurpose.PREVIEW), voice.speechPurposes)
+        assertEquals(1, wake.pauseCount)
+        assertEquals(0, wake.resumeCount)
+        voice.speechCallbacks.single()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(1, wake.resumeCount)
+        assertEquals(setOf("x4_yezi"), viewModel.speechVoiceState.value.previewedIds)
+        assertEquals(0, speech.saveCount)
+        assertEquals(0, voice.listenCount)
+        assertTrue(viewModel.conversationState.value.messages.isEmpty())
+    }
+
+    @Test
+    fun `old preview completion cannot finish a newer preview and navigation stops it`() {
+        val voice = VoiceRuntimeFake("", autoCompleteSpeech = false)
+        val wake = WakeRuntimeFake()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            speechSettingsRepository = PreviewSpeechSettingsFake(),
+            voiceRuntime = voice,
+            wakeRuntime = wake,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.previewSpeechVoice(SpeechProvider.IFLYTEK, "x4_yezi")
+        viewModel.previewSpeechVoice(SpeechProvider.IFLYTEK, "aisjiuxu")
+        assertEquals(0, wake.resumeCount)
+        val resumed = wake.resumeCount
+        voice.speechCallbacks.first()(SpeechPlaybackResult.COMPLETED)
+        assertEquals("aisjiuxu", viewModel.speechVoiceState.value.previewVoiceId)
+        assertEquals(resumed, wake.resumeCount)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        assertEquals(null, viewModel.speechVoiceState.value.previewVoiceId)
+        assertTrue(voice.stopSpeakingCount >= 2)
+        voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+        assertTrue(viewModel.speechVoiceState.value.previewedIds.isEmpty())
+    }
+
+    @Test
+    fun `preview failure exposes safe code and preserves disabled wake state`() {
+        val voice = VoiceRuntimeFake("", autoCompleteSpeech = false)
+        val wake = WakeRuntimeFake().apply { state.value = WakeRuntimeState() }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            speechSettingsRepository = PreviewSpeechSettingsFake(),
+            voiceRuntime = voice,
+            wakeRuntime = wake,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.previewSpeechVoice(SpeechProvider.IFLYTEK, "x4_yezi")
+        voice.state.value = voice.state.value.copy(errorMessage = "safe failure", diagnosticCode = "iflytek 11200")
+        voice.speechCallbacks.single()(SpeechPlaybackResult.FAILED)
+        assertEquals("iflytek 11200", viewModel.speechVoiceState.value.diagnosticCode)
+        assertEquals("safe failure", viewModel.speechVoiceState.value.previewError)
+        assertEquals(0, wake.pauseCount)
+        assertEquals(0, wake.resumeCount)
+        assertEquals(0, voice.listenCount)
+    }
+
+    @Test
+    fun `late catalog response cannot replace the new provider catalog`() {
+        val oldCatalog = CompletableDeferred<List<SpeechVoice>>()
+        val azureVoice = SpeechVoice("en-US-JennyNeural", "Jenny", "en-US")
+        val voice = VoiceRuntimeFake("").apply {
+            voiceCatalogLoader = {
+                if (it == SpeechProvider.IFLYTEK) withContext(NonCancellable) {
+                    oldCatalog.await()
+                } else {
+                    listOf(azureVoice)
+                }
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            voiceRuntime = voice,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.loadSpeechVoices(SpeechProvider.IFLYTEK)
+        viewModel.loadSpeechVoices(SpeechProvider.AZURE)
+        oldCatalog.complete(IFLYTEK_BASIC_VOICES)
+        assertEquals(SpeechProvider.AZURE, viewModel.speechVoiceState.value.provider)
+        assertEquals(listOf(azureVoice), viewModel.speechVoiceState.value.voices)
+    }
+
     @Test
     fun `provider timeout appears as an error without adding assistant history`() {
         val viewModel = MochiHomeViewModel(
@@ -728,6 +834,7 @@ private fun cardViewModel(
 private class VoiceRuntimeFake(
     transcript: String,
     private val speechResult: SpeechPlaybackResult = SpeechPlaybackResult.COMPLETED,
+    private val autoCompleteSpeech: Boolean = true,
 ) : VoiceRuntime {
     private val transcripts = ArrayDeque(listOf(transcript))
     override val state = MutableStateFlow(
@@ -736,6 +843,12 @@ private class VoiceRuntimeFake(
     var spokenText: String? = null
     val spokenTexts = mutableListOf<String>()
     val speechPurposes = mutableListOf<SpeechPurpose>()
+    val previewVoiceIds = mutableListOf<String?>()
+    val speechCallbacks = mutableListOf<(SpeechPlaybackResult) -> Unit>()
+    var stopSpeakingCount = 0
+    var voiceCatalogLoader: suspend (SpeechProvider) -> List<SpeechVoice> = { IFLYTEK_BASIC_VOICES }
+
+    override suspend fun availableVoices(provider: SpeechProvider) = voiceCatalogLoader(provider)
     var listenCount = 0
 
     override fun startListening(
@@ -756,15 +869,34 @@ private class VoiceRuntimeFake(
     override fun speak(
         text: String,
         purpose: SpeechPurpose,
+        previewVoiceId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) {
         spokenText = text
         spokenTexts += text
         speechPurposes += purpose
-        onCompleted(speechResult)
+        previewVoiceIds += previewVoiceId
+        speechCallbacks += onCompleted
+        if (autoCompleteSpeech) onCompleted(speechResult)
     }
 
-    override fun stopSpeaking() = Unit
+    override fun stopSpeaking() { stopSpeakingCount += 1 }
+}
+
+private class PreviewSpeechSettingsFake : SpeechSettingsRepository {
+    var saveCount = 0
+    override suspend fun loadSummary() = SpeechSettingsSummary(
+        provider = SpeechProvider.IFLYTEK,
+        iFlytekAppId = "test-app",
+        hasIFlytekApiKey = true,
+        hasIFlytekApiSecret = true,
+        iFlytekVoice = "x4_xiaoyan",
+    )
+    override suspend fun save(input: SpeechSettingsInput): SpeechSettingsSummary {
+        saveCount += 1
+        return loadSummary()
+    }
+    override suspend fun loadRuntimeConfig() = SpeechRuntimeConfig.IFlytek("test-app", "test-key", "test-secret")
 }
 
 private class HoldingVoiceRuntimeFake : VoiceRuntime {
@@ -792,6 +924,7 @@ private class HoldingVoiceRuntimeFake : VoiceRuntime {
     override fun speak(
         text: String,
         purpose: SpeechPurpose,
+        previewVoiceId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) = onCompleted(SpeechPlaybackResult.COMPLETED)
 
@@ -818,6 +951,7 @@ private class InterruptibleVoiceRuntimeFake : VoiceRuntime {
     override fun speak(
         text: String,
         purpose: SpeechPurpose,
+        previewVoiceId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) = Unit
 

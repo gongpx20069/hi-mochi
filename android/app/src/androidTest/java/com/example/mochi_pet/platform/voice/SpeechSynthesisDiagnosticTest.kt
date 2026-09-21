@@ -25,7 +25,7 @@ class SpeechSynthesisDiagnosticTest {
         val application = InstrumentationRegistry.getInstrumentation()
             .targetContext.applicationContext as MochiApplication
         val config = application.speechSettingsRepository.loadSynthesisConfig()
-        assertTrue("Cloud synthesis must be enabled", config != SpeechRuntimeConfig.System)
+        assertTrue("Cloud synthesis must be enabled", config !is SpeechRuntimeConfig.System)
         val provider = config.synthesisProviderName()
         val extended = InstrumentationRegistry.getArguments()
             .getString("mochiSpeechDiagnosticExtended") == "true"

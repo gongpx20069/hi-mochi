@@ -64,9 +64,10 @@ class SpeechSynthesisSettingsTest {
             isToggleable() and hasAnySibling(hasText("Also use this provider for speech synthesis")),
         )
         toggle.assertIsOff().performScrollTo().performClick()
-        scrollTo("Synthesis voice ID (optional)")
-        compose.onNodeWithText("Synthesis voice ID (optional)")
-            .performScrollTo().performTextReplacement("x4_xiaoyan")
+        scrollTo("Voice")
+        compose.onNodeWithText("Voice").performScrollTo().performClick()
+        compose.onNodeWithText("Xiaoyan").performScrollTo().performClick()
+        compose.onNodeWithText("Confirm selection").performScrollTo().performClick()
         scrollTo("Save speech settings")
         compose.onNodeWithText("Save speech settings").performScrollTo().performClick()
         val input = saved.single()

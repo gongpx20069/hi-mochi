@@ -15,10 +15,13 @@ import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.SpeechRuntimeConfig
+import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.settings.SpeechSettingsRepository
 import com.example.mochi_pet.core.voice.MAX_TRANSCRIPT_CHARS
 import com.example.mochi_pet.core.voice.SpeechPlaybackResult
 import com.example.mochi_pet.core.voice.SpeechPurpose
+import com.example.mochi_pet.core.voice.SpeechVoice
+import com.example.mochi_pet.core.voice.IFLYTEK_BASIC_VOICES
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceRuntimeEvent
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
@@ -41,6 +44,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AndroidVoiceRuntime internal constructor(
     context: Context,
@@ -158,7 +162,7 @@ class AndroidVoiceRuntime internal constructor(
                         return@post
                     }
                     when (config) {
-                        SpeechRuntimeConfig.System ->
+                        is SpeechRuntimeConfig.System ->
                             startSystemRecognition()
                         is SpeechRuntimeConfig.IFlytek ->
                             startIFlytekLiveCapture(config, version)
@@ -185,6 +189,7 @@ class AndroidVoiceRuntime internal constructor(
     override fun speak(
         text: String,
         purpose: SpeechPurpose,
+        previewVoiceId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) {
         val bounded = text.trim().take(MAX_TRANSCRIPT_CHARS)
@@ -220,14 +225,27 @@ class AndroidVoiceRuntime internal constructor(
             synthesisJob = scope.launch {
                 var provider = "settings"
                 val failure = try {
-                    val config = speechSettingsRepository.loadSynthesisConfig()
+                    val savedConfig = if (purpose == SpeechPurpose.PREVIEW) {
+                        speechSettingsRepository.loadRuntimeConfig()
+                    } else {
+                        speechSettingsRepository.loadSynthesisConfig()
+                    }
+                    val config = if (purpose == SpeechPurpose.PREVIEW && previewVoiceId != null) {
+                        when (savedConfig) {
+                            is SpeechRuntimeConfig.System -> savedConfig.copy(voice = previewVoiceId)
+                            is SpeechRuntimeConfig.IFlytek -> savedConfig.copy(voice = previewVoiceId)
+                            is SpeechRuntimeConfig.Azure -> savedConfig.copy(voice = previewVoiceId)
+                        }
+                    } else {
+                        savedConfig
+                    }
                     provider = config.synthesisProviderName()
                     Log.i(SPEECH_LOG_TAG, "synthesis_started provider=$provider")
                     when (config) {
-                        SpeechRuntimeConfig.System -> {
+                        is SpeechRuntimeConfig.System -> {
                             mainHandler.post {
                                 if (utteranceId == activeUtteranceId) {
-                                    speakSystem(bounded, utteranceId)
+                                    speakSystem(bounded, utteranceId, localOnly = true, voiceId = config.voice)
                                 }
                             }
                             return@launch
@@ -237,6 +255,9 @@ class AndroidVoiceRuntime internal constructor(
                             if (chunk.isNotBlank()) {
                                 val audio = synthesizer.synthesize(config, chunk, locale)
                                 ensureActive()
+                                mainHandler.post {
+                                    if (utteranceId == activeUtteranceId) dispatch(VoiceRuntimeEvent.PlaybackStarted)
+                                }
                                 pcmPlayer.play(audio)
                             }
                         }
@@ -265,7 +286,15 @@ class AndroidVoiceRuntime internal constructor(
                 }
                 mainHandler.post {
                     if (utteranceId == activeUtteranceId) {
-                        if (failure == null) finishSpeech() else failSpeech(failure.failure.message)
+                        if (failure == null) {
+                            finishSpeech()
+                        } else {
+                            failSpeech(
+                                failure.failure.message,
+                                failure.providerCode?.let { "$provider $it" }
+                                    ?: failure.httpStatus?.let { "HTTP $it" },
+                            )
+                        }
                     }
                 }
             }
@@ -276,13 +305,18 @@ class AndroidVoiceRuntime internal constructor(
         text: String,
         utteranceId: String,
         localOnly: Boolean = false,
+        voiceId: String = "",
     ) {
         val tts = textToSpeech
-        if (!mutableState.value.ttsReady || tts == null) {
+        if (tts == null || (!mutableState.value.ttsReady && voiceId.isBlank())) {
             failSpeech(SynthesisFailure.PLAYBACK.message)
             return
         }
-        val languageStatus = tts.setLanguage(AppLanguage.resolveContentLocale())
+        val languageStatus = if (voiceId.isBlank()) {
+            tts.setLanguage(AppLanguage.resolveContentLocale())
+        } else {
+            TextToSpeech.LANG_AVAILABLE
+        }
         if (
             languageStatus == TextToSpeech.LANG_MISSING_DATA ||
             languageStatus == TextToSpeech.LANG_NOT_SUPPORTED
@@ -293,7 +327,9 @@ class AndroidVoiceRuntime internal constructor(
         if (localOnly) {
             val language = AppLanguage.resolveContentLocale().language
             val voice = tts.voices?.filter {
-                !it.isNetworkConnectionRequired && it.locale.language == language
+                !it.isNetworkConnectionRequired &&
+                    TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features &&
+                    if (voiceId.isBlank()) it.locale.language == language else it.name == voiceId
             }?.minByOrNull { it.latency }
             if (voice == null || tts.setVoice(voice) == TextToSpeech.ERROR) {
                 failSpeech(SynthesisFailure.PLAYBACK.message)
@@ -317,6 +353,27 @@ class AndroidVoiceRuntime internal constructor(
             finishSpeech(invokeCompletion = false)
         }
     }
+
+    override suspend fun availableVoices(provider: SpeechProvider): List<SpeechVoice> =
+        when (provider) {
+            SpeechProvider.IFLYTEK -> IFLYTEK_BASIC_VOICES
+            SpeechProvider.AZURE -> {
+                val config = speechSettingsRepository.loadRuntimeConfig()
+                check(config is SpeechRuntimeConfig.Azure) { "Save the connection settings first" }
+                AzureSpeechVoices().load(config)
+            }
+            SpeechProvider.SYSTEM -> withContext(Dispatchers.Main.immediate) {
+                val voices = textToSpeech?.voices.orEmpty()
+                    .filter {
+                        !it.isNetworkConnectionRequired &&
+                            TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features
+                    }
+                    .map { SpeechVoice(it.name, it.name, it.locale.toLanguageTag(), "Offline") }
+                    .sortedWith(compareBy({ it.languageTag }, { it.name }))
+                check(voices.isNotEmpty()) { "No offline voices installed. Open system speech settings." }
+                voices
+            }
+        }
 
     override fun close() {
         mainHandler.post {
@@ -580,7 +637,7 @@ class AndroidVoiceRuntime internal constructor(
         transcriptionJob = scope.launch {
             try {
                 val transcriber = when (config) {
-                    SpeechRuntimeConfig.System ->
+                    is SpeechRuntimeConfig.System ->
                         error("System recognition does not use captured audio")
                     is SpeechRuntimeConfig.IFlytek ->
                         IFlytekSpeechTranscriber(
@@ -595,7 +652,7 @@ class AndroidVoiceRuntime internal constructor(
                         )
                 }
                 val providerName = when (config) {
-                    SpeechRuntimeConfig.System -> "system"
+                    is SpeechRuntimeConfig.System -> "system"
                     is SpeechRuntimeConfig.IFlytek -> "iflytek"
                     is SpeechRuntimeConfig.Azure -> "azure"
                 }
@@ -725,8 +782,8 @@ class AndroidVoiceRuntime internal constructor(
         speechRecognizer?.cancel()
     }
 
-    private fun failSpeech(message: String) {
-        dispatch(VoiceRuntimeEvent.Failed(message, offerSpeechSettings = true))
+    private fun failSpeech(message: String, diagnosticCode: String? = null) {
+        dispatch(VoiceRuntimeEvent.Failed(message, offerSpeechSettings = true, diagnosticCode = diagnosticCode))
         finishSpeech(result = SpeechPlaybackResult.FAILED)
     }
 
@@ -739,6 +796,7 @@ class AndroidVoiceRuntime internal constructor(
         speechCompletionCallback = null
         synthesisJob?.cancel()
         synthesisJob = null
+        dispatch(VoiceRuntimeEvent.SpeakingStopped)
         audioFocus.abandon()
         if (invokeCompletion) {
             completion?.invoke(result)
@@ -807,7 +865,11 @@ class AndroidVoiceRuntime internal constructor(
     }
 
     private inner class SpeechProgressCallbacks : UtteranceProgressListener() {
-        override fun onStart(utteranceId: String?) = Unit
+        override fun onStart(utteranceId: String?) {
+            mainHandler.post {
+                if (utteranceId != null && utteranceId == activeUtteranceId) dispatch(VoiceRuntimeEvent.PlaybackStarted)
+            }
+        }
 
         override fun onDone(utteranceId: String?) {
             mainHandler.post {

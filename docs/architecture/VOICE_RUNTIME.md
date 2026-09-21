@@ -104,6 +104,19 @@ Azure uses the same Speech resource key with escaped SSML and
 regional STT/resource endpoints map to the regional TTS hostname and
 `/cognitiveservices/v1`. Azure defaults to `zh-CN-XiaoxiaoNeural` for Chinese and
 `en-US-JennyNeural` otherwise. Users may override the provider voice ID.
+The common picker uses built-in iFlytek presets, Android's installed offline voice
+metadata, or Azure's authenticated `/cognitiveservices/voices/list` (prefixed with
+`/tts` on custom subdomains). Azure catalog loads are cancellable, limited to 15
+seconds, 2 MiB, and 2000 entries; redirects are disabled and catalog errors remain
+visible. The catalog is transient and does not certify pricing or account quotas.
+
+An explicit preview purpose loads the saved connection but overrides only the voice
+for that invocation, even if cloud reply synthesis has not yet been enabled. It
+shares the production synthesis/playback path, never persists the draft voice,
+uses a fixed localized greeting, and never starts follow-up STT. The ViewModel owns
+preview cancellation/version checks and wake restoration. Only installed offline
+voices are used for Android output; missing selected voices fail visibly. Local
+Android voice IDs are stored separately and excluded from cross-device shares.
 
 Reply text is split at sentence boundaries where possible, with at most 300
 Unicode code points per request (strictly below iFlytek's 8000-byte limit).

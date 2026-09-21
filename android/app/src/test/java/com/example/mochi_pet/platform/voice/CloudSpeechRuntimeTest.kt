@@ -34,6 +34,26 @@ class CloudSpeechRuntimeTest {
     private var runtime: AndroidVoiceRuntime? = null
     private var settingsReads = 0
 
+    @Test
+    fun `preview overrides only invocation voice and bypasses reply synthesis opt out`() {
+        val configs = mutableListOf<SpeechRuntimeConfig>()
+        val voice = runtime(
+            synthesisEnabled = false,
+            synthesizer = SpeechSynthesizer { config, _, _ ->
+                configs += config
+                byteArrayOf(0, 0)
+            },
+        )
+        voice.speak("test", SpeechPurpose.PREVIEW, previewVoiceId = "x4_yezi")
+        idle()
+        val previewConfig = configs.single() as SpeechRuntimeConfig.IFlytek
+        assertEquals("x4_yezi", previewConfig.voice)
+        assertEquals("test-key", previewConfig.apiKey)
+        voice.speak("normal reply")
+        idle()
+        assertEquals(1, configs.size)
+    }
+
     @After
     fun tearDown() {
         runtime?.close()
@@ -144,10 +164,11 @@ class CloudSpeechRuntimeTest {
     private fun runtime(
         synthesizer: SpeechSynthesizer = SpeechSynthesizer { _, _, _ -> byteArrayOf(0, 0) },
         player: PcmSpeechPlayer = PcmSpeechPlayer {},
+        synthesisEnabled: Boolean = true,
     ): AndroidVoiceRuntime = AndroidVoiceRuntime(
         context = RuntimeEnvironment.getApplication(),
         speechSettingsRepository = object : SpeechSettingsRepository {
-            override suspend fun loadSummary() = SpeechSettingsSummary(synthesisEnabled = true)
+            override suspend fun loadSummary() = SpeechSettingsSummary(synthesisEnabled = synthesisEnabled)
             override suspend fun save(input: SpeechSettingsInput) = error("Not used")
             override suspend fun loadRuntimeConfig(): SpeechRuntimeConfig {
                 settingsReads += 1

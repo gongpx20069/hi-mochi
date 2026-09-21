@@ -149,8 +149,8 @@ class ProviderShareManager(
                 azureApiKeyReplacement =
                     speech.azureApiKey.takeIf(String::isNotBlank),
                 synthesisEnabled = speech.synthesisEnabled,
-                iFlytekVoice = speech.iFlytekVoice,
-                azureVoice = speech.azureVoice,
+                iFlytekVoice = speech.iFlytekVoice.takeIf { speech.provider == SpeechProvider.IFLYTEK },
+                azureVoice = speech.azureVoice.takeIf { speech.provider == SpeechProvider.AZURE },
             )
         }
         speechInput?.validate()
@@ -175,7 +175,7 @@ class ProviderShareManager(
 
     private fun SpeechRuntimeConfig.toShared(): SharedSpeechProvider =
         when (this) {
-            SpeechRuntimeConfig.System ->
+            is SpeechRuntimeConfig.System ->
                 SharedSpeechProvider(provider = SpeechProvider.SYSTEM)
             is SpeechRuntimeConfig.IFlytek -> SharedSpeechProvider(
                 provider = SpeechProvider.IFLYTEK,

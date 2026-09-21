@@ -13,6 +13,35 @@ import org.junit.Test
 
 class SpeechSettingsRepositoryTest {
     @Test
+    fun `saving other providers preserves all voice selections including local system voice`() = runBlocking {
+        val repository = repository()
+        repository.save(
+            SpeechSettingsInput(
+                SpeechProvider.IFLYTEK,
+                iFlytekAppId = "test-app",
+                iFlytekApiKeyReplacement = "test-key",
+                iFlytekApiSecretReplacement = "test-secret",
+                iFlytekVoice = "x4_yezi",
+            ),
+        )
+        repository.save(
+            SpeechSettingsInput(
+                SpeechProvider.AZURE,
+                azureEndpoint = "https://test.cognitiveservices.azure.com",
+                azureApiKeyReplacement = "test-key",
+                azureVoice = "en-US-JennyNeural",
+            ),
+        )
+        repository.save(SpeechSettingsInput(SpeechProvider.SYSTEM, systemVoice = "en-us-x-test-local"))
+        val summary = repository.loadSummary()
+        assertEquals("x4_yezi", summary.iFlytekVoice)
+        assertEquals("en-US-JennyNeural", summary.azureVoice)
+        assertEquals(SpeechRuntimeConfig.System("en-us-x-test-local"), repository.loadSynthesisConfig())
+        repository.save(SpeechSettingsInput(SpeechProvider.SYSTEM, systemVoice = ""))
+        assertEquals(SpeechRuntimeConfig.System(), repository.loadSynthesisConfig())
+    }
+
+    @Test
     fun `synthesis is opt in and reuses encrypted iFlytek secrets`() = runBlocking {
         val repository = repository()
         val initial = SpeechSettingsInput(
@@ -23,7 +52,7 @@ class SpeechSettingsRepositoryTest {
         )
         repository.save(initial)
         assertFalse(repository.loadSummary().synthesisEnabled)
-        assertEquals(SpeechRuntimeConfig.System, repository.loadSynthesisConfig())
+        assertEquals(SpeechRuntimeConfig.System(), repository.loadSynthesisConfig())
 
         repository.save(
             initial.copy(
@@ -41,7 +70,7 @@ class SpeechSettingsRepositoryTest {
 
         repository.save(SpeechSettingsInput(provider = SpeechProvider.SYSTEM, synthesisEnabled = true))
         assertFalse(repository.loadSummary().synthesisEnabled)
-        assertEquals(SpeechRuntimeConfig.System, repository.loadSynthesisConfig())
+        assertEquals(SpeechRuntimeConfig.System(), repository.loadSynthesisConfig())
     }
 
     @Test
@@ -89,7 +118,7 @@ class SpeechSettingsRepositoryTest {
             repository.loadSummary(),
         )
         assertEquals(
-            SpeechRuntimeConfig.System,
+            SpeechRuntimeConfig.System(),
             repository.loadRuntimeConfig(),
         )
     }
