@@ -34,6 +34,20 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ToolCatalogTest {
+    @Test
+    fun `Termux Skill requires connection and both tool switches`() {
+        val summary = ToolCatalogSummary(termux = ExtensionProviderSummary(
+            connected = true, enabled = true,
+            tools = listOf(ExtensionToolSummary("termux_exec", "", "sensitive", true),
+                ExtensionToolSummary("termux_task", "", "sensitive", false)),
+        ))
+        assertEquals(setOf("termux_exec"), summary.readyToolNames())
+        assertTrue(summary.copy(termux = summary.termux.copy(connected = false)).readyToolNames().isEmpty())
+        assertTrue(summary.copy(termux = summary.termux.copy(enabled = false)).readyToolNames().isEmpty())
+        assertEquals(setOf("Termux extension"),
+            summary.skillReadiness(setOf("termux_exec", "termux_task")).requirements.keys)
+    }
+
     private lateinit var directory: File
     private lateinit var scope: CoroutineScope
     private lateinit var client: RecordingMcpClient
@@ -68,12 +82,12 @@ class ToolCatalogTest {
                 BuiltInToolSummary("native_on", "On", "", true),
                 BuiltInToolSummary("native_off", "Off", "", false),
             ),
-            mijia = MijiaProviderSummary(
+            mijia = ExtensionProviderSummary(
                 connected = true,
                 enabled = true,
                 tools = listOf(
-                    MijiaToolSummary("mijia_on", "", "read", true),
-                    MijiaToolSummary("mijia_off", "", "read", false),
+                    ExtensionToolSummary("mijia_on", "", "read", true),
+                    ExtensionToolSummary("mijia_off", "", "read", false),
                 ),
             ),
         )

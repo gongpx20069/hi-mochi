@@ -175,6 +175,37 @@ internal fun localizeUiText(
 }
 
 private val ZH_UI_TEXT = mapOf(
+    "Termux extension" to "Termux 扩展",
+    "Termux extension is unavailable" to "Termux 扩展不可用",
+    "The extension is unavailable" to "扩展不可用",
+    "Android blocked the extension" to "Android 阻止了扩展",
+    "Optional extension · not installed" to "可选扩展 · 未安装",
+    "Unrestricted local shell. Commands require approval; output may be sent to your model Provider." to
+        "不受命令白名单限制的本机 Shell。执行需要授权，输出可能发送给当前模型 Provider。",
+    "Configure Termux" to "配置 Termux",
+    "Enable tools and Skill" to "启用工具和 Skill",
+    "Termux tasks" to "Termux 任务",
+    "Allow Termux command?" to "允许执行 Termux 命令？",
+    "Commands can read or change Termux files and use the network. Output goes to your model Provider." to
+        "命令可以读取、修改 Termux 文件并访问网络。输出会发送给当前模型 Provider。",
+    "Say: execute once, allow this task, or cancel." to "可以说：执行一次、允许本次任务，或取消。",
+    "Voice confirmation" to "语音确认",
+    "Execute once" to "执行一次",
+    "Allow this task" to "允许本次任务",
+    "Closing Mochi does not stop commands. Detached processes may survive a stop request." to
+        "关闭 Mochi 不会停止命令。脱离任务的进程可能在请求停止后继续运行。",
+    "No tasks" to "暂无任务",
+    "Forget" to "清理记录",
+    "Command output" to "命令输出",
+    "submitted" to "已提交",
+    "running" to "执行中",
+    "succeeded" to "已成功",
+    "failed" to "已失败",
+    "stopping" to "正在停止",
+    "stopped" to "已停止",
+    "timed_out" to "已超时",
+    "unknown" to "状态未知",
+    "forgotten" to "已清理",
     "Settings" to "设置",
     "Mochi settings" to "Mochi 设置",
     "Configure persona, speech, and AI connections independently." to

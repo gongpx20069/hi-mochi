@@ -163,7 +163,7 @@ import com.example.mochi_pet.core.tools.BuiltInToolSummary
 import com.example.mochi_pet.core.tools.ManualMcpServerInput
 import com.example.mochi_pet.core.tools.McpAuthMode
 import com.example.mochi_pet.core.tools.McpServerSummary
-import com.example.mochi_pet.core.tools.MijiaProviderSummary
+import com.example.mochi_pet.core.tools.ExtensionProviderSummary
 import com.example.mochi_pet.core.agentlink.AgentLinkActivityRequest
 import com.example.mochi_pet.core.agentlink.AgentLinkAuthorizationResult
 import com.example.mochi_pet.core.agentlink.AgentLinkUiAction
@@ -243,6 +243,10 @@ fun MochiApp(
         MochiHomeViewModel.factory(application, voiceRuntime, wakeRuntime)
     }
     val viewModel: MochiHomeViewModel = viewModel(factory = factory)
+    val termuxApproval by viewModel.termuxApproval.collectAsStateWithLifecycle()
+    val termuxTasks by viewModel.termuxTasks.collectAsStateWithLifecycle()
+    val showTermuxTasks by viewModel.showTermuxTasks.collectAsStateWithLifecycle()
+    val termuxToolsState by viewModel.toolsState.collectAsStateWithLifecycle()
     LifecycleResumeEffect(Unit) {
         viewModel.refreshTools()
         onPauseOrDispose { }
@@ -319,6 +323,16 @@ fun MochiApp(
         }
     }
 
+    termuxApproval?.let {
+        TermuxApprovalDialog(it, viewModel::onTermuxAction) {
+            startVoice(VoiceInputTrigger.DIRECT)
+        }
+    }
+    if (showTermuxTasks && termuxApproval == null) {
+        TermuxTasksDialog(termuxTasks, viewModel::onTermuxAction,
+            termuxToolsState.feedback, termuxToolsState.isLoading)
+    }
+
     LaunchedEffect(voiceTriggers) {
         voiceTriggers.collect(startVoice)
     }
@@ -372,6 +386,7 @@ private fun MochiAppContent(
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
     val surface by viewModel.surface.collectAsStateWithLifecycle()
+    val termuxTasks by viewModel.termuxTasks.collectAsStateWithLifecycle()
     val plannerState by viewModel.plannerState.collectAsStateWithLifecycle()
     val conversationState by
         viewModel.conversationState.collectAsStateWithLifecycle()
@@ -561,13 +576,13 @@ private fun MochiAppContent(
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(
                 context,
-                localizeUiText("The Mi Home extension is unavailable"),
+                localizeUiText("The extension is unavailable"),
                 Toast.LENGTH_SHORT,
             ).show()
         } catch (_: SecurityException) {
             Toast.makeText(
                 context,
-                localizeUiText("Android blocked the Mi Home extension"),
+                localizeUiText("Android blocked the extension"),
                 Toast.LENGTH_SHORT,
             ).show()
         } finally {
@@ -704,6 +719,7 @@ private fun MochiAppContent(
             onDisconnectMijia = viewModel::disconnectMijia,
             onSetMijiaEnabled = viewModel::setMijiaEnabled,
             onSetMijiaToolEnabled = viewModel::setMijiaToolEnabled,
+            onTermuxAction = viewModel::onTermuxAction,
             onAddMcpServer = viewModel::addManualMcpServer,
             onRemoveMcpServer = viewModel::removeManualMcpServer,
             onSetMcpServerEnabled = viewModel::setMcpServerEnabled,
@@ -787,6 +803,11 @@ private fun MochiAppContent(
                             }
                         }
                         ChatPipelineIndicator(state = visiblePipelineState)
+                        if (termuxTasks.isNotEmpty()) {
+                            TextButton({ viewModel.onTermuxAction(TermuxUiAction.Tasks) }) {
+                                Text("Termux tasks")
+                            }
+                        }
                     }
                 }
             }
@@ -821,6 +842,11 @@ private fun MochiAppContent(
                     },
                 )
                 ChatPipelineIndicator(state = visiblePipelineState)
+                if (termuxTasks.isNotEmpty()) {
+                    TextButton({ viewModel.onTermuxAction(TermuxUiAction.Tasks) }) {
+                        Text("Termux tasks")
+                    }
+                }
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1629,6 +1655,7 @@ private fun SurfaceContent(
     onDisconnectMijia: () -> Unit,
     onSetMijiaEnabled: (Boolean) -> Unit,
     onSetMijiaToolEnabled: (String, Boolean) -> Unit,
+    onTermuxAction: (TermuxUiAction) -> Unit,
     onAddMcpServer: (ManualMcpServerInput) -> Unit,
     onRemoveMcpServer: (String) -> Unit,
     onSetMcpServerEnabled: (String, Boolean) -> Unit,
@@ -1736,6 +1763,7 @@ private fun SurfaceContent(
                 onDisconnectMijia = onDisconnectMijia,
                 onSetMijiaEnabled = onSetMijiaEnabled,
                 onSetMijiaToolEnabled = onSetMijiaToolEnabled,
+                onTermuxAction = onTermuxAction,
                 onAddServer = onAddMcpServer,
                 onRemoveServer = onRemoveMcpServer,
                 onSetServerEnabled = onSetMcpServerEnabled,
@@ -3858,6 +3886,7 @@ private fun ToolsSurface(
     onDisconnectMijia: () -> Unit,
     onSetMijiaEnabled: (Boolean) -> Unit,
     onSetMijiaToolEnabled: (String, Boolean) -> Unit,
+    onTermuxAction: (TermuxUiAction) -> Unit,
     onAddServer: (ManualMcpServerInput) -> Unit,
     onRemoveServer: (String) -> Unit,
     onSetServerEnabled: (String, Boolean) -> Unit,
@@ -4226,6 +4255,13 @@ private fun ToolsSurface(
                 )
             }
             item {
+                TermuxProviderCard(
+                    summary = state.catalog.termux,
+                    disabled = state.isLoading,
+                    onAction = onTermuxAction,
+                )
+            }
+            item {
                 AgentLinkProviderCard(
                     state = state.catalog.agentLink,
                     loading = state.isLoading,
@@ -4267,7 +4303,7 @@ private fun ToolsSurface(
 
 @Composable
 private fun MijiaExtensionCard(
-    summary: MijiaProviderSummary,
+    summary: ExtensionProviderSummary,
     toolsExpanded: Boolean,
     disabled: Boolean,
     onToggleTools: () -> Unit,

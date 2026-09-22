@@ -87,6 +87,7 @@ therefore much smaller. Developers can check a connected device with
 | --- | --- | --- | --- |
 | Mochi Planner | Enabled | Manages Mochi calendar events and dated todos | None |
 | AgentLink | Disabled | Controls shared CLI/App coding chats with human-override guards | Install AgentLink; approve native scoped access; enable all three Tools |
+| Termux | Disabled | Runs local shell commands, scripts and development tools with native approval | Install matching-signed Mochi Termux extension and official Termux; complete Tools > Termux setup |
 | Voice Navigation | Enabled | Opens the relevant native Mochi surface from conversation intent | None |
 | Scheduled Automations | Enabled | Runs one-time or recurring Agent prompts and writes results to Conversation | Notification permission; exact-alarm access is optional |
 | Web Search | Enabled | Researches public web and WeChat official-account content through Agent Browser | None |
@@ -109,6 +110,7 @@ therefore much smaller. Developers can check a connected device with
 | --- | --- | --- |
 | **Planner** | `manage_mochi_calendar`<br>`manage_mochi_todo` | Read and update Mochi-owned events and dated todos. No additional setup. |
 | **AgentLink** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | Authorized shared machine/workspace/chat discovery and control; foreground Main Agent only. |
+| **Termux extension** | `termux_exec` · `termux_task` | Unrestricted shell, bounded output and task inspection/stop; optional, foreground Main Agent only. |
 | **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
 | **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Research public HTTPS pages in one visible, bounded Android WebView session. |
@@ -127,6 +129,22 @@ research starts from the official 12306 query page; flight research prefers
 official airline sites. Mochi never logs in, bypasses verification, enters
 passenger or payment data, or continues into booking. It stops when a site
 requires authentication, CAPTCHA, identity verification, or checkout.
+
+### Run local commands with Termux
+
+Install `Mochi-Termux-Extension` from the same Release/signing channel as Mochi
+and install [official Termux](https://github.com/termux/termux-app#installation)
+separately. Open **Tools > Extensions > Termux > Configure**. Copy the visible
+one-time configuration command into Termux, grant command permission, then
+connect/test and return to **Enable tools and Skill**.
+
+Speak normally to Mochi; approved commands run in the background without an App
+switch. Approve one call or the current task; there is no permanent automatic
+grant. This is unrestricted shell under Termux permissions, not root or a
+sandbox. Agent-visible output is sent to your chosen model Provider.
+**Termux tasks** lets you inspect output locally, refresh, stop and clean up
+completed tasks. Closing Mochi does not stop submitted commands, Android can
+kill background work, and detached processes may survive a stop request.
 
 ### Control shared AgentLink coding chats
 

@@ -296,6 +296,8 @@ function New-MochiReleaseAssets {
         [Parameter(Mandatory)]
         [string] $ExtensionSourceOutputDirectory,
         [Parameter(Mandatory)]
+        [string] $TermuxSourceOutputDirectory,
+        [Parameter(Mandatory)]
         [string] $DestinationDirectory
     )
 
@@ -384,9 +386,34 @@ function New-MochiReleaseAssets {
         ).Hash.ToLowerInvariant()
         $artifacts += [ordered]@{
             kind = 'extension'
+            extension = 'mijia'
             abi = 'universal'
             file = $extensionFileName
             sha256 = $extensionHash
+        }
+
+        $termuxPath = Get-MochiReleaseApkOutputsSingle $TermuxSourceOutputDirectory
+        if ((Get-AndroidApkVersion $termuxPath) -ne $Version) {
+            throw 'Termux extension version does not match the release.'
+        }
+        Assert-AndroidApkSignature $termuxPath
+        Assert-AndroidApkIdentity `
+            -ApkPath $termuxPath `
+            -ExpectedApplicationId 'com.example.mochi_pet.extension.termux' `
+            -ShouldHaveLauncher $false
+        $termuxSigners = @(Get-AndroidApkSignerSha256 $termuxPath)
+        if (Compare-Object $baseSignerDigests $termuxSigners) {
+            throw 'The Termux extension APK must use the base APK signer.'
+        }
+        $termuxName = "Mochi-Termux-Extension-$tag.apk"
+        $termuxDestination = Join-Path $DestinationDirectory $termuxName
+        Copy-Item $termuxPath $termuxDestination
+        $artifacts += [ordered]@{
+            kind = 'extension'
+            extension = 'termux'
+            abi = 'universal'
+            file = $termuxName
+            sha256 = (Get-FileHash -Algorithm SHA256 $termuxDestination).Hash.ToLowerInvariant()
         }
 
         $checksumName = "Mochi-$tag-SHA256SUMS.txt"

@@ -31,16 +31,19 @@ $extensionArtifacts = @(
 if (
     $baseArtifacts.Count -ne $expectedAbis.Count -or
     @($expectedAbis | Where-Object { $_ -notin $baseArtifacts.abi }) -or
-    $extensionArtifacts.Count -ne 1
+    $extensionArtifacts.Count -ne 2 -or
+    @('mijia', 'termux' | Where-Object { $_ -notin $extensionArtifacts.extension }) -or
+    $artifacts.Count -ne 7
 ) {
     throw "Release metadata does not contain the expected APK artifacts."
 }
 $releaseAssets = @()
 $baseSignerDigests = $null
-$extensionSignerDigests = $null
+$extensionSignerDigests = @{}
 foreach ($artifact in $artifacts) {
     $expectedFile = if ($artifact.kind -eq 'extension') {
-        "Mochi-Mijia-Extension-v$version.apk"
+        $extensionLabel = if ($artifact.extension -eq 'mijia') { 'Mijia' } else { 'Termux' }
+        "Mochi-$extensionLabel-Extension-v$version.apk"
     } else {
         "Mochi-v$version-$($artifact.abi).apk"
     }
@@ -59,9 +62,9 @@ foreach ($artifact in $artifacts) {
     if ($artifact.kind -eq 'extension') {
         Assert-AndroidApkIdentity `
             -ApkPath $apkPath `
-            -ExpectedApplicationId 'com.example.mochi_pet.extension.mijia' `
+            -ExpectedApplicationId "com.example.mochi_pet.extension.$($artifact.extension)" `
             -ShouldHaveLauncher $false
-        $extensionSignerDigests = @(Get-AndroidApkSignerSha256 $apkPath)
+        $extensionSignerDigests[$artifact.extension] = @(Get-AndroidApkSignerSha256 $apkPath)
     } else {
         Assert-AndroidApkIdentity `
             -ApkPath $apkPath `
@@ -82,8 +85,10 @@ foreach ($artifact in $artifacts) {
     }
     $releaseAssets += $apkPath
 }
-if (Compare-Object $baseSignerDigests $extensionSignerDigests) {
-    throw 'The Mi Home extension APK must use the base APK signer.'
+foreach ($signers in $extensionSignerDigests.Values) {
+    if (Compare-Object $baseSignerDigests $signers) {
+        throw 'Every extension APK must use the base APK signer.'
+    }
 }
 $expectedChecksumName = "Mochi-v$version-SHA256SUMS.txt"
 if ($metadata.checksum_file -ne $expectedChecksumName) {
@@ -158,6 +163,7 @@ $releaseNotes = @'
 All variants provide the same Mochi features.
 
 Install **`Mochi-Mijia-Extension`** only if you want optional Mi Home Tools.
+Install **`Mochi-Termux-Extension`** only if you want optional local shell Tools; Termux is installed separately.
 It has no launcher icon and must be signed by the same release key as Mochi.
 '@
 

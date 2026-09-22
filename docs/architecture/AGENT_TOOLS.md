@@ -117,6 +117,27 @@ must never be used as an authorization or disabled-Tool workaround.
 
 ## 2. Planner tools
 
+### Optional Termux tools
+
+`termux_exec(command, workdir?, timeout_seconds?)` submits unrestricted shell
+after a nonce-bound native approval, returning `task_id` and `state=submitted`.
+It does not claim completion. `workdir` defaults to Termux HOME, commands are
+bounded to 16 KiB UTF-8, and timeout is 1–1800 seconds, default 120.
+
+`termux_task(action, task_id?)` supports `list`, `read`, `stop`, and `forget`.
+List returns only owned task IDs; other actions require one of those IDs.
+Read/stop return state, optional exit code, bounded stdout/stderr and a
+truncation flag. A nonzero command exit is a successfully observed `failed`
+task, not a successful command; dispatch/authorization/transport failures use
+the standard error envelope. Forget removes only completed task output.
+
+Both provider and individual switches are enforced, including after an approval
+wait. Tools and the dependent default-off Termux Skill are foreground Main-Agent
+only. One-run automatic approval is held by the registry, never by model-supplied
+arguments. There is no shell `confirmed` flag, silent retry, unrestricted Android
+Intent dispatch, or permission inheritance by scheduled/subagents.
+See `EXTENSIONS.md` for setup, command privacy and process-lifetime guarantees.
+
 ### `manage_mochi_calendar`
 
 Operations: `create`, `list`, `update`, `delete`.

@@ -13,7 +13,7 @@ import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.database.MochiDatabase
 import com.example.mochi_pet.core.database.PlannerRepository
 import com.example.mochi_pet.core.database.PlannerStore
-import com.example.mochi_pet.core.extensions.AndroidMijiaExtensionClient
+import com.example.mochi_pet.core.extensions.AndroidMochiExtensionClient
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
 import com.example.mochi_pet.core.memory.AgentMemoryRepository
 import com.example.mochi_pet.core.memory.RoomAgentMemoryRepository
@@ -162,8 +162,14 @@ class MochiApplication : Application() {
     }
 
     val extensionClient: MochiExtensionClient by lazy {
-        AndroidMijiaExtensionClient(this)
+        AndroidMochiExtensionClient(this)
     }
+
+    val termuxClient: MochiExtensionClient by lazy {
+        AndroidMochiExtensionClient(this, com.example.mochi_pet.core.extensions.TrustedExtension.TERMUX)
+    }
+
+    val termuxApproval = com.example.mochi_pet.core.extensions.TermuxApprovalGate()
 
     val agentLinkClient: AndroidAgentLinkClient by lazy {
         AndroidAgentLinkClient(this, toolDataStore)
@@ -178,6 +184,8 @@ class MochiApplication : Application() {
             mcpClient = mcpClient,
             extensionClient = extensionClient,
             agentLinkClient = agentLinkClient,
+            termuxClient = termuxClient,
+            termuxApproval = termuxApproval,
         )
     }
 

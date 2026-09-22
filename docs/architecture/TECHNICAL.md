@@ -368,8 +368,10 @@ applicable, connected, and enabled; every member Tool used by that Skill must
 also remain individually enabled. The UI reports the aggregate label, such as
 `Tencent Docs MCP`, rather than raw Tool IDs. If readiness later fails, the
 saved preference remains but the Skill is omitted from discovery and
-activation. Android never runs downloaded scripts or package-install
-instructions.
+activation. Installing/loading a Skill never runs downloaded scripts or
+package-install instructions. Explicitly approved Termux commands may run user
+scripts or install packages inside Termux; this does not grant other Skills
+or runtimes an execution bypass.
 
 The unauthenticated Explore default parses the public skills.sh Trending (24h)
 leaderboard and falls back to install-ranked public search if the page shape
@@ -451,7 +453,8 @@ Navigation is a local deterministic policy, not an unrestricted model action.
   and service identity. Never relax the public web URL policy to implement a
   local plugin.
 - Bound tool rounds, network response size, script time, and script output.
-- Do not expose shell/process execution or arbitrary filesystem access.
+- Do not expose shell/process execution or arbitrary filesystem access outside
+  the optional, native-approved Termux extension contract in `EXTENSIONS.md`.
 
 ## 7. Observability
 

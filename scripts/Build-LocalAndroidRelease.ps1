@@ -64,6 +64,9 @@ New-MochiReleaseAssets `
     -ExtensionSourceOutputDirectory (
         Join-Path $androidRoot 'extensions\mijia\build\outputs\apk\release'
     ) `
+    -TermuxSourceOutputDirectory (
+        Join-Path $androidRoot 'extensions\termux\build\outputs\apk\release'
+    ) `
     -DestinationDirectory $releaseDirectory
 
 Write-Output "Version: $version"

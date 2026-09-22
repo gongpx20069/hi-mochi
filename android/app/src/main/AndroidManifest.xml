@@ -22,6 +22,7 @@
     <queries>
         <package android:name="com.gongpx.androidacpclient" />
         <package android:name="com.example.mochi_pet.extension.mijia" />
+        <package android:name="com.example.mochi_pet.extension.termux" />
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>

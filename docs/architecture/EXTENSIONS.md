@@ -7,8 +7,9 @@ typed Tools without increasing every base APK. They are not Agent Skills,
 downloaded scripts, remote MCP servers, dynamic-feature splits, or dynamically
 loaded DEX/JAR files.
 
-The first extension is **Mochi Mi Home Extension**, an optional unofficial
-connector for selected Mi Home devices. The initial host accepts only explicit
+The extensions are **Mochi Mi Home Extension**, an optional unofficial
+connector for selected Mi Home devices, and **Mochi Termux Extension**, an
+optional local shell connector. The host accepts only explicit
 official package IDs signed by the same release certificate as Mochi. A future
 third-party extension ecosystem requires a separate trust and review design;
 it is not implied by this contract.
@@ -20,7 +21,8 @@ android/
 ├── app/
 ├── extension-api/
 └── extensions/
-    └── mijia/
+    ├── mijia/
+    └── termux/
 ```
 
 | Module | Application ID / namespace | Responsibility |
@@ -28,9 +30,10 @@ android/
 | `:app` | `com.example.mochi_pet` | Host UI, trust validation, Tool adapter, trusted cards |
 | `:extension-api` | `com.example.mochi_extension` | AIDL and immutable cross-process models |
 | `:extensions:mijia` | `com.example.mochi_pet.extension.mijia` | QR login, Xiaomi cloud/MIoT, device Tools, images |
+| `:extensions:termux` | `com.example.mochi_pet.extension.termux` | Termux setup, background shell submission, task state and termination |
 
-Both applications use `minSdk 26`, the same release version, and the same
-signing key. The extension is one universal APK because it contains no native
+All Mochi applications use `minSdk 26`, the same release version, and the same
+signing key. Each extension is one universal APK because it contains no native
 ABI libraries. The host both defines and requests the shared signature-level
 bind permission; defining the permission alone does not authorize the host to
 start the protected extension Service or configuration Activity.
@@ -82,12 +85,16 @@ extension APK aligned with Mochi's in-app language selection without exposing
 host settings or storage.
 
 Binder calls never carry account passwords, service tokens, encryption keys,
-raw cookies, image byte arrays, filesystem paths, executable code, Android
+raw cookies, image byte arrays, Android
 `Context`, Room entities, model prompts, or navigation directives.
+Filesystem paths and executable shell text are allowed only in the explicitly
+approved Termux contract below, never the Mi Home contract.
 
 Each request has a unique ID. Exactly one terminal callback is accepted.
 Cancellation, timeout, Binder death, or stale Agent session invalidates later
-callbacks. The service must not keep a Tool call running after cancellation.
+callbacks. The service must not keep an IPC Tool call running after cancellation.
+Termux submitted jobs have a separate lifetime: cancelling the IPC wait does
+not terminate a job. Only `termux_task stop` requests process-group termination.
 The Host deadline includes a short callback-delivery grace period beyond the
 request deadline so the service owns the terminal timeout result. Camera event
 image retrieval receives 14 seconds plus one second of Host callback grace,
@@ -115,6 +122,56 @@ extension results.
 
 The initial release excludes extension Tools from Scheduled Agents and
 Subagents.
+
+### Termux execution
+
+The trusted Termux connector has exactly `termux_exec` and `termux_task`.
+Termux itself remains a separately signed, independently installed app. The
+connector alone requests `com.termux.permission.RUN_COMMAND`, targets the
+explicit `com.termux.app.RunCommandService`, and declares package visibility.
+It does not require root, SSH, accessibility or overlay permission.
+
+The configuration Activity provides official installation guidance, a visible
+copyable command that preserves other `termux.properties` settings while
+enabling `allow-external-apps`, Android permission access, and a callback-based
+connection test. It cannot modify Termux's private settings before external
+access has been authorized. The test installs the bundled `runner-v1` script
+under Termux's private `~/.local/state/mochi-termux/` directory and checks
+required shell utilities. There is no downloaded bootstrap code.
+
+The foreground registry wraps both tools in a native approval gate. Approval
+is nonce-bound to exact arguments, expires after two minutes, is cancellable,
+and permits either one call or this registry's Agent run. Reads/stops of a
+task already approved in that run do not ask again. Provider/tool revocation
+invalidates the run's grant. Another run never inherits it. Native task-manager
+buttons operate only on extension-owned task IDs without sending their output
+to the model. Tool results used by the Agent do go to the configured Provider;
+the approval screen discloses this. No heuristic claims to classify arbitrary
+shell as safe. This is not a filesystem, network or credential sandbox.
+
+Commands are limited to 16 KiB UTF-8, an absolute working directory, and a
+1–1800 second execution deadline (default 120). Commands run non-interactively
+with closed stdin. Native submission records a random task ID durably before
+dispatch; transport uncertainty never triggers a retry. A mutable, explicit,
+one-shot PendingIntent targets a non-exported result receiver, with a unique
+action and fixed request ID. Commands and raw output never enter app logs or
+Provider-share data.
+
+The bundled supervisor owns process groups, a deadline watchdog and FIFO
+output drains. Each stream retains at most 16,385 bytes, returns the first
+16,384 and reports truncation. Large output is drained rather than filling disk
+or deadlocking the command. Process identity includes Linux start time before
+group termination, reducing PID-reuse risk. This is best-effort management:
+unrestricted commands can detach or modify their own Termux environment.
+Neither cancellation nor a completed supervisor proves detached descendants
+have ended. Missing evidence is `unknown`, never successful completion.
+
+Up to 100 task IDs are retained in private extension preferences (no backup).
+Bounded output remains in Termux until explicitly forgotten after confirmed
+completion. Termux owns command lifetime; it may outlive Mochi, while Android
+may still kill it. Reconnection reinstalls the same versioned helper without
+deleting tasks. Interactive terminal takeover and persistent-service supervision
+are not provided.
 
 ## 6. Mi Home authentication and storage
 
@@ -274,11 +331,13 @@ The standard Android release builds and signs:
 
 - five Mochi ABI APKs;
 - one universal Mi Home extension APK, not split by native ABI;
+- one universal Termux extension APK, not split by native ABI;
 - one shared SHA-256 manifest and release metadata file.
 
 The publisher verifies application ID, embedded version, signature, absence of
 a launcher entry, protocol version metadata, and hashes. The extension APK is
-named `Mochi-Mijia-Extension-v<version>.apk`.
+named `Mochi-Mijia-Extension-v<version>.apk` or
+`Mochi-Termux-Extension-v<version>.apk`, respectively.
 
 The protocol uses an integer major version plus additive capability flags.
 Unknown optional fields are ignored. Major-version mismatch leaves the

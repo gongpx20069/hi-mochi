@@ -83,6 +83,7 @@
 | --- | --- | --- | --- |
 | Mochi Planner | 启用 | 管理 Mochi 日历事件和带日期的待办 | 无 |
 | AgentLink | 禁用 | 控制 CLI/App 共享编程聊天，检测人工接管冲突 | 安装 AgentLink，在原生页面确认权限并启用三个 Tools |
+| Termux | 禁用 | 通过原生授权运行本机 Shell、脚本和开发工具 | 安装与主应用同签名的 Termux 扩展及官方 Termux，完成 Tools 中的连接向导 |
 | Voice Navigation | 启用 | 根据对话意图打开相关 Mochi 原生页面 | 无 |
 | Scheduled Automations | 启用 | 执行一次性或周期 Agent 任务，并把结果写入 Conversation | 通知权限；精确闹钟权限可选 |
 | Web Search | 启用 | 通过 Agent Browser 搜索公开网页和微信公众号内容 | 无 |
@@ -105,6 +106,7 @@
 | --- | --- | --- |
 | **计划** | `manage_mochi_calendar`<br>`manage_mochi_todo` | 读取和更新 Mochi 自己的日历事件与带日期待办，无需额外配置。 |
 | **AgentLink** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | 发现和控制已授权的共享机器、工作区与聊天；仅限前台 Main Agent。 |
+| **Termux 扩展** | `termux_exec` · `termux_task` | 不受命令白名单限制的 Shell、有界输出、任务查询和停止；可选安装，仅限前台 Main Agent。 |
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
@@ -120,6 +122,21 @@ Tools 页面会将 Agent Browser、Mochi 内建能力和 Provider Tools 分组�
 公开查询页开始，机票优先查询航空公司官网。Mochi 不登录、不绕过验证、不填写
 乘客或支付信息，也不会进入预订流程；遇到登录、验证码、身份验证或结算页面时
 立即停止。
+
+### 使用 Termux 执行本机命令
+
+安装与 Mochi 同一发布/签名渠道的 `Mochi-Termux-Extension`，另行安装
+[官方 Termux](https://github.com/termux/termux-app#installation)。
+打开 **Tools > Extensions > Termux > 配置 Termux**，将向导展示的一次性
+配置命令复制到 Termux 执行，授予命令执行权限并连接测试。返回后点击
+**启用工具和 Skill**。
+
+日常直接语音控制 Mochi，批准后的命令在后台执行，不切换 App。可以授权
+执行一次或本次任务，不提供永久自动授权。这是 Termux 权限下的完整 Shell，
+不是 Root 或文件沙箱；供 Agent 分析的输出会发送给当前模型 Provider。
+**Termux 任务**支持在本机查看输出、刷新、停止和清理已结束任务。
+关闭 Mochi 不会停止已提交命令，Android 仍可能终止后台运行；脱离任务的
+进程可能在停止请求后继续运行。
 
 ### 控制 AgentLink 共享编程聊天
 

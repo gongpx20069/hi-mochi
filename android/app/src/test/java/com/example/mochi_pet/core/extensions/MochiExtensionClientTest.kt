@@ -16,6 +16,15 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class MochiExtensionClientTest {
     @Test
+    fun `Termux configuration is explicit and cannot resolve to Mi Home`() {
+        assertEquals(
+            ExtensionActivityTarget(MochiExtensionProtocol.TERMUX_PACKAGE, MochiExtensionProtocol.TERMUX_CONFIGURATION_ACTIVITY),
+            MochiExtensionSnapshot(installed = true, trusted = true, identity = TrustedExtension.TERMUX).configurationTarget,
+        )
+        assertNull(MochiExtensionSnapshot(installed = true, identity = TrustedExtension.TERMUX).configurationTarget)
+    }
+
+    @Test
     fun `camera event image wait is bounded to fifteen seconds`() {
         assertEquals(
             14_000L,
@@ -60,7 +69,7 @@ class MochiExtensionClientTest {
                 className =
                     MochiExtensionProtocol.MIJIA_CONFIGURATION_ACTIVITY,
             ),
-            MijiaExtensionSnapshot(
+            MochiExtensionSnapshot(
                 installed = true,
                 trusted = true,
             ).configurationTarget,
@@ -70,7 +79,7 @@ class MochiExtensionClientTest {
     @Test
     fun `untrusted extension does not expose configuration`() {
         assertNull(
-            MijiaExtensionSnapshot(
+            MochiExtensionSnapshot(
                 installed = true,
                 trusted = false,
             ).configurationTarget,

@@ -309,6 +309,31 @@ Chinese or English UI language, and moves through these states:
    in-place package update; stored authorization and device selections remain
    unless the extension rejects an incompatible state version.
 
+The optional Termux card uses the same extension section, provider switch and
+collapsed individual tools. Configure opens the signed extension's setup
+Activity: install/open official Termux, copy the visible one-time external-access
+command, grant Android command permission, and connect/test. Steps already
+completed need not be repeated. Returning to Mochi refreshes readiness.
+**Enable tools and Skill** explicitly enables both tools and the default-off
+Termux Skill; a Skill cannot silently enable the provider.
+
+Ordinary shell execution remains in the background without switching apps.
+A native approval dialog shows exact tool arguments, working directory/deadline
+when supplied, and the disclosure that commands have Termux permissions and
+Agent-visible output is sent to the model Provider. Choices are **Execute once**,
+**Allow this task** (current Agent run only), or **Cancel**. Voice confirmation
+accepts explicit full phrases bound to the currently pending request, not a
+model-authored confirmation. Starting approval recognition does not cancel the
+waiting Agent. Unknown speech does not grant permission.
+
+**Termux tasks** provides submitted IDs, explicit refresh, bounded selectable
+output, Stop and completed-task cleanup. Reading output here does not call a
+model. Closing a dialog or conversation is not process termination. The UI
+distinguishes submitted, running, succeeded, failed, stopping, stopped, timed
+out and unknown. Detached descendants may outlive termination of the tracked
+group; the UI never promises otherwise. Interactive commands require manual
+Termux work, not automatic App switching or a silent rerun.
+
 Static package, signing, Service, Activity, and signature-permission checks are
 enough to enter **Installed, not connected**. A failed first Binder start must
 not relabel that trusted package as untrusted or send the user back to

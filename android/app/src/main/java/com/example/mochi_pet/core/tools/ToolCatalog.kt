@@ -9,9 +9,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.agent.tool.AgentTool
 import com.example.mochi_pet.core.agentlink.AgentLinkClient
 import com.example.mochi_pet.core.agentlink.AgentLinkState
-import com.example.mochi_pet.core.extensions.MijiaExtensionSnapshot
+import com.example.mochi_pet.core.extensions.MochiExtensionSnapshot
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
-import com.example.mochi_pet.core.extensions.UnavailableMijiaExtensionClient
+import com.example.mochi_pet.core.extensions.UnavailableExtensionClient
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpAgentTool
 import com.example.mochi_pet.core.mcp.McpRemoteTool
@@ -57,7 +57,8 @@ data class ToolCatalogSummary(
     val builtInTools: List<BuiltInToolSummary> = emptyList(),
     val amap: AmapProviderSummary = AmapProviderSummary(),
     val agentBrowser: AgentBrowserProviderSummary = AgentBrowserProviderSummary(),
-    val mijia: MijiaProviderSummary = MijiaProviderSummary(),
+    val mijia: ExtensionProviderSummary = ExtensionProviderSummary(),
+    val termux: ExtensionProviderSummary = ExtensionProviderSummary(),
     val agentLink: AgentLinkState = AgentLinkState(),
     val servers: List<McpServerSummary> = emptyList(),
     val isLoading: Boolean = false,
@@ -75,7 +76,7 @@ data class AgentBrowserProviderSummary(
     val tools: List<BuiltInToolSummary> = emptyList(),
 )
 
-data class MijiaProviderSummary(
+data class ExtensionProviderSummary(
     val installed: Boolean = false,
     val trusted: Boolean = false,
     val connected: Boolean = false,
@@ -88,10 +89,10 @@ data class MijiaProviderSummary(
     val selectedDeviceCount: Int = 0,
     val configurationPackage: String? = null,
     val configurationActivity: String? = null,
-    val tools: List<MijiaToolSummary> = emptyList(),
+    val tools: List<ExtensionToolSummary> = emptyList(),
 )
 
-data class MijiaToolSummary(
+data class ExtensionToolSummary(
     val name: String,
     val description: String,
     val riskLevel: String,
@@ -136,6 +137,9 @@ fun ToolCatalogSummary.readyToolNames(): Set<String> =
         if (mijia.connected && mijia.enabled) {
             mijia.tools.filter { it.enabled }.mapTo(this) { it.name }
         }
+        if (termux.connected && termux.enabled) {
+            termux.tools.filter { it.enabled }.mapTo(this) { it.name }
+        }
         if (agentLink.authorized && agentLink.connected && agentLink.enabled) {
             addAll(agentLink.enabledTools)
         }
@@ -164,6 +168,7 @@ private fun ToolCatalogSummary.skillRequirementName(
         toolName.startsWith("browser_") -> "Agent Browser"
         toolName.startsWith("amap_") -> "Amap Maps"
         toolName.startsWith("mijia_") -> "Mi Home extension"
+        toolName.startsWith("termux_") -> "Termux extension"
         toolName.startsWith("agentlink_") -> "AgentLink"
         toolName.startsWith("notion_") ->
             servers.firstOrNull { it.id == NOTION_SERVER_ID }?.name
@@ -286,6 +291,15 @@ interface ToolCatalogRepository {
 
     suspend fun disconnectMijia(): ToolCatalogSummary
 
+    suspend fun setTermuxEnabled(enabled: Boolean): ToolCatalogSummary =
+        throw UnsupportedOperationException("Termux extension is unavailable")
+
+    suspend fun setTermuxToolEnabled(name: String, enabled: Boolean): ToolCatalogSummary =
+        throw UnsupportedOperationException("Termux extension is unavailable")
+
+    suspend fun disconnectTermux(): ToolCatalogSummary =
+        throw UnsupportedOperationException("Termux extension is unavailable")
+
     suspend fun loadAmapCredentials(): AmapCredentials?
 
     suspend fun exportSharedTools(
@@ -331,8 +345,11 @@ class DataStoreToolCatalogRepository(
     private val oauthClient: McpOAuthClient = McpOAuthClient(),
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val extensionClient: MochiExtensionClient =
-        UnavailableMijiaExtensionClient,
+        UnavailableExtensionClient,
     private val agentLinkClient: AgentLinkClient? = null,
+    private val termuxClient: MochiExtensionClient = UnavailableExtensionClient,
+    private val termuxApproval: com.example.mochi_pet.core.extensions.TermuxApprovalGate =
+        com.example.mochi_pet.core.extensions.TermuxApprovalGate(),
 ) : ToolCatalogRepository {
     private val json = Json {
         encodeDefaults = true
@@ -343,8 +360,25 @@ class DataStoreToolCatalogRepository(
     override suspend fun loadSummary(): ToolCatalogSummary {
         repairTruncatedTencentDocsCatalog()
         updateCatalog { it }
-        return loadCatalog().toSummary(extensionClient.snapshot()).copy(
+        val catalog = loadCatalog()
+        val termux = termuxClient.snapshot()
+        return catalog.toSummary(extensionClient.snapshot()).copy(
             agentLink = agentLinkClient?.refresh() ?: AgentLinkState(),
+            termux = ExtensionProviderSummary(
+                installed = termux.installed,
+                trusted = termux.trusted,
+                connected = termux.connected,
+                enabled = catalog.termuxEnabled && termux.connected,
+                status = termux.connectionState.status,
+                detail = termux.detail ?: termux.connectionState.detail,
+                versionName = termux.metadata?.versionName,
+                configurationPackage = termux.configurationTarget?.packageName,
+                configurationActivity = termux.configurationTarget?.className,
+                tools = termux.tools.map {
+                    ExtensionToolSummary(it.name, it.description, it.riskLevel,
+                        catalog.termuxToolsEnabled[it.name] ?: it.defaultEnabled)
+                },
+            ),
         )
     }
 
@@ -1087,15 +1121,48 @@ class DataStoreToolCatalogRepository(
 
     override suspend fun loadEnabledExtensionTools(): List<AgentTool> {
         val catalog = loadCatalog()
-        if (!catalog.mijiaEnabled) return emptyList()
+        val termuxTools = if (catalog.termuxEnabled) {
+            val snapshot = termuxClient.snapshot()
+            val session = com.example.mochi_pet.core.extensions.TermuxToolSession(termuxApproval) { name ->
+                val current = loadCatalog()
+                current.termuxEnabled && (current.termuxToolsEnabled[name] ?: true)
+            }
+            if (snapshot.connected) snapshot.tools.filter {
+                catalog.termuxToolsEnabled[it.name] ?: it.defaultEnabled
+            }.map { session.wrap(termuxClient.agentTool(it)) } else emptyList()
+        } else {
+            emptyList()
+        }
+        if (!catalog.mijiaEnabled) return termuxTools
         val snapshot = extensionClient.snapshot()
-        if (!snapshot.connected) return emptyList()
-        return snapshot.tools
+        if (!snapshot.connected) return termuxTools
+        return termuxTools + snapshot.tools
             .filter { definition ->
                 catalog.mijiaToolsEnabled[definition.name]
                     ?: definition.defaultEnabled
             }
             .map(extensionClient::agentTool)
+    }
+
+    override suspend fun setTermuxEnabled(enabled: Boolean): ToolCatalogSummary {
+        if (enabled) require(termuxClient.snapshot().connected) { "Connect Termux first." }
+        termuxApproval.cancelPending()
+        updateCatalog { it.copy(termuxEnabled = enabled) }
+        return loadSummary()
+    }
+
+    override suspend fun setTermuxToolEnabled(name: String, enabled: Boolean): ToolCatalogSummary {
+        require(name in setOf("termux_exec", "termux_task")) { "Unknown Termux tool." }
+        termuxApproval.cancelPending()
+        updateCatalog { it.copy(termuxToolsEnabled = it.termuxToolsEnabled + (name to enabled)) }
+        return loadSummary()
+    }
+
+    override suspend fun disconnectTermux(): ToolCatalogSummary {
+        termuxApproval.cancelPending()
+        termuxClient.disconnect()
+        updateCatalog { it.copy(termuxEnabled = false) }
+        return loadSummary()
     }
 
     private fun PersistedToolCatalog.loadEnabledMcpTools(
@@ -1290,7 +1357,7 @@ class DataStoreToolCatalogRepository(
     }
 
     private fun PersistedToolCatalog.toSummary(
-        extension: MijiaExtensionSnapshot,
+        extension: MochiExtensionSnapshot,
     ): ToolCatalogSummary =
         ToolCatalogSummary(
             builtInTools = BUILT_IN_TOOLS
@@ -1317,7 +1384,7 @@ class DataStoreToolCatalogRepository(
                         toBuiltInToolSummary(descriptor)
                     },
             ),
-            mijia = MijiaProviderSummary(
+            mijia = ExtensionProviderSummary(
                 installed = extension.installed,
                 trusted = extension.trusted,
                 connected = extension.connected,
@@ -1335,7 +1402,7 @@ class DataStoreToolCatalogRepository(
                 configurationActivity =
                     extension.configurationTarget?.className,
                 tools = extension.tools.map { definition ->
-                    MijiaToolSummary(
+                    ExtensionToolSummary(
                         name = definition.name,
                         description = definition.description,
                         riskLevel = definition.riskLevel,
@@ -1733,6 +1800,8 @@ private data class PersistedToolCatalog(
     val agentBrowserEnabled: Boolean = true,
     val mijiaEnabled: Boolean = false,
     val mijiaToolsEnabled: Map<String, Boolean> = emptyMap(),
+    val termuxEnabled: Boolean = false,
+    val termuxToolsEnabled: Map<String, Boolean> = emptyMap(),
     val servers: List<PersistedMcpServer> = emptyList(),
     val pendingNotionOAuth: PendingOAuthRecord? = null,
 )

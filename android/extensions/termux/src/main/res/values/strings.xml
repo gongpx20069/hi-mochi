@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Mochi Termux Extension</string>
+    <string name="setup_title">Connect Termux</string>
+    <string name="setup_help">Run unrestricted shell commands with Termux permissions. Commands can read or change Termux files and use the network. Output used by the Agent is sent to your model Provider. No root, SSH server, or overlay permission is required.</string>
+    <string name="install">Install / open Termux</string>
+    <string name="bootstrap">Copy setup command and open Termux</string>
+    <string name="bootstrap_help">Paste the command below into Termux once. It preserves your existing settings and allows authorized apps to request commands. Then return here.</string>
+    <string name="grant">Grant command permission</string>
+    <string name="test">Connect and test</string>
+    <string name="ready">Connected. Return to Mochi and enable the Termux tools and Skill.</string>
+    <string name="not_ready">Setup required. Initialize Termux, run the setup command and grant permission.</string>
+    <string name="testing">Checking shell and result callback…</string>
+    <string name="failed">Connection failed. Check external-app access, permissions and Termux battery restrictions.</string>
+    <string name="copied">Setup command copied</string>
+    <string name="done">Return to Mochi</string>
+</resources>

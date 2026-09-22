@@ -11,6 +11,13 @@ plugins {
 
 val sourceExtensions = setOf("kt", "kts", "xml")
 
+tasks.register<Exec>("verifyTermuxRunner") {
+    group = "verification"
+    description = "Runs Linux acceptance tests for the Termux process supervisor."
+    onlyIf { System.getProperty("os.name").lowercase().contains("linux") }
+    commandLine("python3", "extensions/termux/src/test/runner_test.py")
+}
+
 tasks.register("verifyFormatting") {
     group = "verification"
     description = "Checks native source files for tabs and trailing whitespace."
@@ -93,6 +100,7 @@ tasks.register("verifyNative") {
     group = "verification"
     description = "Runs deterministic native formatting, lint, tests, and debug assembly."
     dependsOn(
+        "verifyTermuxRunner",
         "verifyArchitecture",
         "verifyFormatting",
         ":app:lintDebug",
@@ -104,6 +112,9 @@ tasks.register("verifyNative") {
         ":extensions:mijia:lintDebug",
         ":extensions:mijia:testDebugUnitTest",
         ":extensions:mijia:assembleDebug",
+        ":extensions:termux:lintDebug",
+        ":extensions:termux:testDebugUnitTest",
+        ":extensions:termux:assembleDebug",
     )
 }
 
@@ -122,5 +133,8 @@ tasks.register("verifyRelease") {
         ":extensions:mijia:lintRelease",
         ":extensions:mijia:testDebugUnitTest",
         ":extensions:mijia:assembleRelease",
+        ":extensions:termux:lintRelease",
+        ":extensions:termux:testDebugUnitTest",
+        ":extensions:termux:assembleRelease",
     )
 }

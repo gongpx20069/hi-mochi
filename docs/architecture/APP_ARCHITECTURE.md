@@ -7,7 +7,8 @@ android/
 ├── app/
 ├── extension-api/
 ├── extensions/
-│   └── mijia/
+│   ├── mijia/
+│   └── termux/
 ├── core/
 │   ├── agent/
 │   ├── database/
@@ -49,6 +50,8 @@ run in local JVM tests.
 | `ExtensionManager` | trusted package discovery, signature/version validation, binding, and cancellation |
 | `ExtensionToolAdapter` | bounded extension schema registration and Tool result translation |
 | Mi Home extension process | Xiaomi QR session, cloud requests, MIoT mapping, device selection, and ephemeral images |
+| Termux extension process | Setup, command dispatch, task IDs and result callbacks; the bundled supervisor executes inside Termux |
+| `TermuxApprovalGate` | Native per-call approval and transient task views; grants belong to one foreground registry |
 | `AgentBrowserSessionController` | visible per-turn WebView, snapshots, actions, and cleanup |
 | `AgentExecutionService` | background Agent Browser lifetime and Stop notification |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
@@ -112,6 +115,9 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   extension Tool names, and non-secret presentation metadata. Extension
   credentials and device selections remain in the extension package's private
   Keystore-backed storage.
+- Termux task IDs live in private extension preferences, while bounded command
+  output and the versioned helper live in Termux's private storage. Neither is
+  exported or backed up by Mochi. Main-Agent approval is in memory only.
 - The same Tool DataStore stores the encrypted Amap Web Service Key, optional
   Security Key, and provider enablement. Six native Tools call fixed official
   HTTPS REST endpoints; they are not represented as a remote MCP server.
@@ -202,7 +208,7 @@ belongs to AgentLink/Bridge, not the calling Mochi coroutine.
 
 ## 9. Optional extension modules
 
-The first extension layout is:
+The extension layout is:
 
 ```text
 android/
@@ -210,8 +216,10 @@ android/
 ├── extension-api/
 │   └── src/main/{aidl,java}/com/example/mochi_extension/
 └── extensions/
-    └── mijia/
-        └── src/main/{java,res}/com/example/mochi_mijia/
+    ├── mijia/
+    │   └── src/main/{java,res}/com/example/mochi_mijia/
+    └── termux/
+        └── src/main/{java,res,assets}/
 ```
 
 Dependency direction is fixed:
@@ -219,7 +227,9 @@ Dependency direction is fixed:
 ```text
 app ----------------> extension-api
 extensions:mijia ---> extension-api
+extensions:termux --> extension-api
 app -X--------------> extensions:mijia
+app -X--------------> extensions:termux
 ```
 
 `extension-api` contains immutable Binder parcelables and AIDL interfaces for

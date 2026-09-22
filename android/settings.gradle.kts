@@ -18,3 +18,4 @@ rootProject.name = "Mochi"
 include(":app")
 include(":extension-api")
 include(":extensions:mijia")
+include(":extensions:termux")

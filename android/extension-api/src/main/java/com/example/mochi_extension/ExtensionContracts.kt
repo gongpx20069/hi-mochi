@@ -16,6 +16,11 @@ object MochiExtensionProtocol {
         "com.example.mochi_mijia.MijiaConfigurationActivity"
     const val EXTRA_UI_LANGUAGE_TAG =
         "com.example.mochi_extension.extra.UI_LANGUAGE_TAG"
+    const val TERMUX_EXTENSION_ID = "termux"
+    const val TERMUX_PACKAGE = "com.example.mochi_pet.extension.termux"
+    const val TERMUX_SERVICE = "com.example.mochi_termux.TermuxExtensionService"
+    const val TERMUX_CONFIGURATION_ACTIVITY =
+        "com.example.mochi_termux.TermuxConfigurationActivity"
 }
 
 object ExtensionConnectionStatus {

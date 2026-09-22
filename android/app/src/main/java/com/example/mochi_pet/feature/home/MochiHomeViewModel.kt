@@ -295,6 +295,9 @@ class MochiHomeViewModel(
     private val toolCatalogRepository: ToolCatalogRepository? = null,
     private val extensionClient: MochiExtensionClient? = null,
     private val agentLinkClient: AgentLinkClient? = null,
+    private val termuxClient: MochiExtensionClient? = null,
+    private val termuxApprovalGate: com.example.mochi_pet.core.extensions.TermuxApprovalGate =
+        com.example.mochi_pet.core.extensions.TermuxApprovalGate(),
     private val agentBrowserRuntime: AgentBrowserRuntime? = null,
     private val weatherRepository: WeatherRepository? = null,
     private val locationPermissionGate: LocationPermissionGate? = null,
@@ -338,6 +341,9 @@ class MochiHomeViewModel(
     private var voiceCatalogVersion = 0L
     private var voicePreviewVersion = 0L
     private var resumeWakeAfterPreview = false
+    val termuxApproval = termuxApprovalGate.pending
+    val termuxTasks = termuxApprovalGate.tasks
+    val showTermuxTasks = MutableStateFlow(false)
 
     val surface: StateFlow<MochiSurface> = mutableSurface.asStateFlow()
     val plannerState: StateFlow<PlannerSurfaceState> =
@@ -772,6 +778,28 @@ class MochiHomeViewModel(
     fun startVoiceInput(acknowledgeWake: Boolean = false) {
         stopVoicePreview()
         val runtime = voiceRuntime ?: return
+        val pendingApproval = termuxApproval.value
+        if (pendingApproval != null) {
+            runtime.stopSpeaking()
+            val listen = {
+                runtime.startListening(
+                    onFinalTranscript = { transcript ->
+                        val choice = termuxVoiceChoice(transcript)
+                        if (choice != null) {
+                            termuxApprovalGate.respond(pendingApproval.id, choice)
+                        } else {
+                            mutableConversationState.update {
+                                it.copy(errorMessage = "Say: execute once, allow this task, or cancel.")
+                            }
+                        }
+                        wakeRuntime?.resume()
+                    },
+                    onNoResult = { wakeRuntime?.resume() },
+                )
+            }
+            wakeRuntime?.pause(listen) ?: listen()
+            return
+        }
         cancelAgentInteraction()
         val version = interactionVersion
         runtime.stopSpeaking()
@@ -1611,6 +1639,86 @@ class MochiHomeViewModel(
         }
     }
 
+    fun onTermuxAction(action: TermuxUiAction) {
+        when (action) {
+            TermuxUiAction.Install -> mutableToolsState.update {
+                it.copy(authorizationUrl = MIJIA_RELEASE_URL)
+            }
+            TermuxUiAction.Configure -> {
+                val summary = mutableToolsState.value.catalog.termux
+                val pkg = summary.configurationPackage
+                val activity = summary.configurationActivity
+                if (pkg == null || activity == null) {
+                    mutableToolsState.update { it.copy(feedback = "Termux extension is unavailable") }
+                } else {
+                    mutableToolsState.update {
+                        it.copy(extensionActivityTarget = ExtensionActivityTarget(pkg, activity))
+                    }
+                }
+            }
+            is TermuxUiAction.Approve -> termuxApprovalGate.respond(action.id, action.choice)
+            TermuxUiAction.CloseTasks -> showTermuxTasks.value = false
+            TermuxUiAction.Tasks, is TermuxUiAction.Task -> updateTools {
+                showTermuxTasks.value = true
+                val client = requireNotNull(termuxClient) { "Termux extension is unavailable" }
+                val snapshot = client.snapshot()
+                require(snapshot.connected) { "Connect Termux first." }
+                val definition = snapshot.tools.first { it.name == "termux_task" }
+                val arguments = kotlinx.serialization.json.buildJsonObject {
+                    if (action is TermuxUiAction.Task) {
+                        put("action", kotlinx.serialization.json.JsonPrimitive(action.action))
+                        put("task_id", kotlinx.serialization.json.JsonPrimitive(action.id))
+                    } else {
+                        put("action", kotlinx.serialization.json.JsonPrimitive("list"))
+                    }
+                }
+                val result = client.agentTool(definition).execute(
+                    arguments, ToolExecutionContext(LocalDate.now(clock), mutableSurface.value),
+                )
+                if (result.status != "ok") {
+                    throw IllegalStateException(result.message ?: "Termux request failed.")
+                }
+                if (action is TermuxUiAction.Task) {
+                    termuxApprovalGate.record(result)
+                } else {
+                    val data = result.data as? kotlinx.serialization.json.JsonObject
+                    val ids = data?.get("task_ids") as? kotlinx.serialization.json.JsonArray
+                    ids?.forEach { element ->
+                        val id = (element as? kotlinx.serialization.json.JsonPrimitive)?.content
+                            ?: throw IllegalStateException("Invalid Termux task list.")
+                        if (termuxTasks.value.none { it.id == id }) {
+                            termuxApprovalGate.record(com.example.mochi_pet.core.agent.tool.ToolResultEnvelope.success(
+                                kotlinx.serialization.json.buildJsonObject {
+                                    put("task_id", kotlinx.serialization.json.JsonPrimitive(id))
+                                    put("state", kotlinx.serialization.json.JsonPrimitive("unknown"))
+                                },
+                            ))
+                        }
+                    }
+                }
+                requireRepository().loadSummary()
+            }
+            else -> updateTools {
+                val repository = requireRepository()
+                when (action) {
+                    TermuxUiAction.Disconnect -> repository.disconnectTermux()
+                    is TermuxUiAction.Enable -> repository.setTermuxEnabled(action.enabled)
+                    is TermuxUiAction.EnableTool -> repository.setTermuxToolEnabled(action.name, action.enabled)
+                    TermuxUiAction.EnableWithSkill -> {
+                        repository.setTermuxEnabled(true)
+                        repository.setTermuxToolEnabled("termux_exec", true)
+                        repository.setTermuxToolEnabled("termux_task", true)
+                        requireNotNull(skillRepository) { "Skill repository is unavailable" }
+                            .setEnabled("builtin:termux", true)
+                        refreshSkills()
+                        repository.loadSummary()
+                    }
+                    else -> error("Unexpected Termux action.")
+                }
+            }
+        }
+    }
+
     fun configureMijiaExtension() {
         val mijia = mutableToolsState.value.catalog.mijia
         val packageName = mijia.configurationPackage
@@ -2393,6 +2501,8 @@ class MochiHomeViewModel(
                             application.toolCatalogRepository,
                         extensionClient = application.extensionClient,
                         agentLinkClient = application.agentLinkClient,
+                        termuxClient = application.termuxClient,
+                        termuxApprovalGate = application.termuxApproval,
                         agentBrowserRuntime = application.agentBrowserRuntime,
                         weatherRepository = application.weatherRepository,
                         locationPermissionGate =

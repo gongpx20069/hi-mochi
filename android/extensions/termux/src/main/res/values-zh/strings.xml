@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Mochi Termux 扩展</string>
+    <string name="setup_title">连接 Termux</string>
+    <string name="setup_help">以 Termux 的权限运行不受命令白名单限制的 Shell。命令可以读取、修改 Termux 文件并访问网络。供 Agent 分析的输出会发送给当前模型 Provider。不需要 Root、SSH 服务或悬浮窗权限。</string>
+    <string name="install">安装 / 打开 Termux</string>
+    <string name="bootstrap">复制配置命令并打开 Termux</string>
+    <string name="bootstrap_help">首次连接需在 Termux 粘贴执行下面的命令。它保留已有设置，允许已获授权的应用请求执行命令。完成后返回这里。</string>
+    <string name="grant">授予命令执行权限</string>
+    <string name="test">连接并测试</string>
+    <string name="ready">已连接。返回 Mochi 后启用 Termux 工具和 Skill。</string>
+    <string name="not_ready">需要配置：初始化 Termux、执行配置命令并授权。</string>
+    <string name="testing">正在检查 Shell 和结果回调…</string>
+    <string name="failed">连接失败。请检查外部调用开关、执行权限和 Termux 电池限制。</string>
+    <string name="copied">已复制配置命令</string>
+    <string name="done">返回 Mochi</string>
+</resources>

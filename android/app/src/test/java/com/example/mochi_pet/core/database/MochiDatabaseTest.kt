@@ -148,7 +148,7 @@ class MochiDatabaseTest {
         assertEquals(false, installed.enabled)
         assertEquals(true, edited.modified)
         val skills = repository.listSkills()
-        assertEquals(14, skills.size)
+        assertEquals(15, skills.size)
         assertEquals(
             listOf("Web Search"),
             skills.filter { it.id.contains("web-search") }.map { it.name },
@@ -211,13 +211,19 @@ class MochiDatabaseTest {
             assertTrue(
                 miHome.readiness(miHome.requiredToolNames).isReady,
             )
+            val termux = initial.first { it.id == "builtin:termux" }
+            assertFalse(termux.enabled)
+            assertEquals(setOf("termux_exec", "termux_task"), termux.requiredToolNames)
+            assertFalse(termux.readiness(setOf("termux_exec")).isReady)
+            assertTrue(termux.readiness(termux.requiredToolNames).isReady)
             assertEquals(
                 true,
                 initial.filter {
                     it.origin == SkillOrigin.BUILT_IN &&
                         !it.name.endsWith("Knowledge") &&
                         it.name != "Mi Home Smart Home" &&
-                        it.name != "AgentLink"
+                        it.name != "AgentLink" &&
+                        it.name != "Termux"
                 }.all { it.enabled },
             )
 

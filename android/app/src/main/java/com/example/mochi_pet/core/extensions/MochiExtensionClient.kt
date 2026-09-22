@@ -56,6 +56,22 @@ data class ExtensionActivityTarget(
     val className: String,
 )
 
+enum class TrustedExtension(
+    val id: String,
+    val packageName: String,
+    val service: String,
+    val activity: String,
+) {
+    MIJIA(
+        MochiExtensionProtocol.MIJIA_EXTENSION_ID, MochiExtensionProtocol.MIJIA_PACKAGE,
+        MochiExtensionProtocol.MIJIA_SERVICE, MochiExtensionProtocol.MIJIA_CONFIGURATION_ACTIVITY,
+    ),
+    TERMUX(
+        MochiExtensionProtocol.TERMUX_EXTENSION_ID, MochiExtensionProtocol.TERMUX_PACKAGE,
+        MochiExtensionProtocol.TERMUX_SERVICE, MochiExtensionProtocol.TERMUX_CONFIGURATION_ACTIVITY,
+    ),
+}
+
 data class OpenedExtensionAttachment(
     val descriptor: ExtensionAttachmentDescriptor,
     val fileDescriptor: ParcelFileDescriptor,
@@ -71,7 +87,7 @@ data class ExtensionImageAttachment(
     val readyForModel: Boolean,
 )
 
-data class MijiaExtensionSnapshot(
+data class MochiExtensionSnapshot(
     val installed: Boolean = false,
     val trusted: Boolean = false,
     val detail: String? = null,
@@ -84,6 +100,7 @@ data class MijiaExtensionSnapshot(
         selectedDeviceCount = 0,
     ),
     val tools: List<ExtensionToolDefinition> = emptyList(),
+    val identity: TrustedExtension = TrustedExtension.MIJIA,
 ) {
     val connected: Boolean
         get() = trusted &&
@@ -92,9 +109,8 @@ data class MijiaExtensionSnapshot(
     val configurationTarget: ExtensionActivityTarget?
         get() = takeIf { trusted }?.let {
             ExtensionActivityTarget(
-                packageName = MochiExtensionProtocol.MIJIA_PACKAGE,
-                className =
-                    MochiExtensionProtocol.MIJIA_CONFIGURATION_ACTIVITY,
+                packageName = identity.packageName,
+                className = identity.activity,
             )
         }
 }
@@ -102,7 +118,7 @@ data class MijiaExtensionSnapshot(
 interface MochiExtensionClient {
     val attachmentEvents: Flow<ExtensionImageAttachment>
 
-    suspend fun snapshot(): MijiaExtensionSnapshot
+    suspend fun snapshot(): MochiExtensionSnapshot
 
     fun agentTool(definition: ExtensionToolDefinition): AgentTool
 
@@ -113,31 +129,32 @@ interface MochiExtensionClient {
     ): OpenedExtensionAttachment
 }
 
-object UnavailableMijiaExtensionClient : MochiExtensionClient {
+object UnavailableExtensionClient : MochiExtensionClient {
     override val attachmentEvents: Flow<ExtensionImageAttachment> =
         emptyFlow()
 
-    override suspend fun snapshot() = MijiaExtensionSnapshot()
+    override suspend fun snapshot() = MochiExtensionSnapshot()
 
     override fun agentTool(definition: ExtensionToolDefinition): AgentTool =
-        error("Mi Home extension is unavailable")
+        error("The extension is unavailable")
 
     override suspend fun disconnect() = Unit
 
     override suspend fun openAttachment(
         descriptor: ExtensionAttachmentDescriptor,
     ): OpenedExtensionAttachment =
-        error("Mi Home extension is unavailable")
+        error("The extension is unavailable")
 }
 
-class AndroidMijiaExtensionClient(
+class AndroidMochiExtensionClient(
     context: Context,
+    private val identity: TrustedExtension = TrustedExtension.MIJIA,
 ) : MochiExtensionClient {
     private val context = context.applicationContext
     private val packageManager = context.packageManager
     private val component = ComponentName(
-        MochiExtensionProtocol.MIJIA_PACKAGE,
-        MochiExtensionProtocol.MIJIA_SERVICE,
+        identity.packageName,
+        identity.service,
     )
     private val mutableAttachmentEvents =
         MutableSharedFlow<ExtensionImageAttachment>(
@@ -147,12 +164,12 @@ class AndroidMijiaExtensionClient(
     override val attachmentEvents: Flow<ExtensionImageAttachment> =
         mutableAttachmentEvents
 
-    override suspend fun snapshot(): MijiaExtensionSnapshot =
+    override suspend fun snapshot(): MochiExtensionSnapshot =
         withContext(Dispatchers.IO) {
             val extensionPackage = extensionPackageInfo()
-                ?: return@withContext MijiaExtensionSnapshot()
+                ?: return@withContext MochiExtensionSnapshot()
             trustError(extensionPackage)?.let { error ->
-                return@withContext MijiaExtensionSnapshot(
+                return@withContext MochiExtensionSnapshot(
                     installed = true,
                     detail = error,
                 )
@@ -161,7 +178,7 @@ class AndroidMijiaExtensionClient(
                 withService { service ->
                     val metadata = service.metadata
                     validateMetadata(metadata, extensionPackage)?.let { error ->
-                        return@withService MijiaExtensionSnapshot(
+                        return@withService MochiExtensionSnapshot(
                             installed = true,
                             detail = error,
                         )
@@ -169,7 +186,7 @@ class AndroidMijiaExtensionClient(
                     val connection = service.connectionState
                     ExtensionApiValidator.connectionStateError(connection)
                         ?.let { error ->
-                            return@withService MijiaExtensionSnapshot(
+                            return@withService MochiExtensionSnapshot(
                                 installed = true,
                                 detail = error,
                             )
@@ -183,30 +200,43 @@ class AndroidMijiaExtensionClient(
                     }
                     ExtensionApiValidator.toolDefinitionsError(tools)
                         ?.let { error ->
-                            return@withService MijiaExtensionSnapshot(
+                            return@withService MochiExtensionSnapshot(
                                 installed = true,
                                 detail = error,
                             )
                         }
-                    MijiaExtensionSnapshot(
+                    MochiExtensionSnapshot(
                         installed = true,
                         trusted = true,
                         metadata = metadata,
                         connectionState = connection,
                         tools = tools,
+                        identity = identity,
                     )
                 }
             } catch (error: ExtensionBindingException) {
-                MijiaExtensionSnapshot(
+                MochiExtensionSnapshot(
                     installed = true,
                     trusted = true,
                     detail = error.message,
+                    identity = identity,
+                )
+            } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                MochiExtensionSnapshot(
+                    installed = true, trusted = true, identity = identity,
+                    detail = "Extension connection timed out. Open its configuration and retry.",
+                )
+            } catch (_: android.os.RemoteException) {
+                MochiExtensionSnapshot(
+                    installed = true, trusted = true, identity = identity,
+                    detail = "Extension process disconnected. Reconnect in Tools.",
                 )
             } catch (error: SecurityException) {
-                MijiaExtensionSnapshot(
+                MochiExtensionSnapshot(
                     installed = true,
                     trusted = true,
                     detail = "Android rejected the extension connection.",
+                    identity = identity,
                 )
             }
         }
@@ -322,6 +352,12 @@ class AndroidMijiaExtensionClient(
         ExtensionApiValidator.requestError(request)?.let {
             return ToolResultEnvelope.error(ToolErrorCode.INVALID_ARGS, it)
         }
+        val current = snapshot()
+        if (!current.connected || current.tools.none { it == definition }) {
+            return ToolResultEnvelope.error(
+                ToolErrorCode.PERMISSION_DENIED, "Extension authorization or tools changed. Reconnect in Tools.",
+            )
+        }
         return try {
             val result = withService { service ->
                 withTimeout(extensionHostTimeoutMillis(request.timeoutMillis)) {
@@ -387,18 +423,21 @@ class AndroidMijiaExtensionClient(
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
             ToolResultEnvelope.error(
                 ToolErrorCode.TIMEOUT,
-                "The Mi Home extension timed out.",
+                "The extension timed out.",
             )
         } catch (error: ExtensionBindingException) {
             ToolResultEnvelope.error(
                 ToolErrorCode.PROVIDER_ERROR,
-                error.message ?: "The Mi Home extension is unavailable.",
+                error.message ?: "The extension is unavailable.",
             )
         } catch (error: SecurityException) {
             ToolResultEnvelope.error(
                 ToolErrorCode.PERMISSION_DENIED,
-                "Android rejected the Mi Home extension connection.",
+                "Android rejected the extension connection.",
             )
+        } catch (_: android.os.RemoteException) {
+            ToolResultEnvelope.error(ToolErrorCode.PROVIDER_ERROR,
+                "Extension process disconnected. Execution outcome may be unknown; do not automatically retry.")
         }
     }
 
@@ -508,7 +547,7 @@ class AndroidMijiaExtensionClient(
         if (!success) {
             return ToolResultEnvelope.error(
                 errorCode.toToolErrorCode(),
-                errorMessage ?: "The Mi Home extension failed.",
+                errorMessage ?: "The extension failed.",
             )
         }
         val data = try {
@@ -518,7 +557,7 @@ class AndroidMijiaExtensionClient(
         } catch (_: SerializationException) {
             return ToolResultEnvelope.error(
                 ToolErrorCode.PROVIDER_ERROR,
-                "The Mi Home extension returned invalid JSON.",
+                "The extension returned invalid JSON.",
             )
         }
         val enrichedData = if (attachments.isNotEmpty() && data is JsonObject) {
@@ -553,7 +592,7 @@ class AndroidMijiaExtensionClient(
 
     private fun extensionPackageInfo(): PackageInfo? =
         try {
-            packageInfo(MochiExtensionProtocol.MIJIA_PACKAGE)
+            packageInfo(identity.packageName)
         } catch (_: PackageManager.NameNotFoundException) {
             null
         }
@@ -584,8 +623,8 @@ class AndroidMijiaExtensionClient(
             @Suppress("DEPRECATION")
             packageManager.getActivityInfo(
                 ComponentName(
-                    MochiExtensionProtocol.MIJIA_PACKAGE,
-                    MochiExtensionProtocol.MIJIA_CONFIGURATION_ACTIVITY,
+                    identity.packageName,
+                    identity.activity,
                 ),
                 PackageManager.MATCH_DISABLED_COMPONENTS,
             )
@@ -613,11 +652,11 @@ class AndroidMijiaExtensionClient(
             return "Update Mochi before using this extension."
         }
         if (
-            metadata.extensionId != MochiExtensionProtocol.MIJIA_EXTENSION_ID ||
-            metadata.packageName != MochiExtensionProtocol.MIJIA_PACKAGE ||
-            metadata.serviceClassName != MochiExtensionProtocol.MIJIA_SERVICE ||
+            metadata.extensionId != identity.id ||
+            metadata.packageName != identity.packageName ||
+            metadata.serviceClassName != identity.service ||
             metadata.configurationActivityClassName !=
-            MochiExtensionProtocol.MIJIA_CONFIGURATION_ACTIVITY
+            identity.activity
         ) {
             return "Extension identity is invalid."
         }
@@ -635,7 +674,7 @@ class AndroidMijiaExtensionClient(
     private suspend fun <T> withService(
         block: suspend (IMochiExtensionService) -> T,
     ): T {
-        val bound = bind()
+        val bound = withTimeout(EXTENSION_OPERATION_TIMEOUT_MILLIS) { bind() }
         return try {
             block(bound.service)
         } finally {
@@ -698,7 +737,7 @@ class AndroidMijiaExtensionClient(
             if (!bound) {
                 continuation.resumeWithException(
                     ExtensionBindingException(
-                        "The Mi Home extension could not be bound.",
+                        "The extension could not be bound.",
                     ),
                 )
                 return@suspendCancellableCoroutine
@@ -773,7 +812,7 @@ private data class ConsumedExtensionImage(
 )
 
 private class ExtensionAgentTool(
-    private val client: AndroidMijiaExtensionClient,
+    private val client: AndroidMochiExtensionClient,
     private val definition: ExtensionToolDefinition,
 ) : AgentTool {
     override val name: String = definition.name

@@ -21,6 +21,15 @@ runtime.
    intent and platform confirmation where appropriate. Agent Browser is the
    explicit exception: its enabled Tools execute without Mochi approval prompts.
 
+Optional Termux execution is unrestricted shell capability, not a sandbox.
+It requires a separately installed, trusted Mochi Termux extension and Termux,
+explicit Android permission and native Mochi approval. Users approve one call
+or the current foreground Agent run; there is no permanent automatic grant.
+Command output used by the Agent is sent to the selected model Provider.
+Scheduled Agents and Subagents cannot use this capability. Installation,
+authorization and manual interactive-terminal work may open another App;
+ordinary commands run in the background without switching away from Mochi.
+
 ## 3. Core experiences
 
 ### 3.1 Mochi face

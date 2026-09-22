@@ -18,7 +18,8 @@ Android modules:
 android/
 ├── app/                 Mochi base application and ABI APKs
 ├── extension-api/       AIDL and immutable extension contracts
-└── extensions/mijia/    optional universal Mi Home extension APK
+├── extensions/mijia/    optional universal Mi Home extension APK
+└── extensions/termux/   optional universal Termux extension APK
 ```
 
 ## Prerequisites
@@ -44,7 +45,10 @@ Set-Location android
 `verifyNative` checks architecture rules, formatting, Android Lint, JVM tests,
 the debug APK, and extension contract/provider tests. `verifyRelease` runs the
 release checks and assembles the five base APKs plus the universal signed Mi
-Home extension APK.
+Home and Termux extension APKs. `verifyNative` also runs `verifyTermuxRunner`
+on Linux: Python standard-library acceptance tests exercise the exact bundled
+Bash supervisor, deadlines, output caps, exit status and process-group stop.
+That Linux-only task is skipped on Windows; CI must pass it before delivery.
 
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
@@ -132,7 +136,9 @@ GitHub CLI with `gh auth login`, then run:
 The build script calculates the next remote version and embeds it in five
 signed base APKs: `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`, and `universal`,
 plus one signed universal `Mochi-Mijia-Extension` APK. It writes them to one
-versioned directory with release metadata and a shared SHA-256 manifest. Use
+versioned directory together with `Mochi-Termux-Extension`. Both extension APKs
+must match the base application's signing certificate and version. It writes a
+release metadata file and shared SHA-256 manifest. Use
 the exact directory printed by that script in the publish command. Local builds
 require a clean worktree. The publish script verifies every APK's application
 ID, metadata, signature, embedded version, expected ABI set, launcher policy,
@@ -142,6 +148,24 @@ version instead of overwriting or reusing a tag. Once a publisher reserves a
 remote tag it is never deleted automatically; an interrupted publication may
 therefore leave a skipped `1.0.x` value, but can never make a released version
 move backward or be silently replaced.
+
+### Termux acceptance
+
+Use matching-signed base and `extensions\termux\build\outputs\apk\debug\termux-debug.apk`
+APKs, updating existing packages with `adb install -r`. Termux is installed
+separately from its official channels; do not uninstall an existing Termux to
+change its source. Follow Tools > Extensions > Termux > Configure.
+The connector uses RUN_COMMAND callbacks (Termux 0.109+) and per-command log
+control (0.118+); use a current compatible official Termux build.
+
+Verify permission denial/revocation, initial stopped-package setup, callback
+delivery with the host foreground, no App switch during background execution,
+one-shot/task-wide native approval, voice confirmation, normal/nonzero exit,
+large stdout/stderr, timeout, Stop, process death, reconnect and retained task
+inspection. Verify Mi Home remains independent and scheduled/subagent registries
+exclude Termux. JVM and Linux tests do not establish real-device cross-App or
+OEM background behavior. No connected Android device means that acceptance is
+blocked, not passed.
 
 ## Engineering expectations
 
