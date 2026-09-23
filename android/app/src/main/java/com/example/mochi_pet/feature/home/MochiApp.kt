@@ -4257,6 +4257,7 @@ private fun ToolsSurface(
             item {
                 TermuxProviderCard(
                     summary = state.catalog.termux,
+                    backgroundEnabled = state.catalog.termuxBackgroundEnabled,
                     disabled = state.isLoading,
                     onAction = onTermuxAction,
                 )

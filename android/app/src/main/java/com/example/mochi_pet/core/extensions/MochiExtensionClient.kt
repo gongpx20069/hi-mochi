@@ -56,6 +56,12 @@ data class ExtensionActivityTarget(
     val className: String,
 )
 
+enum class ExtensionToolScope(val protocolValue: String) {
+    FOREGROUND_MAIN(ExtensionExecutionContext.FOREGROUND_MAIN),
+    SCHEDULED(ExtensionExecutionContext.SCHEDULED),
+    SUBAGENT(ExtensionExecutionContext.SUBAGENT),
+}
+
 enum class TrustedExtension(
     val id: String,
     val packageName: String,
@@ -120,7 +126,10 @@ interface MochiExtensionClient {
 
     suspend fun snapshot(): MochiExtensionSnapshot
 
-    fun agentTool(definition: ExtensionToolDefinition): AgentTool
+    fun agentTool(
+        definition: ExtensionToolDefinition,
+        scope: ExtensionToolScope = ExtensionToolScope.FOREGROUND_MAIN,
+    ): AgentTool
 
     suspend fun disconnect()
 
@@ -135,7 +144,10 @@ object UnavailableExtensionClient : MochiExtensionClient {
 
     override suspend fun snapshot() = MochiExtensionSnapshot()
 
-    override fun agentTool(definition: ExtensionToolDefinition): AgentTool =
+    override fun agentTool(
+        definition: ExtensionToolDefinition,
+        scope: ExtensionToolScope,
+    ): AgentTool =
         error("The extension is unavailable")
 
     override suspend fun disconnect() = Unit
@@ -241,8 +253,10 @@ class AndroidMochiExtensionClient(
             }
         }
 
-    override fun agentTool(definition: ExtensionToolDefinition): AgentTool =
-        ExtensionAgentTool(this, definition)
+    override fun agentTool(
+        definition: ExtensionToolDefinition,
+        scope: ExtensionToolScope,
+    ): AgentTool = ExtensionAgentTool(this, definition, scope)
 
     override suspend fun disconnect() {
         withService { service ->
@@ -341,13 +355,19 @@ class AndroidMochiExtensionClient(
         definition: ExtensionToolDefinition,
         arguments: JsonObject,
         modelImageInputAllowed: Boolean,
+        scope: ExtensionToolScope,
     ): ToolResultEnvelope {
+        if (identity != TrustedExtension.TERMUX && scope != ExtensionToolScope.FOREGROUND_MAIN) {
+            return ToolResultEnvelope.error(
+                ToolErrorCode.PERMISSION_DENIED, "This extension is only available to the foreground Main Agent.",
+            )
+        }
         val request = ExtensionToolRequest(
             requestId = "request-${UUID.randomUUID()}",
             toolName = definition.name,
             argumentsJson = arguments.toString(),
             timeoutMillis = extensionToolTimeoutMillis(definition.name),
-            executionContext = ExtensionExecutionContext.FOREGROUND_MAIN,
+            executionContext = scope.protocolValue,
         )
         ExtensionApiValidator.requestError(request)?.let {
             return ToolResultEnvelope.error(ToolErrorCode.INVALID_ARGS, it)
@@ -814,6 +834,7 @@ private data class ConsumedExtensionImage(
 private class ExtensionAgentTool(
     private val client: AndroidMochiExtensionClient,
     private val definition: ExtensionToolDefinition,
+    private val scope: ExtensionToolScope,
 ) : AgentTool {
     override val name: String = definition.name
     override val schema: JsonObject = buildJsonObject {
@@ -840,6 +861,7 @@ private class ExtensionAgentTool(
         definition,
         arguments,
         context.modelImageInputAllowed,
+        scope,
     )
 }
 

@@ -120,8 +120,8 @@ bounded typed envelopes as native Tools. Extensions cannot directly navigate,
 render UI, call the model, register Skills, invoke native Tools, or see other
 extension results.
 
-The initial release excludes extension Tools from Scheduled Agents and
-Subagents.
+Mi Home Tools remain excluded from Scheduled Agents and Subagents. Termux
+is available to both only through the explicit background authorization below.
 
 ### Termux execution
 
@@ -148,6 +148,25 @@ buttons operate only on extension-owned task IDs without sending their output
 to the model. Tool results used by the Agent do go to the configured Provider;
 the approval screen discloses this. No heuristic claims to classify arbitrary
 shell as safe. This is not a filesystem, network or credential sandbox.
+
+The host Tool DataStore stores a separate `termuxBackgroundEnabled` flag,
+defaulting to false for both new installs and existing settings. A native
+confirmation in the Termux provider card can grant this persistent access to
+all Scheduled Agents and Subagents. It is not inherited from foreground
+one-call/run grants and is not included in Provider sharing. Both background
+registries require this flag, provider enablement, individual Tool enablement,
+and a connected trusted extension. They expose the dependent Skill only if it
+is enabled and its required Tools are present. Every execution rechecks the
+switches; revocation invalidates already assembled registries even after
+re-enablement. Disabling/disconnecting the provider clears background
+authorization. None of these actions terminate submitted shell jobs.
+
+The host binds an `ExtensionToolScope` to each adapter and sends the actual
+`foreground_main`, `scheduled`, or `subagent` execution context over Binder.
+The same-signer Termux service accepts all three validated contexts; the host
+owns user authorization. Mi Home continues rejecting non-foreground contexts.
+Foreground Main-Agent calls still use the native approval gate even when
+background authorization is enabled.
 
 Commands are limited to 16 KiB UTF-8, an absolute working directory, and a
 1–1800 second execution deadline (default 120). Commands run non-interactively
@@ -277,7 +296,7 @@ same normalized bytes to one explicitly requested serial Subagent, where they
 appear only in a dedicated no-Tool multimodal prepass. The host rejects Tool
 calls and raw image echo, then provides only bounded text observations to the
 normal Subagent loop as JSON-escaped, explicitly untrusted user-role evidence
-rather than system instructions. The Subagent receives no extension Tool,
+rather than system instructions. The Subagent receives no Mi Home Tool,
 file descriptor, attachment ID, URL, raw bytes, or forwarding capability. The
 host does not infer visual support from a model name. Gallery export remains
 out of scope.

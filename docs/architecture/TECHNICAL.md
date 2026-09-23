@@ -73,7 +73,11 @@ Each child uses a new `AgentOrchestrator` with only the delegated task, provider
 configuration, Tool execution context, enabled Skill metadata, and its fixed
 role instructions. Parent history, memories, persona, navigation sinks, and
 `delegate_agent` are absent. Researcher receives enabled Browser Tools and
-read-only MCP Tools; Analyst additionally receives sandboxed JavaScript. Child
+read-only MCP Tools; Analyst additionally receives sandboxed JavaScript. Both
+may receive Termux Tools under the separate default-off Background Shell
+authorization, with enabled Skill discovery following Tool readiness. Scheduled
+Main-Agent runs use the same persistent permission; foreground Main-Agent
+approvals remain per-call/run. See `EXTENSIONS.md` for revocation and scope. Child
 research is bounded to 30 Tool rounds. Reaching that bound returns a typed Tool
 error to the Main Agent instead of failing the entire conversation. Both child
 roles are instructed to use their isolated context and larger round budget for

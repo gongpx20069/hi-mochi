@@ -5,6 +5,7 @@ import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
 import com.example.mochi_pet.core.model.MochiSurface
 import java.time.LocalDate
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -91,5 +92,28 @@ class TermuxApprovalTest {
         enabled = true
         assertEquals("PERMISSION_DENIED", tool.execute(arguments, context).code)
         assertEquals(0, delegate.calls)
+    }
+
+    @Test
+    fun `revocation during final suspended background permission check prevents dispatch`() = runTest {
+        val gate = TermuxApprovalGate()
+        val delegate = RecordingTool()
+        val checked = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        var checks = 0
+        val tool = TermuxToolSession(gate, requiresApproval = false) {
+            if (++checks == 2) {
+                checked.complete(Unit)
+                resume.await()
+            }
+            true
+        }.wrap(delegate)
+        val execution = async { tool.execute(arguments, context) }
+        checked.await()
+        gate.cancelPending()
+        resume.complete(Unit)
+        assertEquals("PERMISSION_DENIED", execution.await().code)
+        assertEquals(0, delegate.calls)
+        assertNull(gate.pending.value)
     }
 }

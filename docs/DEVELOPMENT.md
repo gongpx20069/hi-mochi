@@ -162,8 +162,15 @@ Verify permission denial/revocation, initial stopped-package setup, callback
 delivery with the host foreground, no App switch during background execution,
 one-shot/task-wide native approval, voice confirmation, normal/nonzero exit,
 large stdout/stderr, timeout, Stop, process death, reconnect and retained task
-inspection. Verify Mi Home remains independent and scheduled/subagent registries
-exclude Termux. JVM and Linux tests do not establish real-device cross-App or
+inspection. Verify background Shell authorization defaults off, requires native
+confirmation, survives restart, and enables Termux for Scheduled Agents and
+both Subagent roles without per-call prompts. Check foreground confirmation
+still applies, Skill readiness follows each registry, and permission/provider/
+individual Tool revocation blocks subsequent calls. Provider disable/disconnect
+must clear background authorization without claiming to stop submitted work.
+Mi Home and AgentLink must remain excluded from scheduled/subagent registries.
+Update both base and Termux extension APKs for background-context support.
+JVM and Linux tests do not establish real-device cross-App or
 OEM background behavior. No connected Android device means that acceptance is
 blocked, not passed.
 

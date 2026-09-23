@@ -72,6 +72,9 @@ Tools, read-only MCP Tools, and `load_skill`; Analyst adds
 allowlists for built-in Notion and Tencent Docs providers. Remote
 `readOnlyHint` annotations and manually configured MCP servers do not grant
 Subagent access.
+Both child roles can additionally receive `termux_exec` and `termux_task`
+under the separate default-off Background Shell authorization. No other
+extension or companion provider gains child access from that permission.
 
 ## 1.1 AgentLink companion provider
 
@@ -120,7 +123,7 @@ must never be used as an authorization or disabled-Tool workaround.
 ### Optional Termux tools
 
 `termux_exec(command, workdir?, timeout_seconds?)` submits unrestricted shell
-after a nonce-bound native approval, returning `task_id` and `state=submitted`.
+after native authorization, returning `task_id` and `state=submitted`.
 It does not claim completion. `workdir` defaults to Termux HOME, commands are
 bounded to 16 KiB UTF-8, and timeout is 1–1800 seconds, default 120.
 
@@ -132,10 +135,14 @@ task, not a successful command; dispatch/authorization/transport failures use
 the standard error envelope. Forget removes only completed task output.
 
 Both provider and individual switches are enforced, including after an approval
-wait. Tools and the dependent default-off Termux Skill are foreground Main-Agent
-only. One-run automatic approval is held by the registry, never by model-supplied
-arguments. There is no shell `confirmed` flag, silent retry, unrestricted Android
-Intent dispatch, or permission inheritance by scheduled/subagents.
+wait. Foreground Main-Agent calls use nonce-bound per-call/run approval even
+when background access is enabled. Scheduled Agents and both Subagent roles
+receive these Tools only when the separate native Background Shell
+authorization is on. Its persistent flag is checked on every background call;
+disabling/disconnecting Termux clears it. The default-off Termux Skill follows
+the actual registry's required-Tool readiness. One-run foreground approval
+never grants background access. There is no model-supplied shell `confirmed`
+flag, silent retry, or unrestricted Android Intent dispatch.
 See `EXTENSIONS.md` for setup, command privacy and process-lifetime guarantees.
 
 ### `manage_mochi_calendar`

@@ -4,6 +4,12 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
 import com.example.mochi_extension.MochiExtensionProtocol
+import com.example.mochi_extension.ExtensionToolDefinition
+import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.model.MochiSurface
+import java.time.LocalDate
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -15,6 +21,20 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class MochiExtensionClientTest {
+    @Test
+    fun `Mi Home adapter rejects background scopes before binding`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val client = AndroidMochiExtensionClient(context, TrustedExtension.MIJIA)
+        val definition = ExtensionToolDefinition("mijia_list_devices", "", """{"type":"object"}""", "read", true)
+        listOf(ExtensionToolScope.SCHEDULED, ExtensionToolScope.SUBAGENT).forEach { scope ->
+            val result = client.agentTool(definition, scope).execute(
+                JsonObject(emptyMap()), ToolExecutionContext(LocalDate.of(2026, 1, 1), MochiSurface.Face),
+            )
+            assertEquals("PERMISSION_DENIED", result.code)
+            assertEquals("This extension is only available to the foreground Main Agent.", result.message)
+        }
+    }
+
     @Test
     fun `Termux configuration is explicit and cannot resolve to Mi Home`() {
         assertEquals(

@@ -23,10 +23,15 @@ runtime.
 
 Optional Termux execution is unrestricted shell capability, not a sandbox.
 It requires a separately installed, trusted Mochi Termux extension and Termux,
-explicit Android permission and native Mochi approval. Users approve one call
-or the current foreground Agent run; there is no permanent automatic grant.
-Command output used by the Agent is sent to the selected model Provider.
-Scheduled Agents and Subagents cannot use this capability. Installation,
+explicit Android permission and native Mochi authorization. Foreground users
+approve one call or the current Agent run. A separate default-off **Background
+Shell authorization** setting grants all Scheduled Agents and Subagents
+automatic access to enabled Termux Tools, including children delegated from
+foreground conversations. This permission persists across restarts, is
+rechecked on every call, and is cleared when Termux is disabled or disconnected.
+It does not bypass foreground Main-Agent confirmation. Turning it off blocks
+new calls, not already submitted commands. Command output used by the Agent is
+sent to the selected model Provider. Installation,
 authorization and manual interactive-terminal work may open another App;
 ordinary commands run in the background without switching away from Mochi.
 
@@ -165,13 +170,15 @@ support is an optional import/export adapter.
   delegate, run in parallel, or continue in the background.
 - Researcher receives enabled Browser Tools, read-only MCP Tools, and Skills.
   Analyst receives the same capabilities plus sandboxed JavaScript.
+  Both may also use Termux when the user explicitly enables Background Shell
+  authorization; shell changes must remain within the delegated task.
 - Subagents receive no parent conversation history, memories, or persona.
 - When a foreground request explicitly asks to view, describe, or analyze a
   camera event and provider image input is enabled, the Main Agent may attach
   the one host-validated image to one serial Subagent delegation by setting
   `include_image=true`. A dedicated no-Tool multimodal prepass converts it to
   bounded text observations presented as untrusted user-role evidence; the
-  normal Subagent loop receives no extension Tool, raw image, file descriptor,
+  normal Subagent loop receives no Mi Home Tool, raw image, file descriptor,
   attachment URL, or reusable capability.
 - Subagent Browser work reuses the current per-turn session. Home keeps the
   Browser Card visible and identifies the active Subagent.

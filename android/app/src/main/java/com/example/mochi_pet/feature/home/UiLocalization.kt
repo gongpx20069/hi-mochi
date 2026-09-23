@@ -183,6 +183,22 @@ private val ZH_UI_TEXT = mapOf(
     "Unrestricted local shell. Commands require approval; output may be sent to your model Provider." to
         "不受命令白名单限制的本机 Shell。执行需要授权，输出可能发送给当前模型 Provider。",
     "Configure Termux" to "配置 Termux",
+    "Connect Termux first." to "请先连接 Termux。",
+    "Enable Termux tools first." to "请先启用 Termux 工具。",
+    "Background Shell authorization" to "后台 Shell 授权",
+    "Off by default. Allows all Scheduled Agents and Subagents to use enabled Termux tools without per-call confirmation." to
+        "默认关闭。允许所有定时 Agent 和子 Agent 自动使用已启用的 Termux 工具，不再逐次确认。",
+    "Allow background Shell execution?" to "允许后台执行 Shell？",
+    "Authorize background Shell" to "授权后台 Shell",
+    ("All Scheduled Agents and Subagents, including those delegated from a conversation, " +
+        "can run unrestricted commands, change or delete accessible files, and use the network. " +
+        "Output may go to your model Provider. This permission persists across restarts. " +
+        "Foreground Main-Agent calls still require approval. Turning this off blocks new calls, " +
+        "but does not stop submitted commands. Disabling or disconnecting Termux clears this permission.") to
+        ("所有定时 Agent 和子 Agent（包括前台对话委派的子 Agent）均可执行不受白名单限制的命令，" +
+            "修改或删除可访问的文件，并使用网络。输出可能发送给当前模型 Provider。此授权在重启后仍有效。" +
+            "前台 Main Agent 仍需确认。关闭此开关会阻止后续调用，但不会停止已提交的命令。" +
+            "禁用或断开 Termux 会清除此授权。"),
     "Enable tools and Skill" to "启用工具和 Skill",
     "Termux tasks" to "Termux 任务",
     "Allow Termux command?" to "允许执行 Termux 命令？",

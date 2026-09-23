@@ -73,9 +73,10 @@ class TermuxApprovalGate {
     }
 }
 
-/** One instance per foreground registry; task-wide approval cannot survive another run. */
+/** One instance per registry; foreground grants never authorize background runs. */
 internal class TermuxToolSession(
     private val gate: TermuxApprovalGate,
+    private val requiresApproval: Boolean = true,
     private val isEnabled: suspend (String) -> Boolean,
 ) {
     private val revision = gate.revision
@@ -90,18 +91,18 @@ internal class TermuxToolSession(
             arguments: JsonObject,
             context: ToolExecutionContext,
         ): ToolResultEnvelope {
-            if (revision != gate.revision || !isEnabled(name)) return denied()
+            if (!isEnabled(name) || revision != gate.revision) return denied()
             val id = (arguments["task_id"] as? JsonPrimitive)?.content
             val action = (arguments["action"] as? JsonPrimitive)?.content
             val ownedReadOrStop = name == "termux_task" && id in ownedTasks && action in setOf("read", "stop")
-            if (!automatic && !ownedReadOrStop) {
+            if (requiresApproval && !automatic && !ownedReadOrStop) {
                 when (gate.request(name, arguments)) {
                     TermuxApprovalChoice.DENY -> return denied()
                     TermuxApprovalChoice.ONCE -> Unit
                     TermuxApprovalChoice.THIS_RUN -> automatic = true
                 }
             }
-            if (revision != gate.revision || !isEnabled(name)) return denied()
+            if (!isEnabled(name) || revision != gate.revision) return denied()
             return delegate.execute(arguments, context).also { result ->
                 gate.record(result)
                 if (result.status == "ok") {

@@ -174,7 +174,8 @@ limited to two child runs per request, and never grants a child access to
 planner mutations, device location, credentials, UI navigation, or other
 foreground-only capabilities. Researcher uses enabled Browser and approved
 read-only MCP Tools; Analyst can additionally use the local JavaScript
-sandbox.
+sandbox. Both roles may also use Termux after you explicitly enable the
+separate [Background Shell authorization](#run-local-commands-with-termux).
 
 ## Skills and Tools
 
@@ -261,8 +262,9 @@ manufacturer.
 These integrations add capabilities to Mochi but are **not required for its
 core features**. Install only what you need. Mi Home and Termux use optional
 Mochi-signed extension APKs; AgentLink connects through its independent
-companion app. All three are foreground Main-Agent integrations, not default
-Subagent or Scheduled Agent capabilities.
+companion app. Mi Home and AgentLink are foreground Main-Agent integrations;
+Termux can also serve Subagents and Scheduled Agents with separate explicit
+background authorization, disabled by default.
 
 | Integration | Built-in Skill (default) | Additional capabilities | Installation |
 | --- | --- | --- | --- |
@@ -312,9 +314,17 @@ one-time configuration command into Termux, grant command permission, then
 connect/test and return to **Enable tools and Skill**.
 
 Speak normally to Mochi; approved commands run in the background without an App
-switch. Approve one call or the current task; there is no permanent automatic
-grant. This is unrestricted shell under Termux permissions, not root or a
-sandbox. Agent-visible output is sent to your chosen model Provider.
+switch. Foreground Main-Agent calls require approval for one call or the current
+task. To allow **all Scheduled Agents and Subagents** to execute automatically,
+enable **Background Shell authorization** in the Termux card and confirm the
+warning. This is a separate, default-off permission that survives restarts;
+**Enable tools and Skill** does not grant it. It also covers children delegated
+from a foreground conversation, but never skips Main-Agent approval.
+Turning it off blocks subsequent calls; disabling/disconnecting Termux clears
+the permission. Keep both Mochi and its Termux extension updated.
+
+This is unrestricted shell under Termux permissions, not root or a sandbox.
+Agent-visible output is sent to your chosen model Provider.
 **Termux tasks** lets you inspect output locally, refresh, stop and clean up
 completed tasks. Closing Mochi does not stop submitted commands, Android can
 kill background work, and detached processes may survive a stop request.

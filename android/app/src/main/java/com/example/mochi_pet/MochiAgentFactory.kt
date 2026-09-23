@@ -26,6 +26,7 @@ import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.browser.readOnlyAgentBrowserTools
+import com.example.mochi_pet.core.extensions.ExtensionToolScope
 import com.example.mochi_pet.core.maps.amapMapTools
 import com.example.mochi_pet.core.navigation.NavigateMochiUiTool
 import com.example.mochi_pet.core.navigation.NavigationDecision
@@ -44,7 +45,7 @@ suspend fun MochiApplication.createAgentRunner(
     onWeatherLoaded: (CurrentWeather) -> Unit,
     includeBrowser: Boolean,
     includeBrowserInteractions: Boolean = includeBrowser,
-    includeExtensions: Boolean = true,
+    extensionScope: ExtensionToolScope = ExtensionToolScope.FOREGROUND_MAIN,
     includeAgentLink: Boolean = true,
 ): AgentRunner {
     val diagnosticLogger = androidAgentDiagnosticLogger()
@@ -92,11 +93,7 @@ suspend fun MochiApplication.createAgentRunner(
     val tools = (
         enabledBuiltIns +
             toolCatalogRepository.loadEnabledMcpTools() +
-            if (includeExtensions) {
-                toolCatalogRepository.loadEnabledExtensionTools()
-            } else {
-                emptyList()
-            }
+            toolCatalogRepository.loadEnabledExtensionTools(extensionScope)
     ).toMutableList()
     if (includeAgentLink) {
         val state = agentLinkClient.refresh()
@@ -169,6 +166,7 @@ private suspend fun MochiApplication.executeSubagent(
         toolCatalogRepository.isBuiltInEnabled(tool.name)
     }.toMutableList()
     enabledTools += toolCatalogRepository.loadEnabledReadOnlyMcpTools()
+    enabledTools += toolCatalogRepository.loadEnabledExtensionTools(ExtensionToolScope.SUBAGENT)
     val availableSkills = skillRepository.listEnabledMetadata(
         enabledTools.mapTo(mutableSetOf()) { it.name },
     )

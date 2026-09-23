@@ -5,6 +5,22 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.example.mochi_extension.ExtensionAttachmentDescriptor
+import com.example.mochi_extension.ExtensionConnectionState
+import com.example.mochi_extension.ExtensionConnectionStatus
+import com.example.mochi_extension.ExtensionToolDefinition
+import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
+import com.example.mochi_pet.core.extensions.ExtensionImageAttachment
+import com.example.mochi_pet.core.extensions.ExtensionToolScope
+import com.example.mochi_pet.core.extensions.MochiExtensionClient
+import com.example.mochi_pet.core.extensions.MochiExtensionSnapshot
+import com.example.mochi_pet.core.extensions.OpenedExtensionAttachment
+import com.example.mochi_pet.core.extensions.TermuxApprovalChoice
+import com.example.mochi_pet.core.extensions.TermuxApprovalGate
+import com.example.mochi_pet.core.extensions.TrustedExtension
+import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpRemoteTool
 import com.example.mochi_pet.core.mcp.McpServerRuntime
@@ -14,16 +30,26 @@ import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
 import com.example.mochi_pet.core.settings.ApiKeyCipher
 import com.example.mochi_pet.core.settings.EncryptedSecret
 import java.io.File
+import java.time.LocalDate
 import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -48,6 +74,133 @@ class ToolCatalogTest {
             summary.skillReadiness(setOf("termux_exec", "termux_task")).requirements.keys)
     }
 
+    private val termuxArguments = buildJsonObject { put("command", "printf hello") }
+    private val termuxContext = ToolExecutionContext(LocalDate.of(2026, 1, 1), MochiSurface.Face)
+    private val backgroundScopes = listOf(ExtensionToolScope.SCHEDULED, ExtensionToolScope.SUBAGENT)
+
+    private fun termuxRepository(
+        termux: RecordingExtensionClient,
+        gate: TermuxApprovalGate,
+    ) = DataStoreToolCatalogRepository(
+        dataStore = dataStore,
+        secretCipher = PlaintextCipher,
+        mcpClient = client,
+        termuxClient = termux,
+        termuxApproval = gate,
+        extensionClient = RecordingExtensionClient(TrustedExtension.MIJIA),
+    )
+
+    @Test
+    fun `existing settings cannot grant background shell and opted in registries exclude Mi Home`() = runBlocking {
+        dataStore.edit {
+            it[stringPreferencesKey("tools.catalog")] = """{"termuxEnabled":true,"mijiaEnabled":true}"""
+        }
+        val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
+        val gate = TermuxApprovalGate()
+        val catalog = termuxRepository(extension, gate)
+        assertFalse(catalog.loadSummary().termuxBackgroundEnabled)
+        backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
+        assertEquals(
+            setOf("termux_exec", "termux_task", "mijia_list_devices"),
+            catalog.loadEnabledExtensionTools().map { it.name }.toSet(),
+        )
+
+        catalog.setTermuxBackgroundEnabled(true)
+        val restored = termuxRepository(extension, gate)
+        assertTrue(restored.loadSummary().termuxBackgroundEnabled)
+        backgroundScopes.forEach { scope ->
+            val tools = restored.loadEnabledExtensionTools(scope)
+            assertEquals(setOf("termux_exec", "termux_task"), tools.map { it.name }.toSet())
+            tools.forEach { tool ->
+                assertEquals("ok", tool.execute(termuxArguments, termuxContext).status)
+                assertEquals(scope, extension.executions.last())
+                assertNull(gate.pending.value)
+            }
+        }
+        assertEquals(4, extension.executions.size)
+        assertEquals("task-4", gate.tasks.value.first().id)
+    }
+
+    @Test
+    fun `background authorization never bypasses foreground confirmation`() = runBlocking {
+        val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
+        val gate = TermuxApprovalGate()
+        val catalog = termuxRepository(extension, gate)
+        catalog.setTermuxEnabled(true)
+        catalog.setTermuxBackgroundEnabled(true)
+        val tool = catalog.loadEnabledExtensionTools().first { it.name == "termux_exec" }
+        val pending = async { tool.execute(termuxArguments, termuxContext) }
+        val request = withTimeout(5_000) { gate.pending.filterNotNull().first() }
+        assertTrue(extension.executions.isEmpty())
+        gate.respond(request.id, TermuxApprovalChoice.DENY)
+        assertEquals("PERMISSION_DENIED", pending.await().code)
+        assertTrue(extension.executions.isEmpty())
+    }
+
+    @Test
+    fun `background permission revokes old registries even after reenable`() = runBlocking {
+        val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
+        val gate = TermuxApprovalGate()
+        val catalog = termuxRepository(extension, gate)
+        catalog.setTermuxEnabled(true)
+        catalog.setTermuxBackgroundEnabled(true)
+        val staleTools = backgroundScopes.map { scope ->
+            catalog.loadEnabledExtensionTools(scope).first { it.name == "termux_exec" }
+        }
+        catalog.setTermuxBackgroundEnabled(false)
+        backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
+        catalog.setTermuxBackgroundEnabled(true)
+        staleTools.forEach {
+            assertEquals("PERMISSION_DENIED", it.execute(termuxArguments, termuxContext).code)
+        }
+        assertTrue(extension.executions.isEmpty())
+        assertEquals("ok", catalog.loadEnabledExtensionTools(ExtensionToolScope.SUBAGENT)
+            .first { it.name == "termux_exec" }.execute(termuxArguments, termuxContext).status)
+    }
+
+    @Test
+    fun `provider tool and connection switches remain authoritative for background shell`() = runBlocking {
+        val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
+        val gate = TermuxApprovalGate()
+        val catalog = termuxRepository(extension, gate)
+        catalog.setTermuxEnabled(true)
+        catalog.setTermuxBackgroundEnabled(true)
+        val stale = catalog.loadEnabledExtensionTools(ExtensionToolScope.SCHEDULED).first()
+        catalog.setTermuxToolEnabled("termux_exec", false)
+        backgroundScopes.forEach { scope ->
+            assertEquals(listOf("termux_task"), catalog.loadEnabledExtensionTools(scope).map { it.name })
+        }
+        assertEquals("PERMISSION_DENIED", stale.execute(termuxArguments, termuxContext).code)
+        catalog.setTermuxEnabled(false)
+        assertFalse(catalog.loadSummary().termuxBackgroundEnabled)
+        catalog.setTermuxEnabled(true)
+        backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
+        catalog.setTermuxBackgroundEnabled(true)
+        extension.connected = false
+        backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
+        extension.connected = true
+        catalog.disconnectTermux()
+        assertFalse(catalog.loadSummary().termuxBackgroundEnabled)
+        assertFalse(catalog.loadSummary().termux.enabled)
+        assertTrue(extension.executions.isEmpty())
+    }
+
+    @Test
+    fun `background permission requires connected enabled provider but can always be revoked`() = runBlocking {
+        val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
+        val catalog = termuxRepository(extension, TermuxApprovalGate())
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { catalog.setTermuxBackgroundEnabled(true) }
+        }
+        catalog.setTermuxEnabled(true)
+        catalog.setTermuxBackgroundEnabled(true)
+        extension.connected = false
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { catalog.setTermuxBackgroundEnabled(true) }
+        }
+        assertFalse(catalog.setTermuxBackgroundEnabled(false).termuxBackgroundEnabled)
+    }
+
     private lateinit var directory: File
     private lateinit var scope: CoroutineScope
     private lateinit var client: RecordingMcpClient
@@ -67,6 +220,41 @@ class ToolCatalogTest {
             secretCipher = PlaintextCipher,
             mcpClient = client,
         )
+    }
+
+    private class RecordingExtensionClient(private val identity: TrustedExtension) : MochiExtensionClient {
+        override val attachmentEvents = emptyFlow<ExtensionImageAttachment>()
+        var connected = true
+        val executions = mutableListOf<ExtensionToolScope>()
+        private val tools = (if (identity == TrustedExtension.TERMUX) {
+            listOf("termux_exec", "termux_task")
+        } else {
+            listOf("mijia_list_devices")
+        }).map { ExtensionToolDefinition(it, "", """{"type":"object"}""", "sensitive", true) }
+
+        override suspend fun snapshot() = MochiExtensionSnapshot(
+            installed = true, trusted = true, identity = identity, tools = tools,
+            connectionState = ExtensionConnectionState(
+                if (connected) ExtensionConnectionStatus.CONNECTED else ExtensionConnectionStatus.DISCONNECTED,
+                null, null, 0, 0,
+            ),
+        )
+
+        override fun agentTool(definition: ExtensionToolDefinition, scope: ExtensionToolScope) = object : AgentTool {
+            override val name = definition.name
+            override val schema = JsonObject(emptyMap())
+            override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
+                executions += scope
+                return ToolResultEnvelope.success(buildJsonObject {
+                    put("task_id", "task-${executions.size}")
+                    put("state", "submitted")
+                })
+            }
+        }
+
+        override suspend fun disconnect() { connected = false }
+        override suspend fun openAttachment(descriptor: ExtensionAttachmentDescriptor): OpenedExtensionAttachment =
+            error("No attachments in this test")
     }
 
     @After

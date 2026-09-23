@@ -11,6 +11,7 @@ import com.example.mochi_pet.core.agentlink.AgentLinkClient
 import com.example.mochi_pet.core.agentlink.AgentLinkState
 import com.example.mochi_pet.core.extensions.MochiExtensionSnapshot
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
+import com.example.mochi_pet.core.extensions.ExtensionToolScope
 import com.example.mochi_pet.core.extensions.UnavailableExtensionClient
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpAgentTool
@@ -59,6 +60,7 @@ data class ToolCatalogSummary(
     val agentBrowser: AgentBrowserProviderSummary = AgentBrowserProviderSummary(),
     val mijia: ExtensionProviderSummary = ExtensionProviderSummary(),
     val termux: ExtensionProviderSummary = ExtensionProviderSummary(),
+    val termuxBackgroundEnabled: Boolean = false,
     val agentLink: AgentLinkState = AgentLinkState(),
     val servers: List<McpServerSummary> = emptyList(),
     val isLoading: Boolean = false,
@@ -297,6 +299,8 @@ interface ToolCatalogRepository {
     suspend fun setTermuxToolEnabled(name: String, enabled: Boolean): ToolCatalogSummary =
         throw UnsupportedOperationException("Termux extension is unavailable")
 
+    suspend fun setTermuxBackgroundEnabled(enabled: Boolean): ToolCatalogSummary
+
     suspend fun disconnectTermux(): ToolCatalogSummary =
         throw UnsupportedOperationException("Termux extension is unavailable")
 
@@ -335,7 +339,9 @@ interface ToolCatalogRepository {
 
     suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool>
 
-    suspend fun loadEnabledExtensionTools(): List<AgentTool>
+    suspend fun loadEnabledExtensionTools(
+        scope: ExtensionToolScope = ExtensionToolScope.FOREGROUND_MAIN,
+    ): List<AgentTool>
 }
 
 class DataStoreToolCatalogRepository(
@@ -364,6 +370,7 @@ class DataStoreToolCatalogRepository(
         val termux = termuxClient.snapshot()
         return catalog.toSummary(extensionClient.snapshot()).copy(
             agentLink = agentLinkClient?.refresh() ?: AgentLinkState(),
+            termuxBackgroundEnabled = catalog.termuxBackgroundEnabled,
             termux = ExtensionProviderSummary(
                 installed = termux.installed,
                 trusted = termux.trusted,
@@ -1119,21 +1126,26 @@ class DataStoreToolCatalogRepository(
         }
     }
 
-    override suspend fun loadEnabledExtensionTools(): List<AgentTool> {
+    override suspend fun loadEnabledExtensionTools(scope: ExtensionToolScope): List<AgentTool> {
         val catalog = loadCatalog()
-        val termuxTools = if (catalog.termuxEnabled) {
+        val foreground = scope == ExtensionToolScope.FOREGROUND_MAIN
+        val termuxTools = if (catalog.termuxEnabled && (foreground || catalog.termuxBackgroundEnabled)) {
             val snapshot = termuxClient.snapshot()
-            val session = com.example.mochi_pet.core.extensions.TermuxToolSession(termuxApproval) { name ->
+            val session = com.example.mochi_pet.core.extensions.TermuxToolSession(
+                termuxApproval, requiresApproval = foreground,
+            ) { name ->
                 val current = loadCatalog()
-                current.termuxEnabled && (current.termuxToolsEnabled[name] ?: true)
+                current.termuxEnabled &&
+                    (foreground || current.termuxBackgroundEnabled) &&
+                    (current.termuxToolsEnabled[name] ?: snapshot.tools.first { it.name == name }.defaultEnabled)
             }
             if (snapshot.connected) snapshot.tools.filter {
                 catalog.termuxToolsEnabled[it.name] ?: it.defaultEnabled
-            }.map { session.wrap(termuxClient.agentTool(it)) } else emptyList()
+            }.map { session.wrap(termuxClient.agentTool(it, scope)) } else emptyList()
         } else {
             emptyList()
         }
-        if (!catalog.mijiaEnabled) return termuxTools
+        if (!foreground || !catalog.mijiaEnabled) return termuxTools
         val snapshot = extensionClient.snapshot()
         if (!snapshot.connected) return termuxTools
         return termuxTools + snapshot.tools
@@ -1141,13 +1153,25 @@ class DataStoreToolCatalogRepository(
                 catalog.mijiaToolsEnabled[definition.name]
                     ?: definition.defaultEnabled
             }
-            .map(extensionClient::agentTool)
+            .map { extensionClient.agentTool(it, scope) }
     }
 
     override suspend fun setTermuxEnabled(enabled: Boolean): ToolCatalogSummary {
         if (enabled) require(termuxClient.snapshot().connected) { "Connect Termux first." }
         termuxApproval.cancelPending()
-        updateCatalog { it.copy(termuxEnabled = enabled) }
+        updateCatalog {
+            it.copy(termuxEnabled = enabled, termuxBackgroundEnabled = enabled && it.termuxBackgroundEnabled)
+        }
+        return loadSummary()
+    }
+
+    override suspend fun setTermuxBackgroundEnabled(enabled: Boolean): ToolCatalogSummary {
+        if (enabled) require(termuxClient.snapshot().connected) { "Connect Termux first." }
+        updateCatalog {
+            require(!enabled || it.termuxEnabled) { "Enable Termux tools first." }
+            it.copy(termuxBackgroundEnabled = enabled)
+        }
+        termuxApproval.cancelPending()
         return loadSummary()
     }
 
@@ -1160,8 +1184,8 @@ class DataStoreToolCatalogRepository(
 
     override suspend fun disconnectTermux(): ToolCatalogSummary {
         termuxApproval.cancelPending()
+        updateCatalog { it.copy(termuxEnabled = false, termuxBackgroundEnabled = false) }
         termuxClient.disconnect()
-        updateCatalog { it.copy(termuxEnabled = false) }
         return loadSummary()
     }
 
@@ -1801,6 +1825,7 @@ private data class PersistedToolCatalog(
     val mijiaEnabled: Boolean = false,
     val mijiaToolsEnabled: Map<String, Boolean> = emptyMap(),
     val termuxEnabled: Boolean = false,
+    val termuxBackgroundEnabled: Boolean = false,
     val termuxToolsEnabled: Map<String, Boolean> = emptyMap(),
     val servers: List<PersistedMcpServer> = emptyList(),
     val pendingNotionOAuth: PendingOAuthRecord? = null,

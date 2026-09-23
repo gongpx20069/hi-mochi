@@ -21,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.example.mochi_pet.core.extensions.TermuxApprovalChoice
@@ -38,6 +40,7 @@ sealed interface TermuxUiAction {
     data object Tasks : TermuxUiAction
     data object CloseTasks : TermuxUiAction
     data class Enable(val enabled: Boolean) : TermuxUiAction
+    data class EnableBackground(val enabled: Boolean) : TermuxUiAction
     data class EnableTool(val name: String, val enabled: Boolean) : TermuxUiAction
     data class Task(val id: String, val action: String) : TermuxUiAction
     data class Approve(val id: String, val choice: TermuxApprovalChoice) : TermuxUiAction
@@ -46,10 +49,13 @@ sealed interface TermuxUiAction {
 @Composable
 internal fun TermuxProviderCard(
     summary: ExtensionProviderSummary,
+    backgroundEnabled: Boolean,
     disabled: Boolean,
     onAction: (TermuxUiAction) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var confirmBackground by remember(summary.enabled) { mutableStateOf(false) }
+    val backgroundLabel = localizeUiText("Background Shell authorization")
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -66,6 +72,18 @@ internal fun TermuxProviderCard(
                     enabled = summary.connected && !disabled)
             }
             Text("Unrestricted local shell. Commands require approval; output may be sent to your model Provider.")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Background Shell authorization", Modifier.weight(1f))
+                Switch(
+                    checked = backgroundEnabled,
+                    onCheckedChange = {
+                        if (it) confirmBackground = true else onAction(TermuxUiAction.EnableBackground(false))
+                    },
+                    enabled = !disabled && (backgroundEnabled || summary.enabled),
+                    modifier = Modifier.semantics { contentDescription = backgroundLabel },
+                )
+            }
+            Text("Off by default. Allows all Scheduled Agents and Subagents to use enabled Termux tools without per-call confirmation.")
             summary.detail?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (!summary.installed || !summary.trusted) {
                 Button({ onAction(TermuxUiAction.Install) }, enabled = !disabled) { Text("Install extension") }
@@ -94,6 +112,34 @@ internal fun TermuxProviderCard(
                 }
             }
         }
+    }
+    if (confirmBackground) {
+        AlertDialog(
+            onDismissRequest = { confirmBackground = false },
+            title = { Text("Allow background Shell execution?") },
+            text = {
+                Text(
+                    "All Scheduled Agents and Subagents, including those delegated from a conversation, " +
+                        "can run unrestricted commands, change or delete accessible files, and use the network. " +
+                        "Output may go to your model Provider. This permission persists across restarts. " +
+                        "Foreground Main-Agent calls still require approval. Turning this off blocks new calls, " +
+                        "but does not stop submitted commands. Disabling or disconnecting Termux clears this permission.",
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmBackground = false
+                        onAction(TermuxUiAction.EnableBackground(true))
+                    },
+                    enabled = !disabled && summary.enabled,
+                ) { Text("Authorize background Shell") }
+            },
+            dismissButton = {
+                TextButton({ confirmBackground = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 

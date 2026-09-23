@@ -1703,6 +1703,7 @@ class MochiHomeViewModel(
                 when (action) {
                     TermuxUiAction.Disconnect -> repository.disconnectTermux()
                     is TermuxUiAction.Enable -> repository.setTermuxEnabled(action.enabled)
+                    is TermuxUiAction.EnableBackground -> repository.setTermuxBackgroundEnabled(action.enabled)
                     is TermuxUiAction.EnableTool -> repository.setTermuxToolEnabled(action.name, action.enabled)
                     TermuxUiAction.EnableWithSkill -> {
                         repository.setTermuxEnabled(true)

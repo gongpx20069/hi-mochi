@@ -216,6 +216,11 @@ class MochiDatabaseTest {
             assertEquals(setOf("termux_exec", "termux_task"), termux.requiredToolNames)
             assertFalse(termux.readiness(setOf("termux_exec")).isReady)
             assertTrue(termux.readiness(termux.requiredToolNames).isReady)
+            repository.setEnabled("builtin:termux", true)
+            assertEquals(listOf("termux"), repository.listEnabledMetadata(termux.requiredToolNames).map { it.name })
+            assertTrue(repository.listEnabledMetadata(setOf("termux_exec")).none { it.name == "termux" })
+            assertTrue(termux.content.contains("Scheduled agents and subagents"))
+            repository.setEnabled("builtin:termux", false)
             assertEquals(
                 true,
                 initial.filter {

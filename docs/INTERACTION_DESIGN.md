@@ -326,6 +326,18 @@ accepts explicit full phrases bound to the currently pending request, not a
 model-authored confirmation. Starting approval recognition does not cancel the
 waiting Agent. Unknown speech does not grant permission.
 
+The Termux card also has a default-off **Background Shell authorization**
+switch. Enabling it requires a native confirmation explaining that all
+Scheduled Agents and Subagents (including foreground-delegated children) may
+run unrestricted commands without per-call prompts, change/delete accessible
+files, use the network, and send output to the model Provider. It persists
+across restarts, but never bypasses foreground Main-Agent confirmation.
+Neither **Enable tools and Skill** nor enabling the Skill grants this access.
+Turning it off takes effect for subsequent calls, without stopping submitted
+commands. Disabling or disconnecting the provider clears the permission;
+re-enabling the provider does not silently restore it. Revocation remains
+available when the extension is disconnected or unavailable.
+
 **Termux tasks** provides submitted IDs, explicit refresh, bounded selectable
 output, Stop and completed-task cleanup. Reading output here does not call a
 model. Closing a dialog or conversation is not process termination. The UI

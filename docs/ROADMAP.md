@@ -89,7 +89,8 @@ or verification in earlier phases.
 
 - [x] Add isolated Researcher and Analyst roles.
 - [x] Add one-at-a-time delegation with a two-child per-run limit.
-- [x] Restrict children to Browser, read-only MCP, Skills, and Analyst JS.
+- [x] Restrict children to Browser, read-only MCP, Skills, and Analyst JS by
+  default; allow Termux only with explicit Background Shell authorization.
 - [x] Reuse the active Browser session and identify the child on its card.
 - [ ] Add end-to-end provider and real-device Subagent validation.
 
@@ -111,7 +112,7 @@ or verification in earlier phases.
 - [x] Add default-on, same-run multimodal model input with bounded normalization and
   no history, memory, log, export, or Scheduled Agent persistence.
 - [x] Allow one explicit serial Subagent handoff of the current validated image
-  through a no-Tool visual prepass without exposing extension Tools,
+  through a no-Tool visual prepass without exposing Mi Home Tools,
   descriptors, URLs, raw bytes, or reusable image capability to its Tool loop.
 - [x] Build, sign, validate, checksum, and publish the universal extension APK
   with the normal Android Release.
@@ -119,3 +120,7 @@ or verification in earlier phases.
   camera event retrieval against real accounts and devices.
 - [ ] Validate in-place base/extension installation, Binder recovery, and
   configuration UX on real Android hardware.
+- [x] Add default-off persistent Background Shell authorization for Termux in
+  Scheduled Agents and both Subagent roles, with per-call switch checks.
+- [ ] Validate Termux foreground/background authorization, scheduled/child
+  execution, revocation, and task lifetime on real Android hardware.

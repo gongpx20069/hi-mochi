@@ -8,7 +8,6 @@ import android.util.Log
 import com.example.mochi_extension.ExtensionApiValidator
 import com.example.mochi_extension.ExtensionConnectionState
 import com.example.mochi_extension.ExtensionConnectionStatus
-import com.example.mochi_extension.ExtensionExecutionContext
 import com.example.mochi_extension.ExtensionMetadata
 import com.example.mochi_extension.ExtensionRiskLevel
 import com.example.mochi_extension.ExtensionToolDefinition
@@ -71,10 +70,6 @@ class TermuxExtensionService : Service() {
             )
             ExtensionApiValidator.requestError(request)?.let {
                 error("INVALID_ARGS", it)
-                return
-            }
-            if (request.executionContext != ExtensionExecutionContext.FOREGROUND_MAIN) {
-                error("PERMISSION_DENIED", "Termux is only available to the foreground Main Agent.")
                 return
             }
             val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -183,7 +178,8 @@ class TermuxExtensionService : Service() {
 internal val TERMUX_TOOLS = listOf(
     ExtensionToolDefinition(
         "termux_exec",
-        "Run an unrestricted non-interactive shell command in Termux after native user approval. " +
+        "Run an unrestricted non-interactive shell command in Termux with native user authorization " +
+            "(per-call/run approval or the explicit background Shell setting for schedules/subagents). " +
             "Returns a task ID, not completion. Use termux_task to inspect it. Output goes to the model Provider.",
         """{"type":"object","properties":{"command":{"type":"string","maxLength":16384},"workdir":{"type":"string","description":"Absolute directory; defaults to Termux HOME."},"timeout_seconds":{"type":"integer","minimum":1,"maximum":1800,"default":120}},"required":["command"],"additionalProperties":false}""",
         ExtensionRiskLevel.SENSITIVE, true,

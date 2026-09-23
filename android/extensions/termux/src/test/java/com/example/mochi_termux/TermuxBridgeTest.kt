@@ -8,7 +8,16 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.ResolveInfo
 import android.os.Bundle
 import android.os.Looper
+import com.example.mochi_extension.ExtensionExecutionContext
+import com.example.mochi_extension.ExtensionToolRequest
+import com.example.mochi_extension.ExtensionToolResult
+import com.example.mochi_extension.IMochiExtensionService
+import com.example.mochi_extension.IMochiToolCallback
+import java.util.UUID
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -18,6 +27,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -92,5 +102,41 @@ class TermuxBridgeTest {
             bridge.start(ShellCommand("true", TERMUX_HOME, 1))
         }
         assertTrue(bridge.taskIds().isEmpty())
+    }
+
+    @Test
+    fun `signed service accepts foreground scheduled and subagent contexts but not unknown contexts`() = runTest {
+        val bridge = TermuxBridge(app)
+        val connection = async { bridge.connect() }
+        runCurrent()
+        complete(shadowOf(app).nextStartedService)
+        connection.await()
+        val controller = Robolectric.buildService(TermuxExtensionService::class.java).create()
+        try {
+            val service = IMochiExtensionService.Stub.asInterface(controller.get().onBind(Intent()))
+            suspend fun call(scope: String): ExtensionToolResult {
+                val result = CompletableDeferred<ExtensionToolResult>()
+                service.callTool(
+                    ExtensionToolRequest(UUID.randomUUID().toString(), "termux_task", """{"action":"list"}""", 5_000, scope),
+                    object : IMochiToolCallback.Stub() {
+                        override fun onResult(value: ExtensionToolResult) { result.complete(value) }
+                    },
+                )
+                return withTimeout(5_000) { result.await() }
+            }
+            // The Android service uses a real IO dispatcher, not the test scheduler.
+            runBlocking {
+                ExtensionExecutionContext.ALL.forEach { scope ->
+                    val result = call(scope)
+                    assertTrue("$scope: ${result.errorCode}", result.success)
+                    assertEquals("""{"task_ids":[]}""", result.contentJson)
+                }
+                assertEquals("INVALID_ARGS", call("unknown").errorCode)
+                bridge.disconnect()
+                assertEquals("PERMISSION_DENIED", call(ExtensionExecutionContext.SCHEDULED).errorCode)
+            }
+        } finally {
+            controller.destroy()
+        }
     }
 }

@@ -15,6 +15,7 @@ import com.example.mochi_pet.core.database.PlannerRepository
 import com.example.mochi_pet.core.database.PlannerStore
 import com.example.mochi_pet.core.extensions.AndroidMochiExtensionClient
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
+import com.example.mochi_pet.core.extensions.ExtensionToolScope
 import com.example.mochi_pet.core.memory.AgentMemoryRepository
 import com.example.mochi_pet.core.memory.RoomAgentMemoryRepository
 import com.example.mochi_pet.core.persona.FilePersonaRepository
@@ -269,7 +270,7 @@ class MochiApplication : Application() {
                     onWeatherLoaded = {},
                     includeBrowser = true,
                     includeBrowserInteractions = false,
-                    includeExtensions = false,
+                    extensionScope = ExtensionToolScope.SCHEDULED,
                     includeAgentLink = false,
                 ).run(
                     AgentRunRequest(

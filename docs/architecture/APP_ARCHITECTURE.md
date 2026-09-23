@@ -51,7 +51,7 @@ run in local JVM tests.
 | `ExtensionToolAdapter` | bounded extension schema registration and Tool result translation |
 | Mi Home extension process | Xiaomi QR session, cloud requests, MIoT mapping, device selection, and ephemeral images |
 | Termux extension process | Setup, command dispatch, task IDs and result callbacks; the bundled supervisor executes inside Termux |
-| `TermuxApprovalGate` | Native per-call approval and transient task views; grants belong to one foreground registry |
+| `TermuxApprovalGate` | Native per-call approval, registry revocation and transient task views; foreground grants belong to one registry |
 | `AgentBrowserSessionController` | visible per-turn WebView, snapshots, actions, and cleanup |
 | `AgentExecutionService` | background Agent Browser lifetime and Stop notification |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
@@ -118,6 +118,9 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 - Termux task IDs live in private extension preferences, while bounded command
   output and the versioned helper live in Termux's private storage. Neither is
   exported or backed up by Mochi. Main-Agent approval is in memory only.
+  A separate default-off `termuxBackgroundEnabled` Tool DataStore preference
+  authorizes all Scheduled Agents and Subagents, is checked per call, is
+  excluded from Provider sharing, and is cleared on provider disable/disconnect.
 - The same Tool DataStore stores the encrypted Amap Web Service Key, optional
   Security Key, and provider enablement. Six native Tools call fixed official
   HTTPS REST endpoints; they are not represented as a remote MCP server.
