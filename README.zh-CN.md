@@ -82,7 +82,7 @@
 | Skill | 默认状态 | 能力 | 所需配置 |
 | --- | --- | --- | --- |
 | Mochi Planner | 启用 | 管理 Mochi 日历事件和带日期的待办 | 无 |
-| AgentLink | 禁用 | 控制 CLI/App 共享编程聊天，检测人工接管冲突 | 安装 AgentLink，在原生页面确认权限并启用三个 Tools |
+| [AgentLink](https://github.com/gongpx20069/android-agent-link) | 禁用 | 控制 CLI/App 共享编程聊天，检测人工接管冲突 | [下载 AgentLink](https://github.com/gongpx20069/android-agent-link/releases)，在原生页面确认权限并启用三个 Tools |
 | Termux | 禁用 | 通过原生授权运行本机 Shell、脚本和开发工具 | 安装与主应用同签名的 Termux 扩展及官方 Termux，完成 Tools 中的连接向导 |
 | Voice Navigation | 启用 | 根据对话意图打开相关 Mochi 原生页面 | 无 |
 | Scheduled Automations | 启用 | 执行一次性或周期 Agent 任务，并把结果写入 Conversation | 通知权限；精确闹钟权限可选 |
@@ -105,7 +105,7 @@
 | 分组 | 包含的 Tools | 能力与配置 |
 | --- | --- | --- |
 | **计划** | `manage_mochi_calendar`<br>`manage_mochi_todo` | 读取和更新 Mochi 自己的日历事件与带日期待办，无需额外配置。 |
-| **AgentLink** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | 发现和控制已授权的共享机器、工作区与聊天；仅限前台 Main Agent。 |
+| **[AgentLink](https://github.com/gongpx20069/android-agent-link)** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | 发现和控制已授权的共享机器、工作区与聊天；仅限前台 Main Agent。 |
 | **Termux 扩展** | `termux_exec` · `termux_task` | 不受命令白名单限制的 Shell、有界输出、任务查询和停止；可选安装，仅限前台 Main Agent。 |
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
@@ -140,7 +140,10 @@ Tools 页面会将 Agent Browser、Mochi 内建能力和 Provider Tools 分组�
 
 ### 控制 AgentLink 共享编程聊天
 
-安装 AgentLink Android 后，进入 **Tools > AgentLink > 连接/打开 AgentLink**，
+从 [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases)
+下载 Android APK（目前标记为 **Pre-release**）。电脑端 Bridge 的安装和连接方法
+见 [AgentLink 仓库](https://github.com/gongpx20069/android-agent-link)。
+安装并连接 AgentLink 后，进入 **Tools > AgentLink > 连接/打开 AgentLink**，
 在 AgentLink 原生页面确认限定范围的权限后返回 Mochi。启用 Provider、
 `agentlink_workspace`、`agentlink_chat`、`agentlink_control` 三个开关，
 再启用内置 **AgentLink** Skill。Mochi 可发现已授权机器和工作区，创建或继续

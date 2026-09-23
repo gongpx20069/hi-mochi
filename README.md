@@ -86,7 +86,7 @@ therefore much smaller. Developers can check a connected device with
 | Skill | Default | What it does | Required setup |
 | --- | --- | --- | --- |
 | Mochi Planner | Enabled | Manages Mochi calendar events and dated todos | None |
-| AgentLink | Disabled | Controls shared CLI/App coding chats with human-override guards | Install AgentLink; approve native scoped access; enable all three Tools |
+| [AgentLink](https://github.com/gongpx20069/android-agent-link) | Disabled | Controls shared CLI/App coding chats with human-override guards | [Download AgentLink](https://github.com/gongpx20069/android-agent-link/releases); approve native scoped access; enable all three Tools |
 | Termux | Disabled | Runs local shell commands, scripts and development tools with native approval | Install matching-signed Mochi Termux extension and official Termux; complete Tools > Termux setup |
 | Voice Navigation | Enabled | Opens the relevant native Mochi surface from conversation intent | None |
 | Scheduled Automations | Enabled | Runs one-time or recurring Agent prompts and writes results to Conversation | Notification permission; exact-alarm access is optional |
@@ -109,7 +109,7 @@ therefore much smaller. Developers can check a connected device with
 | Group | Included Tools | Purpose and setup |
 | --- | --- | --- |
 | **Planner** | `manage_mochi_calendar`<br>`manage_mochi_todo` | Read and update Mochi-owned events and dated todos. No additional setup. |
-| **AgentLink** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | Authorized shared machine/workspace/chat discovery and control; foreground Main Agent only. |
+| **[AgentLink](https://github.com/gongpx20069/android-agent-link)** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | Authorized shared machine/workspace/chat discovery and control; foreground Main Agent only. |
 | **Termux extension** | `termux_exec` · `termux_task` | Unrestricted shell, bounded output and task inspection/stop; optional, foreground Main Agent only. |
 | **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
 | **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
@@ -148,7 +148,10 @@ kill background work, and detached processes may survive a stop request.
 
 ### Control shared AgentLink coding chats
 
-Install AgentLink Android, then open **Tools > AgentLink > Connect/Open AgentLink**.
+Download the Android APK from [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases)
+(currently marked **Pre-release**). See the [AgentLink repository](https://github.com/gongpx20069/android-agent-link)
+for desktop Bridge setup and connection instructions.
+After installing and connecting AgentLink, open **Tools > AgentLink > Connect/Open AgentLink**.
 Approve the scoped access request in AgentLink and return to Mochi. Enable the
 provider, its three switches (`agentlink_workspace`, `agentlink_chat`,
 `agentlink_control`), and the built-in **AgentLink** Skill.
