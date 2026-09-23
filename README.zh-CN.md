@@ -32,9 +32,13 @@
 
 说出 **“Hi Mochi”**，就能让它记事、查询公开资料、规划日常生活并打开正确的
 原生界面。原生 Android 语音、记忆、计划、Tools 和 Skills 能把闲置手机变成
-常驻待命的伙伴、桌面信息屏、计划助手和智能家居语音终端。
+常驻待命的伙伴、桌面信息屏和计划助手。
 
-### 快速开始：选择正确的 APK
+[快速开始](#快速开始选择正确的-apk) · [配置指南](#配置指南) ·
+[核心功能](#核心功能) · [Skills 与 Tools](#skills-与-tools) ·
+[可选扩展](#可选扩展)
+
+## 快速开始：选择正确的 APK
 
 打开[最新 GitHub Release](https://github.com/gongpx20069/hi-mochi/releases/latest)，
 根据设备选择安装包：
@@ -51,19 +55,83 @@
 2. 打开**设置**，配置
    [AI Provider 端点、模型名称和 API 密钥](#支持的-llm-provider)，并按需设置
    [Speech Provider](#支持的-speech-provider)。
-3. 启用你信任的[内置 Tools](#内置-tools)与[内置 Skills](#内置-skills)，然后通过
-   文字、麦克风或唤醒词开始交流。
+3. 通过文字或麦克风开始交流；语音输入需授予麦克风权限，准备好后可启用
+   **“Hi Mochi”** 唤醒词。其他 Tools 和 Skills 按需配置即可。
 
 各 ABI 专用 APK 与通用版功能完全相同，只是不包含其他 CPU 架构的本地语音库，
 因此体积会小很多。开发者可通过
 `adb shell getprop ro.product.cpu.abi` 查看已连接设备的架构。
+
+**先安装 Mochi 主应用 APK 即可。** 对话、语音、记忆和 Mochi Planner 不要求
+安装任何扩展 APK。升级时使用相同签名渠道的安装包覆盖更新，保留应用数据，
+不要为了升级而先卸载。
+
+## 配置指南
+
+### 支持的 LLM Provider
+
+LLM Provider 是必需配置。未配置时，首次启动会打开设置；之后也可以从右上角
+随时进入设置。
+
+| Provider | 配置 | 凭据 |
+| --- | --- | --- |
+| OpenAI | OpenAI Endpoint 和模型名称 | [OpenAI API Key](https://platform.openai.com/api-keys) |
+| Azure OpenAI | Azure 资源 Endpoint、以 **Deployment 名称**填写模型、API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需兼容 OpenAI Chat/Tool Call 协议 | 对应服务商签发的 API Key |
+
+### 支持的 Speech Provider
+
+进入**设置 > 语音识别与合成**。默认使用 Android 语音；云端语音是可选项，
+与 LLM Provider 分开配置。
+
+| Provider | 默认 | 配置 |
+| --- | --- | --- |
+| Android 系统语音 | 是 | 无需 API 凭据；语音识别和离线合成音色取决于设备已安装的服务 |
+| 讯飞 | 否 | 从[实时语音听写](https://www.xfyun.cn/services/voicedictation)申请 App ID、API Key 和 API Secret；在[讯飞控制台](https://console.xfyun.cn/)管理语音合成权限 |
+| Azure Speech | 否 | 从 [Azure Speech 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices) 获取 Endpoint 和 API Key |
+
+选择讯飞或 Azure 后，可打开默认关闭的**同时用于语音合成**，复用已保存的语音
+凭据播报回答。选择并试听音色后，点击**保存语音设置**才会生效。云端合成会把
+回答文本发送给对应 Provider，试听也会消耗服务额度；音色出现在列表中不代表
+账号已获授权或可以免费使用。唤醒回应仍使用本地语音。
+
+需要其他 LLM 或 Speech Provider？欢迎
+[提交 Issue](https://github.com/gongpx20069/hi-mochi/issues/new)说明 Provider
+及其 API 兼容性，或直接提交 Pull Request。
+
+### Tools 与 Skills 配置
+
+每个 Tool 都有独立开关，Provider 支持的 Tools 还要求对应服务已连接并启用。
+只开启你需要的能力。Skill 描述执行流程，启用 Skill 不会自动开启依赖；
+Skills 页面会提示尚未就绪的 Tool 分组。
+
+地图与商家发现需要[高德 Web 服务 Key](https://console.amap.com/)。
+创建时请选择 **Web 服务**，不是 Android；不需要发布版或调试版 SHA1。
+Mochi 中可选的“安全密钥”也不是 SHA1，仅在高德控制台启用数字签名时填写。
+
+文档协作可使用 [Notion MCP OAuth](https://www.notion.com/help/notion-mcp)
+或[腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html)，再启用对应
+Tools 和 Skill。
+
+### 语言、更新与 Provider 分享
+
+Mochi 默认跟随 Android 系统语言，也可以在设置中固定使用中文或英文。
+每次打开应用时会检查最新稳定 GitHub Release，由你决定是否下载更新。
+
+**分享 Providers**会先让你选择要包含的连接。LLM 与 Speech 默认选中；
+高德、腾讯文档和手动配置的 MCP 工具凭据是可选项，默认不选中。
+加密链接本身包含解密密钥：**任何拿到完整链接的人都能使用所选 API 资源并
+消耗其额度**。Persona、记忆、Planner 数据、Notion OAuth、米家会话和
+Android 系统权限不会被分享。
+
+## 核心功能
 
 ### 全天候，随时语音唤醒
 
 - 通过设备本地的 **“Hi Mochi”** 唤醒词随时唤醒 Mochi。
 - 回答结束后自动继续聆听，让多轮语音对话更加自然。
 - 默认使用 Android 语音识别，也可按需配置内置的讯飞或 Azure STT。
-- 使用 Android 语音合成直接播报回答。
+- 使用 Android 语音合成播报回答，也可按需启用讯飞/Azure 合成。
 - 根据对话自动打开相关日期、天气、计划或结果页面。
 
 ### 不只是一个聊天窗口
@@ -71,19 +139,35 @@
 | 语音优先 | 记住重要信息 | 真正处理工作 |
 | --- | --- | --- |
 | 全天候 “Hi Mochi” 语音唤醒和连续语音对话 | 在本地保存对话历史，并通过 ICU 分词的词法检索召回相关长期记忆 | 内置计划、定时任务、定位、天气、网页、地图、文档和本地计算 Tools |
-| 默认使用 Android 语音识别，也可选配讯飞/Azure STT；语音输出使用 Android TTS，并支持文字输入 | 可直接编辑 `SOUL`、`USER` 和 `AGENTS` Persona 文件 | 通过可信卡片、原生导航以及串行 Researcher/Analyst Subagent 呈现有用结果 |
+| 默认使用 Android 语音，也可选配讯飞/Azure 识别与合成，并支持文字输入 | 可直接编辑 `SOUL`、`USER` 和 `AGENTS` Persona 文件 | 通过可信卡片、原生导航以及串行 Researcher/Analyst Subagent 呈现有用结果 |
 
 | 与 **Notion** 和 **腾讯文档** Cowork | 通过 Skill Market 持续扩展 |
 | --- | --- |
 | 将已授权工作区变成你的私人可读写知识库。Mochi 能查找你的资料、调研新主题、整理信息，与你共同撰写文档，并把成稿直接写回 **Notion** 或 **腾讯文档**。 | 从内置的 skills.sh 市场发现并安装社区 Agent Skills |
+
+### 与 **Notion** 和 **腾讯文档** 一起 Cowork
+
+Mochi 可将已授权的 **Notion** 或 **腾讯文档** 工作区连接为你的私人可读写
+知识库，而不只是只读搜索源。它可以从你的文档中查找相关资料，结合已启用的
+研究 Tools 调研新主题、收集并整理信息，再与你共同撰写新的页面或文档。
+完成后，Mochi 会将成稿写回指定工作区，并通过官方 MCP 集成继续更新已有
+知识。
+
+### 串行 Subagent
+
+Main Agent 可以把一个聚焦任务交给隔离的 **Researcher** 或 **Analyst**，
+等待结果返回后再继续处理。每次请求最多串行运行两个 Child Agent，并且不会向
+它们开放计划修改、设备定位、凭据、界面导航或其他仅限前台的能力。
+Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analyst 还可
+使用本地 JavaScript 沙箱。
+
+## Skills 与 Tools
 
 ### 内置 Skills
 
 | Skill | 默认状态 | 能力 | 所需配置 |
 | --- | --- | --- | --- |
 | Mochi Planner | 启用 | 管理 Mochi 日历事件和带日期的待办 | 无 |
-| [AgentLink](https://github.com/gongpx20069/android-agent-link) | 禁用 | 控制 CLI/App 共享编程聊天，检测人工接管冲突 | [下载 AgentLink](https://github.com/gongpx20069/android-agent-link/releases)，在原生页面确认权限并启用三个 Tools |
-| Termux | 禁用 | 通过原生授权运行本机 Shell、脚本和开发工具 | 安装与主应用同签名的 Termux 扩展及官方 Termux，完成 Tools 中的连接向导 |
 | Voice Navigation | 启用 | 根据对话意图打开相关 Mochi 原生页面 | 无 |
 | Scheduled Automations | 启用 | 执行一次性或周期 Agent 任务，并把结果写入 Conversation | 通知权限；精确闹钟权限可选 |
 | Web Search | 启用 | 通过 Agent Browser 搜索公开网页和微信公众号内容 | 无 |
@@ -95,18 +179,14 @@
 | 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过 Agent Browser 调研无需登录的公开火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用 Agent Browser |
 | 商家发现 | 启用 | 使用高德提供的评分、人均、营业时间、电话、标签和图片发现并比较商家 | [创建高德 Web 服务 Key](https://console.amap.com/) |
 
-> **高德配置：** 创建 Key 时，服务平台请选择 **Web 服务**，不要选择
-> Android 平台。Web 服务 Key 无需填写发布版安全码 SHA1 或调试版安全码
-> SHA1。Mochi 中可选的“安全密钥”也不是 SHA1；只有在高德控制台启用数字
-> 签名时才需要填写。
+需要另行安装应用的 Skills 集中列在后面的[可选扩展](#可选扩展)中，
+不属于首次使用的必需配置。
 
 ### 内置 Tools
 
 | 分组 | 包含的 Tools | 能力与配置 |
 | --- | --- | --- |
 | **计划** | `manage_mochi_calendar`<br>`manage_mochi_todo` | 读取和更新 Mochi 自己的日历事件与带日期待办，无需额外配置。 |
-| **[AgentLink](https://github.com/gongpx20069/android-agent-link)** | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` | 发现和控制已授权的共享机器、工作区与聊天；仅限前台 Main Agent。 |
-| **Termux 扩展** | `termux_exec` · `termux_task` | 不受命令白名单限制的 Shell、有界输出、任务查询和停止；可选安装，仅限前台 Main Agent。 |
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
@@ -123,20 +203,58 @@ Tools 页面会将 Agent Browser、Mochi 内建能力和 Provider Tools 分组�
 乘客或支付信息，也不会进入预订流程；遇到登录、验证码、身份验证或结算页面时
 立即停止。
 
-### 使用 Termux 执行本机命令
+### Skill Market
 
-安装与 Mochi 同一发布/签名渠道的 `Mochi-Termux-Extension`，另行安装
-[官方 Termux](https://github.com/termux/termux-app#installation)。
-打开 **Tools > Extensions > Termux > 配置 Termux**，将向导展示的一次性
-配置命令复制到 Termux 执行，授予命令执行权限并连接测试。返回后点击
-**启用工具和 Skill**。
+内置 Skill Market 让 Mochi 的能力不受默认功能限制。你可以浏览热门 Skills、
+搜索 skills.sh 生态、安装需要的能力，并在需要时启用它们。
 
-日常直接语音控制 Mochi，批准后的命令在后台执行，不切换 App。可以授权
-执行一次或本次任务，不提供永久自动授权。这是 Termux 权限下的完整 Shell，
-不是 Root 或文件沙箱；供 Agent 分析的输出会发送给当前模型 Provider。
-**Termux 任务**支持在本机查看输出、刷新、停止和清理已结束任务。
-关闭 Mochi 不会停止已提交命令，Android 仍可能终止后台运行；脱离任务的
-进程可能在停止请求后继续运行。
+> 启用 Skill 不会自动开启它所依赖的 Tools。
+
+## 隐私从本地开始
+
+Persona 文件、设置、对话、记忆、日历和待办默认保存在设备本地。AI 提供商
+凭据使用 Android Keystore 支持的本地安全存储。
+
+Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存的发送日期和
+时间，包括恢复的历史消息和 Scheduled Agent 结果。
+
+回答问题时，Mochi 会把必要的对话上下文发送给你配置的 AI 提供商。外部 Tool
+只会在已启用的调用中收到完成任务所需的信息。调用 `get_current_location`
+时，获得权限的坐标会作为 Tool 证据发送给你配置的 AI 提供商；你可以在 Tools
+中单独关闭该能力。
+
+## 使用要求与当前状态
+
+- Android 8.0 或更高版本。
+- OpenAI、Azure OpenAI 或兼容 AI 提供商的配置。
+- 语音输入需要麦克风权限。
+- 位置和通知权限仅在使用相关功能时需要。
+
+稳定版本会以签名 APK 的形式通过 GitHub Releases 分发。Mochi 仍在积极开发
+中；语音识别、唤醒、音频焦点、提醒和后台运行效果可能因设备及手机厂商而异。
+
+## 可选扩展
+
+这些集成用于补充 Mochi 的能力，**不是核心功能的使用前提**，只需按需安装。
+米家和 Termux 使用与 Mochi 同签名的独立扩展 APK；AgentLink 通过独立的
+配套应用连接。三者均用于前台 Main Agent，不默认向 Subagent 或定时 Agent 开放。
+
+| 集成 | 内置 Skill（默认状态） | 附加能力 | 安装入口 |
+| --- | --- | --- | --- |
+| 米家 | Mi Home Smart Home——禁用 | 查询/控制选定设备、执行手动场景、查看最新摄像头事件图片 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：`Mochi-Mijia-Extension` |
+| [AgentLink](https://github.com/gongpx20069/android-agent-link) | AgentLink——禁用 | 通过 `agentlink_workspace`、`agentlink_chat`、`agentlink_control` 控制远程共享编程聊天 | [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases) |
+| Termux | Termux——禁用 | 通过 `termux_exec`、`termux_task` 运行完整本机 Shell 并管理任务 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：`Mochi-Termux-Extension`，另需[官方 Termux](https://github.com/termux/termux-app#installation) |
+
+### 米家智能家居
+
+安装与 Mochi 同一发布/签名渠道的 `Mochi-Mijia-Extension`。
+进入 **Tools > Extensions > 米家 > 连接米家**，使用另一台已登录米家的手机
+扫码并确认连接。选择家庭和支持的设备，再启用 Provider、需要的 Tools 以及
+**Mi Home Smart Home** Skill。
+
+这是非官方连接器，能力取决于所选设备，不会开放不支持的操作。
+摄像头图片是最新可用的云端事件，**不是实时画面**。小米凭据保留在扩展中，
+Mochi 不要求你粘贴账号密码。
 
 ### 控制 AgentLink 共享编程聊天
 
@@ -155,78 +273,20 @@ Tools 中的关联聊天按钮打开可信的原生 AgentLink 页面，也可刷
 不允许使用网络/浏览器绕过权限，也不默认向 Subagent 或定时 Agent 开放。
 关联记录并非实时任务监控；请重新读取以了解当前状态。
 
-### 串行 Subagent
+### 使用 Termux 执行本机命令
 
-Main Agent 可以把一个聚焦任务交给隔离的 **Researcher** 或 **Analyst**，
-等待结果返回后再继续处理。每次请求最多串行运行两个 Child Agent，并且不会向
-它们开放计划修改、设备定位、凭据、界面导航或其他仅限前台的能力。
-Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analyst 还可
-使用本地 JavaScript 沙箱。
+安装与 Mochi 同一发布/签名渠道的 `Mochi-Termux-Extension`，另行安装
+[官方 Termux](https://github.com/termux/termux-app#installation)。
+打开 **Tools > Extensions > Termux > 配置 Termux**，将向导展示的一次性
+配置命令复制到 Termux 执行，授予命令执行权限并连接测试。返回后点击
+**启用工具和 Skill**。
 
-### 支持的 LLM Provider
-
-| Provider | 配置 | 凭据 |
-| --- | --- | --- |
-| OpenAI | OpenAI Endpoint 和模型名称 | [OpenAI API Key](https://platform.openai.com/api-keys) |
-| Azure OpenAI | Azure 资源 Endpoint、Deployment 名称和 API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
-| 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需兼容 OpenAI Chat/Tool Call 协议 | 对应服务商签发的 API Key |
-
-### 支持的 Speech Provider
-
-| Provider | 默认 | 配置 |
-| --- | --- | --- |
-| Android 系统语音识别 | 是 | 无需 API 凭据；可用性取决于设备和已安装的语音识别服务 |
-| 讯飞语音转文字 | 否 | 从[实时语音听写](https://www.xfyun.cn/services/voicedictation)申请 App ID、API Key 和 API Secret |
-| Azure Speech-to-Text | 否 | 从 [Azure Speech 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices) 获取 Endpoint 和 API Key |
-
-需要其他 LLM 或 Speech Provider？欢迎
-[提交 Issue](https://github.com/gongpx20069/hi-mochi/issues/new)说明 Provider
-及其 API 兼容性，或直接提交 Pull Request。
-
-### 与 **Notion** 和 **腾讯文档** 一起 Cowork
-
-Mochi 可将已授权的 **Notion** 或 **腾讯文档** 工作区连接为你的私人可读写
-知识库，而不只是只读搜索源。它可以从你的文档中查找相关资料，结合已启用的
-研究 Tools 调研新主题、收集并整理信息，再与你共同撰写新的页面或文档。
-完成后，Mochi 会将成稿写回指定工作区，并通过官方 MCP 集成继续更新已有
-知识。
-
-内置 Skill Market 让 Mochi 的能力不受默认功能限制。你可以浏览热门 Skills、
-搜索 skills.sh 生态、安装需要的能力，并在需要时启用它们。
-
-> 启用 Skill 不会自动开启它所依赖的 Tools。
-
-Mochi 默认跟随 Android 系统语言，也可以在设置中固定使用中文或英文。
-每次打开应用时，Mochi 会检查最新稳定 GitHub Release；发现更高的 `1.0.x`
-版本后由用户决定是否打开发布页下载。
-
-已配置用户可以生成一个加密的 Provider 分享链接，将 LLM 与 Speech Provider
-资源交给朋友使用。随机解密密钥包含在链接本身，因此无需另输密码，但任何拿到
-完整链接的人都能使用对应 API 资源并消耗其额度。链接不包含 Persona、记忆、
-Planner 数据、Tools 凭据或 Android 系统权限。
-
-### 隐私从本地开始
-
-Persona 文件、设置、对话、记忆、日历和待办默认保存在设备本地。AI 提供商
-凭据使用 Android Keystore 支持的本地安全存储。
-
-Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存的发送日期和
-时间，包括恢复的历史消息和 Scheduled Agent 结果。
-
-回答问题时，Mochi 会把必要的对话上下文发送给你配置的 AI 提供商。外部 Tool
-只会在已启用的调用中收到完成任务所需的信息。调用 `get_current_location`
-时，获得权限的坐标会作为 Tool 证据发送给你配置的 AI 提供商；你可以在 Tools
-中单独关闭该能力。
-
-### 使用要求与当前状态
-
-- Android 8.0 或更高版本。
-- OpenAI、Azure OpenAI 或兼容 AI 提供商的配置。
-- 语音输入需要麦克风权限。
-- 位置和通知权限仅在使用相关功能时需要。
-
-稳定版本会以签名 APK 的形式通过 GitHub Releases 分发。Mochi 仍在积极开发
-中；语音识别、唤醒、音频焦点、提醒和后台运行效果可能因设备及手机厂商而异。
+日常直接语音控制 Mochi，批准后的命令在后台执行，不切换 App。可以授权
+执行一次或本次任务，不提供永久自动授权。这是 Termux 权限下的完整 Shell，
+不是 Root 或文件沙箱；供 Agent 分析的输出会发送给当前模型 Provider。
+**Termux 任务**支持在本机查看输出、刷新、停止和清理已结束任务。
+关闭 Mochi 不会停止已提交命令，Android 仍可能终止后台运行；脱离任务的
+进程可能在停止请求后继续运行。
 
 ---
 

@@ -39,7 +39,10 @@ Code and generated schemas must implement the contracts; they do not silently
 redefine them.
 
 User-facing capability and third-party API setup links are maintained in the
-root [`README.md`](../README.md), including the complete built-in Skills table.
+root [`README.md`](../README.md), including complete built-in Skills coverage
+across the core and optional-extension tables. Keep both README languages
+aligned: installation and essential configuration first, core features next,
+and optional Mi Home, AgentLink, and Termux integrations in a later section.
 
 When two documents conflict, fix the lower-authority document instead of
 adding an exception.
