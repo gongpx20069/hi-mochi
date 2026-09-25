@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.MochiExtension" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#0E0D12</item>
+        <item name="android:colorAccent">#FFB7A5</item>
+    </style>
+</resources>

@@ -20,6 +20,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.resetMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -37,6 +39,43 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], application = Application::class)
 class TermuxBridgeTest {
     private val app get() = RuntimeEnvironment.getApplication()
+
+    @Test
+    fun `setup never skips installation or denied permission`() {
+        assertEquals(TermuxSetupStep.INSTALL, termuxSetupStep(false, true))
+        assertEquals(TermuxSetupStep.PERMISSION, termuxSetupStep(true, false))
+        assertEquals(TermuxSetupStep.CHECK, termuxSetupStep(true, true))
+        val model = TermuxSetupViewModel(app)
+        model.permissionResult(false)
+        assertEquals(TermuxSetupStep.PERMISSION, model.step)
+        assertEquals(R.string.permission_denied, model.error)
+        assertEquals(null, shadowOf(app).nextStartedService)
+    }
+
+    @Test
+    fun `repeated resume dispatches one bounded probe and never assumes success`() = runTest {
+        kotlinx.coroutines.Dispatchers.setMain(kotlinx.coroutines.test.StandardTestDispatcher(testScheduler))
+        val store = androidx.lifecycle.ViewModelStore()
+        try {
+            val model = TermuxSetupViewModel(app)
+            store.put("setup", model)
+            model.awaitingTerminal = true
+            model.resume()
+            model.resume()
+            runCurrent()
+            assertFalse(model.awaitingTerminal)
+            assertEquals(TermuxSetupStep.CHECKING, model.step)
+            assertTrue(shadowOf(app).nextStartedService != null)
+            assertEquals(null, shadowOf(app).nextStartedService)
+            testScheduler.advanceTimeBy(15_001)
+            runCurrent()
+            assertEquals(TermuxSetupStep.ERROR, model.step)
+            assertEquals(R.string.check_timeout, model.error)
+        } finally {
+            store.clear()
+            kotlinx.coroutines.Dispatchers.resetMain()
+        }
+    }
 
     @Before
     fun installFakeTermux() {

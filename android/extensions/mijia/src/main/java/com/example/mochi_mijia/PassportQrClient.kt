@@ -3,6 +3,8 @@ package com.example.mochi_mijia
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -82,6 +84,7 @@ class PassportQrClient(
                 serviceToken = serviceToken,
                 deviceId = sessionStore.getOrCreateDeviceId(),
             )
+            currentCoroutineContext().ensureActive()
             sessionStore.save(session)
             session
         }

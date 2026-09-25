@@ -552,10 +552,16 @@ private fun MochiAppContent(
             viewModel.consumeToolAuthorizationUrl()
         }
     }
+    val pendingExtensionSetup by viewModel.pendingExtensionSetup.collectAsStateWithLifecycle()
+    pendingExtensionSetup?.let { kind ->
+        ExtensionSetupCompletionDialog(kind, viewModel::enableConfiguredExtension, viewModel::dismissExtensionSetup)
+    }
+    var launchedExtensionPackage by rememberSaveable { mutableStateOf<String?>(null) }
     val extensionActivityLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
-    ) {
-        viewModel.refreshTools()
+    ) { result ->
+        viewModel.completeExtensionSetup(launchedExtensionPackage, result.resultCode == Activity.RESULT_OK)
+        launchedExtensionPackage = null
     }
     LaunchedEffect(toolsState.agentLinkActivityRequest) {
         toolsState.agentLinkActivityRequest?.let(launchAgentLink)
@@ -565,6 +571,7 @@ private fun MochiAppContent(
         val target = toolsState.extensionActivityTarget
             ?: return@LaunchedEffect
         try {
+            launchedExtensionPackage = target.packageName
             extensionActivityLauncher.launch(
                 Intent().setComponent(
                     ComponentName(target.packageName, target.className),
@@ -4314,40 +4321,25 @@ private fun MijiaExtensionCard(
     onSetEnabled: (Boolean) -> Unit,
     onSetToolEnabled: (String, Boolean) -> Unit,
 ) {
-    PlannerCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Mi Home",
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = when {
+    var management by rememberSaveable { mutableStateOf(false) }
+    var confirmDisconnect by remember { mutableStateOf(false) }
+    com.example.mochi_ui.ExtensionCard {
+        com.example.mochi_ui.ExtensionHeading(
+            title = localizeUiText("Mi Home"),
+            status = localizeUiText(when {
                         !summary.installed ->
                             "Optional unofficial extension · not installed"
                         !summary.trusted ->
                             "Installed package could not be trusted"
+                        summary.connected && !summary.enabled ->
+                            "Connected - not enabled"
                         summary.connected ->
                             "${summary.selectedDeviceCount} selected devices"
                         summary.status == "authorization_expired" ->
                             "Authorization expired"
                         else -> "Installed · connection required"
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                summary.versionName?.let { version ->
-                    Text(
-                        text = "Extension $version",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            }
+            }),
+        ) {
             if (summary.connected) {
                 Switch(
                     checked = summary.enabled,
@@ -4413,7 +4405,9 @@ private fun MijiaExtensionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton({ management = !management }) { Text(if (management) "Hide connection settings" else "Connection settings") }
+                if (management) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    summary.versionName?.let { Text("Extension $it", style = MaterialTheme.typography.bodySmall) }
                     OutlinedButton(
                         onClick = onConfigure,
                         enabled = !disabled,
@@ -4421,7 +4415,7 @@ private fun MijiaExtensionCard(
                         Text("Manage")
                     }
                     TextButton(
-                        onClick = onDisconnect,
+                        onClick = { confirmDisconnect = true },
                         enabled = !disabled,
                     ) {
                         Text("Disconnect")
@@ -4490,6 +4484,16 @@ private fun MijiaExtensionCard(
             }
         }
     }
+    if (confirmDisconnect) AlertDialog(
+                        onDismissRequest = { confirmDisconnect = false },
+                        title = { Text("Disconnect Mi Home?") },
+                        text = { Text("You will need to authorize Mi Home again before using its tools.") },
+                        confirmButton = { TextButton({
+                            confirmDisconnect = false
+                            onDisconnect()
+                        }) { Text("Disconnect") } },
+                        dismissButton = { TextButton({ confirmDisconnect = false }) { Text("Cancel") } },
+                    )
 }
 
 @Composable

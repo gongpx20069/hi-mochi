@@ -128,8 +128,10 @@ class AgentLinkProviderCardTest {
             refresh.fetchSemanticsNode().boundsInRoot.top >=
                 connect.fetchSemanticsNode().boundsInRoot.bottom,
         )
+        compose.onNodeWithText("Connection settings").performScrollTo().performClick()
         compose.onNodeWithText("Manage access").performScrollTo().performClick()
         compose.onNodeWithText("Revoke").performScrollTo().performClick()
+        compose.onNodeWithText("Linked remote chats · refresh via tools").performScrollTo().performClick()
         compose.onNodeWithText("Test chat").performScrollTo().performClick()
         assertEquals(
             listOf(

@@ -14,16 +14,24 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 
-internal class TermuxException(val code: String, message: String) : Exception(message)
+internal enum class TermuxFailureReason { COMMAND_ACCESS, BACKGROUND_START, SERVICE_UNAVAILABLE, CHECK_FAILED }
+
+internal class TermuxException(
+    val code: String,
+    message: String,
+    val reason: TermuxFailureReason = TermuxFailureReason.CHECK_FAILED,
+) : Exception(message)
 
 internal data class CommandResult(val stdout: String, val exitCode: Int)
 
 internal class TermuxBridge(private val context: Context) {
     private val preferences = context.getSharedPreferences("termux", Context.MODE_PRIVATE)
 
+    fun installed(): Boolean = context.packageManager.getLaunchIntentForPackage("com.termux") != null
+
     fun available(): Boolean =
         context.checkSelfPermission(TERMUX_PERMISSION) == PackageManager.PERMISSION_GRANTED &&
-            context.packageManager.getLaunchIntentForPackage("com.termux") != null
+            installed()
 
     fun connected(): Boolean = available() && preferences.getBoolean("connected", false)
 
@@ -125,7 +133,7 @@ internal class TermuxBridge(private val context: Context) {
 
     private fun dispatch(arguments: Array<String>, id: String): PendingIntent {
         if (!available()) {
-            throw TermuxException("PERMISSION_DENIED", "Install Termux and grant command permission.")
+            throw TermuxException("PERMISSION_DENIED", "Install Termux and grant command permission.", TermuxFailureReason.COMMAND_ACCESS)
         }
         val callbackIntent = Intent(context, TermuxResultReceiver::class.java)
             .setAction("com.example.mochi_termux.RESULT.$id")
@@ -145,14 +153,14 @@ internal class TermuxBridge(private val context: Context) {
             .putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", callback)
         try {
             if (context.startService(intent) == null) {
-                throw TermuxException("PROVIDER_ERROR", "Termux command service is unavailable.")
+                throw TermuxException("PROVIDER_ERROR", "Termux command service is unavailable.", TermuxFailureReason.SERVICE_UNAVAILABLE)
             }
         } catch (_: SecurityException) {
             callback.cancel()
-            throw TermuxException("PERMISSION_DENIED", "Android rejected Termux command access.")
+            throw TermuxException("PERMISSION_DENIED", "Android rejected Termux command access.", TermuxFailureReason.COMMAND_ACCESS)
         } catch (_: IllegalStateException) {
             callback.cancel()
-            throw TermuxException("PROVIDER_ERROR", "Android blocked the background start. Open Termux and retry.")
+            throw TermuxException("PROVIDER_ERROR", "Android blocked the background start. Open Termux and retry.", TermuxFailureReason.BACKGROUND_START)
         } catch (error: TermuxException) {
             callback.cancel()
             throw error

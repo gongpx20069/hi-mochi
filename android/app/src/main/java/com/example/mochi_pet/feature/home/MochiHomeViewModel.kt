@@ -343,6 +343,7 @@ class MochiHomeViewModel(
     private var resumeWakeAfterPreview = false
     val termuxApproval = termuxApprovalGate.pending
     val termuxTasks = termuxApprovalGate.tasks
+    val pendingExtensionSetup = MutableStateFlow<ExtensionSetupKind?>(null)
     val showTermuxTasks = MutableStateFlow(false)
 
     val surface: StateFlow<MochiSurface> = mutableSurface.asStateFlow()
@@ -1640,6 +1641,10 @@ class MochiHomeViewModel(
     }
 
     fun onTermuxAction(action: TermuxUiAction) {
+        if (action == TermuxUiAction.EnableWithSkill) {
+            pendingExtensionSetup.value = ExtensionSetupKind.TERMUX
+            return
+        }
         when (action) {
             TermuxUiAction.Install -> mutableToolsState.update {
                 it.copy(authorizationUrl = MIJIA_RELEASE_URL)
@@ -1705,15 +1710,6 @@ class MochiHomeViewModel(
                     is TermuxUiAction.Enable -> repository.setTermuxEnabled(action.enabled)
                     is TermuxUiAction.EnableBackground -> repository.setTermuxBackgroundEnabled(action.enabled)
                     is TermuxUiAction.EnableTool -> repository.setTermuxToolEnabled(action.name, action.enabled)
-                    TermuxUiAction.EnableWithSkill -> {
-                        repository.setTermuxEnabled(true)
-                        repository.setTermuxToolEnabled("termux_exec", true)
-                        repository.setTermuxToolEnabled("termux_task", true)
-                        requireNotNull(skillRepository) { "Skill repository is unavailable" }
-                            .setEnabled("builtin:termux", true)
-                        refreshSkills()
-                        repository.loadSummary()
-                    }
                     else -> error("Unexpected Termux action.")
                 }
             }
@@ -1750,10 +1746,69 @@ class MochiHomeViewModel(
         loadTools()
     }
 
+    fun completeExtensionSetup(packageName: String?, accepted: Boolean) {
+        val kind = ExtensionSetupKind.fromPackage(packageName)
+        updateTools {
+            requireRepository().loadSummary().also { catalog ->
+                if (accepted && kind != null && kind.connected(catalog) && !kind.enabled(catalog)) {
+                    pendingExtensionSetup.value = kind
+                }
+            }
+        }
+    }
+
+    fun dismissExtensionSetup() {
+        pendingExtensionSetup.value = null
+    }
+
+    fun enableConfiguredExtension() {
+        val kind = pendingExtensionSetup.value ?: return
+        pendingExtensionSetup.value = null
+        updateTools {
+            val repository = requireRepository()
+            val catalog = repository.loadSummary()
+            check(kind.connected(catalog)) { "Connection is unavailable. Reconnect before enabling tools." }
+            val skills = requireNotNull(skillRepository) { "Skill repository is unavailable" }
+            val skill = skills.listSkills().first { it.id == kind.skillId }
+            val available = when (kind) {
+                ExtensionSetupKind.TERMUX -> catalog.termux.tools.map { it.name }.toSet()
+                ExtensionSetupKind.MIJIA -> catalog.mijia.tools.map { it.name }.toSet()
+                ExtensionSetupKind.AGENTLINK -> com.example.mochi_pet.core.agentlink.AGENTLINK_TOOLS
+            }
+            check(available.containsAll(skill.requiredToolNames)) { "Required Skill tools are unavailable." }
+            for (name in skill.requiredToolNames) {
+                when (kind) {
+                    ExtensionSetupKind.TERMUX -> repository.setTermuxToolEnabled(name, true)
+                    ExtensionSetupKind.MIJIA -> repository.setMijiaToolEnabled(name, true)
+                    ExtensionSetupKind.AGENTLINK -> requireNotNull(agentLinkClient).setToolEnabled(name, true)
+                }
+            }
+            when (kind) {
+                ExtensionSetupKind.TERMUX -> repository.setTermuxEnabled(true)
+                ExtensionSetupKind.MIJIA -> repository.setMijiaEnabled(true)
+                ExtensionSetupKind.AGENTLINK -> requireNotNull(agentLinkClient).setEnabled(true)
+            }
+            skills.setEnabled(kind.skillId, true)
+            refreshSkills()
+            repository.loadSummary()
+        }
+    }
+
     fun onAgentLinkAction(action: AgentLinkUiAction) {
+        if (action == AgentLinkUiAction.Install || action == AgentLinkUiAction.SetupGuide) {
+            mutableToolsState.update {
+                it.copy(authorizationUrl = if (action == AgentLinkUiAction.Install) {
+                    "https://github.com/gongpx20069/android-agent-link/releases"
+                } else {
+                    "https://github.com/gongpx20069/android-agent-link#readme"
+                })
+            }
+            return
+        }
         val client = agentLinkClient ?: return
         updateTools {
             when (action) {
+                AgentLinkUiAction.Install, AgentLinkUiAction.SetupGuide -> error("External guidance was already handled.")
                 AgentLinkUiAction.Connect -> {
                     val request = client.beginAuthorization()
                     mutableToolsState.update { it.copy(agentLinkActivityRequest = request) }
@@ -1788,7 +1843,12 @@ class MochiHomeViewModel(
     fun completeAgentLinkAuthorization(result: AgentLinkAuthorizationResult) {
         updateTools {
             agentLinkClient?.completeAuthorization(result.requestId, result.version, result.accepted)
-            requireRepository().loadSummary()
+            requireRepository().loadSummary().also { catalog ->
+                val kind = ExtensionSetupKind.AGENTLINK
+                if (result.accepted && kind.connected(catalog) && !kind.enabled(catalog)) {
+                    pendingExtensionSetup.value = kind
+                }
+            }
         }
     }
 

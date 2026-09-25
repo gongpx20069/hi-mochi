@@ -4,6 +4,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
@@ -46,6 +47,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     testOptions { unitTests.isIncludeAndroidResources = true }
+    buildFeatures { compose = true }
     bundle { language { enableSplit = false } }
     lint {
         abortOnError = true
@@ -59,6 +61,9 @@ kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
 dependencies {
     implementation(project(":extension-api"))
+    implementation(project(":extension-ui"))
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("androidx.activity:activity-ktx:1.12.4")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
     //noinspection NewerVersionAvailable

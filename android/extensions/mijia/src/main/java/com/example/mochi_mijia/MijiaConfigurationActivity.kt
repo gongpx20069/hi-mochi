@@ -1,456 +1,350 @@
 package com.example.mochi_mijia
 
 import android.app.Activity
-import android.content.res.ColorStateList
+import android.app.Application
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.view.Gravity
-import android.view.View
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
+import android.os.SystemClock
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.set
-import androidx.core.os.LocaleListCompat
-import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.mochi_extension.MochiExtensionProtocol
+import com.example.mochi_ui.ExtensionSetupScreen
+import com.example.mochi_ui.MochiTheme
+import com.example.mochi_ui.extensionUiContext
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
-class MijiaConfigurationActivity : AppCompatActivity() {
-    private lateinit var statusView: TextView
-    private lateinit var qrView: ImageView
-    private lateinit var primaryButton: Button
-    private lateinit var saveButton: Button
-    private lateinit var disconnectButton: Button
-    private lateinit var deviceContainer: LinearLayout
-    private val graph by lazy { MijiaGraph.get(this) }
-    private val checkBoxes = LinkedHashMap<String, CheckBox>()
+internal enum class MijiaSetupStep { PREPARE, AUTHORIZE, SELECT }
+
+internal fun visibleMijiaDevices(devices: List<MijiaDevice>, query: String): List<MijiaDevice> =
+    devices.filter { device ->
+        device.category in SUPPORTED_MIJIA_CATEGORIES &&
+            listOf(device.name, device.homeName, device.roomName.orEmpty()).any {
+                it.contains(query.trim(), ignoreCase = true)
+            }
+    }.sortedWith(compareBy(MijiaDevice::homeName, { it.roomName.orEmpty() }, MijiaDevice::name))
+
+internal class MijiaSetupViewModel(application: Application) : AndroidViewModel(application) {
+    private val graph = MijiaGraph.get(application)
+    var step by mutableStateOf(MijiaSetupStep.PREPARE)
+        private set
+    var busy by mutableStateOf(false)
+        private set
+    var status by mutableStateOf(R.string.prepare_help)
+        private set
+    var error by mutableStateOf<Int?>(null)
+        private set
+    var qr by mutableStateOf<Bitmap?>(null)
+        private set
+    var remaining by mutableStateOf(0)
+        private set
+    var devices by mutableStateOf<List<MijiaDevice>>(emptyList())
+        private set
+    var selected by mutableStateOf<Set<String>>(emptySet())
+        private set
+    private var saved = emptySet<String>()
+    var finished by mutableStateOf(false)
+        private set
+    var devicesLoaded by mutableStateOf(false)
+        private set
+    val dirty get() = selected != saved
+    private var operation: Job? = null
+
+    init {
+        runOperation(R.string.load_devices_failed) {
+            if (withContext(Dispatchers.IO) { graph.sessionStore.load() } != null) loadDevices()
+        }
+    }
+
+    private fun runOperation(failureText: Int, block: suspend () -> Unit) {
+        if (operation?.isActive == true) return
+        busy = true
+        error = null
+        operation = viewModelScope.launch {
+            try {
+                block()
+            } catch (_: TimeoutCancellationException) {
+                error = R.string.qr_expired
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: MijiaAuthorizationException) {
+                step = MijiaSetupStep.PREPARE
+                error = R.string.authorization_failed
+            } catch (_: MijiaProviderException) {
+                error = failureText
+            } catch (_: IOException) {
+                error = R.string.network_failed
+            } catch (_: IllegalArgumentException) {
+                error = failureText
+            } finally {
+                busy = false
+                qr = null
+            }
+        }
+    }
+
+    fun connect() = runOperation(R.string.connection_failed) {
+        devicesLoaded = false
+        devices = emptyList()
+        selected = emptySet()
+        saved = emptySet()
+        step = MijiaSetupStep.AUTHORIZE
+        status = R.string.requesting_qr
+        val challenge = graph.passportQrClient.begin()
+        qr = withContext(Dispatchers.Default) { qrBitmap(challenge.loginUrl) }
+        val duration = challenge.timeoutSeconds.coerceIn(1, 600)
+        val deadline = SystemClock.elapsedRealtime() + duration * 1_000
+        status = R.string.scan_instructions
+        coroutineScope {
+            val countdown = launch {
+                while (true) {
+                    remaining = ((deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0) / 1_000).toInt()
+                    delay(1_000)
+                }
+            }
+            try {
+                withTimeout(duration * 1_000) { graph.passportQrClient.complete(challenge) }
+            } finally {
+                countdown.cancel()
+                qr = null
+            }
+        }
+        loadDevices()
+    }
+
+    private suspend fun loadDevices() {
+        step = MijiaSetupStep.SELECT
+        status = R.string.loading_devices
+        devices = visibleMijiaDevices(withContext(Dispatchers.IO) {
+            graph.repository.homesAndDevices().second
+        }, "")
+        saved = withContext(Dispatchers.IO) { graph.sessionStore.load() }?.selectedDeviceIds.orEmpty()
+            .intersect(devices.map { it.id }.toSet())
+        selected = saved
+        devicesLoaded = true
+        status = if (devices.isEmpty()) R.string.empty_devices else R.string.choose_devices
+    }
+
+    fun retryDevices() = runOperation(R.string.load_devices_failed) { loadDevices() }
+
+    fun select(ids: Set<String>, checked: Boolean) {
+        if (busy) return
+        val supported = ids.intersect(devices.map { it.id }.toSet())
+        selected = if (checked) selected + supported else selected - supported
+    }
+
+    fun save() = runOperation(R.string.save_devices_failed) {
+        withContext(Dispatchers.IO) { graph.repository.saveSelectedDevices(selected) }
+        saved = selected
+        finished = true
+    }
+
+    fun cancel() {
+        operation?.cancel()
+        qr = null
+    }
+}
+
+class MijiaConfigurationActivity : ComponentActivity() {
+    private val model: MijiaSetupViewModel by viewModels()
+    private lateinit var localized: Context
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        intent.getStringExtra(MochiExtensionProtocol.EXTRA_UI_LANGUAGE_TAG)
-            ?.takeIf(String::isNotBlank)
-            ?.let { languageTag ->
-                AppCompatDelegate.setApplicationLocales(
-                    LocaleListCompat.forLanguageTags(languageTag),
-                )
-            }
         super.onCreate(savedInstanceState)
-        buildContent()
-        refresh()
-    }
-
-    private fun buildContent() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), dp(32), dp(24), dp(32))
-        }
-        root.addView(
-            TextView(this).apply {
-                text = getString(R.string.app_name)
-                textSize = 24f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT),
         )
-        root.addView(
-            TextView(this).apply {
-                text = getString(R.string.extension_description)
-                textSize = 14f
-                setTextColor(0xFFCAC4D0.toInt())
-                gravity = Gravity.CENTER
-                setPadding(0, dp(8), 0, dp(16))
-            },
-        )
-        statusView = TextView(this).apply {
-            textSize = 15f
-            setTextColor(0xFFEADDFF.toInt())
-            gravity = Gravity.CENTER
-            setPadding(0, dp(8), 0, dp(12))
-        }
-        root.addView(statusView)
-        qrView = ImageView(this).apply {
-            visibility = View.GONE
-            contentDescription = getString(R.string.qr_content_description)
-            adjustViewBounds = true
-        }
-        root.addView(
-            qrView,
-            LinearLayout.LayoutParams(dp(300), dp(300)),
-        )
-        primaryButton = Button(this).apply {
-            text = getString(R.string.generate_qr)
-            setOnClickListener { startQrLogin() }
-        }
-        root.addView(primaryButton)
-        deviceContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = View.GONE
-            setPadding(0, dp(16), 0, dp(8))
-        }
-        root.addView(
-            deviceContainer,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-        saveButton = Button(this).apply {
-            text = getString(R.string.save_selected_devices)
-            visibility = View.GONE
-            setOnClickListener { saveSelection() }
-        }
-        root.addView(saveButton)
-        disconnectButton = Button(this).apply {
-            text = getString(R.string.disconnect_mijia)
-            visibility = View.GONE
-            setOnClickListener { disconnect() }
-        }
-        root.addView(disconnectButton)
-        setContentView(
-            ScrollView(this).apply {
-                setBackgroundColor(0xFF141218.toInt())
-                addView(root)
-            },
-        )
-    }
-
-    private fun refresh() {
-        lifecycleScope.launch {
-            val session = withContext(Dispatchers.IO) {
-                graph.sessionStore.load()
-            }
-            if (session == null) {
-                showDisconnected()
-                startQrLogin()
-            } else {
-                showDeviceSelection()
-            }
-        }
-    }
-
-    private fun showDisconnected() {
-        statusView.text = getString(R.string.scan_instructions)
-        qrView.visibility = View.GONE
-        primaryButton.visibility = View.VISIBLE
-        primaryButton.isEnabled = true
-        deviceContainer.visibility = View.GONE
-        saveButton.visibility = View.GONE
-        disconnectButton.visibility = View.GONE
-    }
-
-    private fun startQrLogin() {
-        primaryButton.isEnabled = false
-        statusView.text = getString(R.string.requesting_qr)
-        lifecycleScope.launch {
-            try {
-                val challenge = withContext(Dispatchers.IO) {
-                    graph.passportQrClient.begin()
+        localized = extensionUiContext(intent.getStringExtra(MochiExtensionProtocol.EXTRA_UI_LANGUAGE_TAG))
+        setContent {
+            MochiTheme {
+                var query by rememberSaveable { mutableStateOf("") }
+                var confirmLeave by rememberSaveable { mutableStateOf(false) }
+                fun leave() {
+                    if (model.dirty) confirmLeave = true else {
+                        model.cancel()
+                        finish()
+                    }
                 }
-                qrView.setImageBitmap(
-                    withContext(Dispatchers.Default) {
-                        qrBitmap(challenge.loginUrl)
+                BackHandler { leave() }
+                LaunchedEffect(model.finished) {
+                    if (model.finished) {
+                        setResult(Activity.RESULT_OK)
+                        finish()
+                    }
+                }
+                ExtensionSetupScreen(
+                    title = text(R.string.setup_title),
+                    steps = listOf(text(R.string.step_prepare), text(R.string.step_authorize), text(R.string.step_select)),
+                    step = model.step.ordinal,
+                    backLabel = text(R.string.back),
+                    onBack = { leave() },
+                    primaryLabel = text(when {
+                        model.step == MijiaSetupStep.SELECT && (!model.devicesLoaded || model.devices.isEmpty()) -> R.string.retry_devices
+                        model.step == MijiaSetupStep.SELECT -> R.string.save_selected_devices
+                        model.qr != null -> R.string.waiting_scan
+                        else -> R.string.generate_qr
+                    }),
+                    onPrimary = {
+                        when {
+                            model.step == MijiaSetupStep.SELECT && (!model.devicesLoaded || model.devices.isEmpty()) -> model.retryDevices()
+                            model.step == MijiaSetupStep.SELECT -> model.save()
+                            else -> model.connect()
+                        }
                     },
-                )
-                qrView.visibility = View.VISIBLE
-                val timeoutSeconds = challenge.timeoutSeconds
-                    .coerceIn(1, Int.MAX_VALUE.toLong())
-                    .toInt()
-                statusView.text = resources.getQuantityString(
-                    R.plurals.qr_expires,
-                    timeoutSeconds,
-                    timeoutSeconds,
-                )
-                val session = withTimeout(
-                    (challenge.timeoutSeconds + 15) * 1_000,
+                    busy = model.busy,
+                    footer = if (model.step == MijiaSetupStep.SELECT) {
+                        localized.resources.getQuantityString(R.plurals.selected_count, model.selected.size, model.selected.size)
+                    } else null,
                 ) {
-                    graph.passportQrClient.complete(challenge)
+                    Text(text(when (model.step) {
+                        MijiaSetupStep.PREPARE -> R.string.prepare_title
+                        MijiaSetupStep.AUTHORIZE -> R.string.authorize_title
+                        MijiaSetupStep.SELECT -> R.string.selection_title
+                    }), style = MaterialTheme.typography.titleLarge)
+                    Text(text(model.status), style = MaterialTheme.typography.bodyLarge)
+                    model.error?.let { Text(text(it), color = MaterialTheme.colorScheme.error) }
+                    model.qr?.let { image ->
+                        Image(
+                            image.asImageBitmap(), text(R.string.qr_content_description),
+                            Modifier.align(Alignment.CenterHorizontally).widthIn(max = 280.dp)
+                                .fillMaxWidth().aspectRatio(1f).background(androidx.compose.ui.graphics.Color.White).padding(12.dp),
+                        )
+                        Text(localized.resources.getQuantityString(R.plurals.qr_expires, model.remaining, model.remaining))
+                    }
+                    if (model.step == MijiaSetupStep.SELECT && model.devices.isNotEmpty()) {
+                        OutlinedTextField(
+                            value = query, onValueChange = { query = it },
+                            label = { Text(text(R.string.search_devices)) },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        )
+                        val visible = visibleMijiaDevices(model.devices, query)
+                        if (visible.isEmpty()) Text(text(R.string.no_search_results))
+                        visible.groupBy { it.homeId }.values.forEach { homeDevices ->
+                            val ids = homeDevices.map { it.id }.toSet()
+                            val allSelected = model.selected.containsAll(ids)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(homeDevices.first().homeName, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                                TextButton({ model.select(ids, !allSelected) }, enabled = !model.busy) {
+                                    Text(text(if (allSelected) R.string.clear_visible else R.string.select_visible))
+                                }
+                            }
+                            homeDevices.forEach { device ->
+                                val checked = device.id in model.selected
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 88.dp).toggleable(
+                                        checked, enabled = !model.busy, role = Role.Checkbox,
+                                        onValueChange = { model.select(setOf(device.id), it) },
+                                    ),
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = if (checked) MaterialTheme.colorScheme.secondaryContainer
+                                        else MaterialTheme.colorScheme.surface,
+                                ) {
+                                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = checked, onCheckedChange = null)
+                                        Column(Modifier.weight(1f).padding(start = 8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(device.name, style = MaterialTheme.typography.titleMedium)
+                                            Text(device.roomName ?: text(R.string.no_room),
+                                                style = MaterialTheme.typography.bodyMedium)
+                                            Text(text(categoryLabel(device.category)),
+                                                color = MaterialTheme.colorScheme.secondary,
+                                                style = MaterialTheme.typography.bodyMedium)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Text(text(R.string.extension_description), style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                statusView.text = getString(R.string.detecting_region)
-                withContext(Dispatchers.IO) {
-                    graph.repository.ensureRegion()
-                }
-                statusView.text = getString(
-                    R.string.connected_as,
-                    session.userId.takeLast(4),
+                if (confirmLeave) AlertDialog(
+                    onDismissRequest = { confirmLeave = false },
+                    title = { Text(text(R.string.discard_title)) },
+                    text = { Text(text(R.string.discard_help)) },
+                    confirmButton = { TextButton({
+                        model.cancel()
+                        finish()
+                    }) { Text(text(R.string.discard)) } },
+                    dismissButton = { TextButton({ confirmLeave = false }) { Text(text(R.string.keep_editing)) } },
                 )
-                qrView.visibility = View.GONE
-                showDeviceSelection()
-            } catch (_: Exception) {
-                statusView.text = getString(R.string.connection_failed)
-                qrView.visibility = View.GONE
-                primaryButton.isEnabled = true
-                primaryButton.text = getString(R.string.generate_new_qr)
             }
         }
     }
 
-    private suspend fun showDeviceSelection() {
-        primaryButton.visibility = View.GONE
-        qrView.visibility = View.GONE
-        statusView.text = getString(R.string.loading_devices)
-        try {
-            val (homes, devices) = withContext(Dispatchers.IO) {
-                graph.repository.homesAndDevices()
-            }
-            val session = withContext(Dispatchers.IO) {
-                checkNotNull(graph.sessionStore.load())
-            }
-            val supported = devices
-                .filter { it.category in SUPPORTED_MIJIA_CATEGORIES }
-                .sortedWith(
-                    compareBy(
-                        MijiaDevice::homeName,
-                        { it.roomName.orEmpty() },
-                        MijiaDevice::name,
-                    ),
-                )
-            statusView.text = if (supported.isEmpty()) {
-                resources.getQuantityString(
-                    R.plurals.no_supported_devices,
-                    homes.size,
-                    homes.size,
-                )
-            } else {
-                getString(R.string.choose_devices)
-            }
-            checkBoxes.clear()
-            deviceContainer.removeAllViews()
-            supported.forEach { device ->
-                val (card, checkBox) = deviceSelectionCard(
-                    device = device,
-                    selected = device.id in session.selectedDeviceIds,
-                )
-                checkBoxes[device.id] = checkBox
-                deviceContainer.addView(
-                    card,
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                    ).apply {
-                        bottomMargin = dp(10)
-                    },
-                )
-            }
-            deviceContainer.visibility = View.VISIBLE
-            saveButton.visibility =
-                if (supported.isEmpty()) View.GONE else View.VISIBLE
-            disconnectButton.visibility = View.VISIBLE
-        } catch (_: Exception) {
-            statusView.text = getString(R.string.load_devices_failed)
-            disconnectButton.visibility = View.VISIBLE
-        }
-    }
+    private fun text(id: Int) = localized.getString(id)
+}
 
-    private fun deviceSelectionCard(
-        device: MijiaDevice,
-        selected: Boolean,
-    ): Pair<View, CheckBox> {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(88)
-            isClickable = true
-            isFocusable = true
-            elevation = dp(2).toFloat()
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-        }
-        val checkBox = CheckBox(this).apply {
-            isChecked = selected
-            buttonTintList = ColorStateList(
-                arrayOf(
-                    intArrayOf(android.R.attr.state_checked),
-                    intArrayOf(),
-                ),
-                intArrayOf(
-                    DEVICE_CARD_ACCENT,
-                    DEVICE_CARD_SECONDARY_TEXT,
-                ),
-            )
-            contentDescription = getString(
-                R.string.select_device,
-                device.name,
-            )
-        }
-        card.addView(
-            checkBox,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                marginEnd = dp(12)
-            },
-        )
-        val details = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            isDuplicateParentStateEnabled = true
-        }
-        details.addView(
-            TextView(this).apply {
-                text = device.name
-                textSize = 17f
-                setTextColor(Color.WHITE)
-                setTypeface(typeface, Typeface.BOLD)
-            },
-        )
-        details.addView(
-            TextView(this).apply {
-                text = getString(
-                    R.string.device_location,
-                    device.homeName,
-                    device.roomName ?: getString(R.string.no_room),
-                )
-                textSize = 13f
-                setTextColor(DEVICE_CARD_SECONDARY_TEXT)
-                setPadding(0, dp(4), 0, 0)
-            },
-        )
-        details.addView(
-            TextView(this).apply {
-                text = deviceCategoryLabel(device.category)
-                textSize = 12f
-                setTextColor(DEVICE_CARD_ACCENT)
-                setTypeface(typeface, Typeface.BOLD)
-                setPadding(0, dp(5), 0, 0)
-            },
-        )
-        card.addView(
-            details,
-            LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f,
-            ),
-        )
-        fun updateSelectionStyle(isSelected: Boolean) {
-            card.background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(18).toFloat()
-                setColor(
-                    if (isSelected) {
-                        DEVICE_CARD_SELECTED_BACKGROUND
-                    } else {
-                        DEVICE_CARD_BACKGROUND
-                    },
-                )
-                setStroke(
-                    dp(if (isSelected) 2 else 1),
-                    if (isSelected) {
-                        DEVICE_CARD_ACCENT
-                    } else {
-                        DEVICE_CARD_OUTLINE
-                    },
-                )
-            }
-        }
-        checkBox.setOnCheckedChangeListener { _, isChecked ->
-            updateSelectionStyle(isChecked)
-        }
-        card.setOnClickListener {
-            checkBox.isChecked = !checkBox.isChecked
-        }
-        updateSelectionStyle(selected)
-        return card to checkBox
-    }
+private fun categoryLabel(category: MijiaDeviceCategory): Int = when (category) {
+    MijiaDeviceCategory.LIGHT -> R.string.category_light
+    MijiaDeviceCategory.SWITCH -> R.string.category_switch
+    MijiaDeviceCategory.PLUG -> R.string.category_plug
+    MijiaDeviceCategory.FAN -> R.string.category_fan
+    MijiaDeviceCategory.AIR_CONDITIONER -> R.string.category_air_conditioner
+    MijiaDeviceCategory.AIR_PURIFIER -> R.string.category_air_purifier
+    MijiaDeviceCategory.HUMIDIFIER -> R.string.category_humidifier
+    MijiaDeviceCategory.CURTAIN -> R.string.category_curtain
+    MijiaDeviceCategory.SENSOR -> R.string.category_sensor
+    MijiaDeviceCategory.TELEVISION -> R.string.category_television
+    MijiaDeviceCategory.CAMERA -> R.string.category_camera
+    MijiaDeviceCategory.SCALE -> R.string.category_scale
+    MijiaDeviceCategory.UNKNOWN -> R.string.category_unknown
+}
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
-
-    private fun saveSelection() {
-        saveButton.isEnabled = false
-        lifecycleScope.launch {
-            try {
-                val selected = checkBoxes
-                    .filterValues(CheckBox::isChecked)
-                    .keys
-                withContext(Dispatchers.IO) {
-                    graph.repository.saveSelectedDevices(selected)
-                }
-                setResult(Activity.RESULT_OK)
-                finish()
-            } catch (_: Exception) {
-                statusView.text = getString(R.string.save_devices_failed)
-                saveButton.isEnabled = true
-            }
+private fun qrBitmap(value: String): Bitmap {
+    val matrix = MultiFormatWriter().encode(value, BarcodeFormat.QR_CODE, 720, 720)
+    return createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888).apply {
+        for (y in 0 until matrix.height) for (x in 0 until matrix.width) {
+            this[x, y] = if (matrix[x, y]) Color.BLACK else Color.WHITE
         }
-    }
-
-    private fun disconnect() {
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                graph.sessionStore.clear()
-            }
-            setResult(Activity.RESULT_OK)
-            finish()
-        }
-    }
-
-    private fun deviceCategoryLabel(category: MijiaDeviceCategory): String =
-        getString(
-            when (category) {
-                MijiaDeviceCategory.LIGHT -> R.string.category_light
-                MijiaDeviceCategory.SWITCH -> R.string.category_switch
-                MijiaDeviceCategory.PLUG -> R.string.category_plug
-                MijiaDeviceCategory.FAN -> R.string.category_fan
-                MijiaDeviceCategory.AIR_CONDITIONER ->
-                    R.string.category_air_conditioner
-                MijiaDeviceCategory.AIR_PURIFIER ->
-                    R.string.category_air_purifier
-                MijiaDeviceCategory.HUMIDIFIER ->
-                    R.string.category_humidifier
-                MijiaDeviceCategory.CURTAIN -> R.string.category_curtain
-                MijiaDeviceCategory.SENSOR -> R.string.category_sensor
-                MijiaDeviceCategory.TELEVISION ->
-                    R.string.category_television
-                MijiaDeviceCategory.CAMERA -> R.string.category_camera
-                MijiaDeviceCategory.SCALE -> R.string.category_scale
-                MijiaDeviceCategory.UNKNOWN -> R.string.category_unknown
-            },
-        )
-
-    private fun qrBitmap(value: String): Bitmap {
-        val matrix = MultiFormatWriter().encode(
-            value,
-            BarcodeFormat.QR_CODE,
-            720,
-            720,
-        )
-        return createBitmap(
-            matrix.width,
-            matrix.height,
-            config = Bitmap.Config.ARGB_8888,
-        ).apply {
-            for (y in 0 until matrix.height) {
-                for (x in 0 until matrix.width) {
-                    this[x, y] =
-                        if (matrix[x, y]) Color.BLACK else Color.WHITE
-                }
-            }
-        }
-    }
-
-    private companion object {
-        val DEVICE_CARD_BACKGROUND = 0xFF211F26.toInt()
-        val DEVICE_CARD_SELECTED_BACKGROUND = 0xFF2B2440.toInt()
-        val DEVICE_CARD_OUTLINE = 0xFF49454F.toInt()
-        val DEVICE_CARD_ACCENT = 0xFFD0BCFF.toInt()
-        val DEVICE_CARD_SECONDARY_TEXT = 0xFFCAC4D0.toInt()
     }
 }

@@ -81,6 +81,8 @@ data class AgentLinkAuthorizationResult(
 )
 
 sealed interface AgentLinkUiAction {
+    data object Install : AgentLinkUiAction
+    data object SetupGuide : AgentLinkUiAction
     data object Connect : AgentLinkUiAction
     data object Refresh : AgentLinkUiAction
     data object Revoke : AgentLinkUiAction

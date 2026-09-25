@@ -17,5 +17,6 @@ dependencyResolutionManagement {
 rootProject.name = "Mochi"
 include(":app")
 include(":extension-api")
+include(":extension-ui")
 include(":extensions:mijia")
 include(":extensions:termux")

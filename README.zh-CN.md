@@ -251,8 +251,9 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 
 安装与 Mochi 同一发布/签名渠道的 `Mochi-Mijia-Extension`。
 进入 **Tools > Extensions > 米家 > 连接米家**，使用另一台已登录米家的手机
-扫码并确认连接。选择家庭和支持的设备，再启用 Provider、需要的 Tools 以及
-**Mi Home Smart Home** Skill。
+扫码并确认连接。按家庭搜索和选择支持的设备，然后保存。返回 Mochi 验证后，
+点击**启用工具和 Skill**即可开启 Provider 及 Skill 必需的工具；选择**暂不启用**
+则仅保留连接。管理已启用的扩展时，不会自动改动已有工具开关。
 
 这是非官方连接器，能力取决于所选设备，不会开放不支持的操作。
 摄像头图片是最新可用的云端事件，**不是实时画面**。小米凭据保留在扩展中，
@@ -279,13 +280,15 @@ Tools 中的关联聊天按钮打开可信的原生 AgentLink 页面，也可刷
 
 安装与 Mochi 同一发布/签名渠道的 `Mochi-Termux-Extension`，另行安装
 [官方 Termux](https://github.com/termux/termux-app#installation)。
-打开 **Tools > Extensions > Termux > 配置 Termux**，将向导展示的一次性
-配置命令复制到 Termux 执行，授予命令执行权限并连接测试。返回后点击
-**启用工具和 Skill**。
+打开 **Tools > Extensions > Termux > 配置 Termux**，向导先检查安装和 Android
+命令权限，再检查连接。已配置好的 Termux 无需再次跳转终端；首次配置时，
+选择**第一次连接？配置 Termux**，复制命令并打开 Termux，长按提示符粘贴、
+按回车，再返回，向导会自动检查连接。验证成功后选择**启用工具和 Skill**
+或**暂不启用**。
 
 日常直接语音控制 Mochi，批准后的命令在后台执行，不切换 App。前台 Main Agent
 仍需授权执行一次或本次任务。若要让**所有定时 Agent 和子 Agent**自动执行，
-在 Termux 卡片中开启**后台 Shell 授权**并确认风险提示。此权限默认关闭，
+在 Termux 卡片的**连接设置**中开启**后台 Shell 授权**并确认风险提示。此权限默认关闭，
 重启后仍有效；**启用工具和 Skill**不会自动授予它。它也适用于前台对话委派的
 子 Agent，但不会跳过 Main Agent 的确认。关闭后台授权会阻止后续调用；
 禁用或断开 Termux 会清除此权限。请同步更新 Mochi 与 Termux 扩展 APK。

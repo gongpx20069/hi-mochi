@@ -277,8 +277,10 @@ background authorization, disabled by default.
 Install `Mochi-Mijia-Extension` from the same Release/signing channel as Mochi.
 Open **Tools > Extensions > Mi Home > Connect Mi Home**, scan the QR code
 using another phone already signed into Mi Home, and confirm the connection.
-Select homes and supported devices, then enable the provider, desired Tools,
-and **Mi Home Smart Home** Skill.
+Search and select supported devices by home, then save. On the verified return,
+**Enable tools and Skill** enables the provider and the Skill's required Tools;
+**Not now** leaves it connected but disabled. Existing enablement choices are
+preserved when managing an already enabled extension.
 
 This is an unofficial connector. Capabilities depend on each selected device;
 unsupported actions are not exposed. Camera images are the latest available
@@ -309,14 +311,17 @@ task monitors; read again to inspect current state.
 
 Install `Mochi-Termux-Extension` from the same Release/signing channel as Mochi
 and install [official Termux](https://github.com/termux/termux-app#installation)
-separately. Open **Tools > Extensions > Termux > Configure**. Copy the visible
-one-time configuration command into Termux, grant command permission, then
-connect/test and return to **Enable tools and Skill**.
+separately. Open **Tools > Extensions > Termux > Configure Termux**. The wizard
+checks installation and Android command permission, then checks the connection.
+Already configured Termux needs no terminal visit. For first-time setup, choose
+**First connection? Set up Termux**, copy the command, paste it at the Termux
+prompt and press Enter. Returning automatically checks the connection.
+After verification, choose **Enable tools and Skill** or **Not now**.
 
 Speak normally to Mochi; approved commands run in the background without an App
 switch. Foreground Main-Agent calls require approval for one call or the current
 task. To allow **all Scheduled Agents and Subagents** to execute automatically,
-enable **Background Shell authorization** in the Termux card and confirm the
+open **Connection settings > Background Shell authorization** in the Termux card and confirm the
 warning. This is a separate, default-off permission that survives restarts;
 **Enable tools and Skill** does not grant it. It also covers children delegated
 from a foreground conversation, but never skips Main-Agent approval.

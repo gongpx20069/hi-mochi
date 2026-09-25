@@ -66,6 +66,7 @@ class TermuxUiTest {
                 )
             }
         }
+        compose.onNodeWithText("Connection settings").performClick()
         val toggle = compose.onNodeWithContentDescription("Background Shell authorization")
         toggle.assertIsOff().performClick()
         compose.onNodeWithText("Allow background Shell execution?").assertExists()
@@ -88,9 +89,29 @@ class TermuxUiTest {
                 )
             }
         }
+        compose.onNodeWithText("Connection settings").performClick()
         compose.onNodeWithContentDescription("Background Shell authorization").assertIsOn().performClick()
         assertEquals(listOf(TermuxUiAction.EnableBackground(false)), actions)
         compose.onNodeWithText("Allow background Shell execution?").assertDoesNotExist()
+    }
+
+    @Test
+    fun `disconnect confirmation works without expanded tools`() {
+        val actions = mutableListOf<TermuxUiAction>()
+        compose.setContent {
+            MaterialTheme {
+                TermuxProviderCard(
+                    ExtensionProviderSummary(installed = true, trusted = true, connected = true),
+                    backgroundEnabled = false, disabled = false, onAction = actions::add,
+                )
+            }
+        }
+        compose.onNodeWithText("Connection settings").performClick()
+        compose.onNodeWithText("Disconnect").performClick()
+        compose.onNodeWithText("Disconnect Termux?").assertExists()
+        assertTrue(actions.isEmpty())
+        compose.onNodeWithText("Cancel").performClick()
+        assertTrue(actions.isEmpty())
     }
 
     @Test
@@ -103,6 +124,7 @@ class TermuxUiTest {
                 )
             }
         }
+        compose.onNodeWithText("Connection settings").performClick()
         compose.onNodeWithContentDescription("Background Shell authorization").assertIsOff().assertIsNotEnabled()
     }
 }

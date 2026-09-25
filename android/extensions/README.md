@@ -1,14 +1,15 @@
 # Extension experience guidelines
 
-**Status: proposed redesign; not implemented by this documentation change.**
+**Status: shared Mochi UI implemented in this repository; external AgentLink
+pages and the full device/usability acceptance matrix remain outstanding.**
 These guidelines cover every Mochi optional integration: Termux, Mi Home,
 AgentLink, and future extensions. AgentLink is included in the user experience
 even though it uses an independent companion-app protocol, not `extension-api`.
 
 ## Ownership and scope
 
-- [Interaction design](../../docs/INTERACTION_DESIGN.md#7-planned-unified-extension-experience)
-  owns the proposed setup flows, consent, state transitions, and recovery.
+- [Interaction design](../../docs/INTERACTION_DESIGN.md#7-unified-extension-experience)
+  owns setup flows, consent, state transitions, and recovery.
 - [Extension architecture](../../docs/architecture/EXTENSIONS.md) owns current
   package trust, permissions, Binder/Messenger contracts, and task lifetime.
 - [App architecture](../../docs/architecture/APP_ARCHITECTURE.md) owns module
@@ -17,7 +18,7 @@ even though it uses an independent companion-app protocol, not `extension-api`.
 - [Development](../../docs/DEVELOPMENT.md) owns build and device verification.
 
 This README owns the redesign's measurable visual and usability acceptance
-criteria. They are targets, not claims about the currently installed APKs.
+criteria. Unmeasured criteria remain targets, not claims of completed acceptance.
 Root READMEs remain user onboarding, not extension implementation manuals.
 
 | Surface | Code owner | Required treatment |
@@ -38,11 +39,10 @@ vendor palette. Provider identity belongs in the icon and name, not an
 independent page background, button system, or typography.
 
 The current palette source is
-[`MochiTheme.kt`](../app/src/main/java/com/example/mochi_pet/ui/theme/MochiTheme.kt).
-During implementation, extract common theme tokens and reusable UI into a
-compile-time shared Android UI library consumed by the host and both extension
-APKs. Prefer the same Compose Material 3 components as the host rather than
-maintaining independent platform-View skins. Keep authorization and connection
+[`MochiTheme.kt`](../extension-ui/src/main/java/com/example/mochi_ui/MochiTheme.kt).
+The `:extension-ui` library supplies the theme, integration cards, headings,
+and scrolling setup shell to the host and both extension APKs, using Compose
+Material 3 rather than independent platform-View skins. Keep authorization and connection
 logic out of that library. AgentLink needs a coordinated equivalent in its own
 repository; it cannot import this repository's host application module.
 

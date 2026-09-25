@@ -311,9 +311,10 @@ Chinese or English UI language, and moves through these states:
 
 The optional Termux card uses the same extension section, provider switch and
 collapsed individual tools. Configure opens the signed extension's setup
-Activity: install/open official Termux, copy the visible one-time external-access
-command, grant Android command permission, and connect/test. Steps already
-completed need not be repeated. Returning to Mochi refreshes readiness.
+Activity: verify installation, grant Android command permission, then check
+the connection. First-time setup exposes a single copied command with paste
+instructions; returning from Termux automatically checks once. Already working
+connections need no terminal visit. Returning to Mochi refreshes readiness.
 **Enable tools and Skill** explicitly enables both tools and the default-off
 Termux Skill; a Skill cannot silently enable the provider.
 
@@ -363,8 +364,8 @@ read-only sensors, televisions, cameras, and scales derive capabilities from
 each device's MIoT specification rather than from a fixed model allowlist.
 Each selectable device uses a full-width rounded card with a primary device
 name, separate home/room and category lines, and a checkbox. The whole card is
-clickable; selected cards use both a highlighted background and stronger
-outline so selection never relies on the checkbox or color alone.
+clickable; selected cards use a highlighted background and a checked checkbox,
+with checkbox semantics so selection never relies on color alone.
 Locks, alarms, garage doors, robot-vacuum maps, camera storage mutation, and
 unsupported capabilities never appear. Ambiguous duplicate device names are
 displayed with home and room labels.
@@ -460,11 +461,13 @@ future-dated todos are not carried into Today.
 - Keep default SOUL, USER, AGENTS, Tool schemas, and model system prompts in
   English; UI localization must not rewrite Agent instructions.
 
-## 7. Planned unified extension experience
+## 7. Unified extension experience
 
-**Design proposal, not current runtime behavior.** Sections above describe
-the shipped flows. This redesign covers Termux, Mi Home, AgentLink, and future
-optional integrations. Shared visual tokens, measurable layout/accessibility
+**Implementation status:** the shared shell, Termux/Mi Home setup, Mochi-owned
+integration cards, and explicit enablement are implemented. AgentLink's external
+native pages and full real-device/usability acceptance remain outstanding.
+This section defines the common contract, including remaining acceptance targets.
+Shared visual tokens, measurable layout/accessibility
 targets, and acceptance criteria live in
 [`android/extensions/README.md`](../android/extensions/README.md).
 
@@ -502,10 +505,8 @@ the user's statement that a step is done.
 
 ### Termux: guide the user through the necessary work only
 
-The current screen mixes prerequisites, a long command, Android authorization,
-testing, and completion on one page. A generic failure does not identify the
-failed check, and returning to the Activity only refreshes a connected flag.
-The redesign replaces this with the following evidence-driven sequence:
+The setup page presents the following evidence-driven sequence instead of a
+flat list of permission, command, and testing buttons:
 
 | Step | Display and primary action | Advance condition |
 | --- | --- | --- |

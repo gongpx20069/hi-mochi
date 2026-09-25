@@ -6,6 +6,7 @@
 android/
 ├── app/
 ├── extension-api/
+├── extension-ui/
 ├── extensions/
 │   ├── mijia/
 │   └── termux/
@@ -240,10 +241,10 @@ metadata, connection state, Tool definitions, asynchronous Tool calls,
 cancellation, and bounded attachments. It contains no provider implementation,
 Compose UI, network client, secret storage, or model dependency.
 
-The unified extension experience in `INTERACTION_DESIGN.md` is a planned
-redesign, not an existing module. Its implementation should extract the host's
-theme and shared setup components into a compile-time Android UI library used
-by `app`, `extensions:mijia`, and `extensions:termux`. That library owns only
+The unified extension experience in `INTERACTION_DESIGN.md` uses the
+`:extension-ui` compile-time Android UI library for the shared Mochi theme,
+cards, and setup shell. It is consumed by `app`, `extensions:mijia`, and
+`extensions:termux`. That library owns only
 presentation tokens/components, never authorization, provider state, Binder,
 networking, or secrets. It must not depend on an application module or change
 `extension-api` into a UI dependency. AgentLink remains an independent

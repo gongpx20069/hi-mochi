@@ -175,6 +175,30 @@ internal fun localizeUiText(
 }
 
 private val ZH_UI_TEXT = mapOf(
+    "Not now" to "暂不启用",
+    "Connected - not enabled" to "已连接 · 尚未启用",
+    "Connection settings" to "连接设置",
+    "Hide connection settings" to "收起连接设置",
+    "Check connection" to "检查连接",
+    "Disconnect Termux?" to "断开 Termux？",
+    "New calls and background authorization will be disabled. Submitted commands will not be stopped." to
+        "将停用新的调用并撤销后台授权。已提交的命令不会停止。",
+    "Disconnect Mi Home?" to "断开米家？",
+    "You will need to authorize Mi Home again before using its tools." to "再次使用米家工具前，需要重新授权。",
+    "Install or update AgentLink" to "安装或更新 AgentLink",
+    "Desktop Bridge setup" to "桌面 Bridge 配置指南",
+    "Authorize in AgentLink, then return here. A connected desktop Bridge is needed for remote work." to
+        "在 AgentLink 中授权后返回此处。远程任务需要已连接的桌面 Bridge。",
+    "Connection verified. Enable this extension and its Skill?" to "连接已验证。是否启用此扩展及其 Skill？",
+    "Run local shell commands and inspect or stop tasks. Output may go to your model Provider." to
+        "执行本地 Shell 命令、查看或停止任务。输出可能发送给模型供应商。",
+    "Read and control selected smart-home devices and scenes." to "读取和控制已选中的智能家居设备及场景。",
+    "Use authorized remote workspaces, shared chats, and agent controls." to "访问已授权的远程工作区、共享对话和 Agent 控制。",
+    "This also enables any disabled tools required by the Skill. Other tool choices are preserved." to
+        "此操作也会重新启用该 Skill 必需但已关闭的工具；其他工具设置保持不变。",
+    "Background Shell authorization is unchanged and must be granted separately." to "后台 Shell 授权保持不变，必须单独开启。",
+    "Connection is unavailable. Reconnect before enabling tools." to "连接不可用，请重新连接后再启用工具。",
+    "Required Skill tools are unavailable." to "该 Skill 必需的工具不可用。",
     "Termux extension" to "Termux 扩展",
     "Termux extension is unavailable" to "Termux 扩展不可用",
     "The extension is unavailable" to "扩展不可用",

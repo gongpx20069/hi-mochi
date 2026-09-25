@@ -18,6 +18,7 @@ Android modules:
 android/
 ├── app/                 Mochi base application and ABI APKs
 ├── extension-api/       AIDL and immutable extension contracts
+├── extension-ui/        shared Mochi theme, cards, and setup shell
 ├── extensions/mijia/    optional universal Mi Home extension APK
 └── extensions/termux/   optional universal Termux extension APK
 ```

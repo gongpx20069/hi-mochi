@@ -1,29 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="setup_title">Connect Mi Home</string>
+    <string name="back">Back</string>
+    <string name="step_prepare">Prepare</string>
+    <string name="step_authorize">Authorize</string>
+    <string name="step_select">Devices</string>
+    <string name="prepare_title">Have your other phone ready</string>
+    <string name="prepare_help">You need another phone already signed into Mi Home to scan and confirm. Continue when it is ready. Mochi never asks for your Xiaomi password.</string>
+    <string name="authorize_title">Scan and confirm</string>
+    <string name="selection_title">Choose accessible devices</string>
+    <plurals name="selected_count">
+        <item quantity="one">%1$d device selected</item>
+        <item quantity="other">%1$d devices selected</item>
+    </plurals>
+    <string name="search_devices">Search device, home, or room</string>
+    <string name="select_visible">Select shown</string>
+    <string name="clear_visible">Clear shown</string>
+    <string name="no_search_results">No devices match this search.</string>
+    <string name="empty_devices">No supported devices were found. Check the account and its homes in Mi Home, then return and retry.</string>
+    <string name="retry_devices">Reload devices</string>
+    <string name="waiting_scan">Waiting for confirmation</string>
+    <string name="qr_expired">This QR code expired. Generate a new one when you are ready.</string>
+    <string name="authorization_failed">Mi Home authorization is unavailable or expired. Scan a new QR code to reconnect.</string>
+    <string name="network_failed">Could not reach Mi Home. Check the network and retry; existing device selections are not changed.</string>
+    <string name="discard_title">Discard unsaved selection?</string>
+    <string name="discard_help">Your previous saved device selection will remain unchanged.</string>
+    <string name="discard">Discard and return</string>
+    <string name="keep_editing">Keep editing</string>
     <string name="app_name">Mochi Mi Home Extension</string>
     <string name="extension_description">Unofficial connector. Xiaomi credentials stay inside this extension and are protected by Android Keystore.</string>
     <string name="qr_content_description">Mi Home login QR code</string>
     <string name="generate_qr">Generate QR code</string>
-    <string name="generate_new_qr">Generate a new QR code</string>
     <string name="save_selected_devices">Save selected devices</string>
-    <string name="disconnect_mijia">Disconnect Mi Home</string>
     <string name="scan_instructions">Scan the QR code with another phone already signed into Mi Home.</string>
     <string name="requesting_qr">Requesting a Xiaomi login QR code…</string>
     <plurals name="qr_expires">
         <item quantity="one">Scan and confirm in Mi Home. The QR code expires in %1$d second.</item>
         <item quantity="other">Scan and confirm in Mi Home. The QR code expires in %1$d seconds.</item>
     </plurals>
-    <string name="detecting_region">Login confirmed. Detecting Mi Home region…</string>
-    <string name="connected_as">Connected as Xiaomi %1$s.</string>
     <string name="connection_failed">Mi Home connection failed. Generate a new QR code.</string>
     <string name="loading_devices">Loading supported Mi Home devices…</string>
-    <plurals name="no_supported_devices">
-        <item quantity="one">Connected to %1$d home, but no supported devices were found.</item>
-        <item quantity="other">Connected to %1$d homes, but no supported devices were found.</item>
-    </plurals>
     <string name="choose_devices">Choose the devices Mochi may access. Unsupported and high-risk devices are hidden.</string>
-    <string name="device_location">%1$s · %2$s</string>
-    <string name="select_device">Select %1$s</string>
     <string name="no_room">No room</string>
     <string name="load_devices_failed">Could not load Mi Home devices.</string>
     <string name="save_devices_failed">Could not save device selection.</string>

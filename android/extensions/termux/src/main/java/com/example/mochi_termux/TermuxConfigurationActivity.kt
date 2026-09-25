@@ -1,124 +1,255 @@
 package com.example.mochi_termux
 
+import android.app.Activity
+import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.lifecycle.lifecycleScope
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.mochi_extension.MochiExtensionProtocol
-import java.util.Locale
+import com.example.mochi_ui.ExtensionSetupScreen
+import com.example.mochi_ui.MochiTheme
+import com.example.mochi_ui.extensionUiContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 
-class TermuxConfigurationActivity : ComponentActivity() {
-    private lateinit var status: TextView
-    private lateinit var localized: Context
-    private val bridge by lazy { TermuxBridge(this) }
-    private val permission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            updateStatus()
-        } else {
-            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri()))
+internal enum class TermuxSetupStep { INSTALL, PERMISSION, CHECK, EXTERNAL, CHECKING, READY, ERROR }
+
+internal fun termuxSetupStep(installed: Boolean, permitted: Boolean): TermuxSetupStep = when {
+    !installed -> TermuxSetupStep.INSTALL
+    !permitted -> TermuxSetupStep.PERMISSION
+    else -> TermuxSetupStep.CHECK
+}
+
+internal class TermuxSetupViewModel(application: Application) : AndroidViewModel(application) {
+    private val bridge = TermuxBridge(application)
+    var step by mutableStateOf(termuxSetupStep(bridge.installed(), bridge.available()))
+        private set
+    var error by mutableStateOf<Int?>(null)
+        private set
+    private var job: Job? = null
+    var awaitingTerminal = false
+    var awaitingSettings = false
+
+    fun resume() {
+        if (awaitingTerminal) {
+            awaitingTerminal = false
+            check()
+        } else if (awaitingSettings) {
+            awaitingSettings = false
+            permissionResult(bridge.available())
+        } else if (step == TermuxSetupStep.INSTALL && bridge.installed()) {
+            step = termuxSetupStep(true, bridge.available())
         }
+        if (step == TermuxSetupStep.CHECK) check()
+    }
+
+    fun permissionResult(granted: Boolean) {
+        if (granted) check() else {
+            step = TermuxSetupStep.PERMISSION
+            error = R.string.permission_denied
+        }
+    }
+
+    fun showExternal() {
+        error = null
+        step = TermuxSetupStep.EXTERNAL
+    }
+
+    fun launchFailed() {
+        awaitingTerminal = false
+        awaitingSettings = false
+        error = R.string.open_failed
+    }
+
+    fun check() {
+        if (job?.isActive == true) return
+        val prerequisite = termuxSetupStep(bridge.installed(), bridge.available())
+        if (prerequisite != TermuxSetupStep.CHECK) {
+            step = prerequisite
+            error = null
+            return
+        }
+        step = TermuxSetupStep.CHECKING
+        error = null
+        job = viewModelScope.launch {
+            try {
+                bridge.connect()
+                step = TermuxSetupStep.READY
+            } catch (_: TimeoutCancellationException) {
+                error = R.string.check_timeout
+                step = TermuxSetupStep.ERROR
+            } catch (failure: TermuxException) {
+                error = when (failure.reason) {
+                    TermuxFailureReason.COMMAND_ACCESS -> R.string.permission_denied
+                    TermuxFailureReason.BACKGROUND_START -> R.string.background_blocked
+                    TermuxFailureReason.SERVICE_UNAVAILABLE -> R.string.service_unavailable
+                    TermuxFailureReason.CHECK_FAILED -> R.string.check_failed
+                }
+                step = TermuxSetupStep.ERROR
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            }
+        }
+    }
+}
+
+class TermuxConfigurationActivity : ComponentActivity() {
+    private val model: TermuxSetupViewModel by viewModels()
+    private lateinit var localized: Context
+    private val permission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        model.permissionResult(it)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val language = intent.getStringExtra(MochiExtensionProtocol.EXTRA_UI_LANGUAGE_TAG)
-        localized = createConfigurationContext(Configuration(resources.configuration).apply {
-            if (language != null && language in setOf("zh", "zh-CN", "en", "en-US")) {
-                setLocale(Locale.forLanguageTag(language))
-            }
-        })
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            val padding = (20 * resources.displayMetrics.density).toInt()
-            setPadding(padding, padding, padding, padding)
-        }
-        fun text(value: String): TextView = TextView(this).apply {
-            text = value
-            textSize = 16f
-            setPadding(0, 12, 0, 12)
-            column.addView(this)
-        }
-        fun button(label: Int, action: () -> Unit) = Button(this).apply {
-            text = localized.getString(label)
-            setOnClickListener { action() }
-            column.addView(this)
-        }
-        text(localized.getString(R.string.setup_title)).textSize = 24f
-        text(localized.getString(R.string.setup_help))
-        status = text("")
-        button(R.string.install) { openTermux() }
-        text(localized.getString(R.string.bootstrap_help))
-        text(SETUP_COMMAND).setTextIsSelectable(true)
-        button(R.string.bootstrap) {
-            getSystemService(ClipboardManager::class.java)
-                .setPrimaryClip(ClipData.newPlainText("Termux setup", SETUP_COMMAND))
-            Toast.makeText(this, localized.getString(R.string.copied), Toast.LENGTH_SHORT).show()
-            openTermux()
-        }
-        button(R.string.grant) { permission.launch(TERMUX_PERMISSION) }
-        val test = button(R.string.test) { }
-        test.setOnClickListener {
-            lifecycleScope.launch {
-                test.isEnabled = false
-                status.text = localized.getString(R.string.testing)
-                try {
-                    bridge.connect()
-                    status.text = localized.getString(R.string.ready)
-                } catch (_: TimeoutCancellationException) {
-                    status.text = localized.getString(R.string.failed)
-                } catch (_: TermuxException) {
-                    status.text = localized.getString(R.string.failed)
-                } catch (error: CancellationException) {
-                    throw error
-                } finally {
-                    test.isEnabled = true
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
+        localized = extensionUiContext(intent.getStringExtra(MochiExtensionProtocol.EXTRA_UI_LANGUAGE_TAG))
+        setContent {
+            MochiTheme {
+                val step = model.step
+                var showCommand by rememberSaveable { mutableStateOf(false) }
+                LaunchedEffect(step) {
+                    if (step == TermuxSetupStep.READY) {
+                        setResult(Activity.RESULT_OK)
+                        finish()
+                    }
+                }
+                val primary = when (step) {
+                    TermuxSetupStep.INSTALL -> R.string.install_termux
+                    TermuxSetupStep.PERMISSION -> R.string.grant
+                    TermuxSetupStep.EXTERNAL -> R.string.bootstrap
+                    TermuxSetupStep.ERROR -> R.string.retry_check
+                    TermuxSetupStep.CHECKING -> R.string.testing
+                    TermuxSetupStep.READY -> R.string.done
+                    TermuxSetupStep.CHECK -> R.string.test
+                }
+                ExtensionSetupScreen(
+                    title = text(R.string.setup_title),
+                    steps = listOf(text(R.string.step_prepare), text(R.string.step_authorize), text(R.string.step_verify)),
+                    step = when (step) {
+                        TermuxSetupStep.INSTALL -> 0
+                        TermuxSetupStep.PERMISSION, TermuxSetupStep.EXTERNAL -> 1
+                        else -> 2
+                    },
+                    backLabel = text(R.string.back),
+                    onBack = { finish() },
+                    primaryLabel = text(primary),
+                    onPrimary = {
+                        when (step) {
+                            TermuxSetupStep.INSTALL -> launchExternal(
+                                Intent(Intent.ACTION_VIEW, "https://github.com/termux/termux-app#installation".toUri()),
+                            )
+                            TermuxSetupStep.PERMISSION -> permission.launch(TERMUX_PERMISSION)
+                            TermuxSetupStep.EXTERNAL -> {
+                                getSystemService(ClipboardManager::class.java)
+                                    .setPrimaryClip(ClipData.newPlainText("Termux setup", SETUP_COMMAND))
+                                openTerminal()
+                            }
+                            else -> model.check()
+                        }
+                    },
+                    busy = step == TermuxSetupStep.CHECKING,
+                ) {
+                    Text(text(when (step) {
+                        TermuxSetupStep.INSTALL -> R.string.prepare_title
+                        TermuxSetupStep.PERMISSION -> R.string.permission_title
+                        TermuxSetupStep.EXTERNAL -> R.string.external_title
+                        TermuxSetupStep.ERROR -> R.string.error_title
+                        else -> R.string.verify_title
+                    }), style = MaterialTheme.typography.titleLarge)
+                    Text(text(when (step) {
+                        TermuxSetupStep.INSTALL -> R.string.prepare_help
+                        TermuxSetupStep.PERMISSION -> R.string.permission_help
+                        TermuxSetupStep.EXTERNAL -> R.string.paste_help
+                        TermuxSetupStep.CHECKING -> R.string.verify_progress
+                        TermuxSetupStep.ERROR -> R.string.recovery_help
+                        else -> R.string.verify_help
+                    }), style = MaterialTheme.typography.bodyLarge)
+                    model.error?.let { Text(text(it), color = MaterialTheme.colorScheme.error) }
+                    if (step == TermuxSetupStep.EXTERNAL) {
+                        Text(text(R.string.bootstrap_scope), style = MaterialTheme.typography.bodyMedium)
+                        TextButton({ showCommand = !showCommand }) {
+                            Text(text(if (showCommand) R.string.hide_command else R.string.show_command))
+                        }
+                        if (showCommand) SelectionContainer {
+                            Text(SETUP_COMMAND, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        TextButton({ model.check() }) { Text(text(R.string.already_configured)) }
+                    }
+                    if (step == TermuxSetupStep.ERROR || step == TermuxSetupStep.CHECK) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton({ model.showExternal() }) { Text(text(R.string.first_setup)) }
+                            if (step == TermuxSetupStep.ERROR) {
+                                TextButton({ openTerminal() }) { Text(text(R.string.open_termux_retry)) }
+                            }
+                        }
+                    }
+                    if (step == TermuxSetupStep.PERMISSION && model.error != null) {
+                        TextButton({
+                            model.awaitingSettings = true
+                            launchExternal(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri()))
+                        }) { Text(text(R.string.open_settings)) }
+                    }
+                    Text(text(R.string.setup_help), style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
-        button(R.string.done) { finish() }
-        val scroll = ScrollView(this).apply { addView(column) }
-        ViewCompat.setOnApplyWindowInsetsListener(scroll) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-            insets
-        }
-        setContentView(scroll)
-        updateStatus()
     }
 
     override fun onResume() {
         super.onResume()
-        if (::status.isInitialized) updateStatus()
+        model.resume()
     }
 
-    private fun updateStatus() {
-        status.text = localized.getString(if (bridge.connected()) R.string.ready else R.string.not_ready)
+    private fun text(id: Int) = localized.getString(id)
+
+    private fun openTerminal() {
+        val launch = packageManager.getLaunchIntentForPackage("com.termux")
+        if (launch == null) {
+            model.launchFailed()
+        } else {
+            model.awaitingTerminal = true
+            launchExternal(launch)
+        }
     }
 
-    private fun openTermux() {
-        val intent = packageManager.getLaunchIntentForPackage("com.termux")
-            ?: Intent(Intent.ACTION_VIEW, "https://github.com/termux/termux-app#installation".toUri())
+    private fun launchExternal(target: Intent) {
         try {
-            startActivity(intent)
+            startActivity(target)
         } catch (_: android.content.ActivityNotFoundException) {
-            status.text = localized.getString(R.string.failed)
+            model.launchFailed()
+        } catch (_: SecurityException) {
+            model.launchFailed()
         }
     }
 }
