@@ -42,18 +42,9 @@ internal class TermuxBridge(private val context: Context) {
     suspend fun connect() {
         disconnect()
         val script = context.assets.open("runner-v1.sh").bufferedReader().use { it.readText() }
-        val install = """
-            set -eu
-            umask 077
-            mkdir -p "${'$'}HOME/.local/state/mochi-termux"
-            printf '%s' "${'$'}1" | base64 -d > "${'$'}HOME/.local/state/mochi-termux/runner-v1.tmp"
-            chmod 700 "${'$'}HOME/.local/state/mochi-termux/runner-v1.tmp"
-            mv "${'$'}HOME/.local/state/mochi-termux/runner-v1.tmp" "${'$'}HOME/.local/state/mochi-termux/runner-v1"
-            bash "${'$'}HOME/.local/state/mochi-termux/runner-v1" probe
-        """.trimIndent()
-        val result = request(arrayOf("-c", install, "mochi-setup", encoded(script)))
+        val result = request(termuxConnectionArguments(script))
         if (result.exitCode != 0 || result.stdout.trim() != "MOCHI_READY_V1") {
-            throw TermuxException("PROVIDER_ERROR", "Termux shell prerequisites or callback test failed.")
+            throw TermuxException("PROVIDER_ERROR", "Termux shell prerequisites or callback test failed (exit=${result.exitCode}).")
         }
         preferences.edit { putBoolean("connected", true) }
     }
@@ -117,7 +108,7 @@ internal class TermuxBridge(private val context: Context) {
         if (!connected()) throw TermuxException("PERMISSION_DENIED", "Connect Termux in Tools first.")
     }
 
-    private suspend fun request(arguments: Array<String>): CommandResult {
+    internal suspend fun request(arguments: Array<String>): CommandResult {
         val id = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<CommandResult>()
         pending[id] = deferred
@@ -178,7 +169,7 @@ internal class TermuxBridge(private val context: Context) {
             val stdout = bundle?.getString("stdout").orEmpty()
             if (bundle == null || error != -1 || exitCode !in 0..255 || stdout.length > 64_000) {
                 deferred?.completeExceptionally(
-                    TermuxException("PROVIDER_ERROR", "Termux rejected or lost the command. Check setup; do not blindly retry."),
+                    TermuxException("PROVIDER_ERROR", "Termux rejected or lost the command (provider=$error, exit=$exitCode). Check setup; do not blindly retry."),
                 )
                 val preferences = context.getSharedPreferences("termux", Context.MODE_PRIVATE)
                 if (id in preferences.getStringSet("tasks", emptySet()).orEmpty()) {

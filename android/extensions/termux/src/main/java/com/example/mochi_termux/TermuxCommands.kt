@@ -18,8 +18,23 @@ internal val SETUP_COMMAND = """
     touch ~/.termux/termux.properties &&
     sed -i '/^[[:space:]]*allow-external-apps[[:space:]]*=/d' ~/.termux/termux.properties &&
     printf '\nallow-external-apps=true\n' >> ~/.termux/termux.properties &&
-    termux-reload-settings
+    termux-reload-settings &&
+    printf '\nMOCHI_SETUP_SAVED\n'
 """.trimIndent().replace("\n", " ")
+
+internal fun termuxConnectionArguments(script: String): Array<String> {
+    val install = """
+        set -eu
+        umask 077
+        mkdir -p "${'$'}HOME/.local/state/mochi-termux"
+        printf '%s' "${'$'}1" | base64 -d > "${'$'}HOME/.local/state/mochi-termux/runner-v1.tmp"
+        chmod 700 "${'$'}HOME/.local/state/mochi-termux/runner-v1.tmp"
+        mv "${'$'}HOME/.local/state/mochi-termux/runner-v1.tmp" "${'$'}HOME/.local/state/mochi-termux/runner-v1"
+        bash "${'$'}HOME/.local/state/mochi-termux/runner-v1" probe
+    """.trimIndent()
+    // Normalize the bundled shell source, never user-supplied command text.
+    return arrayOf("-c", install, "mochi-setup", encoded(script.replace("\r\n", "\n")))
+}
 
 internal data class ShellCommand(
     val command: String,

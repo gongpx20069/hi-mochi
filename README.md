@@ -316,6 +316,8 @@ checks installation and Android command permission, then checks the connection.
 Already configured Termux needs no terminal visit. For first-time setup, choose
 **First connection? Set up Termux**, copy the command, paste it at the Termux
 prompt and press Enter. Returning automatically checks the connection.
+`MOCHI_SETUP_SAVED` confirms the settings were saved; `[1]` alone is only a
+terminal background-job number, not a successful connection.
 After verification, choose **Enable tools and Skill** or **Not now**.
 
 Speak normally to Mochi; approved commands run in the background without an App

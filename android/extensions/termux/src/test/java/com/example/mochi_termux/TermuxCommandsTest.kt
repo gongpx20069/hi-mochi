@@ -10,6 +10,26 @@ import org.junit.Test
 
 class TermuxCommandsTest {
     @Test
+    fun `connection payload canonicalizes Windows helper line endings only`() {
+        val lf = "#!/usr/bin/bash\nset -eu\nprintf 'MOCHI_READY_V1\\n'\n"
+        val crlf = lf.replace("\n", "\r\n")
+        val arguments = termuxConnectionArguments(crlf)
+        assertEquals("-c", arguments[0])
+        assertEquals("mochi-setup", arguments[2])
+        assertEquals(lf, java.util.Base64.getDecoder().decode(arguments[3]).toString(Charsets.UTF_8))
+        assertEquals(termuxConnectionArguments(lf).toList(), arguments.toList())
+        assertEquals(crlf, java.util.Base64.getDecoder().decode(encoded(crlf)).toString(Charsets.UTF_8))
+        assertTrue(!arguments[1].contains('\r'))
+    }
+
+    @Test
+    fun `setup confirmation reports saved settings rather than connection success`() {
+        assertTrue(SETUP_COMMAND.contains("termux-reload-settings &&"))
+        assertTrue(SETUP_COMMAND.contains("MOCHI_SETUP_SAVED"))
+        assertTrue(!SETUP_COMMAND.contains("MOCHI_READY_V1"))
+    }
+
+    @Test
     fun `unrestricted shell remains data and has explicit resource limits`() {
         val command = ShellCommand.parse(Json.parseToJsonElement(
             """{"command":"printf '%s' \"hello\" | cat > output.txt","workdir":"/tmp/a b","timeout_seconds":1800}""",

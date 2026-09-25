@@ -138,6 +138,10 @@ connection test. It cannot modify Termux's private settings before external
 access has been authorized. The test installs the bundled `runner-v1` script
 under Termux's private `~/.local/state/mochi-termux/` directory and checks
 required shell utilities. There is no downloaded bootstrap code.
+Bundled shell assets use LF line endings, enforced by `.gitattributes` and
+`verifyFormatting`. The helper installer also normalizes CRLF before encoding
+the bundled script; it must not normalize user command text. Setup prints
+`MOCHI_SETUP_SAVED` after saving settings, not as evidence of a working connection.
 
 The foreground registry wraps both tools in a native approval gate. Approval
 is nonce-bound to exact arguments, expires after two minutes, is cancellable,

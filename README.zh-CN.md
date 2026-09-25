@@ -171,13 +171,13 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | Mochi Planner | 启用 | 管理 Mochi 日历事件和带日期的待办 | 无 |
 | Voice Navigation | 启用 | 根据对话意图打开相关 Mochi 原生页面 | 无 |
 | Scheduled Automations | 启用 | 执行一次性或周期 Agent 任务，并把结果写入 Conversation | 通知权限；精确闹钟权限可选 |
-| Web Search | 启用 | 通过 Agent Browser 搜索公开网页和微信公众号内容 | 无 |
+| Web Search | 启用 | 通过智能体浏览器搜索公开网页和微信公众号内容 | 无 |
 | Product Search | 启用 | 搜索并比较公开商品页面，不下单、不支付 | 无 |
 | Douban Ratings | 启用 | 获取公开豆瓣评分、评分人数和评论主题 | 无 |
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
 | **Notion Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新页面，并在已授权的私人知识库中查找或更新信息 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
 | **腾讯文档 Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新文档，并在已授权的私人知识库中查找或更新信息 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
-| 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过 Agent Browser 调研无需登录的公开火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用 Agent Browser |
+| 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过智能体浏览器调研无需登录的公开火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用智能体浏览器 |
 | 商家发现 | 启用 | 使用高德提供的评分、人均、营业时间、电话、标签和图片发现并比较商家 | [创建高德 Web 服务 Key](https://console.amap.com/) |
 
 需要另行安装应用的 Skills 集中列在后面的[可选扩展](#可选扩展)中，
@@ -190,12 +190,12 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | **计划** | `manage_mochi_calendar`<br>`manage_mochi_todo` | 读取和更新 Mochi 自己的日历事件与带日期待办，无需额外配置。 |
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
-| **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
+| **智能体浏览器（Agent Browser）** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
 | **原生体验** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | 打开可信 Mochi 界面，或在本地运行有界的纯 JavaScript 计算。 |
 | **高德地图** | 地点搜索 · 商家详情 · 路线<br>地理编码 · 逆地理编码 · 天气 | 使用可信 GCJ-02 坐标搜索地点和商家、比较可用评分与人均并规划路线，需要 Web 服务 Key。 |
 | **已连接 MCP** | **Notion** · **腾讯文档**<br>手动配置的 MCP Server | 检索私人知识、开展调研，并在已授权工作区中协作创建或更新文档。 |
 
-Tools 页面会将 Agent Browser、Mochi 内建能力和 Provider Tools 分组并默认
+Tools 页面会将智能体浏览器、Mochi 内建能力和 Provider Tools 分组并默认
 收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
 每个 Tool 都有独立开关；Provider 支持的 Tools 还要求对应 Provider 开关已启用。
 
@@ -285,6 +285,7 @@ Tools 中的关联聊天按钮打开可信的原生 AgentLink 页面，也可刷
 选择**第一次连接？配置 Termux**，复制命令并打开 Termux，长按提示符粘贴、
 按回车，再返回，向导会自动检查连接。验证成功后选择**启用工具和 Skill**
 或**暂不启用**。
+`MOCHI_SETUP_SAVED` 表示设置已保存；`[1]` 只是终端后台任务编号，不代表连接成功。
 
 日常直接语音控制 Mochi，批准后的命令在后台执行，不切换 App。前台 Main Agent
 仍需授权执行一次或本次任务。若要让**所有定时 Agent 和子 Agent**自动执行，

@@ -175,6 +175,26 @@ JVM and Linux tests do not establish real-device cross-App or
 OEM background behavior. No connected Android device means that acceptance is
 blocked, not passed.
 
+For an opt-in connection diagnostic, build
+`:extensions:termux:assembleDebug :extensions:termux:assembleDebugAndroidTest`,
+update the matching-signed extension and its test APK with `adb install -r`,
+and run:
+
+```powershell
+adb -s <device-id> shell am instrument -w `
+  -e class com.example.mochi_termux.TermuxConnectionDiagnosticTest `
+  -e mochiTermuxDiagnostic true `
+  com.example.mochi_pet.extension.termux.test/androidx.test.runner.AndroidJUnitRunner
+adb -s <device-id> logcat -d -s MochiTermuxCheck
+```
+
+This checks only a fixed utility list and installs/verifies the bundled helper.
+It requires existing Termux command permission and external-access setup.
+Only allowlisted availability markers are logged, never user files, raw
+command errors, credentials, or model requests. Without explicit opt-in it is
+skipped. Shell assets must retain LF line endings in Windows-built APKs;
+the formatting gate rejects CR bytes before delivery.
+
 ## Engineering expectations
 
 - Follow the harness loop in [`AGENTS.md`](../AGENTS.md).

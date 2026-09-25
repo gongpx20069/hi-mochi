@@ -43,6 +43,14 @@ tasks.register("verifyFormatting") {
                 separator = "\n",
             )
         }
+        val shellFilesWithCarriageReturns = fileTree(rootDir) {
+            include("**/src/main/assets/**/*.sh")
+            exclude("**/build/**", "**/.gradle/**")
+        }.files.filter { file -> file.readBytes().any { it == 13.toByte() } }
+        check(shellFilesWithCarriageReturns.isEmpty()) {
+            "Bundled shell scripts must use LF line endings: " +
+                shellFilesWithCarriageReturns.joinToString { it.relativeTo(rootDir).toString() }
+        }
     }
 }
 

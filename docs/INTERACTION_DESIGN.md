@@ -454,6 +454,9 @@ future-dated todos are not carried into Today.
 - Settings provides explicit Follow system, Chinese, and English choices.
 - Render app labels, notifications, spoken summaries, and Calendar headings in
   the selected UI language.
+- Localize **Agent Browser** as **智能体浏览器** in Chinese, including Tool
+  cards, accessibility labels, and Skill prerequisite messages. English Agent
+  instructions and Tool identifiers remain unchanged.
 - Use system 12/24-hour preference.
 - Provide content descriptions and scalable text.
 - Never communicate state through color alone.

@@ -658,7 +658,7 @@ private val ZH_UI_TEXT = mapOf(
     "Notion Knowledge" to "Notion 知识",
     "Tencent Docs Knowledge" to "腾讯文档知识",
     "Tencent Docs MCP" to "腾讯文档 MCP",
-    "Agent Browser" to "代理浏览器",
+    "Agent Browser" to "智能体浏览器",
     "Amap Maps" to "高德地图",
     "Mi Home extension" to "米家扩展",
     "Travel Planning" to "出行规划",

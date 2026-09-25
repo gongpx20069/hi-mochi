@@ -104,9 +104,15 @@ class UiLocalizationTest {
     }
 
     @Test
+    fun `Agent Browser uses the intelligent agent name and preserves English`() {
+        assertEquals("智能体浏览器", localizeUiText("Agent Browser", "zh"))
+        assertEquals("Agent Browser", localizeUiText("Agent Browser", "en"))
+    }
+
+    @Test
     fun `Skill Tool groups localize as aggregate prerequisites`() {
         assertEquals(
-            "请先启用所需的工具组：腾讯文档 MCP、代理浏览器",
+            "请先启用所需的工具组：腾讯文档 MCP、智能体浏览器",
             localizeUiText(
                 "Enable required Tool groups first: " +
                     "Tencent Docs MCP, Agent Browser",
