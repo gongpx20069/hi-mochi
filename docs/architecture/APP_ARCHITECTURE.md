@@ -53,6 +53,8 @@ run in local JVM tests.
 | Mi Home extension process | Xiaomi QR session, cloud requests, MIoT mapping, device selection, and ephemeral images |
 | Termux extension process | Setup, command dispatch, task IDs and result callbacks; the bundled supervisor executes inside Termux |
 | `TermuxRuntimeState` | Registry revocation generation and transient task views; no execution approval state |
+| `AgentTaskRuntime` | Bounded process-local run observations and exact foreground coroutine ownership |
+| `TaskCenterViewModel` | Read-only source aggregation, explicit source-specific actions and cancellable configuration reports |
 | `AgentBrowserSessionController` | visible per-turn WebView, snapshots, actions, and cleanup |
 | `AgentExecutionService` | background Agent Browser lifetime and Stop notification |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
@@ -149,6 +151,23 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   secrets are re-encrypted with the receiving device's Keystore key.
 
 ## 6. Error model
+
+The task center observes existing Orchestrator diagnostics; it does not create
+an execution queue or persist prompts/results again. Foreground cancellation
+uses the exact owning Job, while scheduled cancellation uses its unique
+WorkManager name without removing the next alarm. Cancelled claimed schedules
+record the new `CANCELLED` enum value in the existing nullable text result
+column and reschedule recurrence; this adds no Room column or schema migration.
+Subagents retain their parent's schedule ID/Job, not another lifecycle.
+
+Task snapshots come from Room/WorkManager, the existing Termux task Tool and
+guarded AgentLink chat reads. Polling is limited to the resumed task page;
+remote reads and quota-consuming model checks are never periodic. Each source
+refresh is bounded to 20 seconds and reports failure independently. Terminal
+Termux snapshots are retained without repeatedly reading output.
+Configuration probes are separately bounded and return typed status/repair
+targets. UI translates those targets into existing navigation and platform
+permission/setup actions. No Composable invokes a Tool, LLM or repository.
 
 Errors are typed by domain: validation, permission, not found, conflict,
 network, provider, cancellation, and internal. UI copy is derived at the

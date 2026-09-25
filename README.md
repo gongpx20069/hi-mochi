@@ -135,6 +135,23 @@ OAuth, Mi Home sessions, and Android permissions are not shared.
 
 ## Core features
 
+### Unified task center
+
+Open **Tasks** in the app header for foreground/Subagent runs, all schedules,
+Termux tasks, and authorized AgentLink chat task snapshots. Stop supported
+tasks, open conversation results, inspect command output, or open the native
+AgentLink chat. Stopping an Agent does not stop already submitted Shell or
+remote work. Closing the task center does not stop execution. Agent run
+observations cover this app process; schedules and extension records retain
+their original owners.
+
+**Settings > Configuration check** makes one fixed-text model request (which
+may consume quota), checks speech configuration, extension connections and
+Skill prerequisites, and links to repair settings. Results distinguish Passed,
+Needs attention, Not tested and Not enabled. It never changes settings, records
+audio or executes Shell commands. Real speech operation still requires a
+microphone test and voice preview.
+
 ### Always ready for your voice
 
 - Wake Mochi anytime with the on-device **“Hi Mochi”** wake word.

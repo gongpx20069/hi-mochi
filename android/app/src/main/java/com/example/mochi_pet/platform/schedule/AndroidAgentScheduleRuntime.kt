@@ -18,11 +18,16 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.await
 import com.example.mochi_pet.MochiApplication
 import com.example.mochi_pet.R
 import com.example.mochi_pet.core.schedule.AgentSchedule
 import com.example.mochi_pet.core.schedule.AgentScheduleController
+import com.example.mochi_pet.core.schedule.cancelQueuedOccurrence
+import java.time.Instant
 import java.time.Duration
+import kotlinx.coroutines.flow.first
+import com.example.mochi_pet.core.tasks.TaskStatus
 
 class AndroidAgentScheduleController(
     private val context: Context,
@@ -60,7 +65,27 @@ class AndroidAgentScheduleController(
     }
 
     override suspend fun runNow(id: String) {
-        enqueue(id, manual = true)
+        enqueue(id, manual = true).await()
+    }
+
+    suspend fun taskStatuses(ids: List<String>): Map<String, TaskStatus> =
+        ids.mapNotNull { id ->
+            val work = WorkManager.getInstance(context)
+                .getWorkInfosForUniqueWorkFlow(workName(id)).first()
+                .firstOrNull { !it.state.isFinished }
+            work?.let {
+                id to if (it.state == androidx.work.WorkInfo.State.RUNNING) {
+                    TaskStatus.RUNNING
+                } else {
+                    TaskStatus.QUEUED
+                }
+            }
+        }.toMap()
+
+    suspend fun stopRun(id: String) {
+        WorkManager.getInstance(context).cancelUniqueWork(workName(id)).await()
+        val application = context.applicationContext as MochiApplication
+        application.agentScheduleStore.cancelQueuedOccurrence(id, Instant.now())?.let { sync(it) }
     }
 
     suspend fun syncAll() {
@@ -71,7 +96,7 @@ class AndroidAgentScheduleController(
     fun enqueue(
         id: String,
         manual: Boolean,
-    ) {
+    ): androidx.work.Operation {
         val data = Data.Builder()
             .putString(KEY_SCHEDULE_ID, id)
             .putBoolean(KEY_MANUAL, manual)
@@ -84,7 +109,7 @@ class AndroidAgentScheduleController(
                     .build(),
             )
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
+        return WorkManager.getInstance(context).enqueueUniqueWork(
             workName(id),
             ExistingWorkPolicy.KEEP,
             request,

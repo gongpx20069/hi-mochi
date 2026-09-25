@@ -67,6 +67,7 @@ import com.example.mochi_pet.core.settings.SpeechSettingsSummary
 import com.example.mochi_pet.core.schedule.AgentSchedule
 import com.example.mochi_pet.core.schedule.AgentScheduleController
 import com.example.mochi_pet.core.schedule.AgentScheduleDraft
+import com.example.mochi_pet.core.schedule.toDraft
 import com.example.mochi_pet.core.schedule.AgentScheduleStore
 import com.example.mochi_pet.core.skills.MarketSkillSummary
 import com.example.mochi_pet.core.skills.MochiSkill
@@ -295,7 +296,6 @@ class MochiHomeViewModel(
     private val toolCatalogRepository: ToolCatalogRepository? = null,
     private val extensionClient: MochiExtensionClient? = null,
     private val agentLinkClient: AgentLinkClient? = null,
-    private val termuxClient: MochiExtensionClient? = null,
     private val termuxRuntime: com.example.mochi_pet.core.extensions.TermuxRuntimeState =
         com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
     private val agentBrowserRuntime: AgentBrowserRuntime? = null,
@@ -459,17 +459,7 @@ class MochiHomeViewModel(
                     )
                 val updated = store.set(
                     id = id,
-                    draft = AgentScheduleDraft(
-                        name = existing.name,
-                        prompt = existing.prompt,
-                        type = existing.type,
-                        runAt = existing.runAt,
-                        localTime = existing.localTime,
-                        daysOfWeek = existing.daysOfWeek,
-                        intervalMinutes = existing.intervalMinutes,
-                        timezone = existing.timezone,
-                        enabled = enabled,
-                    ),
+                    draft = existing.toDraft(enabled),
                 )
                 controller.sync(updated)
             }.onSuccess {
@@ -653,6 +643,11 @@ class MochiHomeViewModel(
                     }
                 }
             } catch (error: CancellationException) {
+                if (version == interactionVersion) {
+                    mutableConversationState.update { it.copy(isSending = false) }
+                    mutablePipelineState.value = ChatPipelineUiState()
+                    wakeRuntime?.resume()
+                }
                 throw error
             } catch (error: ProviderSettingsIncompleteException) {
                 if (version == interactionVersion) {
@@ -1618,6 +1613,10 @@ class MochiHomeViewModel(
     }
 
     fun onTermuxAction(action: TermuxUiAction) {
+        if (action == TermuxUiAction.Tasks) {
+            showTermuxTasks.value = true
+            return
+        }
         if (action == TermuxUiAction.EnableWithSkill) {
             pendingExtensionSetup.value = ExtensionSetupKind.TERMUX
             return
@@ -1639,46 +1638,6 @@ class MochiHomeViewModel(
                 }
             }
             TermuxUiAction.CloseTasks -> showTermuxTasks.value = false
-            TermuxUiAction.Tasks, is TermuxUiAction.Task -> updateTools {
-                showTermuxTasks.value = true
-                val client = requireNotNull(termuxClient) { "Termux extension is unavailable" }
-                val snapshot = client.snapshot()
-                require(snapshot.connected) { "Connect Termux first." }
-                val definition = snapshot.tools.first { it.name == "termux_task" }
-                val arguments = kotlinx.serialization.json.buildJsonObject {
-                    if (action is TermuxUiAction.Task) {
-                        put("action", kotlinx.serialization.json.JsonPrimitive(action.action))
-                        put("task_id", kotlinx.serialization.json.JsonPrimitive(action.id))
-                    } else {
-                        put("action", kotlinx.serialization.json.JsonPrimitive("list"))
-                    }
-                }
-                val result = client.agentTool(definition).execute(
-                    arguments, ToolExecutionContext(LocalDate.now(clock), mutableSurface.value),
-                )
-                if (result.status != "ok") {
-                    throw IllegalStateException(result.message ?: "Termux request failed.")
-                }
-                if (action is TermuxUiAction.Task) {
-                    termuxRuntime.record(result)
-                } else {
-                    val data = result.data as? kotlinx.serialization.json.JsonObject
-                    val ids = data?.get("task_ids") as? kotlinx.serialization.json.JsonArray
-                    ids?.forEach { element ->
-                        val id = (element as? kotlinx.serialization.json.JsonPrimitive)?.content
-                            ?: throw IllegalStateException("Invalid Termux task list.")
-                        if (termuxTasks.value.none { it.id == id }) {
-                            termuxRuntime.record(com.example.mochi_pet.core.agent.tool.ToolResultEnvelope.success(
-                                kotlinx.serialization.json.buildJsonObject {
-                                    put("task_id", kotlinx.serialization.json.JsonPrimitive(id))
-                                    put("state", kotlinx.serialization.json.JsonPrimitive("unknown"))
-                                },
-                            ))
-                        }
-                    }
-                }
-                requireRepository().loadSummary()
-            }
             else -> updateTools {
                 val repository = requireRepository()
                 when (action) {
@@ -2537,7 +2496,6 @@ class MochiHomeViewModel(
                             application.toolCatalogRepository,
                         extensionClient = application.extensionClient,
                         agentLinkClient = application.agentLinkClient,
-                        termuxClient = application.termuxClient,
                         termuxRuntime = application.termuxRuntime,
                         agentBrowserRuntime = application.agentBrowserRuntime,
                         weatherRepository = application.weatherRepository,

@@ -54,6 +54,32 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Task center and configuration-check regression coverage:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*AgentTaskRuntimeTest" `
+  --tests "*AgentLinkTaskSnapshotTest" --tests "*ConfigurationCheckTest" `
+  --tests "*ConfigurationDiagnosticsTest" --tests "*TaskCenterUiTest" `
+  --tests "*TaskDashboardTest" --tests "*AgentScheduleTest" --no-daemon
+```
+
+Device acceptance should cover empty and restored task lists, foreground and
+child cancellation, stopping a queued/running schedule without disabling the
+next recurrence, Termux refresh/output/Stop/Forget, and AgentLink revocation,
+unknown outcomes and native chat handoff. Confirm checks do not run on open,
+show the quota disclosure, remain cancellable, and never change configuration.
+Run model checks only with explicitly authorized test credentials; the JVM
+suite verifies the fixed request and failure handling without network access.
+Verify repair entry points and narrow-screen/large-font reachability.
+The dashboard Compose tests also render English/Chinese synthetic fixtures to
+`app/build/reports/task-dashboard-fixture.png` and
+`app/build/reports/task-dashboard-zh-fixture.png`. These use the real Mochi
+theme without user data; inspect them when changing task layout or typography.
+`feature.home.TaskCenterSmokeTest` in the app instrumentation suite exercises
+the real header, task center and diagnostic entry without starting a model
+probe or changing Provider settings. It may perform the task center's normal
+read-only refresh of existing connected tasks.
+
 AgentLink domain/registry regression coverage:
 
 ```powershell

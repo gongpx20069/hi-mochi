@@ -276,6 +276,56 @@ support is an optional import/export adapter.
 - AgentLink credentials stay in AgentLink and are excluded from export/share.
   Subagents, schedules and network/browser workarounds do not gain these Tools.
 
+### 3.12 Task center and configuration checks
+
+The app header exposes Tasks; Settings also exposes Configuration check.
+The task center unifies presentation, not execution ownership:
+
+Its status-first dashboard uses one filtered list and focused task details,
+not separate execution consoles. Active and attention-needed work comes first;
+overview counters also act as filters. Configuration checks have a persistent
+header entry and a separate page. Common task actions need at most a card tap
+and one explicit action; schedule Run now and future-run pause/resume are
+available directly in its details.
+
+- Foreground and Subagent runs show runtime status, current Tool, timestamp
+  and cancellation. Stopping a child stops its owning parent interaction.
+  The process-local view retains up to 100 finished runs plus active runs.
+  Results remain in the conversation; it is not a new persistent chat archive.
+- All persisted schedules appear regardless of their next run date. Actual
+  running/queued state comes from WorkManager, separately from the next alarm
+  and persisted last result. Stopping a run does not disable future recurrence.
+  Cancellation records `CANCELLED` and advances an already claimed recurrence.
+- Termux shows retained task status, bounded output, Stop and Forget for
+  completed tasks. It replaces the separate task dialog. Opening the task
+  center never submits a new Shell command. Detached processes retain the
+  existing stop limitations.
+- AgentLink exposes remembered chats and bounded task snapshots through
+  guarded chat reads. Unknown remote outcomes/states are not success. Reads
+  require its provider/chat Tool and current authorization; results and
+  cancellation open the trusted native chat. No automatic resend is offered.
+- While the task page is resumed, local schedule and Termux snapshots refresh
+  every five seconds without overlapping refreshes. AgentLink reads occur
+  only on opening/manual refresh. Closing the page stops its refresh work,
+  not execution or previously submitted side effects.
+
+Configuration checks are explicit and cancellable. They use saved settings
+without modifying switches, credentials or permissions. The disclosure states
+that one fixed short request goes to the configured AI Provider and may consume
+quota; no conversation history, microphone audio or generated command is sent.
+Each probe has a 15-second bound and failures do not hide independent results.
+
+Results distinguish Passed, Needs attention, Not tested and Not enabled.
+Model success proves only a basic text call, not Tool/image compatibility.
+Speech checks cover permission, configuration and system-service readiness,
+not actual recognition or cloud quotas; microphone testing and voice preview
+remain explicit actions. Extension checks distinguish installation, trust,
+connection and enablement; Termux repair opens its existing per-step setup.
+Skill checks list missing Tool groups and respect individual switches.
+Connection summaries are not proof of a successful device or Shell action.
+Remediation opens the relevant Settings, Tools, Skills or trusted setup flow.
+Raw Provider errors and secrets never enter the report, logs or exports.
+
 ## 4. Local agent
 
 The agent uses:

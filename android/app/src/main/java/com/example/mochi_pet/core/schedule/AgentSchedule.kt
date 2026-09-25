@@ -17,6 +17,7 @@ enum class AgentScheduleType {
 enum class AgentScheduleResult {
     SUCCESS,
     FAILED,
+    CANCELLED,
 }
 
 data class AgentSchedule(
@@ -79,19 +80,19 @@ fun nextAgentScheduleRun(
     schedule: AgentSchedule,
     after: Instant,
 ): Instant? =
-    nextAgentScheduleRun(
-        AgentScheduleDraft(
-            name = schedule.name,
-            prompt = schedule.prompt,
-            type = schedule.type,
-            runAt = schedule.runAt,
-            localTime = schedule.localTime,
-            daysOfWeek = schedule.daysOfWeek,
-            intervalMinutes = schedule.intervalMinutes,
-            timezone = schedule.timezone,
-            enabled = schedule.enabled,
-        ),
-        after,
+    nextAgentScheduleRun(schedule.toDraft(), after)
+
+fun AgentSchedule.toDraft(enabled: Boolean = this.enabled): AgentScheduleDraft =
+    AgentScheduleDraft(
+        name = name,
+        prompt = prompt,
+        type = type,
+        runAt = runAt,
+        localTime = localTime,
+        daysOfWeek = daysOfWeek,
+        intervalMinutes = intervalMinutes,
+        timezone = timezone,
+        enabled = enabled,
     )
 
 private fun nextLocalRun(

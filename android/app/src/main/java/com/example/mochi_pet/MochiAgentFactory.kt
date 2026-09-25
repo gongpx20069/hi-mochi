@@ -38,6 +38,9 @@ import com.example.mochi_pet.core.skills.LoadSkillTool
 import com.example.mochi_pet.core.weather.CurrentWeather
 import com.example.mochi_pet.core.weather.CurrentWeatherTool
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 
 suspend fun MochiApplication.createAgentRunner(
     sink: UiDirectiveSink,
@@ -47,8 +50,11 @@ suspend fun MochiApplication.createAgentRunner(
     includeBrowserInteractions: Boolean = includeBrowser,
     extensionScope: ExtensionToolScope = ExtensionToolScope.FOREGROUND_MAIN,
     includeAgentLink: Boolean = true,
+    taskScheduleId: String? = null,
+    taskTitle: String = "Conversation",
 ): AgentRunner {
-    val diagnosticLogger = androidAgentDiagnosticLogger()
+    val owner = currentCoroutineContext().job
+    val diagnosticLogger = taskDiagnosticLogger(taskScheduleId, taskTitle, owner)
     val navigationPolicy = NavigationPolicy()
     var appliedNavigation: NavigationDecision? = null
     val recordingSink = UiDirectiveSink { decision ->
@@ -131,6 +137,8 @@ suspend fun MochiApplication.createAgentRunner(
                         includeBrowser = includeBrowser,
                         includeBrowserInteractions =
                             includeBrowserInteractions,
+                        taskScheduleId = taskScheduleId,
+                        owner = owner,
                     )
                 },
             )
@@ -150,6 +158,8 @@ private suspend fun MochiApplication.executeSubagent(
     parentObserver: AgentPipelineObserver,
     includeBrowser: Boolean,
     includeBrowserInteractions: Boolean,
+    taskScheduleId: String?,
+    owner: Job,
 ): String {
     val tools = mutableListOf<AgentTool>()
     if (includeBrowser) {
@@ -207,7 +217,7 @@ private suspend fun MochiApplication.executeSubagent(
                 )
             },
             diagnosticActor = type.id,
-            diagnosticLogger = androidAgentDiagnosticLogger(),
+            diagnosticLogger = taskDiagnosticLogger(taskScheduleId, type.displayName, owner),
         ).run(
             AgentRunRequest(
                 provider = parentRequest.provider,
@@ -256,8 +266,13 @@ private fun buildSubagentPipelineDetail(
     return "${type.displayName} · $activity"
 }
 
-private fun androidAgentDiagnosticLogger(): AgentDiagnosticLogger =
+private fun MochiApplication.taskDiagnosticLogger(
+    scheduleId: String?,
+    title: String,
+    owner: Job,
+): AgentDiagnosticLogger =
     AgentDiagnosticLogger { event ->
+        agentTaskRuntime.record(event, scheduleId, title, owner)
         val message = event.toLogMessage()
         when (event.type) {
             AgentDiagnosticEventType.RUN_FAILED,

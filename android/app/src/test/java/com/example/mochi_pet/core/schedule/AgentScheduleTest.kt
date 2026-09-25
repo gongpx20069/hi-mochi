@@ -25,6 +25,34 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class AgentScheduleTest {
     @Test
+    fun `cancelled recurring run stays recurring and persists cancellation without another schema`() = runBlocking {
+        val database = androidx.room.Room.inMemoryDatabaseBuilder(
+            androidx.test.core.app.ApplicationProvider.getApplicationContext(),
+            MochiDatabase::class.java,
+        ).build()
+        try {
+            val now = Instant.parse("2026-09-25T00:00:00Z")
+            val repository = RoomAgentScheduleRepository(database.agentScheduleDao(), Clock.fixed(now, ZoneOffset.UTC))
+            val schedule = repository.set(draft = AgentScheduleDraft(
+                name = "Hourly", prompt = "Brief me", type = AgentScheduleType.EVERY, intervalMinutes = 60,
+            ))
+            val cancelled = repository.recordResult(schedule.id, AgentScheduleResult.CANCELLED, now.plusSeconds(3600))
+            assertEquals(AgentScheduleResult.CANCELLED, repository.get(schedule.id)?.lastResult)
+            assertEquals(now.plusSeconds(7200), cancelled.nextRunAt)
+            assertEquals(true, cancelled.enabled)
+            val manual = repository.recordResult(schedule.id, AgentScheduleResult.CANCELLED, now.plusSeconds(3700),
+                advanceSchedule = false)
+            assertEquals(cancelled.nextRunAt, manual.nextRunAt)
+            assertEquals(null, repository.cancelQueuedOccurrence(schedule.id, now.plusSeconds(4000)))
+            val queued = requireNotNull(repository.cancelQueuedOccurrence(schedule.id, now.plusSeconds(7300)))
+            assertEquals(now.plusSeconds(10900), queued.nextRunAt)
+            assertEquals(AgentScheduleResult.CANCELLED, queued.lastResult)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
     fun `daily schedule uses its local timezone`() {
         val next = nextAgentScheduleRun(
             draft = AgentScheduleDraft(

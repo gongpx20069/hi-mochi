@@ -156,6 +156,59 @@ rolled back; stale replies, cards, navigation, and TTS callbacks are ignored.
 
 ## 4. Manual navigation
 
+The app header has a stable **Tasks** entry. Its full-height dashboard follows
+Mochi's near-black/plum surfaces, peach identity accent, lavender activity color,
+20-28 dp rounded cards and subtle borders. A small Mochi orbital illustration
+animates only while tasks are active; progress tracks are indeterminate, never
+fabricated percentages. Text and status badges carry meaning without color.
+Content is bounded to 680 dp and respects system insets.
+
+The overview summarizes active, attention-needed and finished records.
+Tapping a metric filters the same list. One horizontally scrollable filter
+strip offers All, In progress, Needs attention, Schedules and Finished; task
+sources are badges, not four long repeated sections. Active work sorts first,
+then attention-needed items. An active scheduled Main run merges with its
+schedule card instead of appearing twice. An empty dashboard offers Ask Mochi
+rather than four empty provider sections.
+
+Each task card has one action: tap for a focused, full-height-capable detail
+sheet. Primary controls stay in its footer while output/body content scrolls;
+long Shell output must never scroll Stop or Refresh out of reach.
+Runtime-specific operations live there, normally within two taps of the
+list. Foreground/child details open conversation results and explicitly label
+Stop parent task for children. Schedule details support Run now, Stop current
+run, and Pause future runs/Resume without visiting another page. Pausing future
+alarms does not stop a current run; past one-time schedules cannot silently
+resume without a new date. Termux details show separate selectable stdout and
+stderr, refresh, Stop, and terminal-only Remove finished record. Raw IDs/exit
+codes are behind Technical details, not the list's primary text.
+
+Unknown states never become success. AgentLink details show their snapshot time
+and open the trusted native chat for live results and cancellation. Errors stay
+visible in both the list and affected action context; Refresh never resubmits.
+Closing a detail sheet returns to the same list/filter. Removing a finished
+record dismisses its obsolete sheet automatically.
+
+**Check setup** stays visible in the dashboard header; configuration checking
+is a separate page, not an extra task category. Settings also opens it directly.
+Back returns to the entry point and cancels an unfinished check; Close never
+stops executing tasks. Existing Termux task links open this same dashboard.
+Detailed lifecycle warnings are in How it works and relevant task details,
+rather than repeated above every list. At 320 dp and 200% font scale, content
+must scroll without hiding Close/Back or repair actions; tap targets retain
+Material's minimum sizes.
+
+Configuration checks start only from **Run configuration check**, beneath a
+fixed-text request/quota disclosure. Progress, cancellation and last check time
+are visible. Attention-needed and not-yet-tested results appear first;
+passed/disabled checks are collapsed under Other checks. Each result explains
+what was actually checked and offers
+**Open related settings** when appropriate. Optional disabled integrations are
+not treated as required setup failures. Speech checks explicitly require a
+subsequent microphone test or voice preview to establish real operation.
+Checks stop on Back/Close, retain explicitly incomplete results after cancellation,
+and reject late callbacks from superseded checks.
+
 The Tools surface has a stable **AgentLink** provider card even before connection.
 It reuses the same rounded surface, spacing, localized typography, and Tool rows
 as other providers. The three Tools start collapsed behind **Show tools (3)**;

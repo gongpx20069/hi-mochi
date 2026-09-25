@@ -135,6 +135,13 @@ class RoomAgentScheduleRepository(
 class AgentScheduleNotFoundException(id: String) :
     IllegalStateException("Agent schedule not found: $id")
 
+suspend fun AgentScheduleStore.cancelQueuedOccurrence(id: String, now: Instant): AgentSchedule? {
+    val schedule = get(id) ?: return null
+    val due = schedule.nextRunAt ?: return null
+    if (!schedule.enabled || due.isAfter(now)) return null
+    return recordResult(id, AgentScheduleResult.CANCELLED, now)
+}
+
 private fun validate(draft: AgentScheduleDraft) {
     require(draft.name.trim().isNotEmpty()) {
         "Schedule name must not be empty"

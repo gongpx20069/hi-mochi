@@ -63,6 +63,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 private val Application.providerDataStore by preferencesDataStore(
     name = "provider_settings",
@@ -202,6 +204,8 @@ class MochiApplication : Application() {
         OkHttpOpenAiChatClient()
     }
 
+    val agentTaskRuntime = com.example.mochi_pet.core.tasks.AgentTaskRuntime()
+
     val locationPermissionGate: LocationPermissionGate by lazy {
         LocationPermissionGate {
             ContextCompat.checkSelfPermission(
@@ -248,13 +252,13 @@ class MochiApplication : Application() {
         manual: Boolean,
     ): Boolean {
         val now = Instant.now()
-        val schedule = if (manual) {
-            agentScheduleStore.get(id)
-        } else {
-            agentScheduleStore.claimDue(id, now)
+        // Finish the claim before observing cancellation so a claimed alarm is always reconciled.
+        val schedule = withContext(NonCancellable) {
+            if (manual) agentScheduleStore.get(id) else agentScheduleStore.claimDue(id, now)
         } ?: return false
         val userText = "[Scheduled Agent · ${schedule.name}]\n${schedule.prompt}"
         return try {
+            currentCoroutineContext().ensureActive()
             val provider = providerSettingsRepository.loadRuntimeConfig()
             val settings = agentSettingsRepository.load()
             val persona = personaRepository.load()
@@ -272,6 +276,8 @@ class MochiApplication : Application() {
                     includeBrowserInteractions = false,
                     extensionScope = ExtensionToolScope.SCHEDULED,
                     includeAgentLink = false,
+                    taskScheduleId = id,
+                    taskTitle = schedule.name,
                 ).run(
                     AgentRunRequest(
                         provider = provider,
@@ -305,6 +311,16 @@ class MochiApplication : Application() {
                 success = true,
             )
             true
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            withContext(NonCancellable) {
+                if (agentScheduleStore.get(id) != null) {
+                    val updated = agentScheduleStore.recordResult(
+                        id, AgentScheduleResult.CANCELLED, Instant.now(), advanceSchedule = !manual,
+                    )
+                    agentScheduleController.sync(updated)
+                }
+            }
+            throw error
         } catch (error: Exception) {
             SCHEDULE_LOGGER.log(
                 Level.SEVERE,

@@ -1,13 +1,8 @@
 package com.example.mochi_pet.feature.home
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -21,12 +16,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import com.example.mochi_pet.core.extensions.TermuxTaskView
 import com.example.mochi_pet.core.tools.ExtensionProviderSummary
 import com.example.mochi_ui.ExtensionCard
 import com.example.mochi_ui.ExtensionHeading
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 sealed interface TermuxUiAction {
     data object Install : TermuxUiAction
@@ -37,7 +29,6 @@ sealed interface TermuxUiAction {
     data object CloseTasks : TermuxUiAction
     data class Enable(val enabled: Boolean) : TermuxUiAction
     data class EnableTool(val name: String, val enabled: Boolean) : TermuxUiAction
-    data class Task(val id: String, val action: String) : TermuxUiAction
 }
 
 @Composable
@@ -108,42 +99,5 @@ internal fun TermuxProviderCard(
             onAction(TermuxUiAction.Disconnect)
         }) { Text("Disconnect") } },
         dismissButton = { TextButton({ confirmDisconnect = false }) { Text("Cancel") } },
-    )
-}
-
-@Composable
-internal fun TermuxTasksDialog(
-    tasks: List<TermuxTaskView>,
-    onAction: (TermuxUiAction) -> Unit,
-    feedback: String?,
-    loading: Boolean,
-) {
-    AlertDialog(
-        onDismissRequest = { onAction(TermuxUiAction.CloseTasks) },
-        title = { Text("Termux tasks") },
-        text = {
-            Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState())) {
-                Text("Closing Mochi does not stop commands. Detached processes may survive a stop request.")
-                feedback?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                if (tasks.isEmpty()) Text("No tasks")
-                tasks.forEach { task ->
-                    val data = task.result.data as? JsonObject
-                    Text(task.id, style = MaterialTheme.typography.labelSmall)
-                    Text((data?.get("state") as? JsonPrimitive)?.content ?: task.result.message ?: "Unknown")
-                    Row {
-                        TextButton({ onAction(TermuxUiAction.Task(task.id, "read")) }, enabled = !loading) { Text("Refresh") }
-                        TextButton({ onAction(TermuxUiAction.Task(task.id, "stop")) }, enabled = !loading) { Text("Stop") }
-                        TextButton({ onAction(TermuxUiAction.Task(task.id, "forget")) }, enabled = !loading) { Text("Forget") }
-                    }
-                    var showOutput by remember(task.id) { mutableStateOf(false) }
-                    TextButton({ showOutput = !showOutput }) { Text("Command output") }
-                    if (showOutput) {
-                        SelectionContainer { Text(data?.toString().orEmpty(), fontFamily = FontFamily.Monospace) }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton({ onAction(TermuxUiAction.Tasks) }, enabled = !loading) { Text("Refresh") } },
-        dismissButton = { TextButton({ onAction(TermuxUiAction.CloseTasks) }) { Text("Close") } },
     )
 }

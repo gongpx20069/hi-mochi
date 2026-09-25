@@ -74,6 +74,21 @@ or verification in earlier phases.
 - [ ] Performance, battery, and process-death validation.
 - [x] Signed release APKs with per-ABI and universal download variants.
 
+## P2 - Task visibility and configuration checks
+
+- [x] Add one task center for Agent/Subagent runs, all schedules, Termux tasks
+  and authorized AgentLink task snapshots, retaining execution ownership.
+- [x] Add precise Stop actions, terminal Termux output/Forget and native remote
+  chat/result links without automatic retries.
+- [x] Add explicit bounded model/configuration checks, speech readiness,
+  extension setup diagnosis and grouped Skill prerequisites.
+- [x] Distinguish tested, configured-only, disabled and failed checks, with
+  direct repair paths and safe localized errors.
+- [ ] Complete the multi-device and real companion-service acceptance matrix.
+
+Deferred reliability, scenario-template, memory/backup and recurring-calendar
+ideas are recorded in [`BRAINSTORM.md`](BRAINSTORM.md), not promised as shipped.
+
 ## P2 - Agent Browser
 
 - [x] Add one grouped Agent Browser provider card with five Tool switches.

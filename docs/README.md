@@ -10,6 +10,7 @@ contains the product and engineering source of truth.
 | --- | --- |
 | [`PRD.md`](PRD.md) | Product scope, principles, and acceptance criteria |
 | [`INTERACTION_DESIGN.md`](INTERACTION_DESIGN.md) | Screens, gestures, voice navigation, and accessibility |
+| [`BRAINSTORM.md`](BRAINSTORM.md) | Deferred product ideas; not shipped behavior or delivery commitments |
 
 ## Architecture
 

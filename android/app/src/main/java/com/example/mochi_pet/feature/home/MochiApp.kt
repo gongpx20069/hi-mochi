@@ -125,6 +125,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.mochi_pet.core.diagnostics.RepairTarget
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
@@ -243,9 +246,24 @@ fun MochiApp(
         MochiHomeViewModel.factory(application, voiceRuntime, wakeRuntime)
     }
     val viewModel: MochiHomeViewModel = viewModel(factory = factory)
+    val taskCenter: TaskCenterViewModel = viewModel(factory = remember(application) {
+        viewModelFactory { initializer { TaskCenterViewModel(application) } }
+    })
+    val taskCenterState by taskCenter.state.collectAsStateWithLifecycle()
+    val agentTasks by taskCenter.agentTasks.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(taskCenterState.visible, taskCenterState.diagnosticsPage) {
+        val polling = coroutineScope.launch {
+            if (taskCenterState.visible && !taskCenterState.diagnosticsPage) {
+                while (true) {
+                    delay(5_000)
+                    taskCenter.refresh(includeRemote = false)
+                }
+            }
+        }
+        onPauseOrDispose { polling.cancel() }
+    }
     val termuxTasks by viewModel.termuxTasks.collectAsStateWithLifecycle()
     val showTermuxTasks by viewModel.showTermuxTasks.collectAsStateWithLifecycle()
-    val termuxToolsState by viewModel.toolsState.collectAsStateWithLifecycle()
     LifecycleResumeEffect(Unit) {
         viewModel.refreshTools()
         onPauseOrDispose { }
@@ -322,9 +340,57 @@ fun MochiApp(
         }
     }
 
-    if (showTermuxTasks) {
-        TermuxTasksDialog(termuxTasks, viewModel::onTermuxAction,
-            termuxToolsState.feedback, termuxToolsState.isLoading)
+    LaunchedEffect(showTermuxTasks) {
+        if (showTermuxTasks) {
+            viewModel.onTermuxAction(TermuxUiAction.CloseTasks)
+            taskCenter.open()
+        }
+    }
+    if (taskCenterState.visible) {
+        TaskCenterDialog(
+            state = taskCenterState, agents = agentTasks, termux = termuxTasks,
+            onClose = taskCenter::close, onPage = taskCenter::showDiagnostics,
+            onRefresh = { taskCenter.refresh() }, onCheck = taskCenter::checkConfiguration,
+            onCancelCheck = taskCenter::cancelChecks,
+            onStopAgent = taskCenter::stopAgent, onStopSchedule = taskCenter::stopSchedule,
+            onRunSchedule = taskCenter::runSchedule, onScheduleEnabled = taskCenter::setScheduleEnabled,
+            onTermux = taskCenter::termuxAction,
+            onChat = { link ->
+                taskCenter.close()
+                viewModel.onAgentLinkAction(AgentLinkUiAction.OpenChat(link))
+            },
+            onConversation = {
+                taskCenter.close()
+                viewModel.navigate(MochiNavigationIntent.ShowConversation)
+            },
+            onPlanner = {
+                taskCenter.close()
+                viewModel.navigate(MochiNavigationIntent.ShowToday)
+            },
+            onRepair = { target ->
+                taskCenter.close()
+                viewModel.navigate(when (target) {
+                    RepairTarget.MODEL, RepairTarget.SPEECH, RepairTarget.PERMISSIONS ->
+                        MochiNavigationIntent.ShowSettings
+                    RepairTarget.SKILLS -> MochiNavigationIntent.ShowSkills
+                    else -> MochiNavigationIntent.ShowTools
+                })
+                when (target) {
+                    RepairTarget.PERMISSIONS -> context.startActivity(Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        "package:${context.packageName}".toUri(),
+                    ))
+                    RepairTarget.TERMUX -> if (viewModel.toolsState.value.catalog.termux.trusted) {
+                        viewModel.onTermuxAction(TermuxUiAction.Configure)
+                    }
+                    RepairTarget.MIJIA -> if (viewModel.toolsState.value.catalog.mijia.trusted) {
+                        viewModel.configureMijiaExtension()
+                    }
+                    RepairTarget.AGENTLINK -> Unit
+                    else -> Unit
+                }
+            },
+        )
     }
 
     LaunchedEffect(voiceTriggers) {
@@ -366,6 +432,7 @@ fun MochiApp(
 
     MochiAppContent(
         viewModel = viewModel,
+        taskCenter = taskCenter,
         onStartVoice = { startVoice(VoiceInputTrigger.DIRECT) },
         onEnableWake = enableWake,
         launchAgentLink = launchAgentLink,
@@ -375,12 +442,12 @@ fun MochiApp(
 @Composable
 private fun MochiAppContent(
     viewModel: MochiHomeViewModel,
+    taskCenter: TaskCenterViewModel,
     onStartVoice: () -> Unit,
     onEnableWake: () -> Unit,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
     val surface by viewModel.surface.collectAsStateWithLifecycle()
-    val termuxTasks by viewModel.termuxTasks.collectAsStateWithLifecycle()
     val plannerState by viewModel.plannerState.collectAsStateWithLifecycle()
     val conversationState by
         viewModel.conversationState.collectAsStateWithLifecycle()
@@ -804,11 +871,7 @@ private fun MochiAppContent(
                             }
                         }
                         ChatPipelineIndicator(state = visiblePipelineState)
-                        if (termuxTasks.isNotEmpty()) {
-                            TextButton({ viewModel.onTermuxAction(TermuxUiAction.Tasks) }) {
-                                Text("Termux tasks")
-                            }
-                        }
+                        TextButton({ taskCenter.open() }) { Text("Task center") }
                     }
                 }
             }
@@ -832,6 +895,7 @@ private fun MochiAppContent(
                 MochiTopBar(
                     surface = surface,
                     wakeState = wakeState,
+                    onTasks = { taskCenter.open() },
                     onSettings = {
                         viewModel.navigate(
                             if (surface == MochiSurface.Settings) {
@@ -843,10 +907,8 @@ private fun MochiAppContent(
                     },
                 )
                 ChatPipelineIndicator(state = visiblePipelineState)
-                if (termuxTasks.isNotEmpty()) {
-                    TextButton({ viewModel.onTermuxAction(TermuxUiAction.Tasks) }) {
-                        Text("Termux tasks")
-                    }
+                if (surface == MochiSurface.Settings) {
+                    TextButton({ taskCenter.open(diagnostics = true) }) { Text("Configuration check") }
                 }
                 Surface(
                     modifier = Modifier
@@ -1042,6 +1104,7 @@ private fun BrowserSessionCard(
 private fun MochiTopBar(
     surface: MochiSurface,
     wakeState: WakeRuntimeState,
+    onTasks: () -> Unit,
     onSettings: () -> Unit,
 ) {
     Row(
@@ -1049,7 +1112,7 @@ private fun MochiTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
+        Column(Modifier.weight(1f)) {
             Text(
                 text = "Mochi",
                 color = MaterialTheme.colorScheme.onBackground,
@@ -1066,6 +1129,7 @@ private fun MochiTopBar(
                 style = MaterialTheme.typography.labelMedium,
             )
         }
+        TextButton(onTasks) { Text("Tasks") }
         OutlinedButton(
             onClick = onSettings,
             shape = RoundedCornerShape(18.dp),
@@ -5576,6 +5640,8 @@ private fun AgentScheduleRow(
                         !schedule.enabled -> "Paused"
                         schedule.lastResult == AgentScheduleResult.FAILED ->
                             "Last run failed · Next ${nextRun ?: "pending"}"
+                        schedule.lastResult == AgentScheduleResult.CANCELLED ->
+                            localizeUiText("Last run cancelled") + " · " + (nextRun ?: localizeUiText("Not scheduled"))
                         else -> "Next ${nextRun ?: "pending"}"
                     },
                     color = if (
