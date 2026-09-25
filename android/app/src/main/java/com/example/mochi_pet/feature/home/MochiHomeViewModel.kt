@@ -296,8 +296,8 @@ class MochiHomeViewModel(
     private val extensionClient: MochiExtensionClient? = null,
     private val agentLinkClient: AgentLinkClient? = null,
     private val termuxClient: MochiExtensionClient? = null,
-    private val termuxApprovalGate: com.example.mochi_pet.core.extensions.TermuxApprovalGate =
-        com.example.mochi_pet.core.extensions.TermuxApprovalGate(),
+    private val termuxRuntime: com.example.mochi_pet.core.extensions.TermuxRuntimeState =
+        com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
     private val agentBrowserRuntime: AgentBrowserRuntime? = null,
     private val weatherRepository: WeatherRepository? = null,
     private val locationPermissionGate: LocationPermissionGate? = null,
@@ -341,8 +341,7 @@ class MochiHomeViewModel(
     private var voiceCatalogVersion = 0L
     private var voicePreviewVersion = 0L
     private var resumeWakeAfterPreview = false
-    val termuxApproval = termuxApprovalGate.pending
-    val termuxTasks = termuxApprovalGate.tasks
+    val termuxTasks = termuxRuntime.tasks
     val pendingExtensionSetup = MutableStateFlow<ExtensionSetupKind?>(null)
     val showTermuxTasks = MutableStateFlow(false)
 
@@ -779,28 +778,6 @@ class MochiHomeViewModel(
     fun startVoiceInput(acknowledgeWake: Boolean = false) {
         stopVoicePreview()
         val runtime = voiceRuntime ?: return
-        val pendingApproval = termuxApproval.value
-        if (pendingApproval != null) {
-            runtime.stopSpeaking()
-            val listen = {
-                runtime.startListening(
-                    onFinalTranscript = { transcript ->
-                        val choice = termuxVoiceChoice(transcript)
-                        if (choice != null) {
-                            termuxApprovalGate.respond(pendingApproval.id, choice)
-                        } else {
-                            mutableConversationState.update {
-                                it.copy(errorMessage = "Say: execute once, allow this task, or cancel.")
-                            }
-                        }
-                        wakeRuntime?.resume()
-                    },
-                    onNoResult = { wakeRuntime?.resume() },
-                )
-            }
-            wakeRuntime?.pause(listen) ?: listen()
-            return
-        }
         cancelAgentInteraction()
         val version = interactionVersion
         runtime.stopSpeaking()
@@ -1661,7 +1638,6 @@ class MochiHomeViewModel(
                     }
                 }
             }
-            is TermuxUiAction.Approve -> termuxApprovalGate.respond(action.id, action.choice)
             TermuxUiAction.CloseTasks -> showTermuxTasks.value = false
             TermuxUiAction.Tasks, is TermuxUiAction.Task -> updateTools {
                 showTermuxTasks.value = true
@@ -1684,7 +1660,7 @@ class MochiHomeViewModel(
                     throw IllegalStateException(result.message ?: "Termux request failed.")
                 }
                 if (action is TermuxUiAction.Task) {
-                    termuxApprovalGate.record(result)
+                    termuxRuntime.record(result)
                 } else {
                     val data = result.data as? kotlinx.serialization.json.JsonObject
                     val ids = data?.get("task_ids") as? kotlinx.serialization.json.JsonArray
@@ -1692,7 +1668,7 @@ class MochiHomeViewModel(
                         val id = (element as? kotlinx.serialization.json.JsonPrimitive)?.content
                             ?: throw IllegalStateException("Invalid Termux task list.")
                         if (termuxTasks.value.none { it.id == id }) {
-                            termuxApprovalGate.record(com.example.mochi_pet.core.agent.tool.ToolResultEnvelope.success(
+                            termuxRuntime.record(com.example.mochi_pet.core.agent.tool.ToolResultEnvelope.success(
                                 kotlinx.serialization.json.buildJsonObject {
                                     put("task_id", kotlinx.serialization.json.JsonPrimitive(id))
                                     put("state", kotlinx.serialization.json.JsonPrimitive("unknown"))
@@ -1708,7 +1684,6 @@ class MochiHomeViewModel(
                 when (action) {
                     TermuxUiAction.Disconnect -> repository.disconnectTermux()
                     is TermuxUiAction.Enable -> repository.setTermuxEnabled(action.enabled)
-                    is TermuxUiAction.EnableBackground -> repository.setTermuxBackgroundEnabled(action.enabled)
                     is TermuxUiAction.EnableTool -> repository.setTermuxToolEnabled(action.name, action.enabled)
                     else -> error("Unexpected Termux action.")
                 }
@@ -2563,7 +2538,7 @@ class MochiHomeViewModel(
                         extensionClient = application.extensionClient,
                         agentLinkClient = application.agentLinkClient,
                         termuxClient = application.termuxClient,
-                        termuxApprovalGate = application.termuxApproval,
+                        termuxRuntime = application.termuxRuntime,
                         agentBrowserRuntime = application.agentBrowserRuntime,
                         weatherRepository = application.weatherRepository,
                         locationPermissionGate =

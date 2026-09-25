@@ -7,7 +7,7 @@
     <string name="prepare_title">Termux is needed first</string>
     <string name="prepare_help">Install official Termux, open it once, and wait for initialization. Then return here. Keep your existing Termux installation and data.</string>
     <string name="permission_title">Allow command access</string>
-    <string name="permission_help">Android must allow Mochi Termux Extension to run commands in Termux. This does not grant background Shell authorization in Mochi.</string>
+    <string name="permission_help">Android must allow Mochi Termux Extension to run commands in Termux. After connecting and enabling Termux in Mochi, conversations, scheduled agents and subagents execute commands automatically.</string>
     <string name="external_title">One command, once</string>
     <string name="paste_help">Copy the command and open Termux. Wait for initialization, long-press the prompt, paste, and press Enter. MOCHI_SETUP_SAVED means settings were saved, not that connection succeeded. A message such as [1] is only a background job number. Return here for the automatic connection check.</string>
     <string name="bootstrap_scope">This preserves other settings and allows requests from externally authorized apps, not only Mochi. Android permission is also required. No remote script is downloaded.</string>

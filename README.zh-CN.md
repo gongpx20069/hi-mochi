@@ -159,8 +159,8 @@ Main Agent 可以把一个聚焦任务交给隔离的 **Researcher** 或 **Analy
 等待结果返回后再继续处理。每次请求最多串行运行两个 Child Agent，并且不会向
 它们开放计划修改、设备定位、凭据、界面导航或其他仅限前台的能力。
 Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analyst 还可
-使用本地 JavaScript 沙箱。单独开启[后台 Shell 授权](#使用-termux-执行本机命令)后，
-两种子 Agent 还可使用 Termux。
+使用本地 JavaScript 沙箱。[Termux](#使用-termux-执行本机命令) 连接并启用后，
+两种子 Agent 也可直接使用已开启的 Termux 工具。
 
 ## Skills 与 Tools
 
@@ -238,8 +238,8 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 
 这些集成用于补充 Mochi 的能力，**不是核心功能的使用前提**，只需按需安装。
 米家和 Termux 使用与 Mochi 同签名的独立扩展 APK；AgentLink 通过独立的
-配套应用连接。米家和 AgentLink 用于前台 Main Agent；Termux 在单独明确授权后，
-也可用于 Subagent 和定时 Agent，后台授权默认关闭。
+配套应用连接。米家和 AgentLink 用于前台 Main Agent；Termux 连接并启用后，
+也可由 Subagent 和定时 Agent 自动执行。仅安装不会自动启用 Provider。
 
 | 集成 | 内置 Skill（默认状态） | 附加能力 | 安装入口 |
 | --- | --- | --- | --- |
@@ -287,12 +287,11 @@ Tools 中的关联聊天按钮打开可信的原生 AgentLink 页面，也可刷
 或**暂不启用**。
 `MOCHI_SETUP_SAVED` 表示设置已保存；`[1]` 只是终端后台任务编号，不代表连接成功。
 
-日常直接语音控制 Mochi，批准后的命令在后台执行，不切换 App。前台 Main Agent
-仍需授权执行一次或本次任务。若要让**所有定时 Agent 和子 Agent**自动执行，
-在 Termux 卡片的**连接设置**中开启**后台 Shell 授权**并确认风险提示。此权限默认关闭，
-重启后仍有效；**启用工具和 Skill**不会自动授予它。它也适用于前台对话委派的
-子 Agent，但不会跳过 Main Agent 的确认。关闭后台授权会阻止后续调用；
-禁用或断开 Termux 会清除此权限。请同步更新 Mochi 与 Termux 扩展 APK。
+日常直接语音控制 Mochi。连接并启用后，**前台对话、所有定时 Agent 和子 Agent**
+均自动执行已开启的 Termux 工具，不再逐次确认，也不切换 App；不再需要独立的
+后台 Shell 授权开关。Provider 和工具开关仍然有效，禁用或断开会阻止新调用，
+但不会停止已提交的命令。更新后，已启用的 Provider 采用此行为，原有工具选择保留。
+请同步更新 Mochi 与 Termux 扩展 APK。
 
 这是 Termux 权限下的完整 Shell，不是 Root 或文件沙箱；供 Agent 分析的输出
 会发送给当前模型 Provider。

@@ -74,10 +74,10 @@ configuration, Tool execution context, enabled Skill metadata, and its fixed
 role instructions. Parent history, memories, persona, navigation sinks, and
 `delegate_agent` are absent. Researcher receives enabled Browser Tools and
 read-only MCP Tools; Analyst additionally receives sandboxed JavaScript. Both
-may receive Termux Tools under the separate default-off Background Shell
-authorization, with enabled Skill discovery following Tool readiness. Scheduled
-Main-Agent runs use the same persistent permission; foreground Main-Agent
-approvals remain per-call/run. See `EXTENSIONS.md` for revocation and scope. Child
+may receive connected, enabled Termux Tools, with enabled Skill discovery
+following Tool readiness. Foreground, scheduled, and child calls execute
+automatically without per-command confirmation or a separate background flag.
+See `EXTENSIONS.md` for revocation and scope. Child
 research is bounded to 30 Tool rounds. Reaching that bound returns a typed Tool
 error to the Main Agent instead of failing the entire conversation. Both child
 roles are instructed to use their isolated context and larger round budget for
@@ -373,7 +373,7 @@ also remain individually enabled. The UI reports the aggregate label, such as
 `Tencent Docs MCP`, rather than raw Tool IDs. If readiness later fails, the
 saved preference remains but the Skill is omitted from discovery and
 activation. Installing/loading a Skill never runs downloaded scripts or
-package-install instructions. Explicitly approved Termux commands may run user
+package-install instructions. Connected, enabled Termux Tools may run user
 scripts or install packages inside Termux; this does not grant other Skills
 or runtimes an execution bypass.
 
@@ -458,7 +458,7 @@ Navigation is a local deterministic policy, not an unrestricted model action.
   local plugin.
 - Bound tool rounds, network response size, script time, and script output.
 - Do not expose shell/process execution or arbitrary filesystem access outside
-  the optional, native-approved Termux extension contract in `EXTENSIONS.md`.
+  the optional, user-enabled Termux extension contract in `EXTENSIONS.md`.
 
 ## 7. Observability
 

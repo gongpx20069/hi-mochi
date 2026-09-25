@@ -161,14 +161,14 @@ control (0.118+); use a current compatible official Termux build.
 
 Verify permission denial/revocation, initial stopped-package setup, callback
 delivery with the host foreground, no App switch during background execution,
-one-shot/task-wide native approval, voice confirmation, normal/nonzero exit,
+automatic execution without native/voice confirmation, normal/nonzero exit,
 large stdout/stderr, timeout, Stop, process death, reconnect and retained task
-inspection. Verify background Shell authorization defaults off, requires native
-confirmation, survives restart, and enables Termux for Scheduled Agents and
-both Subagent roles without per-call prompts. Check foreground confirmation
-still applies, Skill readiness follows each registry, and permission/provider/
-individual Tool revocation blocks subsequent calls. Provider disable/disconnect
-must clear background authorization without claiming to stop submitted work.
+inspection. Verify connected, enabled Termux works for foreground conversations,
+Scheduled Agents and both Subagent roles with no separate background switch.
+Check upgrades preserve provider/Tool selections and ignore/remove the old
+background flag. Skill readiness follows each registry; permission/provider/
+individual Tool revocation blocks subsequent calls, including stale registries
+after re-enabling, without claiming to stop submitted work.
 Mi Home and AgentLink must remain excluded from scheduled/subagent registries.
 Update both base and Termux extension APKs for background-context support.
 JVM and Linux tests do not establish real-device cross-App or
@@ -194,6 +194,24 @@ Only allowlisted availability markers are logged, never user files, raw
 command errors, credentials, or model requests. Without explicit opt-in it is
 skipped. Shell assets must retain LF line endings in Windows-built APKs;
 the formatting gate rejects CR bytes before delivery.
+
+To verify automatic execution across all three real Binder contexts, build
+`:app:assembleDebug :app:assembleDebugAndroidTest`, update the matching-signed
+base and test APKs in place, and run:
+
+```powershell
+adb -s <device-id> shell am instrument -w `
+  -e class com.example.mochi_pet.platform.extensions.TermuxAutomaticExecutionTest `
+  -e mochiTermuxExecutionDiagnostic true `
+  com.example.mochi_pet.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The provider must already be connected and enabled; this diagnostic never
+changes provider or Tool settings. It submits one fixed `printf` command per
+foreground/scheduled/subagent registry, reads the callback-backed result, and
+forgets only its own completed task records. It does not call a model or read
+user files. This proves the real execution adapters, not voice recognition,
+schedule timing, or LLM delegation.
 
 ## Engineering expectations
 

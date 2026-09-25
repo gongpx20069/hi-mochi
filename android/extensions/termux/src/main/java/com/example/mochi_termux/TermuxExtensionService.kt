@@ -178,8 +178,8 @@ class TermuxExtensionService : Service() {
 internal val TERMUX_TOOLS = listOf(
     ExtensionToolDefinition(
         "termux_exec",
-        "Run an unrestricted non-interactive shell command in Termux with native user authorization " +
-            "(per-call/run approval or the explicit background Shell setting for schedules/subagents). " +
+        "Run an unrestricted non-interactive shell command in Termux. Connected and enabled tools " +
+            "execute automatically for conversations, scheduled agents and subagents without per-call approval. " +
             "Returns a task ID, not completion. Use termux_task to inspect it. Output goes to the model Provider.",
         """{"type":"object","properties":{"command":{"type":"string","maxLength":16384},"workdir":{"type":"string","description":"Absolute directory; defaults to Termux HOME."},"timeout_seconds":{"type":"integer","minimum":1,"maximum":1800,"default":120}},"required":["command"],"additionalProperties":false}""",
         ExtensionRiskLevel.SENSITIVE, true,

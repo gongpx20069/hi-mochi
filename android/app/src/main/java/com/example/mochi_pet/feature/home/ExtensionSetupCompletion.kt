@@ -54,7 +54,7 @@ internal fun ExtensionSetupCompletionDialog(
                 })
                 Text("This also enables any disabled tools required by the Skill. Other tool choices are preserved.")
                 if (kind == ExtensionSetupKind.TERMUX) {
-                    Text("Background Shell authorization is unchanged and must be granted separately.")
+                    Text("Enabled commands run automatically for conversations, Scheduled Agents, and Subagents. Output may go to your model Provider.")
                 }
             }
         },

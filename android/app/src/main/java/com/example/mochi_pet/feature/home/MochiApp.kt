@@ -243,7 +243,6 @@ fun MochiApp(
         MochiHomeViewModel.factory(application, voiceRuntime, wakeRuntime)
     }
     val viewModel: MochiHomeViewModel = viewModel(factory = factory)
-    val termuxApproval by viewModel.termuxApproval.collectAsStateWithLifecycle()
     val termuxTasks by viewModel.termuxTasks.collectAsStateWithLifecycle()
     val showTermuxTasks by viewModel.showTermuxTasks.collectAsStateWithLifecycle()
     val termuxToolsState by viewModel.toolsState.collectAsStateWithLifecycle()
@@ -323,12 +322,7 @@ fun MochiApp(
         }
     }
 
-    termuxApproval?.let {
-        TermuxApprovalDialog(it, viewModel::onTermuxAction) {
-            startVoice(VoiceInputTrigger.DIRECT)
-        }
-    }
-    if (showTermuxTasks && termuxApproval == null) {
+    if (showTermuxTasks) {
         TermuxTasksDialog(termuxTasks, viewModel::onTermuxAction,
             termuxToolsState.feedback, termuxToolsState.isLoading)
     }
@@ -4264,7 +4258,6 @@ private fun ToolsSurface(
             item {
                 TermuxProviderCard(
                     summary = state.catalog.termux,
-                    backgroundEnabled = state.catalog.termuxBackgroundEnabled,
                     disabled = state.isLoading,
                     onAction = onTermuxAction,
                 )

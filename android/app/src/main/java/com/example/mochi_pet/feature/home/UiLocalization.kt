@@ -181,8 +181,8 @@ private val ZH_UI_TEXT = mapOf(
     "Hide connection settings" to "收起连接设置",
     "Check connection" to "检查连接",
     "Disconnect Termux?" to "断开 Termux？",
-    "New calls and background authorization will be disabled. Submitted commands will not be stopped." to
-        "将停用新的调用并撤销后台授权。已提交的命令不会停止。",
+    "New calls will be disabled for all Agents. Submitted commands will not be stopped." to
+        "将停用所有 Agent 的后续调用。已提交的命令不会停止。",
     "Disconnect Mi Home?" to "断开米家？",
     "You will need to authorize Mi Home again before using its tools." to "再次使用米家工具前，需要重新授权。",
     "Install or update AgentLink" to "安装或更新 AgentLink",
@@ -196,7 +196,6 @@ private val ZH_UI_TEXT = mapOf(
     "Use authorized remote workspaces, shared chats, and agent controls." to "访问已授权的远程工作区、共享对话和 Agent 控制。",
     "This also enables any disabled tools required by the Skill. Other tool choices are preserved." to
         "此操作也会重新启用该 Skill 必需但已关闭的工具；其他工具设置保持不变。",
-    "Background Shell authorization is unchanged and must be granted separately." to "后台 Shell 授权保持不变，必须单独开启。",
     "Connection is unavailable. Reconnect before enabling tools." to "连接不可用，请重新连接后再启用工具。",
     "Required Skill tools are unavailable." to "该 Skill 必需的工具不可用。",
     "Termux extension" to "Termux 扩展",
@@ -204,34 +203,12 @@ private val ZH_UI_TEXT = mapOf(
     "The extension is unavailable" to "扩展不可用",
     "Android blocked the extension" to "Android 阻止了扩展",
     "Optional extension · not installed" to "可选扩展 · 未安装",
-    "Unrestricted local shell. Commands require approval; output may be sent to your model Provider." to
-        "不受命令白名单限制的本机 Shell。执行需要授权，输出可能发送给当前模型 Provider。",
+    "Enabled commands run automatically for conversations, Scheduled Agents, and Subagents. Output may go to your model Provider." to
+        "启用后，对话、定时 Agent 和子 Agent 的命令均自动执行，无需逐次确认。输出可能发送给当前模型 Provider。",
     "Configure Termux" to "配置 Termux",
     "Connect Termux first." to "请先连接 Termux。",
-    "Enable Termux tools first." to "请先启用 Termux 工具。",
-    "Background Shell authorization" to "后台 Shell 授权",
-    "Off by default. Allows all Scheduled Agents and Subagents to use enabled Termux tools without per-call confirmation." to
-        "默认关闭。允许所有定时 Agent 和子 Agent 自动使用已启用的 Termux 工具，不再逐次确认。",
-    "Allow background Shell execution?" to "允许后台执行 Shell？",
-    "Authorize background Shell" to "授权后台 Shell",
-    ("All Scheduled Agents and Subagents, including those delegated from a conversation, " +
-        "can run unrestricted commands, change or delete accessible files, and use the network. " +
-        "Output may go to your model Provider. This permission persists across restarts. " +
-        "Foreground Main-Agent calls still require approval. Turning this off blocks new calls, " +
-        "but does not stop submitted commands. Disabling or disconnecting Termux clears this permission.") to
-        ("所有定时 Agent 和子 Agent（包括前台对话委派的子 Agent）均可执行不受白名单限制的命令，" +
-            "修改或删除可访问的文件，并使用网络。输出可能发送给当前模型 Provider。此授权在重启后仍有效。" +
-            "前台 Main Agent 仍需确认。关闭此开关会阻止后续调用，但不会停止已提交的命令。" +
-            "禁用或断开 Termux 会清除此授权。"),
     "Enable tools and Skill" to "启用工具和 Skill",
     "Termux tasks" to "Termux 任务",
-    "Allow Termux command?" to "允许执行 Termux 命令？",
-    "Commands can read or change Termux files and use the network. Output goes to your model Provider." to
-        "命令可以读取、修改 Termux 文件并访问网络。输出会发送给当前模型 Provider。",
-    "Say: execute once, allow this task, or cancel." to "可以说：执行一次、允许本次任务，或取消。",
-    "Voice confirmation" to "语音确认",
-    "Execute once" to "执行一次",
-    "Allow this task" to "允许本次任务",
     "Closing Mochi does not stop commands. Detached processes may survive a stop request." to
         "关闭 Mochi 不会停止命令。脱离任务的进程可能在请求停止后继续运行。",
     "No tasks" to "暂无任务",

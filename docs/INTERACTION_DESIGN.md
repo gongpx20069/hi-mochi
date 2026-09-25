@@ -319,25 +319,13 @@ connections need no terminal visit. Returning to Mochi refreshes readiness.
 Termux Skill; a Skill cannot silently enable the provider.
 
 Ordinary shell execution remains in the background without switching apps.
-A native approval dialog shows exact tool arguments, working directory/deadline
-when supplied, and the disclosure that commands have Termux permissions and
-Agent-visible output is sent to the model Provider. Choices are **Execute once**,
-**Allow this task** (current Agent run only), or **Cancel**. Voice confirmation
-accepts explicit full phrases bound to the currently pending request, not a
-model-authored confirmation. Starting approval recognition does not cancel the
-waiting Agent. Unknown speech does not grant permission.
-
-The Termux card also has a default-off **Background Shell authorization**
-switch. Enabling it requires a native confirmation explaining that all
-Scheduled Agents and Subagents (including foreground-delegated children) may
-run unrestricted commands without per-call prompts, change/delete accessible
-files, use the network, and send output to the model Provider. It persists
-across restarts, but never bypasses foreground Main-Agent confirmation.
-Neither **Enable tools and Skill** nor enabling the Skill grants this access.
-Turning it off takes effect for subsequent calls, without stopping submitted
-commands. Disabling or disconnecting the provider clears the permission;
-re-enabling the provider does not silently restore it. Revocation remains
-available when the extension is disconnected or unavailable.
+Once the provider and relevant Tools are enabled, foreground conversations,
+Scheduled Agents, and Subagents execute commands automatically. There is no
+per-command/run approval dialog, voice-confirmation interception, or separate
+background Shell switch. The card explains automatic execution and model-visible
+output. Android command permission and explicit provider enablement remain.
+Disabling the provider or an individual Tool blocks subsequent calls without
+stopping submitted commands; old registries remain revoked after re-enabling.
 
 **Termux tasks** provides submitted IDs, explicit refresh, bounded selectable
 output, Stop and completed-task cleanup. Reading output here does not call a
@@ -557,10 +545,10 @@ Use typed, localized check-stage/error evidence, not string matching on
 untrusted shell output. Generic missing evidence stays unknown. Do not show
 raw provider payloads, credentials, or arbitrary command output in diagnostics.
 
-Background Shell authorization is not an onboarding step. It stays default
-off in advanced permissions and retains its existing separate confirmation
-for Scheduled Agents/Subagents. Connecting or enabling the Skill cannot
-silently grant it. Foreground approval and Stop semantics remain unchanged.
+There is no separate background Shell authorization step. Connection alone
+does not enable the provider. Once enabled, all three execution scopes run
+commands automatically; Skill enablement never overrides provider/Tool
+switches. Stop semantics remain unchanged.
 
 ### Mi Home: the same shell, with QR and selection content
 

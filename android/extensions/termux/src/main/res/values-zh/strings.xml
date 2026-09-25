@@ -7,7 +7,7 @@
     <string name="prepare_title">先准备好 Termux</string>
     <string name="prepare_help">安装官方 Termux，首次打开并等待初始化完成，再回到这里。请保留现有 Termux 安装和数据，不要卸载重装。</string>
     <string name="permission_title">允许执行命令</string>
-    <string name="permission_help">需要 Android 允许 Mochi Termux 扩展在 Termux 中运行命令。这不会开启 Mochi 的后台 Shell 授权。</string>
+    <string name="permission_help">需要 Android 允许 Mochi Termux 扩展在 Termux 中运行命令。在 Mochi 中连接并启用 Termux 后，对话、定时 Agent 和子 Agent 的命令均自动执行。</string>
     <string name="external_title">一条命令，只需配置一次</string>
     <string name="paste_help">复制命令并打开 Termux。等待初始化完成，长按命令提示符处，粘贴后按回车。MOCHI_SETUP_SAVED 表示设置已保存，不代表连接成功。[1] 一类提示只是后台任务编号。完成后返回这里，会自动检查连接。</string>
     <string name="bootstrap_scope">命令保留其他设置，允许已获执行权限的外部应用（不只 Mochi）发起请求，仍需 Android 授权。不会下载远程脚本。</string>

@@ -52,7 +52,7 @@ run in local JVM tests.
 | `ExtensionToolAdapter` | bounded extension schema registration and Tool result translation |
 | Mi Home extension process | Xiaomi QR session, cloud requests, MIoT mapping, device selection, and ephemeral images |
 | Termux extension process | Setup, command dispatch, task IDs and result callbacks; the bundled supervisor executes inside Termux |
-| `TermuxApprovalGate` | Native per-call approval, registry revocation and transient task views; foreground grants belong to one registry |
+| `TermuxRuntimeState` | Registry revocation generation and transient task views; no execution approval state |
 | `AgentBrowserSessionController` | visible per-turn WebView, snapshots, actions, and cleanup |
 | `AgentExecutionService` | background Agent Browser lifetime and Stop notification |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
@@ -118,10 +118,10 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   Keystore-backed storage.
 - Termux task IDs live in private extension preferences, while bounded command
   output and the versioned helper live in Termux's private storage. Neither is
-  exported or backed up by Mochi. Main-Agent approval is in memory only.
-  A separate default-off `termuxBackgroundEnabled` Tool DataStore preference
-  authorizes all Scheduled Agents and Subagents, is checked per call, is
-  excluded from Provider sharing, and is cleared on provider disable/disconnect.
+  exported or backed up by Mochi. Provider and individual Tool settings govern
+  automatic execution in foreground, scheduled, and subagent registries.
+  The obsolete `termuxBackgroundEnabled` JSON field is ignored and removed
+  on the next catalog write; existing provider/Tool selections are preserved.
 - The same Tool DataStore stores the encrypted Amap Web Service Key, optional
   Security Key, and provider enablement. Six native Tools call fixed official
   HTTPS REST endpoints; they are not represented as a remote MCP server.

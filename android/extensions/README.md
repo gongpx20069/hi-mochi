@@ -102,11 +102,11 @@ management, not a permanent row of equally prominent buttons. Revocation must
 remain discoverable and reachable in at most two in-app actions from the card.
 Do not hide a failed or revoked permission in an overflow menu.
 
-The Termux **Background Shell authorization** control stays a separate,
-default-off advanced permission with its own native confirmation. It must
-never be bundled into connection, a recommended preset, or **Enable tools and
-Skill**. The same design system must not make Mi Home or AgentLink background
-capabilities appear available.
+Termux has no per-command confirmation or separate background permission.
+Its card explains that connected, enabled Tools execute automatically for
+conversations, Scheduled Agents, and Subagents. Provider and individual Tool
+switches remain authoritative. The same design system must not make Mi Home
+or AgentLink background capabilities appear available.
 
 ## Measurable onboarding targets
 
@@ -122,7 +122,7 @@ capabilities appear available.
 | Provider/network errors | State what is known, what is unknown, and one next action; diagnostics contain a safe stage/code, not raw provider payloads |
 | Back/rotation/re-entry | Retain non-secret progress and draft selection; revalidate external facts and reject stale callbacks; never replay a write or bootstrap command |
 | Optional test after setup | No LLM, billable task, device mutation, workspace creation, or automatic shell task solely to show a success illustration |
-| Consent | Cancelling system/native authorization never enables a provider, Skill, or background Shell permission |
+| Consent | Cancelling setup or explicit enablement never enables a provider or Skill |
 
 Do not publish a seconds-to-complete promise without measured device results.
 For usability acceptance, have five first-time testers attempt the documented

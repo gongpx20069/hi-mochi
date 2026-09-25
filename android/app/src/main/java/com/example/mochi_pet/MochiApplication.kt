@@ -170,7 +170,7 @@ class MochiApplication : Application() {
         AndroidMochiExtensionClient(this, com.example.mochi_pet.core.extensions.TrustedExtension.TERMUX)
     }
 
-    val termuxApproval = com.example.mochi_pet.core.extensions.TermuxApprovalGate()
+    val termuxRuntime = com.example.mochi_pet.core.extensions.TermuxRuntimeState()
 
     val agentLinkClient: AndroidAgentLinkClient by lazy {
         AndroidAgentLinkClient(this, toolDataStore)
@@ -186,7 +186,7 @@ class MochiApplication : Application() {
             extensionClient = extensionClient,
             agentLinkClient = agentLinkClient,
             termuxClient = termuxClient,
-            termuxApproval = termuxApproval,
+            termuxRuntime = termuxRuntime,
         )
     }
 

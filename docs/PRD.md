@@ -18,19 +18,19 @@ runtime.
 4. Voice-first: speech can change data and move the UI to the most relevant
    Mochi surface.
 5. Explicit side effects: destructive or sensitive actions require clear user
-   intent and platform confirmation where appropriate. Agent Browser is the
-   explicit exception: its enabled Tools execute without Mochi approval prompts.
+   intent and platform confirmation where appropriate. Enabled Agent Browser
+   and Termux Tools execute without Mochi per-command approval prompts.
 
 Optional Termux execution is unrestricted shell capability, not a sandbox.
 It requires a separately installed, trusted Mochi Termux extension and Termux,
-explicit Android permission and native Mochi authorization. Foreground users
-approve one call or the current Agent run. A separate default-off **Background
-Shell authorization** setting grants all Scheduled Agents and Subagents
-automatic access to enabled Termux Tools, including children delegated from
-foreground conversations. This permission persists across restarts, is
-rechecked on every call, and is cleared when Termux is disabled or disconnected.
-It does not bypass foreground Main-Agent confirmation. Turning it off blocks
-new calls, not already submitted commands. Command output used by the Agent is
+explicit Android permission, connection, and Mochi provider/Tool enablement.
+Once enabled, commands execute automatically for foreground conversations,
+all Scheduled Agents, and both Subagent roles. There is no per-command/run
+approval, voice confirmation, or separate background authorization setting.
+Each call still checks provider and Tool switches; disabling or disconnecting
+blocks new calls without stopping submitted commands. Existing enabled
+providers adopt this policy on upgrade; their individual Tool choices remain.
+Command output used by the Agent is
 sent to the selected model Provider. Installation,
 authorization and manual interactive-terminal work may open another App;
 ordinary commands run in the background without switching away from Mochi.
@@ -170,8 +170,8 @@ support is an optional import/export adapter.
   delegate, run in parallel, or continue in the background.
 - Researcher receives enabled Browser Tools, read-only MCP Tools, and Skills.
   Analyst receives the same capabilities plus sandboxed JavaScript.
-  Both may also use Termux when the user explicitly enables Background Shell
-  authorization; shell changes must remain within the delegated task.
+  Both may also use connected, enabled Termux Tools without additional
+  confirmation; shell changes must remain within the delegated task.
 - Subagents receive no parent conversation history, memories, or persona.
 - When a foreground request explicitly asks to view, describe, or analyze a
   camera event and provider image input is enabled, the Main Agent may attach

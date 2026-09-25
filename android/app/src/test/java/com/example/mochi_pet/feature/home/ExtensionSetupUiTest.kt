@@ -50,7 +50,7 @@ class ExtensionSetupUiTest {
             }
         }
         compose.onNodeWithText("This also enables any disabled tools required by the Skill. Other tool choices are preserved.").assertExists()
-        compose.onNodeWithText("Background Shell authorization is unchanged and must be granted separately.").assertExists()
+        compose.onNodeWithText("Enabled commands run automatically for conversations, Scheduled Agents, and Subagents. Output may go to your model Provider.").assertExists()
         compose.onNodeWithText("Not now").performClick()
         assertFalse(enabled)
         assertEquals(true, dismissed)

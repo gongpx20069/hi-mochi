@@ -90,7 +90,7 @@ or verification in earlier phases.
 - [x] Add isolated Researcher and Analyst roles.
 - [x] Add one-at-a-time delegation with a two-child per-run limit.
 - [x] Restrict children to Browser, read-only MCP, Skills, and Analyst JS by
-  default; allow Termux only with explicit Background Shell authorization.
+  default; also expose connected, enabled Termux Tools with automatic execution.
 - [x] Reuse the active Browser session and identify the child on its card.
 - [ ] Add end-to-end provider and real-device Subagent validation.
 
@@ -120,9 +120,9 @@ or verification in earlier phases.
   camera event retrieval against real accounts and devices.
 - [ ] Validate in-place base/extension installation, Binder recovery, and
   configuration UX on real Android hardware.
-- [x] Add default-off persistent Background Shell authorization for Termux in
-  Scheduled Agents and both Subagent roles, with per-call switch checks.
-- [ ] Validate Termux foreground/background authorization, scheduled/child
+- [x] Use automatic Termux execution across foreground, Scheduled Agents, and
+  both Subagent roles; remove command approval and the separate background flag.
+- [ ] Validate Termux foreground/scheduled/child
   execution, revocation, and task lifetime on real Android hardware.
 - [x] Implement the shared extension UI library, Termux/Mi Home setup pages,
   common explicit enablement, and Mochi-owned AgentLink card.

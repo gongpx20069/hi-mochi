@@ -60,7 +60,6 @@ data class ToolCatalogSummary(
     val agentBrowser: AgentBrowserProviderSummary = AgentBrowserProviderSummary(),
     val mijia: ExtensionProviderSummary = ExtensionProviderSummary(),
     val termux: ExtensionProviderSummary = ExtensionProviderSummary(),
-    val termuxBackgroundEnabled: Boolean = false,
     val agentLink: AgentLinkState = AgentLinkState(),
     val servers: List<McpServerSummary> = emptyList(),
     val isLoading: Boolean = false,
@@ -299,8 +298,6 @@ interface ToolCatalogRepository {
     suspend fun setTermuxToolEnabled(name: String, enabled: Boolean): ToolCatalogSummary =
         throw UnsupportedOperationException("Termux extension is unavailable")
 
-    suspend fun setTermuxBackgroundEnabled(enabled: Boolean): ToolCatalogSummary
-
     suspend fun disconnectTermux(): ToolCatalogSummary =
         throw UnsupportedOperationException("Termux extension is unavailable")
 
@@ -354,8 +351,8 @@ class DataStoreToolCatalogRepository(
         UnavailableExtensionClient,
     private val agentLinkClient: AgentLinkClient? = null,
     private val termuxClient: MochiExtensionClient = UnavailableExtensionClient,
-    private val termuxApproval: com.example.mochi_pet.core.extensions.TermuxApprovalGate =
-        com.example.mochi_pet.core.extensions.TermuxApprovalGate(),
+    private val termuxRuntime: com.example.mochi_pet.core.extensions.TermuxRuntimeState =
+        com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
 ) : ToolCatalogRepository {
     private val json = Json {
         encodeDefaults = true
@@ -370,7 +367,6 @@ class DataStoreToolCatalogRepository(
         val termux = termuxClient.snapshot()
         return catalog.toSummary(extensionClient.snapshot()).copy(
             agentLink = agentLinkClient?.refresh() ?: AgentLinkState(),
-            termuxBackgroundEnabled = catalog.termuxBackgroundEnabled,
             termux = ExtensionProviderSummary(
                 installed = termux.installed,
                 trusted = termux.trusted,
@@ -1129,14 +1125,13 @@ class DataStoreToolCatalogRepository(
     override suspend fun loadEnabledExtensionTools(scope: ExtensionToolScope): List<AgentTool> {
         val catalog = loadCatalog()
         val foreground = scope == ExtensionToolScope.FOREGROUND_MAIN
-        val termuxTools = if (catalog.termuxEnabled && (foreground || catalog.termuxBackgroundEnabled)) {
+        val termuxTools = if (catalog.termuxEnabled) {
             val snapshot = termuxClient.snapshot()
             val session = com.example.mochi_pet.core.extensions.TermuxToolSession(
-                termuxApproval, requiresApproval = foreground,
+                termuxRuntime,
             ) { name ->
                 val current = loadCatalog()
                 current.termuxEnabled &&
-                    (foreground || current.termuxBackgroundEnabled) &&
                     (current.termuxToolsEnabled[name] ?: snapshot.tools.first { it.name == name }.defaultEnabled)
             }
             if (snapshot.connected) snapshot.tools.filter {
@@ -1158,33 +1153,23 @@ class DataStoreToolCatalogRepository(
 
     override suspend fun setTermuxEnabled(enabled: Boolean): ToolCatalogSummary {
         if (enabled) require(termuxClient.snapshot().connected) { "Connect Termux first." }
-        termuxApproval.cancelPending()
+        termuxRuntime.invalidateSessions()
         updateCatalog {
-            it.copy(termuxEnabled = enabled, termuxBackgroundEnabled = enabled && it.termuxBackgroundEnabled)
+            it.copy(termuxEnabled = enabled)
         }
-        return loadSummary()
-    }
-
-    override suspend fun setTermuxBackgroundEnabled(enabled: Boolean): ToolCatalogSummary {
-        if (enabled) require(termuxClient.snapshot().connected) { "Connect Termux first." }
-        updateCatalog {
-            require(!enabled || it.termuxEnabled) { "Enable Termux tools first." }
-            it.copy(termuxBackgroundEnabled = enabled)
-        }
-        termuxApproval.cancelPending()
         return loadSummary()
     }
 
     override suspend fun setTermuxToolEnabled(name: String, enabled: Boolean): ToolCatalogSummary {
         require(name in setOf("termux_exec", "termux_task")) { "Unknown Termux tool." }
-        termuxApproval.cancelPending()
+        termuxRuntime.invalidateSessions()
         updateCatalog { it.copy(termuxToolsEnabled = it.termuxToolsEnabled + (name to enabled)) }
         return loadSummary()
     }
 
     override suspend fun disconnectTermux(): ToolCatalogSummary {
-        termuxApproval.cancelPending()
-        updateCatalog { it.copy(termuxEnabled = false, termuxBackgroundEnabled = false) }
+        termuxRuntime.invalidateSessions()
+        updateCatalog { it.copy(termuxEnabled = false) }
         termuxClient.disconnect()
         return loadSummary()
     }
@@ -1825,7 +1810,6 @@ private data class PersistedToolCatalog(
     val mijiaEnabled: Boolean = false,
     val mijiaToolsEnabled: Map<String, Boolean> = emptyMap(),
     val termuxEnabled: Boolean = false,
-    val termuxBackgroundEnabled: Boolean = false,
     val termuxToolsEnabled: Map<String, Boolean> = emptyMap(),
     val servers: List<PersistedMcpServer> = emptyList(),
     val pendingNotionOAuth: PendingOAuthRecord? = null,

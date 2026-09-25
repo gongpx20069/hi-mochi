@@ -174,8 +174,8 @@ limited to two child runs per request, and never grants a child access to
 planner mutations, device location, credentials, UI navigation, or other
 foreground-only capabilities. Researcher uses enabled Browser and approved
 read-only MCP Tools; Analyst can additionally use the local JavaScript
-sandbox. Both roles may also use Termux after you explicitly enable the
-separate [Background Shell authorization](#run-local-commands-with-termux).
+sandbox. Both roles may also use [Termux](#run-local-commands-with-termux)
+once its provider is connected and its Tools are enabled.
 
 ## Skills and Tools
 
@@ -263,8 +263,8 @@ These integrations add capabilities to Mochi but are **not required for its
 core features**. Install only what you need. Mi Home and Termux use optional
 Mochi-signed extension APKs; AgentLink connects through its independent
 companion app. Mi Home and AgentLink are foreground Main-Agent integrations;
-Termux can also serve Subagents and Scheduled Agents with separate explicit
-background authorization, disabled by default.
+Termux also serves Subagents and Scheduled Agents automatically once connected
+and enabled. Installation alone never enables its provider.
 
 | Integration | Built-in Skill (default) | Additional capabilities | Installation |
 | --- | --- | --- | --- |
@@ -320,15 +320,13 @@ prompt and press Enter. Returning automatically checks the connection.
 terminal background-job number, not a successful connection.
 After verification, choose **Enable tools and Skill** or **Not now**.
 
-Speak normally to Mochi; approved commands run in the background without an App
-switch. Foreground Main-Agent calls require approval for one call or the current
-task. To allow **all Scheduled Agents and Subagents** to execute automatically,
-open **Connection settings > Background Shell authorization** in the Termux card and confirm the
-warning. This is a separate, default-off permission that survives restarts;
-**Enable tools and Skill** does not grant it. It also covers children delegated
-from a foreground conversation, but never skips Main-Agent approval.
-Turning it off blocks subsequent calls; disabling/disconnecting Termux clears
-the permission. Keep both Mochi and its Termux extension updated.
+Speak normally to Mochi; once connected and enabled, commands execute
+automatically for **foreground conversations, all Scheduled Agents, and
+Subagents**, without per-command confirmation or an App switch. There is no
+separate background authorization setting. Provider and individual Tool
+switches still apply; disabling or disconnecting blocks new calls but does not
+stop submitted work. Existing enabled providers adopt this behavior on update,
+preserving individual Tool choices. Keep Mochi and its Termux extension updated.
 
 This is unrestricted shell under Termux permissions, not root or a sandbox.
 Agent-visible output is sent to your chosen model Provider.

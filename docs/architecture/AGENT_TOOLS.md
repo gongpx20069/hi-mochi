@@ -73,8 +73,8 @@ allowlists for built-in Notion and Tencent Docs providers. Remote
 `readOnlyHint` annotations and manually configured MCP servers do not grant
 Subagent access.
 Both child roles can additionally receive `termux_exec` and `termux_task`
-under the separate default-off Background Shell authorization. No other
-extension or companion provider gains child access from that permission.
+when the Termux provider is connected and enabled and the individual Tools
+are enabled. No other extension or companion provider gains child access.
 
 ## 1.1 AgentLink companion provider
 
@@ -123,7 +123,7 @@ must never be used as an authorization or disabled-Tool workaround.
 ### Optional Termux tools
 
 `termux_exec(command, workdir?, timeout_seconds?)` submits unrestricted shell
-after native authorization, returning `task_id` and `state=submitted`.
+when connected and enabled, returning `task_id` and `state=submitted`.
 It does not claim completion. `workdir` defaults to Termux HOME, commands are
 bounded to 16 KiB UTF-8, and timeout is 1–1800 seconds, default 120.
 
@@ -134,14 +134,12 @@ truncation flag. A nonzero command exit is a successfully observed `failed`
 task, not a successful command; dispatch/authorization/transport failures use
 the standard error envelope. Forget removes only completed task output.
 
-Both provider and individual switches are enforced, including after an approval
-wait. Foreground Main-Agent calls use nonce-bound per-call/run approval even
-when background access is enabled. Scheduled Agents and both Subagent roles
-receive these Tools only when the separate native Background Shell
-authorization is on. Its persistent flag is checked on every background call;
-disabling/disconnecting Termux clears it. The default-off Termux Skill follows
-the actual registry's required-Tool readiness. One-run foreground approval
-never grants background access. There is no model-supplied shell `confirmed`
+Both provider and individual switches are enforced on every call. Foreground
+Main Agents, Scheduled Agents, and both Subagent roles execute enabled tools
+automatically, without per-command/run confirmation or a separate background
+setting. Disabling a Tool/provider or disconnecting invalidates old registries,
+including after re-enabling. The default-off Termux Skill follows the actual
+registry's required-Tool readiness. There is no model-supplied shell `confirmed`
 flag, silent retry, or unrestricted Android Intent dispatch.
 See `EXTENSIONS.md` for setup, command privacy and process-lifetime guarantees.
 

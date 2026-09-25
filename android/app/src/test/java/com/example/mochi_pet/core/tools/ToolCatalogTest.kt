@@ -17,8 +17,7 @@ import com.example.mochi_pet.core.extensions.ExtensionToolScope
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
 import com.example.mochi_pet.core.extensions.MochiExtensionSnapshot
 import com.example.mochi_pet.core.extensions.OpenedExtensionAttachment
-import com.example.mochi_pet.core.extensions.TermuxApprovalChoice
-import com.example.mochi_pet.core.extensions.TermuxApprovalGate
+import com.example.mochi_pet.core.extensions.TermuxRuntimeState
 import com.example.mochi_pet.core.extensions.TrustedExtension
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.maps.AmapCredentials
@@ -36,9 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -80,76 +77,68 @@ class ToolCatalogTest {
 
     private fun termuxRepository(
         termux: RecordingExtensionClient,
-        gate: TermuxApprovalGate,
+        runtime: TermuxRuntimeState,
     ) = DataStoreToolCatalogRepository(
         dataStore = dataStore,
         secretCipher = PlaintextCipher,
         mcpClient = client,
         termuxClient = termux,
-        termuxApproval = gate,
+        termuxRuntime = runtime,
         extensionClient = RecordingExtensionClient(TrustedExtension.MIJIA),
     )
 
     @Test
-    fun `existing settings cannot grant background shell and opted in registries exclude Mi Home`() = runBlocking {
-        dataStore.edit {
-            it[stringPreferencesKey("tools.catalog")] = """{"termuxEnabled":true,"mijiaEnabled":true}"""
-        }
+    fun `legacy background flags no longer restrict enabled Termux and background registries exclude Mi Home`() = runBlocking {
         val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
-        val gate = TermuxApprovalGate()
-        val catalog = termuxRepository(extension, gate)
-        assertFalse(catalog.loadSummary().termuxBackgroundEnabled)
-        backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
-        assertEquals(
-            setOf("termux_exec", "termux_task", "mijia_list_devices"),
-            catalog.loadEnabledExtensionTools().map { it.name }.toSet(),
-        )
-
-        catalog.setTermuxBackgroundEnabled(true)
-        val restored = termuxRepository(extension, gate)
-        assertTrue(restored.loadSummary().termuxBackgroundEnabled)
-        backgroundScopes.forEach { scope ->
-            val tools = restored.loadEnabledExtensionTools(scope)
-            assertEquals(setOf("termux_exec", "termux_task"), tools.map { it.name }.toSet())
-            tools.forEach { tool ->
-                assertEquals("ok", tool.execute(termuxArguments, termuxContext).status)
-                assertEquals(scope, extension.executions.last())
-                assertNull(gate.pending.value)
+        val runtime = TermuxRuntimeState()
+        for (legacy in listOf("", ""","termuxBackgroundEnabled":false""", ""","termuxBackgroundEnabled":true""")) {
+            dataStore.edit {
+                it[stringPreferencesKey("tools.catalog")] = """{"termuxEnabled":true,"mijiaEnabled":true$legacy}"""
+            }
+            val restored = termuxRepository(extension, runtime)
+            assertTrue(restored.loadSummary().termux.enabled)
+            assertFalse(dataStore.data.first()[stringPreferencesKey("tools.catalog")].orEmpty().contains("termuxBackgroundEnabled"))
+            assertEquals(
+                setOf("termux_exec", "termux_task", "mijia_list_devices"),
+                restored.loadEnabledExtensionTools().map { it.name }.toSet(),
+            )
+            backgroundScopes.forEach { scope ->
+                val tools = restored.loadEnabledExtensionTools(scope)
+                assertEquals(setOf("termux_exec", "termux_task"), tools.map { it.name }.toSet())
+                tools.forEach { tool ->
+                    assertEquals("ok", withTimeout(5_000) { tool.execute(termuxArguments, termuxContext) }.status)
+                    assertEquals(scope, extension.executions.last())
+                }
             }
         }
-        assertEquals(4, extension.executions.size)
-        assertEquals("task-4", gate.tasks.value.first().id)
+        assertEquals(12, extension.executions.size)
+        assertEquals("task-12", runtime.tasks.value.first().id)
     }
 
     @Test
-    fun `background authorization never bypasses foreground confirmation`() = runBlocking {
+    fun `foreground tools execute immediately without confirmation`() = runBlocking {
         val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
-        val gate = TermuxApprovalGate()
-        val catalog = termuxRepository(extension, gate)
+        val catalog = termuxRepository(extension, TermuxRuntimeState())
         catalog.setTermuxEnabled(true)
-        catalog.setTermuxBackgroundEnabled(true)
         val tool = catalog.loadEnabledExtensionTools().first { it.name == "termux_exec" }
-        val pending = async { tool.execute(termuxArguments, termuxContext) }
-        val request = withTimeout(5_000) { gate.pending.filterNotNull().first() }
-        assertTrue(extension.executions.isEmpty())
-        gate.respond(request.id, TermuxApprovalChoice.DENY)
-        assertEquals("PERMISSION_DENIED", pending.await().code)
-        assertTrue(extension.executions.isEmpty())
+        repeat(2) {
+            assertEquals("ok", withTimeout(5_000) { tool.execute(termuxArguments, termuxContext) }.status)
+        }
+        assertEquals(listOf(ExtensionToolScope.FOREGROUND_MAIN, ExtensionToolScope.FOREGROUND_MAIN), extension.executions)
     }
 
     @Test
-    fun `background permission revokes old registries even after reenable`() = runBlocking {
+    fun `provider disable revokes all old registries even after reenable`() = runBlocking {
         val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
-        val gate = TermuxApprovalGate()
-        val catalog = termuxRepository(extension, gate)
+        val catalog = termuxRepository(extension, TermuxRuntimeState())
         catalog.setTermuxEnabled(true)
-        catalog.setTermuxBackgroundEnabled(true)
-        val staleTools = backgroundScopes.map { scope ->
+        val allScopes = listOf(ExtensionToolScope.FOREGROUND_MAIN) + backgroundScopes
+        val staleTools = allScopes.map { scope ->
             catalog.loadEnabledExtensionTools(scope).first { it.name == "termux_exec" }
         }
-        catalog.setTermuxBackgroundEnabled(false)
-        backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
-        catalog.setTermuxBackgroundEnabled(true)
+        catalog.setTermuxEnabled(false)
+        allScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
+        catalog.setTermuxEnabled(true)
         staleTools.forEach {
             assertEquals("PERMISSION_DENIED", it.execute(termuxArguments, termuxContext).code)
         }
@@ -161,10 +150,8 @@ class ToolCatalogTest {
     @Test
     fun `provider tool and connection switches remain authoritative for background shell`() = runBlocking {
         val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
-        val gate = TermuxApprovalGate()
-        val catalog = termuxRepository(extension, gate)
+        val catalog = termuxRepository(extension, TermuxRuntimeState())
         catalog.setTermuxEnabled(true)
-        catalog.setTermuxBackgroundEnabled(true)
         val stale = catalog.loadEnabledExtensionTools(ExtensionToolScope.SCHEDULED).first()
         catalog.setTermuxToolEnabled("termux_exec", false)
         backgroundScopes.forEach { scope ->
@@ -172,33 +159,33 @@ class ToolCatalogTest {
         }
         assertEquals("PERMISSION_DENIED", stale.execute(termuxArguments, termuxContext).code)
         catalog.setTermuxEnabled(false)
-        assertFalse(catalog.loadSummary().termuxBackgroundEnabled)
-        catalog.setTermuxEnabled(true)
         backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
-        catalog.setTermuxBackgroundEnabled(true)
+        catalog.setTermuxEnabled(true)
+        backgroundScopes.forEach {
+            assertEquals(listOf("termux_task"), catalog.loadEnabledExtensionTools(it).map { tool -> tool.name })
+        }
         extension.connected = false
         backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
         extension.connected = true
         catalog.disconnectTermux()
-        assertFalse(catalog.loadSummary().termuxBackgroundEnabled)
         assertFalse(catalog.loadSummary().termux.enabled)
         assertTrue(extension.executions.isEmpty())
     }
 
     @Test
-    fun `background permission requires connected enabled provider but can always be revoked`() = runBlocking {
+    fun `Termux is disabled by default and disconnected provider cannot be enabled`() = runBlocking {
         val extension = RecordingExtensionClient(TrustedExtension.TERMUX)
-        val catalog = termuxRepository(extension, TermuxApprovalGate())
-        assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { catalog.setTermuxBackgroundEnabled(true) }
+        val catalog = termuxRepository(extension, TermuxRuntimeState())
+        assertFalse(catalog.loadSummary().termux.enabled)
+        (listOf(ExtensionToolScope.FOREGROUND_MAIN) + backgroundScopes).forEach {
+            assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty())
         }
         catalog.setTermuxEnabled(true)
-        catalog.setTermuxBackgroundEnabled(true)
         extension.connected = false
         assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { catalog.setTermuxBackgroundEnabled(true) }
+            runBlocking { catalog.setTermuxEnabled(true) }
         }
-        assertFalse(catalog.setTermuxBackgroundEnabled(false).termuxBackgroundEnabled)
+        assertFalse(catalog.setTermuxEnabled(false).termux.enabled)
     }
 
     private lateinit var directory: File
