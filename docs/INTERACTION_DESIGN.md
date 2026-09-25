@@ -459,3 +459,153 @@ future-dated todos are not carried into Today.
 - TTS response and visual transition must describe the same resolved date.
 - Keep default SOUL, USER, AGENTS, Tool schemas, and model system prompts in
   English; UI localization must not rewrite Agent instructions.
+
+## 7. Planned unified extension experience
+
+**Design proposal, not current runtime behavior.** Sections above describe
+the shipped flows. This redesign covers Termux, Mi Home, AgentLink, and future
+optional integrations. Shared visual tokens, measurable layout/accessibility
+targets, and acceptance criteria live in
+[`android/extensions/README.md`](../android/extensions/README.md).
+
+### Common structure and trust boundary
+
+Use a shared Mochi connection wizard rather than a page of setup commands and
+equally prominent buttons. The structure is **Prepare > Authorize > Verify**,
+with provider-specific content and a final, explicit host enablement action.
+Only the current incomplete step is expanded. Users can leave and continue;
+already verified prerequisites are not presented as work to repeat.
+
+Connection, user authorization, Tool enablement, and Skill enablement remain
+separate facts. Show **Connected - not enabled** when appropriate, not a
+premature ready-to-use success. The completion summary names the capabilities
+about to be enabled. **Enable tools and Skill** is an explicit host action;
+**Not now** preserves the connection without enabling execution. Preserve
+existing individual choices when reconnecting. If a required Tool is disabled,
+explain the Skill dependency and ask before restoring that Tool; never silently
+overwrite a user's selection.
+
+Every Mochi integration card uses the same structure and state vocabulary.
+The protocol does not change: Termux/Mi Home are same-signer extension APKs;
+AgentLink is a separately authorized companion. Its native authorization and
+access-management pages require a coordinated change in
+[`android-agent-link`](https://github.com/gongpx20069/android-agent-link).
+This repository owns the Mochi card, preflight, handoff, return, and status
+presentation, not Android or third-party screens.
+
+State labels distinguish **Not installed**, **Setup required**, **Awaiting
+authorization**, **Checking**, **Connected - not enabled**, **Ready**,
+**Authorization expired**, **Unavailable**, and **Outcome unknown**.
+Do not map every transport failure to expired credentials or reinstall.
+Readiness comes from a fresh validated result, never a timer, app return, or
+the user's statement that a step is done.
+
+### Termux: guide the user through the necessary work only
+
+The current screen mixes prerequisites, a long command, Android authorization,
+testing, and completion on one page. A generic failure does not identify the
+failed check, and returning to the Activity only refreshes a connected flag.
+The redesign replaces this with the following evidence-driven sequence:
+
+| Step | Display and primary action | Advance condition |
+| --- | --- | --- |
+| Prepare | Detect Termux installation. If missing, **Install Termux** opens official installation guidance. Explain first-run initialization and how to return. | Package availability is verified; initialization is not assumed from installation alone. |
+| Authorize: Android | Explain that Mochi Termux Extension needs Android's permission to run commands in Termux. **Allow command access** opens the system permission request. Skip when already granted. | Actual Android permission is granted. A denial stays on this step; open app settings only after another explicit action. |
+| Authorize: Termux | After permission, a user-initiated connection attempt checks whether setup already works. Otherwise guide the one-time external-access setup when evidence supports that recovery. **Copy command and open Termux** is the only primary action. | Returning from the pending terminal handoff starts one verification attempt; neither copying nor returning counts as success. |
+| Verify | Show actual phases: checking access, installing/updating the bundled helper, checking shell prerequisites, and receiving a callback. | Validated callback and required shell checks succeed. |
+| Finish in Mochi | Show **Connected - not enabled**, capability/privacy summary, **Enable tools and Skill**, and **Not now**. Return via the validated native Activity path; no separate Done/Refresh/Test sequence. | Host revalidates connection and applies only the enablement explicitly chosen by the user. |
+
+The first Connect action explains that verification may write Mochi's bundled
+helper into Termux private storage; it does not execute a user task or call a
+model. Fully configured users bypass the manual-command branch. A saved
+connected flag alone is insufficient to skip fresh checks.
+
+For the terminal handoff, show concrete instructions before leaving:
+**Wait for Termux initialization if needed. Long-press the prompt, paste the
+copied command, press Enter, then return to Mochi.** Show what the command
+changes and make its complete text inspectable/selectable in an expandable
+code panel. Copy the exact inspected command; no remote bootstrap download,
+invisible auto-paste, accessibility clicks, or simulated Enter.
+
+Stock Termux does not let another app change its private
+`allow-external-apps` setting before access is authorized. Therefore a fresh
+setup still needs this one manual command; do not promise zero-touch setup.
+Explain that this setting permits requests from externally authorized apps,
+not only Mochi, and that Android permission and Mochi authorization are
+additional checks. Preserve other Termux settings and installed data.
+
+On return, use the pending attempt identity to resume once. Rotation, repeated
+onResume, late callbacks, or cancellation must not start duplicate probes or
+install helpers concurrently. Losing the Activity can require a new check,
+never a silent replay of the bootstrap command or a previously submitted task.
+
+| Observed problem | User-facing recovery |
+| --- | --- |
+| Termux absent | Install from official guidance; do not show permission/test buttons yet. |
+| Android command permission denied | Explain which permission was denied; offer retry or, when necessary, an explicit Open settings action. |
+| Explicit external-access rejection | Return to the one-time command step with its purpose and paste instructions. |
+| Shell executable/helper prerequisite error | Explain initialization or the named missing prerequisite; do not run package installation without consent. |
+| Callback deadline expired | Say the connection was not confirmed. Offer Retry and collapsed checks for terminal setup/background restrictions; do not assert which setting is wrong. |
+| Android reports background start blocked | Offer Open Termux, then retry after return; do not require disabling battery optimization for every user. |
+| Protocol/package trust mismatch | Explain compatible in-place update/signing requirements; never suggest uninstalling as the default repair. |
+
+Use typed, localized check-stage/error evidence, not string matching on
+untrusted shell output. Generic missing evidence stays unknown. Do not show
+raw provider payloads, credentials, or arbitrary command output in diagnostics.
+
+Background Shell authorization is not an onboarding step. It stays default
+off in advanced permissions and retains its existing separate confirmation
+for Scheduled Agents/Subagents. Connecting or enabling the Skill cannot
+silently grant it. Foreground approval and Stop semantics remain unchanged.
+
+### Mi Home: the same shell, with QR and selection content
+
+Prepare explains **another phone already signed into Mi Home must scan and
+confirm** before showing a QR code. Do not promise an unsupported same-phone
+login shortcut or ask for account passwords.
+
+Authorize shows one QR card, clear scan/confirm state, actual expiry countdown,
+and a refresh action only when appropriate. Keep one active challenge; Cancel,
+expiry, and stale callbacks cannot complete a different challenge. After
+authorization, discover the region and devices with visible progress.
+
+The selection step groups supported devices by home/room and offers search,
+per-home selection, and a persistent selected count. Only supported visible
+devices are selectable; bulk selection never silently includes unsupported
+devices. Preserve saved choices on re-entry and retain unsaved choices across
+rotation; leaving with unsaved changes asks whether to discard them.
+Zero supported devices is an explained empty state, not an enabled success.
+Saving an intentional empty selection disables usable device access rather
+than inventing a device or failing silently.
+
+Save returns to the common Mochi completion/enablement summary. Manage devices,
+reconnect, and disconnect share the common management area. Disconnect requires
+confirmation; it must not sit beside Save as an equally prominent primary
+action. Camera descriptions still say latest available event, not live video.
+
+### AgentLink: distinguish app authorization from computer availability
+
+Prepare checks installation and protocol compatibility independently. A
+missing app links to AgentLink downloads; an incompatible version offers an
+update. Explain that remote work also needs a connected desktop Bridge, with
+a link to its official setup instructions rather than an unexplained failure.
+
+Authorize names the destination before opening AgentLink's native scoped
+consent page. Preserve nonce/signer validation and exact granted scope. On a
+validated return, refresh once without requiring a manual Refresh click.
+Cancellation or a stale Activity result never grants access.
+
+Verify checks companion authorization and connectivity; authorized read-only
+machine/workspace discovery may present available targets. Do not send an
+Agent prompt, create a workspace, change configuration, or broaden access as a
+connection test. If evidence specifically shows a Bridge is offline, say
+**Authorized - computer offline** and offer to open AgentLink/setup guidance.
+If the failure source is unknown, say so rather than diagnosing the Bridge.
+Do not force repeated authorization to repair mere transport unavailability.
+
+Completion follows the same host enablement summary. Move linked chats to a
+separate expandable management section with freshness/unknown-outcome labels;
+cached links are not live task state. Access management and revoke stay
+explicit, discoverable native actions. Revoke reports unconfirmed remote
+results honestly; neither leaving the wizard nor closing Mochi stops remote
+tasks. AgentLink remains unavailable to Scheduled Agents and Subagents.

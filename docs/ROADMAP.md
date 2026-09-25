@@ -124,3 +124,8 @@ or verification in earlier phases.
   Scheduled Agents and both Subagent roles, with per-call switch checks.
 - [ ] Validate Termux foreground/background authorization, scheduled/child
   execution, revocation, and task lifetime on real Android hardware.
+- [ ] Implement the proposed shared extension setup shell and visual acceptance
+  criteria for Termux, Mi Home, and AgentLink; see `INTERACTION_DESIGN.md` and
+  `android/extensions/README.md`.
+- [ ] Coordinate AgentLink native authorization/access-management styling in
+  its companion repository; host card styling alone does not complete the work.

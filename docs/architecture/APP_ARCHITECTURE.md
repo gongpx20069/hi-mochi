@@ -240,6 +240,16 @@ metadata, connection state, Tool definitions, asynchronous Tool calls,
 cancellation, and bounded attachments. It contains no provider implementation,
 Compose UI, network client, secret storage, or model dependency.
 
+The unified extension experience in `INTERACTION_DESIGN.md` is a planned
+redesign, not an existing module. Its implementation should extract the host's
+theme and shared setup components into a compile-time Android UI library used
+by `app`, `extensions:mijia`, and `extensions:termux`. That library owns only
+presentation tokens/components, never authorization, provider state, Binder,
+networking, or secrets. It must not depend on an application module or change
+`extension-api` into a UI dependency. AgentLink remains an independent
+repository/protocol and needs coordinated native-page styling; it cannot
+consume Mochi's host application module.
+
 `ExtensionManager` binds an explicit package only after PackageManager confirms
 the expected package name, signing-certificate digest, signature-level bind
 permission, exported service identity, minimum host version, and supported

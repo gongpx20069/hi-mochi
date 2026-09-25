@@ -44,6 +44,11 @@ across the core and optional-extension tables. Keep both README languages
 aligned: installation and essential configuration first, core features next,
 and optional Mi Home, AgentLink, and Termux integrations in a later section.
 
+The planned all-extension setup flows live in `INTERACTION_DESIGN.md`.
+[`android/extensions/README.md`](../android/extensions/README.md) contains their
+shared visual tokens and measurable UI acceptance targets, including AgentLink
+handoffs. Keep proposed redesign criteria distinct from shipped behavior.
+
 When two documents conflict, fix the lower-authority document instead of
 adding an exception.
 
