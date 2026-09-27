@@ -131,10 +131,11 @@ It replaces every Home presentation with the same pure-black display: a
 round, earless anime-cat Mochi with large glossy eyes, short whiskers, a tiny
 cat smile and tucked paws. Its silhouette has no ears or head protrusions.
 The clock always uses zero-padded 24-hour `HH:mm`, regardless of Android's
-12/24-hour preference. Numerals use bundled rounded Nunito ExtraBold.
-The localized date and weekday occupy separate lines, both bold and at least
-half the clock's rendered font size. Fit the clock and date together rather
-than shrinking the date independently; preserve the ratio at large font scales.
+12/24-hour preference. Numerals use bundled bubble-style Fredoka Bold with
+compact, responsive sizing. The localized date and weekday
+occupy separate lines, both bold at 40% of the clock's rendered font size.
+Date text is deliberately less prominent. Fit the complete pair without
+clipping at large font scales.
 The palette is neutral gray/white only, never peach/purple. A small dark-gray
 face fill, restrained highlights and generous black space limit illuminated
 pixel area. Bold type and the larger date intentionally light more pixels

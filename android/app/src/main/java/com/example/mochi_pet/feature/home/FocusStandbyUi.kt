@@ -41,9 +41,9 @@ import com.example.mochi_pet.R
 @OptIn(ExperimentalTextApi::class)
 private val StandbyFont = FontFamily(
     Font(
-        R.font.nunito,
-        weight = FontWeight.ExtraBold,
-        variationSettings = FontVariation.Settings(FontVariation.weight(800)),
+        R.font.fredoka,
+        weight = FontWeight.Bold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(700)),
     ),
 )
 
@@ -63,19 +63,20 @@ internal fun StandbyClock(time: String, date: String, modifier: Modifier = Modif
         val clockHeight = if (landscape) maxHeight else maxHeight - faceHeight - 20.dp
         val density = LocalDensity.current
         val measurer = rememberTextMeasurer()
-        // Fit the pair together: shrinking only the date would break its half-clock size contract.
+        // Keep the date subordinate while fitting the complete two-line label.
         val styles = remember(time, date, clockWidth, clockHeight, density, measurer) {
             with(density) {
                 val constraints = Constraints(maxWidth = clockWidth.roundToPx())
-                (128 downTo 12 step 2).firstNotNullOf { size ->
+                val maxTimeSize = minOf(112f, clockWidth.value * .30f, clockHeight.value * .32f).toInt()
+                (maxTimeSize downTo 12 step 2).firstNotNullOf { size ->
                     val timeStyle = TextStyle(
-                        fontFamily = StandbyFont, fontWeight = FontWeight.ExtraBold,
+                        fontFamily = StandbyFont, fontWeight = FontWeight.Bold,
                         fontSize = size.dp.toSp(), lineHeight = (size * 1.12f).dp.toSp(),
                         textAlign = TextAlign.Center, fontFeatureSettings = "tnum",
                         color = Color(0xFFCCCCCC),
                     )
                     val dateStyle = timeStyle.copy(
-                        fontSize = (size / 2f).dp.toSp(), lineHeight = (size * .62f).dp.toSp(),
+                        fontSize = (size * .4f).dp.toSp(), lineHeight = (size * .5f).dp.toSp(),
                         color = Color(0xFFAAAAAA),
                     )
                     val timeLayout = measurer.measure(time, timeStyle, softWrap = false, maxLines = 1, constraints = constraints)

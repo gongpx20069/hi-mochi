@@ -92,10 +92,10 @@ class FocusStandbyUiTest {
                 layouts.isNotEmpty() && layouts.none { it.hasVisualOverflow })
             val input = layouts.single().layoutInput
             assertEquals(if (tag == "standby-date") 2 else 1, layouts.single().lineCount)
-            assertEquals(FontWeight.ExtraBold, input.style.fontWeight)
+            assertEquals(FontWeight.Bold, input.style.fontWeight)
             fontSizes += with(input.density) { input.style.fontSize.toPx() }
         }
-        assertTrue("Date must be at least half the clock font size in pixels", fontSizes[1] + .1f >= fontSizes[0] / 2f)
+        assertEquals("Date stays smaller at forty percent of the clock font size", fontSizes[0] * .4f, fontSizes[1], .1f)
     }
 
     private fun checkFixture(name: String) {
