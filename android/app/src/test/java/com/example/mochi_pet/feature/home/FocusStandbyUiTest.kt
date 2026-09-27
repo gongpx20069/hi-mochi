@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.assertIsDisplayed
@@ -18,6 +22,9 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import com.example.mochi_pet.R
 import androidx.compose.ui.unit.Density
 import com.example.mochi_pet.ui.theme.MochiTheme
 import java.io.File
@@ -92,7 +99,14 @@ class FocusStandbyUiTest {
                 layouts.isNotEmpty() && layouts.none { it.hasVisualOverflow })
             val input = layouts.single().layoutInput
             assertEquals(if (tag == "standby-date") 2 else 1, layouts.single().lineCount)
-            assertEquals(FontWeight.Bold, input.style.fontWeight)
+            if (tag == "standby-time") {
+                assertEquals(FontWeight.Bold, input.style.fontWeight)
+                assertTrue("Clock must have a thick outline", input.style.drawStyle is Stroke)
+            } else {
+                assertEquals(FontWeight.Normal, input.style.fontWeight)
+                assertEquals(FontFamily(Font(R.font.aoyagi_reisho)), input.style.fontFamily)
+                assertEquals("Date must remain solid", Fill, input.style.drawStyle)
+            }
             fontSizes += with(input.density) { input.style.fontSize.toPx() }
         }
         assertEquals("Date stays smaller at forty percent of the clock font size", fontSizes[0] * .4f, fontSizes[1], .1f)
@@ -121,9 +135,34 @@ class FocusStandbyUiTest {
         val file = File("build/reports/$name")
         file.parentFile.mkdirs()
         file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        checkHollowClock(bitmap)
         bitmap.recycle()
         assertTrue("Fixture must contain visible clock and mascot", illuminated > count * .005)
         assertTrue("At least 72% of pixels must remain black", illuminated < count * .28)
         assertTrue("Average channel intensity ${intensity.toDouble() / count} must stay below 30/255", intensity.toDouble() / count < 30.0)
+    }
+
+    private fun checkHollowClock(screen: Bitmap) {
+        val node = compose.onNodeWithTag("standby-time").fetchSemanticsNode()
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithTag("standby-time").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        val filled = Bitmap.createBitmap(layout.size.width, layout.size.height, Bitmap.Config.ARGB_8888)
+        layout.multiParagraph.paint(
+            Canvas(filled.asImageBitmap()), color = layout.layoutInput.style.color, drawStyle = Fill,
+        )
+        var outlineIntensity = 0L
+        var fillIntensity = 0L
+        val bounds = node.boundsInRoot
+        for (y in 0 until filled.height) {
+            for (x in 0 until filled.width) {
+                outlineIntensity += android.graphics.Color.red(screen.getPixel(bounds.left.toInt() + x, bounds.top.toInt() + y))
+                fillIntensity += android.graphics.Color.red(filled.getPixel(x, y))
+            }
+        }
+        filled.recycle()
+        assertTrue("Outline must remain visible", outlineIntensity > 0)
+        assertTrue("Hollow digits must light substantially less than the same filled font",
+            outlineIntensity < fillIntensity * .8)
     }
 }

@@ -132,8 +132,10 @@ round, earless anime-cat Mochi with large glossy eyes, short whiskers, a tiny
 cat smile and tucked paws. Its silhouette has no ears or head protrusions.
 The clock always uses zero-padded 24-hour `HH:mm`, regardless of Android's
 12/24-hour preference. Numerals use bundled bubble-style Fredoka Bold with
-compact, responsive sizing. The localized date and weekday
-occupy separate lines, both bold at 40% of the clock's rendered font size.
+compact, responsive sizing and a 2.25 dp rounded gray-white outline, leaving
+the glyph interiors black. The localized date and weekday use bundled Aoyagi
+Reisho (clerical/lishu script), solid with its original stroke weight, on
+separate lines at 40% of the clock's rendered font size.
 Date text is deliberately less prominent. Fit the complete pair without
 clipping at large font scales.
 The palette is neutral gray/white only, never peach/purple. A small dark-gray

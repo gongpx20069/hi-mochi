@@ -23,6 +23,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -36,6 +38,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.mochi_pet.R
 
 @OptIn(ExperimentalTextApi::class)
@@ -46,6 +49,8 @@ private val StandbyFont = FontFamily(
         variationSettings = FontVariation.Settings(FontVariation.weight(700)),
     ),
 )
+
+private val StandbyDateFont = FontFamily(Font(R.font.aoyagi_reisho))
 
 @Composable
 internal fun StandbyClock(time: String, date: String, modifier: Modifier = Modifier) {
@@ -72,12 +77,17 @@ internal fun StandbyClock(time: String, date: String, modifier: Modifier = Modif
                     val timeStyle = TextStyle(
                         fontFamily = StandbyFont, fontWeight = FontWeight.Bold,
                         fontSize = size.dp.toSp(), lineHeight = (size * 1.12f).dp.toSp(),
+                        letterSpacing = (size * .06f).dp.toSp(),
                         textAlign = TextAlign.Center, fontFeatureSettings = "tnum",
                         color = Color(0xFFCCCCCC),
+                        drawStyle = Stroke(width = 2.25.dp.toPx(), join = StrokeJoin.Round),
                     )
                     val dateStyle = timeStyle.copy(
+                        fontFamily = StandbyDateFont, fontWeight = FontWeight.Normal,
                         fontSize = (size * .4f).dp.toSp(), lineHeight = (size * .5f).dp.toSp(),
+                        letterSpacing = 0.sp,
                         color = Color(0xFFAAAAAA),
+                        drawStyle = Fill,
                     )
                     val timeLayout = measurer.measure(time, timeStyle, softWrap = false, maxLines = 1, constraints = constraints)
                     val dateLayout = measurer.measure(date, dateStyle, maxLines = 2, constraints = constraints)

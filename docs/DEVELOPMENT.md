@@ -43,6 +43,16 @@ Its SIL Open Font License and copyright notice ship in
 `app/src/main/assets/licenses/fredoka-OFL.txt`. Font rendering is offline;
 unsupported glyphs (including Chinese) use Android's font fallback.
 
+Date/weekday text separately uses the unmodified Aoyagi Reisho SIMO 2.01 font
+from `https://opentype.jp/bin/aoyagireisyosimo_ttf_2_01.zip`,
+bundled as `app/src/main/res/font/aoyagi_reisho.ttf`. Aoyagi Kouzan supplied
+the calligraphy and SIMO created the font. Its included terms permit free
+commercial use and free redistribution, but prohibit charging for the font
+itself and require both the usage terms and font description to accompany it.
+Both ship under `app/src/main/assets/licenses/aoyagi-reisho-*` (usage text
+and original description PDF). The font covers all digits, Chinese date and
+weekday characters, and English month/weekday names used by standby.
+
 From PowerShell:
 
 ```powershell
