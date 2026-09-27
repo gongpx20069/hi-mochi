@@ -357,6 +357,12 @@ repeated timezone IDs while still distinguishing historical context from the
 current conversation. If no conversation match exists, only explicit
 fact/summary memories are eligible for recency fallback.
 
+The proposed replacement for chronological-neighbor recall is documented in
+[Event memory design](EVENT_MEMORY_DESIGN.md). It defines evidence-backed
+events, bounded foreground recall, asynchronous organization, freshness and
+deletion rules, and unmeasured latency acceptance targets. It is not the
+implemented memory contract described above.
+
 Skills follow the Agent Skills format: a root `SKILL.md` with required `name`
 and `description` frontmatter plus optional `license`, `compatibility`,
 `metadata`, and experimental `allowed-tools`. The initial prompt contains only

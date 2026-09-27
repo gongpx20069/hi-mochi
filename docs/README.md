@@ -23,6 +23,7 @@ contains the product and engineering source of truth.
 | [`architecture/AGENT_BROWSER.md`](architecture/AGENT_BROWSER.md) | Visible per-turn browser Tools, lifecycle, and safety |
 | [`architecture/CARD_PRESENTATION.md`](architecture/CARD_PRESENTATION.md) | Trusted Agent card evidence and rendering |
 | [`architecture/VOICE_RUNTIME.md`](architecture/VOICE_RUNTIME.md) | Wake word, recognition, audio focus, and speech runtime |
+| [`architecture/EVENT_MEMORY_DESIGN.md`](architecture/EVENT_MEMORY_DESIGN.md) | Proposed single-chat event memory, consistency, latency budgets, and evaluation; not shipped behavior |
 
 ## Delivery
 

@@ -38,6 +38,11 @@ Build on existing Scheduled Agents and Skills rather than another executor.
 
 Keep conversation history separate from durable, user-reviewable preferences.
 
+The [event memory proposal](architecture/EVENT_MEMORY_DESIGN.md) develops the
+single-chat organization and recall design, including consistency, Provider
+cost, Android scheduling and latency gates. It remains proposed; local backup
+and the broader ideas below are not implied delivery commitments.
+
 - Let users inspect, correct and delete saved memories with clear provenance.
 - Resolve outdated or contradictory preferences rather than accumulating
   competing instructions indefinitely.
