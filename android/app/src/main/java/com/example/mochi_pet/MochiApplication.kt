@@ -5,6 +5,12 @@ import android.app.Application
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.example.mochi_pet.core.agentlink.AgentLinkResultMonitor
+import com.example.mochi_pet.platform.agentlink.DataStoreAgentLinkResults
+import com.example.mochi_pet.platform.agentlink.scheduleAgentLinkResultCollection
+import java.io.File
+import kotlinx.coroutines.delay
 import com.example.mochi_pet.core.agent.llm.OkHttpOpenAiChatClient
 import com.example.mochi_pet.core.agent.llm.OpenAiChatClient
 import com.example.mochi_pet.core.agent.AgentPipelineObserver
@@ -91,6 +97,23 @@ class MochiApplication : Application() {
         applicationScope.launch {
             agentScheduleController.syncAll()
         }
+        applicationScope.launch {
+            var collectionScheduled = false
+            while (true) {
+                agentLinkResultMonitor.refresh()
+                if (!collectionScheduled && agentLinkResults.state.value.tasks.any { it.receipt?.terminal != true }) {
+                    try {
+                        scheduleAgentLinkResultCollection(this@MochiApplication)
+                        collectionScheduled = true
+                    } catch (error: kotlinx.coroutines.CancellationException) {
+                        throw error
+                    } catch (_: Exception) {
+                        agentLinkResults.availability(false, "Remote results could not be read or saved. Check AgentLink and retry.")
+                    }
+                }
+                delay(20_000)
+            }
+        }
     }
 
     private val database: MochiDatabase by lazy {
@@ -175,7 +198,20 @@ class MochiApplication : Application() {
     val termuxRuntime = com.example.mochi_pet.core.extensions.TermuxRuntimeState()
 
     val agentLinkClient: AndroidAgentLinkClient by lazy {
-        AndroidAgentLinkClient(this, toolDataStore)
+        AndroidAgentLinkClient(this, toolDataStore, agentLinkResults) { scheduleAgentLinkResultCollection(this) }
+    }
+
+    val agentLinkResults by lazy {
+        DataStoreAgentLinkResults(
+            PreferenceDataStoreFactory.create(scope = applicationScope) {
+                File(noBackupFilesDir, "agentlink_results.preferences_pb")
+            },
+            AndroidKeystoreApiKeyCipher("mochi_agentlink_results_v1"),
+        )
+    }
+
+    val agentLinkResultMonitor by lazy {
+        AgentLinkResultMonitor(agentLinkClient, agentLinkResults)
     }
 
     val toolCatalogRepository: ToolCatalogRepository by lazy {

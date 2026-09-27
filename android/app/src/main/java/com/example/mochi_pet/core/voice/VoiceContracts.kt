@@ -22,6 +22,7 @@ enum class VoiceInputTrigger {
 enum class SpeechPurpose {
     REPLY,
     WAKE_ACKNOWLEDGEMENT,
+    WAKE_BRIEFING,
     PREVIEW,
 }
 
@@ -31,6 +32,8 @@ enum class SpeechPlaybackResult {
     COMPLETED,
     FAILED,
 }
+
+enum class WakeBriefingResult { COMPLETED, INTERRUPTED, DISMISSED, SKIPPED, FAILED }
 
 sealed interface VoiceRuntimeEvent {
     data class Availability(
@@ -105,6 +108,16 @@ interface VoiceRuntime {
     )
 
     fun stopListening()
+
+    fun startListeningWithBriefing(
+        text: String,
+        onBriefingResult: (WakeBriefingResult) -> Unit,
+        onFinalTranscript: (String) -> Unit,
+        onNoResult: () -> Unit,
+    ) {
+        onBriefingResult(WakeBriefingResult.SKIPPED)
+        startListening(onFinalTranscript, onNoResult)
+    }
 
     fun speak(
         text: String,

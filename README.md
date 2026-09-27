@@ -322,7 +322,13 @@ Remote tasks continue when Mochi closes. Human CLI/App changes override stale
 automation: conflicts stop follow-ups instead of retrying. Credentials remain
 in AgentLink, never Mochi exports/share. No browser/network bypass or default
 Subagent/Scheduled Agent access is provided. Linked chats are not cached-live
-task monitors; read again to inspect current state.
+task monitors by themselves. Newly submitted Mochi tasks are followed separately
+with durable, encrypted result cards in the conversation and task center.
+Update both AgentLink and its Bridge for this feature. Background collection is
+best effort, not instant push. At the next “Hi Mochi”, a short local briefing may
+replace “Yes?”. Input wins: unsupported simultaneous speech skips the brief.
+Saying “Hi Mochi” again dismisses the current brief and unread markers without
+deleting history or cancelling the remote task.
 
 ### Run local commands with Termux
 

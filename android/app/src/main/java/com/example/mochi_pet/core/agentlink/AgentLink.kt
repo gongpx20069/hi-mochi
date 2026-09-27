@@ -66,6 +66,7 @@ data class AgentLinkState(
     val status: String = "not_installed",
     val enabledTools: Set<String> = AGENTLINK_TOOLS,
     val links: List<AgentLinkChatLink> = emptyList(),
+    val readableMachineIds: Set<String> = emptySet(),
 )
 
 data class AgentLinkActivityRequest(
@@ -93,6 +94,10 @@ sealed interface AgentLinkUiAction {
 }
 
 interface AgentLinkClient {
+    suspend fun taskFollowUpEnabled(): Boolean {
+        val state = refresh()
+        return state.enabled && state.authorized && "agentlink_chat" in state.enabledTools
+    }
     suspend fun refresh(): AgentLinkState
     suspend fun execute(tool: String, request: AgentLinkRequest): ToolResultEnvelope
     suspend fun setEnabled(enabled: Boolean)

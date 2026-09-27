@@ -30,6 +30,11 @@ import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.SpeechPlaybackResult
 import com.example.mochi_pet.core.voice.SpeechPurpose
 import com.example.mochi_pet.core.voice.SpeechVoice
+import com.example.mochi_pet.core.voice.WakeBriefingResult
+import com.example.mochi_pet.core.agentlink.AgentLinkResultState
+import com.example.mochi_pet.core.agentlink.ResultsFake
+import com.example.mochi_pet.core.agentlink.followed
+import com.example.mochi_pet.core.agentlink.receipt
 import com.example.mochi_pet.core.voice.IFLYTEK_BASIC_VOICES
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.settings.SpeechSettingsRepository
@@ -58,6 +63,47 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test
+    fun `wake briefing completion and deliberate dismissal acknowledge different states`() {
+        for (result in WakeBriefingResult.entries) {
+            val repository = ResultsFake(AgentLinkResultState(listOf(followed().copy(receipt = receipt())), true,
+                readableMachineIds = setOf("machine")))
+            val voice = BriefingVoiceFake()
+            val viewModel = MochiHomeViewModel(
+                plannerStore = PlannerStoreFake(), voiceRuntime = voice,
+                agentLinkResults = repository, ioDispatcher = Dispatchers.Unconfined,
+            )
+            viewModel.startVoiceInput(acknowledgeWake = true)
+            assertEquals(1, voice.listenCount)
+            assertEquals(0, voice.acknowledgements)
+            voice.briefingResult!!(result)
+            val task = repository.state.value.tasks.single()
+            assertEquals(result != WakeBriefingResult.DISMISSED, task.unread)
+            assertEquals(result !in setOf(WakeBriefingResult.COMPLETED, WakeBriefingResult.DISMISSED), task.pendingAnnouncement)
+        }
+    }
+
+    @Test
+    fun `second wake dismisses current batch keeps history and starts listening without another brief`() {
+        val repository = ResultsFake(AgentLinkResultState(listOf(followed().copy(receipt = receipt())), true,
+            readableMachineIds = setOf("machine")))
+        val voice = BriefingVoiceFake()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), voiceRuntime = voice,
+            agentLinkResults = repository, ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.startVoiceInput(acknowledgeWake = true)
+        val oldCallback = voice.briefingResult!!
+        viewModel.startVoiceInput(acknowledgeWake = true)
+        assertEquals(2, voice.listenCount)
+        assertEquals(0, voice.acknowledgements)
+        assertEquals(1, repository.state.value.tasks.size)
+        assertFalse(repository.state.value.tasks.single().unread)
+        assertFalse(repository.state.value.tasks.single().pendingAnnouncement)
+        oldCallback(WakeBriefingResult.COMPLETED)
+        assertFalse(repository.state.value.tasks.single().unread)
+    }
+
     @Test
     fun `voice preview uses draft ID without saving history or opening recognition`() {
         val voice = VoiceRuntimeFake("", autoCompleteSpeech = false)
@@ -830,6 +876,27 @@ private fun cardViewModel(
         clock = fixedClock(),
         ioDispatcher = Dispatchers.Unconfined,
     )
+
+private class BriefingVoiceFake : VoiceRuntime {
+    override val state = MutableStateFlow(VoiceRuntimeState())
+    var listenCount = 0
+    var acknowledgements = 0
+    var briefingResult: ((WakeBriefingResult) -> Unit)? = null
+    override fun startListening(onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit) { listenCount++ }
+    override fun startListeningWithBriefing(
+        text: String, onBriefingResult: (WakeBriefingResult) -> Unit,
+        onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit,
+    ) {
+        briefingResult = onBriefingResult
+        listenCount++
+    }
+    override fun stopListening() = Unit
+    override fun stopSpeaking() = Unit
+    override fun speak(text: String, purpose: SpeechPurpose, previewVoiceId: String?, onCompleted: (SpeechPlaybackResult) -> Unit) {
+        acknowledgements++
+        onCompleted(SpeechPlaybackResult.COMPLETED)
+    }
+}
 
 private class VoiceRuntimeFake(
     transcript: String,

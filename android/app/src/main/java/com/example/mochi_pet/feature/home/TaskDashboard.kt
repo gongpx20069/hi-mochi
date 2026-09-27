@@ -1,6 +1,7 @@
 package com.example.mochi_pet.feature.home
 
 import com.example.mochi_pet.core.agentlink.AgentLinkChatLink
+import com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask
 import com.example.mochi_pet.core.extensions.TermuxTaskView
 import com.example.mochi_pet.core.schedule.AgentSchedule
 import com.example.mochi_pet.core.schedule.AgentScheduleResult
@@ -19,7 +20,7 @@ internal sealed interface TaskReference {
     data class Agent(val value: AgentTaskView) : TaskReference
     data class Schedule(val value: AgentSchedule) : TaskReference
     data class Shell(val value: TermuxTaskView) : TaskReference
-    data class Remote(val link: AgentLinkChatLink, val taskId: String?) : TaskReference
+    data class Remote(val link: AgentLinkChatLink, val taskId: String?, val result: FollowedAgentLinkTask? = null) : TaskReference
 }
 
 internal data class DashboardTask(
@@ -31,6 +32,7 @@ internal data class DashboardTask(
     val reference: TaskReference,
     val time: Instant? = null,
     val attention: Boolean = status == TaskStatus.FAILED,
+    val unread: Boolean = false,
 ) {
     val active: Boolean get() = status in setOf(TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.STOPPING)
     fun matches(filter: TaskFilter): Boolean = when (filter) {
@@ -38,7 +40,8 @@ internal data class DashboardTask(
         TaskFilter.ACTIVE -> active
         TaskFilter.ATTENTION -> attention
         TaskFilter.PLANNED -> reference is TaskReference.Schedule
-        TaskFilter.HISTORY -> status in setOf(TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED)
+        TaskFilter.HISTORY -> status in setOf(TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED) ||
+            (reference as? TaskReference.Remote)?.result?.receipt?.terminal == true
     }
 }
 
@@ -74,10 +77,34 @@ internal fun taskDashboard(
         add(DashboardTask("shell:${task.id}", "Shell task", "Termux", status, status.label(),
             TaskReference.Shell(task), attention = status == TaskStatus.FAILED || status == TaskStatus.UNKNOWN))
     }
+    state.remoteResults.forEach { result ->
+        val status = when (result.receipt?.state) {
+            "starting", "queued" -> TaskStatus.QUEUED
+            "running" -> TaskStatus.RUNNING
+            "completed" -> TaskStatus.SUCCEEDED
+            "failed" -> TaskStatus.FAILED
+            "cancelled" -> TaskStatus.CANCELLED
+            else -> TaskStatus.UNKNOWN
+        }
+        add(DashboardTask(
+            "receipt:${result.key}", result.title, "AgentLink", status,
+            when (result.receipt?.state) {
+                "completed" -> "Remote run ended"
+                "waitingApproval" -> "Waiting for your approval"
+                "interrupted" -> "Outcome unconfirmed"
+                else -> status.label()
+            }, TaskReference.Remote(result.link, result.taskId, result),
+            result.receipt?.updatedAt?.let(Instant::ofEpochMilli),
+            attention = result.unread || result.receipt?.state in setOf("waitingApproval", "failed", "interrupted"),
+            unread = result.unread,
+        ))
+    }
     state.agentLink.links.forEach { link ->
         val prefix = "remote:${link.machineId.length}:${link.machineId}:${link.chatId.length}:${link.chatId}"
-        val snapshots = state.remoteTasks.filter { it.link.machineId == link.machineId && it.link.chatId == link.chatId }
-        if (snapshots.isEmpty()) {
+        val followed = state.remoteResults.filter { it.machineId == link.machineId && it.chatId == link.chatId }
+        val snapshots = state.remoteTasks.filter { it.link.machineId == link.machineId && it.link.chatId == link.chatId &&
+            followed.none { followedTask -> followedTask.taskId == it.id } }
+        if (snapshots.isEmpty() && followed.isEmpty()) {
             add(DashboardTask(prefix, link.title, "AgentLink", null,
                 if ((link.machineId to link.chatId) in state.checkedChats) "Linked chat" else "Remote status not checked",
                 TaskReference.Remote(link, null), state.remoteCheckedAt, attention = link.outcomeUnknown))

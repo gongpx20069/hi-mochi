@@ -48,6 +48,7 @@ run in local JVM tests.
 | `ToolCatalogRepository` | built-in enablement, MCP servers, OAuth, selected schemas |
 | `AgentLinkClient` | typed shared-chat requests, scoped connection state, non-secret links |
 | `AndroidAgentLinkClient` | explicit Activity result authorization, signer pinning, bounded Messenger IPC |
+| `AgentLinkResultMonitor` / `AgentLinkResultRepository` | exact submitted-operation receipts, encrypted durability, separate viewed/announced revisions |
 | `ExtensionManager` | trusted package discovery, signature/version validation, binding, and cancellation |
 | `ExtensionToolAdapter` | bounded extension schema registration and Tool result translation |
 | Mi Home extension process | Xiaomi QR session, cloud requests, MIoT mapping, device selection, and ephemeral images |
@@ -111,6 +112,14 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   user-confirmed package signer digest, and up to 20 non-secret machine/chat/task
   links with event cursors. No Room schema changes are needed. Human revision
   guards are run-local and never restored from these links.
+- A separate DataStore under `noBackupFilesDir` holds up to 100 followed
+  AgentLink operations and bounded answer excerpts, encrypted with a dedicated
+  Keystore key. It is neither conversation memory nor Provider-share data.
+  Only terminal records already viewed and announced are evicted; if all
+  records are still needed, new submission fails visibly before remote dispatch.
+  Operation identity is saved and background collection scheduled before send,
+  so a lost acceptance reply never causes an automatic resend. Revocation clears
+  retained results; late receipts cannot recreate a removed tracking record.
 - Android Keystore protects BYOK credentials.
 - A dedicated Tool DataStore owns built-in enablement, MCP configuration, and
   encrypted MCP/OAuth credentials.
@@ -153,7 +162,7 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 ## 6. Error model
 
 The task center observes existing Orchestrator diagnostics; it does not create
-an execution queue or persist prompts/results again. Foreground cancellation
+an execution queue or duplicate Agent prompts. Foreground cancellation
 uses the exact owning Job, while scheduled cancellation uses its unique
 WorkManager name without removing the next alarm. Cancelled claimed schedules
 record the new `CANCELLED` enum value in the existing nullable text result
@@ -161,8 +170,14 @@ column and reschedule recurrence; this adds no Room column or schema migration.
 Subagents retain their parent's schedule ID/Job, not another lifecycle.
 
 Task snapshots come from Room/WorkManager, the existing Termux task Tool and
-guarded AgentLink chat reads. Polling is limited to the resumed task page;
-remote reads and quota-consuming model checks are never periodic. Each source
+guarded AgentLink chat reads. General dashboard polling is limited to the resumed
+task page; quota-consuming model checks are never periodic. Separately, the
+application's mutex-serialized receipt monitor reads up to four exact pending
+Mochi operation IDs per pass, followed by a 20-second pause. WorkManager supplies
+best-effort collection at a 15-minute minimum interval after process death.
+Terminal receipts stop being polled. The provider/chat switch and fresh native
+read-granted machine set gate reads and voice eligibility; access generations reject
+in-flight replies after local switch/revoke changes. Each dashboard source
 refresh is bounded to 20 seconds and reports failure independently. Terminal
 Termux snapshots are retained without repeatedly reading output.
 Configuration probes are separately bounded and return typed status/repair

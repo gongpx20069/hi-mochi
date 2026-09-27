@@ -175,6 +175,22 @@ internal fun localizeUiText(
 }
 
 private val ZH_UI_TEXT = mapOf(
+    "New result" to "新结果",
+    "Remote run ended" to "远端执行已结束",
+    "Waiting for your approval" to "等待你确认",
+    "Outcome unconfirmed" to "结果尚未确认",
+    "Remote answer" to "远端回复",
+    "Result excerpt shortened. Open AgentLink for the full answer." to "这里只展示部分结果，请打开 AgentLink 查看完整回复。",
+    "Remote run state is not verification that your request was fulfilled." to "执行结束不代表已验证完成了你的要求。",
+    "Briefing pending" to "等待下次唤醒简报",
+    "Briefing dismissed or played" to "简报已播放或关闭",
+    "Open or continue in AgentLink" to "在 AgentLink 查看或继续",
+    "Briefing status could not be saved. The result remains available." to "简报状态保存失败，任务结果仍然保留。",
+    "Remote follow-up is paused. Check AgentLink access in Tools." to "远端跟踪已暂停，请在工具中检查 AgentLink 授权。",
+    "Remote follow-up needs an updated AgentLink app and Bridge." to "请更新 AgentLink 应用和 Bridge，以启用任务结果跟踪。",
+    "Remote task not found. Its outcome is unknown; do not resubmit automatically." to "未找到远端任务，结果暂不确定，请勿自动重复提交。",
+    "Remote follow-up is unavailable. Saved results remain; reconnect to collect updates." to "暂时无法跟踪远端任务。已保存的结果仍在，恢复连接后会补收进展。",
+    "Remote results could not be read or saved. Check AgentLink and retry." to "无法读取或保存远端结果，请检查 AgentLink 后重试。",
     "MOCHI / CONTROL" to "MOCHI / 控制台",
     "All tasks" to "全部",
     "In progress" to "进行中",

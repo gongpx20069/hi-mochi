@@ -29,6 +29,12 @@ import com.example.mochi_pet.core.agentlink.AgentLinkClient
 import com.example.mochi_pet.core.agentlink.AgentLinkActivityRequest
 import com.example.mochi_pet.core.agentlink.AgentLinkAuthorizationResult
 import com.example.mochi_pet.core.agentlink.AgentLinkUiAction
+import com.example.mochi_pet.core.agentlink.AgentLinkResultRepository
+import com.example.mochi_pet.core.agentlink.AgentLinkResultVersion
+import com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask
+import com.example.mochi_pet.core.agentlink.AgentLinkBriefing
+import com.example.mochi_pet.core.agentlink.briefing
+import com.example.mochi_pet.core.voice.WakeBriefingResult
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.database.PlannerStore
@@ -175,6 +181,7 @@ data class ConversationUiState(
     val isSending: Boolean = false,
     val errorMessage: String? = null,
     val emotion: String = "neutral",
+    val remoteTasks: List<FollowedAgentLinkTask> = emptyList(),
 )
 
 enum class ChatPipelineStage {
@@ -296,6 +303,7 @@ class MochiHomeViewModel(
     private val toolCatalogRepository: ToolCatalogRepository? = null,
     private val extensionClient: MochiExtensionClient? = null,
     private val agentLinkClient: AgentLinkClient? = null,
+    private val agentLinkResults: AgentLinkResultRepository? = null,
     private val termuxRuntime: com.example.mochi_pet.core.extensions.TermuxRuntimeState =
         com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
     private val agentBrowserRuntime: AgentBrowserRuntime? = null,
@@ -333,6 +341,7 @@ class MochiHomeViewModel(
     private val unavailableBrowserState =
         MutableStateFlow(AgentBrowserUiState())
     private var loadVersion = 0L
+    @Volatile private var activeBriefing: AgentLinkBriefing? = null
     private var interactionVersion = 0L
     private var agentJob: Job? = null
     private val mutableSpeechVoiceState = MutableStateFlow(SpeechVoiceUiState())
@@ -387,6 +396,20 @@ class MochiHomeViewModel(
         loadSkills()
         loadTools()
         observeExtensionAttachments()
+        agentLinkResults?.let { repository ->
+            viewModelScope.launch(ioDispatcher) {
+                repository.state.collect { results ->
+                    mutableConversationState.update { it.copy(remoteTasks = results.tasks) }
+                    val active = activeBriefing
+                    if (active != null && (!results.canAnnounce || active.versions.any { version ->
+                        results.tasks.none { it.key == version.key && it.machineId in results.readableMachineIds }
+                    })) {
+                        activeBriefing = null
+                        voiceRuntime?.stopSpeaking()
+                    }
+                }
+            }
+        }
     }
 
     fun browserWebView(context: Context): WebView? =
@@ -773,8 +796,15 @@ class MochiHomeViewModel(
     fun startVoiceInput(acknowledgeWake: Boolean = false) {
         stopVoicePreview()
         val runtime = voiceRuntime ?: return
+        val interruptedBriefing = activeBriefing.takeIf { acknowledgeWake }
+        if (interruptedBriefing != null) acknowledgeBriefing(interruptedBriefing, dismissed = true)
+        activeBriefing = null
         cancelAgentInteraction()
         val version = interactionVersion
+        val candidate = if (acknowledgeWake && interruptedBriefing == null) {
+            agentLinkResults?.state?.value?.briefing(AppLanguage.resolveContentLocale().language == "zh")
+        } else null
+        var briefingDismissed = false
         runtime.stopSpeaking()
         val startListening = startListening@ {
             if (version != interactionVersion) {
@@ -783,8 +813,7 @@ class MochiHomeViewModel(
             mutablePipelineState.value = ChatPipelineUiState(
                 stage = ChatPipelineStage.LISTENING,
             )
-            runtime.startListening(
-                onFinalTranscript = { transcript ->
+            val onTranscript: (String) -> Unit = { transcript ->
                     if (version == interactionVersion) {
                         wakeRuntime?.resume()
                         sendConversation(
@@ -792,17 +821,32 @@ class MochiHomeViewModel(
                             continueListeningAfterReply = true,
                         )
                     }
-                },
-                onNoResult = {
+                }
+            val onNoResult: () -> Unit = {
                     if (version == interactionVersion) {
-                        mutablePipelineState.value = ChatPipelineUiState()
-                        wakeRuntime?.resume()
+                        if (briefingDismissed) startFollowUpListening(version)
+                        else {
+                            mutablePipelineState.value = ChatPipelineUiState()
+                            wakeRuntime?.resume()
+                        }
                     }
-                },
-            )
+                }
+            if (candidate == null) runtime.startListening(onTranscript, onNoResult)
+            else {
+                activeBriefing = candidate
+                runtime.startListeningWithBriefing(candidate.text, { result ->
+                    if (version == interactionVersion && activeBriefing === candidate) {
+                        activeBriefing = null
+                        briefingDismissed = result == WakeBriefingResult.DISMISSED
+                        if (result == WakeBriefingResult.COMPLETED || briefingDismissed) {
+                            acknowledgeBriefing(candidate, dismissed = briefingDismissed)
+                        }
+                    }
+                }, onTranscript, onNoResult)
+            }
         }
         val beginVoiceInput = {
-            if (acknowledgeWake && version == interactionVersion) {
+            if (acknowledgeWake && candidate == null && interruptedBriefing == null && version == interactionVersion) {
                 mutablePipelineState.value = ChatPipelineUiState(
                     stage = ChatPipelineStage.SPEAKING,
                 )
@@ -816,11 +860,26 @@ class MochiHomeViewModel(
                 startListening()
             }
         }
+
         val wake = wakeRuntime
         if (wake == null) {
             beginVoiceInput()
         } else {
             wake.pause(beginVoiceInput)
+        }
+    }
+
+    private fun acknowledgeBriefing(briefing: AgentLinkBriefing, dismissed: Boolean) {
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                agentLinkResults?.acknowledge(briefing.versions, viewed = dismissed, announced = true)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                mutableConversationState.update {
+                    it.copy(errorMessage = "Briefing status could not be saved. The result remains available.")
+                }
+            }
         }
     }
 
@@ -865,6 +924,7 @@ class MochiHomeViewModel(
     }
 
     private fun cancelAgentInteraction() {
+        activeBriefing = null
         interactionVersion += 1
         agentJob?.cancel()
         agentJob = null
@@ -1757,7 +1817,15 @@ class MochiHomeViewModel(
                 is AgentLinkUiAction.Enable -> client.setEnabled(action.enabled)
                 is AgentLinkUiAction.EnableTool -> client.setToolEnabled(action.name, action.enabled)
                 is AgentLinkUiAction.OpenChat -> {
-                    require(action.link in mutableToolsState.value.catalog.agentLink.links)
+                    val results = agentLinkResults?.state?.value?.tasks.orEmpty().filter {
+                        it.machineId == action.link.machineId && it.chatId == action.link.chatId
+                    }
+                    require(mutableToolsState.value.catalog.agentLink.links.any {
+                        it.machineId == action.link.machineId && it.chatId == action.link.chatId
+                    } || results.isNotEmpty())
+                    agentLinkResults?.acknowledge(results.mapNotNull { task ->
+                        task.receipt?.let { AgentLinkResultVersion(task.key, it.revision) }
+                    }, viewed = true, announced = false)
                     mutableToolsState.update {
                         it.copy(agentLinkActivityRequest = AgentLinkActivityRequest(
                             requestId = java.util.UUID.randomUUID().toString(),
@@ -2496,6 +2564,7 @@ class MochiHomeViewModel(
                             application.toolCatalogRepository,
                         extensionClient = application.extensionClient,
                         agentLinkClient = application.agentLinkClient,
+                        agentLinkResults = application.agentLinkResults,
                         termuxRuntime = application.termuxRuntime,
                         agentBrowserRuntime = application.agentBrowserRuntime,
                         weatherRepository = application.weatherRepository,

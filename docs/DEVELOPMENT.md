@@ -93,6 +93,16 @@ revision conflict, revoke, Binder death, reconnect and unknown-write outcomes.
 Verify a running remote task survives Mochi cancellation. JVM tests do not prove
 cross-APK Android identity, Activity result, or Bridge connectivity behavior.
 
+Receipt/next-wake regressions also cover `AgentLinkResultsTest`,
+`DataStoreAgentLinkResultsTest`, `WakeBriefingTest` and `MochiHomeViewModelTest`.
+Run with an updated AgentLink APK and Bridge supporting `task.read`. Device
+acceptance must cover lost send replies, reconnect/restart, approval/completion,
+permission/switch revocation, unread versus announced state, and exact linked-chat
+handoff. Test immediate user speech, full local playback, ordinary interruption,
+a second `Hi Mochi` (including a command immediately after it), echo-only capture,
+unavailable offline TTS/AEC, all three STT providers, and no microphone overlap.
+No attached device means these gates are outstanding, not proven by unit tests.
+
 To diagnose cloud synthesis against the phone's saved settings, build
 `:app:assembleDebug :app:assembleDebugAndroidTest`, update the matching-signed
 app and test APKs with `adb install -r`, and run:

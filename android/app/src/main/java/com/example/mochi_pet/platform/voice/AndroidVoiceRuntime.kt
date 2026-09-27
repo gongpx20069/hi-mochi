@@ -20,6 +20,8 @@ import com.example.mochi_pet.core.settings.SpeechSettingsRepository
 import com.example.mochi_pet.core.voice.MAX_TRANSCRIPT_CHARS
 import com.example.mochi_pet.core.voice.SpeechPlaybackResult
 import com.example.mochi_pet.core.voice.SpeechPurpose
+import com.example.mochi_pet.core.voice.WakeBriefingResult
+import com.example.mochi_pet.platform.wake.BriefingKeywordDetector
 import com.example.mochi_pet.core.voice.SpeechVoice
 import com.example.mochi_pet.core.voice.IFLYTEK_BASIC_VOICES
 import com.example.mochi_pet.core.voice.VoiceRuntime
@@ -74,10 +76,31 @@ class AndroidVoiceRuntime internal constructor(
     private var iflytekLiveSession: IFlytekLiveSpeechSession? = null
     private var transcriptionJob: Job? = null
     private var interactionVersion = 0L
+    private var briefing: ListeningBriefing? = null
+    @Volatile private var briefingDetector: BriefingKeywordDetector? = null
+    @Volatile private var detectBriefingWake = false
+    private var dismissedBriefingWake = false
+    private var briefingText = ""
+    private var activeSpeechPurpose = SpeechPurpose.REPLY
+    private var closed = false
 
     override val state: StateFlow<VoiceRuntimeState> = mutableState.asStateFlow()
 
     init {
+        scope.launch {
+            try {
+                val detector = BriefingKeywordDetector(applicationContext)
+                mainHandler.post {
+                    if (closed) detector.close() else briefingDetector = detector
+                }
+            } catch (_: IOException) {
+                Log.w(SPEECH_LOG_TAG, "briefing_keyword_model_unavailable")
+            } catch (_: RuntimeException) {
+                Log.w(SPEECH_LOG_TAG, "briefing_keyword_initialization_failed")
+            } catch (_: LinkageError) {
+                Log.w(SPEECH_LOG_TAG, "briefing_keyword_runtime_unavailable")
+            }
+        }
         mainHandler.post {
             if (mutableState.value.recognitionAvailable) {
                 speechRecognizer = createSpeechRecognizer(applicationContext)
@@ -112,6 +135,19 @@ class AndroidVoiceRuntime internal constructor(
     override fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
+    ) = listen(onFinalTranscript, onNoResult, null)
+
+    override fun startListeningWithBriefing(
+        text: String,
+        onBriefingResult: (WakeBriefingResult) -> Unit,
+        onFinalTranscript: (String) -> Unit,
+        onNoResult: () -> Unit,
+    ) = listen(onFinalTranscript, onNoResult, ListeningBriefing(text, onBriefingResult))
+
+    private fun listen(
+        onFinalTranscript: (String) -> Unit,
+        onNoResult: () -> Unit,
+        candidate: ListeningBriefing?,
     ) {
         mainHandler.post {
             textToSpeech?.stop()
@@ -132,6 +168,7 @@ class AndroidVoiceRuntime internal constructor(
                     ),
                 )
                 onNoResult()
+                candidate?.onResult?.invoke(WakeBriefingResult.SKIPPED)
                 return@post
             }
             cancelRecognition()
@@ -139,6 +176,9 @@ class AndroidVoiceRuntime internal constructor(
             finalTranscriptCallback = onFinalTranscript
             noResultCallback = onNoResult
             latestPartialTranscript = ""
+            briefing = candidate
+            briefingText = ""
+            dismissedBriefingWake = false
             val version = ++interactionVersion
             dispatch(VoiceRuntimeEvent.ListeningStarted)
             transcriptionJob = scope.launch {
@@ -162,8 +202,10 @@ class AndroidVoiceRuntime internal constructor(
                         return@post
                     }
                     when (config) {
-                        is SpeechRuntimeConfig.System ->
+                        is SpeechRuntimeConfig.System -> {
+                            finishBriefing(WakeBriefingResult.SKIPPED)
                             startSystemRecognition()
+                        }
                         is SpeechRuntimeConfig.IFlytek ->
                             startIFlytekLiveCapture(config, version)
                         is SpeechRuntimeConfig.Azure ->
@@ -194,8 +236,10 @@ class AndroidVoiceRuntime internal constructor(
     ) {
         val bounded = text.trim().take(MAX_TRANSCRIPT_CHARS)
         mainHandler.post {
+            if (purpose == SpeechPurpose.WAKE_BRIEFING && briefing?.interrupted != false) return@post
             textToSpeech?.stop()
             finishSpeech(invokeCompletion = false)
+            activeSpeechPurpose = purpose
             if (bounded.isEmpty()) {
                 onCompleted(SpeechPlaybackResult.COMPLETED)
                 return@post
@@ -205,7 +249,7 @@ class AndroidVoiceRuntime internal constructor(
             speechCompletionCallback = onCompleted
             dispatch(VoiceRuntimeEvent.SpeakingStarted)
             if (
-                !audioFocus.requestSpeechFocus {
+                purpose != SpeechPurpose.WAKE_BRIEFING && !audioFocus.requestSpeechFocus {
                     mainHandler.post {
                         if (utteranceId == activeUtteranceId) {
                             textToSpeech?.stop()
@@ -217,7 +261,7 @@ class AndroidVoiceRuntime internal constructor(
                 failSpeech("Speech audio focus is unavailable")
                 return@post
             }
-            if (purpose == SpeechPurpose.WAKE_ACKNOWLEDGEMENT) {
+            if (purpose == SpeechPurpose.WAKE_ACKNOWLEDGEMENT || purpose == SpeechPurpose.WAKE_BRIEFING) {
                 speakSystem(bounded, utteranceId, localOnly = true)
                 return@post
             }
@@ -349,6 +393,7 @@ class AndroidVoiceRuntime internal constructor(
 
     override fun stopSpeaking() {
         mainHandler.post {
+            finishBriefing(WakeBriefingResult.INTERRUPTED)
             textToSpeech?.stop()
             finishSpeech(invokeCompletion = false)
         }
@@ -377,12 +422,15 @@ class AndroidVoiceRuntime internal constructor(
 
     override fun close() {
         mainHandler.post {
+            closed = true
             interactionVersion += 1
             finalTranscriptCallback = null
             noResultCallback = null
             finishSpeech(invokeCompletion = false)
             audioFocus.abandon()
             cancelRecognition()
+            briefingDetector?.close()
+            briefingDetector = null
             speechRecognizer?.destroy()
             speechRecognizer = null
             textToSpeech?.stop()
@@ -457,8 +505,14 @@ class AndroidVoiceRuntime internal constructor(
         config: SpeechRuntimeConfig,
         version: Long,
     ) {
+        prepareBriefingCapture()
         val capture = RecordedSpeechCapture(
             context = applicationContext,
+            echoCancellation = briefing != null,
+            noSpeechTimeoutSeconds = if (briefing != null) 10f else 8f,
+            onReady = { ready -> mainHandler.post { briefingCaptureReady(ready, version) } },
+            onSpeechStarted = { mainHandler.post { interruptBriefing(version) } },
+            onAudioSamples = { samples, count -> inspectBriefingWake(samples, count, version) },
             onCaptured = { file ->
                 mainHandler.post {
                     if (version != interactionVersion) {
@@ -494,6 +548,7 @@ class AndroidVoiceRuntime internal constructor(
         config: SpeechRuntimeConfig.IFlytek,
         version: Long,
     ) {
+        prepareBriefingCapture()
         lateinit var capture: RecordedSpeechCapture
         val session = IFlytekLiveSpeechSession(
             appId = config.appId,
@@ -511,11 +566,17 @@ class AndroidVoiceRuntime internal constructor(
         iflytekLiveSession = session
         capture = RecordedSpeechCapture(
             context = applicationContext,
-            onAudioSamples = session::acceptPcm,
+            onAudioSamples = { samples, count ->
+                session.acceptPcm(samples, count)
+                inspectBriefingWake(samples, count, version)
+            },
+            echoCancellation = briefing != null,
+            onReady = { ready -> mainHandler.post { briefingCaptureReady(ready, version) } },
+            onSpeechStarted = { mainHandler.post { interruptBriefing(version) } },
             vadMinimumSilenceSeconds =
                 IFLYTEK_LOCAL_VAD_FALLBACK_SECONDS,
             noSpeechTimeoutSeconds =
-                IFLYTEK_NO_SPEECH_TIMEOUT_SECONDS,
+                if (briefing != null) 10f else IFLYTEK_NO_SPEECH_TIMEOUT_SECONDS,
             onCaptured = { file ->
                 mainHandler.post {
                     if (version != interactionVersion) {
@@ -759,20 +820,23 @@ class AndroidVoiceRuntime internal constructor(
     private fun completeRecognition(transcript: String) {
         val callback = finalTranscriptCallback
         val noResult = noResultCallback
+        val cleaned = briefingTranscript(transcript, briefingText, dismissedBriefingWake)
         cancelRecognition()
         finalTranscriptCallback = null
         noResultCallback = null
         latestPartialTranscript = ""
         audioFocus.abandon()
         dispatch(VoiceRuntimeEvent.ListeningStopped)
-        if (transcript.isNotBlank()) {
-            callback?.invoke(transcript.trim().take(MAX_TRANSCRIPT_CHARS))
+        if (cleaned.isNotBlank()) {
+            callback?.invoke(cleaned.trim().take(MAX_TRANSCRIPT_CHARS))
         } else {
             noResult?.invoke()
         }
     }
 
     private fun cancelRecognition() {
+        detectBriefingWake = false
+        finishBriefing(WakeBriefingResult.INTERRUPTED)
         transcriptionJob?.cancel()
         transcriptionJob = null
         speechCapture?.close()
@@ -783,7 +847,9 @@ class AndroidVoiceRuntime internal constructor(
     }
 
     private fun failSpeech(message: String, diagnosticCode: String? = null) {
-        dispatch(VoiceRuntimeEvent.Failed(message, offerSpeechSettings = true, diagnosticCode = diagnosticCode))
+        if (activeSpeechPurpose == SpeechPurpose.WAKE_BRIEFING) {
+            mutableState.update { it.copy(errorMessage = message, offerSpeechSettings = true, diagnosticCode = diagnosticCode) }
+        } else dispatch(VoiceRuntimeEvent.Failed(message, offerSpeechSettings = true, diagnosticCode = diagnosticCode))
         finishSpeech(result = SpeechPlaybackResult.FAILED)
     }
 
@@ -797,10 +863,92 @@ class AndroidVoiceRuntime internal constructor(
         synthesisJob?.cancel()
         synthesisJob = null
         dispatch(VoiceRuntimeEvent.SpeakingStopped)
-        audioFocus.abandon()
+        if (!mutableState.value.isListening) audioFocus.abandon()
         if (invokeCompletion) {
             completion?.invoke(result)
         }
+    }
+
+    private fun prepareBriefingCapture() {
+        if (briefing == null) return
+        val detector = briefingDetector
+        if (detector == null) finishBriefing(WakeBriefingResult.SKIPPED)
+        else {
+            try {
+                detector.reset()
+                detectBriefingWake = true
+            } catch (_: RuntimeException) {
+                Log.w(SPEECH_LOG_TAG, "briefing_keyword_reset_failed")
+                finishBriefing(WakeBriefingResult.SKIPPED)
+            }
+        }
+    }
+
+    private fun briefingCaptureReady(echoReady: Boolean, version: Long) {
+        if (version != interactionVersion || briefing == null) return
+        if (!echoReady) {
+            finishBriefing(WakeBriefingResult.SKIPPED)
+            return
+        }
+        val candidate = briefing ?: return
+        // Capture is already live. Immediate user speech wins this short local silence window.
+        mainHandler.postDelayed({
+            if (version == interactionVersion && briefing === candidate && !candidate.interrupted) {
+                candidate.playing = true
+                speak(candidate.text, SpeechPurpose.WAKE_BRIEFING, null) { result ->
+                    if (version == interactionVersion && briefing === candidate) {
+                        finishBriefing(if (result == SpeechPlaybackResult.COMPLETED) WakeBriefingResult.COMPLETED else WakeBriefingResult.FAILED)
+                    }
+                }
+            }
+        }, 400)
+    }
+
+    private fun interruptBriefing(version: Long) {
+        if (version != interactionVersion) return
+        val candidate = briefing ?: return
+        candidate.interrupted = true
+        if (candidate.playing) {
+            textToSpeech?.stop()
+            finishSpeech(invokeCompletion = false)
+        }
+    }
+
+    private fun inspectBriefingWake(samples: ShortArray, count: Int, version: Long) {
+        if (!detectBriefingWake) return
+        val detected = try {
+            briefingDetector?.accept(samples, count) == true
+        } catch (_: RuntimeException) {
+            detectBriefingWake = false
+            Log.w(SPEECH_LOG_TAG, "briefing_keyword_detection_failed")
+            mainHandler.post { if (version == interactionVersion) finishBriefing(WakeBriefingResult.SKIPPED) }
+            false
+        }
+        if (detected) {
+            mainHandler.post {
+                if (version == interactionVersion && briefing != null) {
+                    interruptBriefing(version)
+                    dismissedBriefingWake = true
+                    finishBriefing(WakeBriefingResult.DISMISSED)
+                }
+            }
+        }
+    }
+
+    private fun finishBriefing(result: WakeBriefingResult) {
+        val candidate = briefing ?: return
+        briefing = null
+        detectBriefingWake = false
+        if (candidate.playing && result != WakeBriefingResult.COMPLETED) {
+            textToSpeech?.stop()
+            finishSpeech(invokeCompletion = false)
+        }
+        candidate.onResult(result)
+    }
+
+    private class ListeningBriefing(val text: String, val onResult: (WakeBriefingResult) -> Unit) {
+        var interrupted = false
+        var playing = false
     }
 
     private inner class RecognitionCallbacks : RecognitionListener {
@@ -867,7 +1015,10 @@ class AndroidVoiceRuntime internal constructor(
     private inner class SpeechProgressCallbacks : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) {
             mainHandler.post {
-                if (utteranceId != null && utteranceId == activeUtteranceId) dispatch(VoiceRuntimeEvent.PlaybackStarted)
+                if (utteranceId != null && utteranceId == activeUtteranceId) {
+                    if (activeSpeechPurpose == SpeechPurpose.WAKE_BRIEFING) briefingText = briefing?.text.orEmpty()
+                    dispatch(VoiceRuntimeEvent.PlaybackStarted)
+                }
             }
         }
 
@@ -922,6 +1073,14 @@ class AndroidVoiceRuntime internal constructor(
 
 private fun pcmDurationMillis(file: File): Long =
     file.length() * 1_000L / (16_000L * 2L)
+
+internal fun briefingTranscript(transcript: String, spoken: String, wakeDetected: Boolean): String {
+    fun normalized(value: String) = value.filter(Char::isLetterOrDigit).lowercase()
+    if (spoken.isNotBlank() && normalized(transcript) == normalized(spoken)) return ""
+    return if (wakeDetected) transcript.trim().replaceFirst(
+        Regex("^(?:hi|hey|嗨|嘿)\\s*(?:mochi|moki|莫奇|摩奇|麻薯)[\\s，,。.!！?？:：]*", RegexOption.IGNORE_CASE), "",
+    ) else transcript
+}
 
 private fun recognitionAvailable(context: Context): Boolean =
     SpeechRecognizer.isRecognitionAvailable(context) ||

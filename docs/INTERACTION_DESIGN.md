@@ -80,6 +80,21 @@ is transient feedback, not a conversation message, and is excluded from
 history and model context. Microphone-button and media-button starts do not add
 this acknowledgement.
 
+New AgentLink outcomes replace the acknowledgement with a short conversational
+briefing, not logs or remote identifiers. Multiple updates are combined and
+needed approval/failure takes precedence. Wording says the remote run ended,
+not that requirements or tests passed. Selection uses already collected local
+receipts, never a network/model call on wake.
+
+Input takes priority: supported cloud capture starts before local briefing
+playback and ordinary speech stops playback without discarding recorded audio.
+System STT, unavailable local models/voice or missing enabled echo cancellation
+skip the briefing; results stay pending. A second locally detected `Hi Mochi`
+during the briefing stops it, clears the batch's unread and pending-speech state,
+and keeps the task history. Ordinary interruption or failed playback does not
+acknowledge results. If that second wake contains no command, listening continues
+without requiring a third wake. Background/locked wake restrictions are unchanged.
+
 An app-wide compact pipeline card appears above the active surface during
 Listening, Skilling, Thinking, Tool, Summarizing, and Speaking stages. It uses
 a breathing activity pulse, concise status copy, and a six-segment progress
@@ -189,6 +204,14 @@ visible in both the list and affected action context; Refresh never resubmits.
 Closing a detail sheet returns to the same list/filter. Removing a finished
 record dismisses its obsolete sheet automatically.
 
+New Mochi-submitted AgentLink tasks also have durable result cards in the
+conversation and task dashboard. A new-result marker is separate from speech
+delivery. Opening local details marks only that result revision as viewed.
+Cards display a bounded remote-answer excerpt with an explicit verification
+limitation and offer one trusted action to open/continue the exact original
+AgentLink chat. They never infer a destination from “continue it” or send a
+follow-up automatically. Revocation removes Mochi's retained results.
+
 **Check setup** stays visible in the dashboard header; configuration checking
 is a separate page, not an extra task category. Settings also opens it directly.
 Back returns to the entry point and cancels an unfinished check; Close never
@@ -223,8 +246,10 @@ disconnected and incompatible states are not displayed as cached-live.
 
 Successful shared-chat reads and control results retain non-secret linked-chat
 buttons in this provider card. Tapping one opens the trusted AgentLink native
-chat, never a model URL. These links are not live task monitors: use tools to
-read remote changes and current task state. Closing Mochi does not stop remote
+chat, never a model URL. These links alone are not live task monitors; separate
+receipt collection follows newly submitted Mochi operations, not every CLI/App
+chat. Failed reads keep earlier snapshots visible, with a follow-up error.
+Closing Mochi does not stop remote
 tasks. A human override conflict stops Mochi automatic follow-ups and requires
 new user direction rather than silently retrying or overwriting the human.
 

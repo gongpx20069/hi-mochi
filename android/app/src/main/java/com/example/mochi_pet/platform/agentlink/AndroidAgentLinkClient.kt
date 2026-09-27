@@ -16,6 +16,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.example.mochi_pet.core.agent.tool.ToolErrorCode
@@ -27,6 +28,8 @@ import com.example.mochi_pet.core.agentlink.AgentLinkChatLink
 import com.example.mochi_pet.core.agentlink.AgentLinkClient
 import com.example.mochi_pet.core.agentlink.AgentLinkRequest
 import com.example.mochi_pet.core.agentlink.AgentLinkState
+import com.example.mochi_pet.core.agentlink.AgentLinkResultRepository
+import com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -39,6 +42,8 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,9 +51,16 @@ import kotlinx.serialization.json.jsonPrimitive
 class AndroidAgentLinkClient(
     private val context: Context,
     private val store: DataStore<Preferences>,
+    private val results: AgentLinkResultRepository? = null,
+    private val onFollow: suspend () -> Unit = {},
 ) : AgentLinkClient {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val authorization = AgentLinkAuthorization()
+
+    override suspend fun taskFollowUpEnabled(): Boolean {
+        val prefs = store.data.first()
+        return prefs[ENABLED] == true && "agentlink_chat" in (prefs[TOOLS] ?: AGENTLINK_TOOLS) && prefs[SIGNER] != null
+    }
 
     override suspend fun refresh(): AgentLinkState = withContext(Dispatchers.IO) {
         val prefs = store.data.first()
@@ -60,19 +72,31 @@ class AndroidAgentLinkClient(
             }.orEmpty(),
         )
         val identity = runCatching { identity() }.getOrNull()
-            ?: return@withContext base
+            ?: return@withContext base.also { results?.availability(false) }
         if (prefs[SIGNER] != identity) {
+            results?.availability(false)
             return@withContext base.copy(installed = true, status = "authorization_required")
         }
         val response = rpc("agentlink_control", """{"action":"status"}""")
+        if ((store.data.first()[GENERATION] ?: 0) != (prefs[GENERATION] ?: 0)) {
+            results?.availability(false)
+            return@withContext base.copy(status = "access_changed")
+        }
         val data = response.data as? JsonObject
         val authorized = data?.get("authorized")?.jsonPrimitive?.booleanOrNull == true
         val connected = data?.get("connected")?.jsonPrimitive?.booleanOrNull == true
         val compatible = data?.get("protocolVersion")?.jsonPrimitive?.intOrNull == 1
+        val readGranted = (data?.get("permissions") as? JsonArray).orEmpty().any {
+            (it as? JsonPrimitive)?.content == "read"
+        }
+        val readableMachines = if (readGranted) (data?.get("machines") as? JsonArray).orEmpty().mapNotNull {
+            ((it as? JsonObject)?.get("machineId") as? JsonPrimitive)?.takeIf { id -> id.isString }?.content
+        }.toSet() else emptySet()
         base.copy(
             installed = true,
             authorized = authorized && compatible && response.status == "ok",
             connected = authorized && connected && compatible && response.status == "ok",
+            readableMachineIds = readableMachines,
             status = when {
                 response.status != "ok" -> "disconnected"
                 !compatible -> "incompatible"
@@ -80,18 +104,24 @@ class AndroidAgentLinkClient(
                 !connected -> "disconnected"
                 else -> "connected"
             },
-        )
+        ).also {
+            results?.availability(it.authorized && it.connected && it.enabled && "agentlink_chat" in it.enabledTools,
+                readableMachineIds = readableMachines)
+        }
     }
 
     override suspend fun setEnabled(enabled: Boolean) {
-        store.edit { it[ENABLED] = enabled }
+        results?.availability(false)
+        store.edit { it[ENABLED] = enabled; it[GENERATION] = (it[GENERATION] ?: 0) + 1 }
     }
 
     override suspend fun setToolEnabled(name: String, enabled: Boolean) {
         require(name in AGENTLINK_TOOLS)
+        results?.availability(false)
         store.edit {
             val current = it[TOOLS] ?: AGENTLINK_TOOLS
             it[TOOLS] = if (enabled) current + name else current - name
+            it[GENERATION] = (it[GENERATION] ?: 0) + 1
         }
     }
 
@@ -103,10 +133,12 @@ class AndroidAgentLinkClient(
     override suspend fun completeAuthorization(requestId: String?, version: Int, accepted: Boolean) {
         val currentSigner = if (accepted) withContext(Dispatchers.IO) { identity() } else null
         val signer = authorization.complete(requestId, version, accepted, currentSigner) ?: return
-        store.edit { it[SIGNER] = signer }
+        results?.availability(false)
+        store.edit { it[SIGNER] = signer; it[GENERATION] = (it[GENERATION] ?: 0) + 1 }
     }
 
     override suspend fun revoke() {
+        results?.availability(false)
         var confirmed = false
         try {
             confirmed = rpc("agentlink_control", """{"action":"revoke"}""").status == "ok"
@@ -115,7 +147,9 @@ class AndroidAgentLinkClient(
                 if (confirmed) it.remove(SIGNER)
                 it[ENABLED] = false
                 it.remove(LINKS)
+                it[GENERATION] = (it[GENERATION] ?: 0) + 1
             }
+            results?.clear()
         }
         check(confirmed) { "Mochi access disabled locally; remote revoke unconfirmed. Open AgentLink Manage access." }
     }
@@ -149,8 +183,25 @@ class AndroidAgentLinkClient(
         val wireRequest = if (tool == "agentlink_workspace" &&
             request.action == "list" && request.machineId == null
         ) request.copy(action = "machines") else request
+        val generation = store.data.first()[GENERATION] ?: 0
+        if (tool == "agentlink_control" && request.action == "send") {
+            val machineId = requireNotNull(request.machineId)
+            val chatId = requireNotNull(request.chatId)
+            results?.follow(FollowedAgentLinkTask(
+                machineId, chatId, requireNotNull(request.operationId),
+                state.links.firstOrNull { it.machineId == machineId && it.chatId == chatId }?.title ?: chatId,
+            ))
+            onFollow()
+        }
         // AgentLink itself fixes provenance to mochi; it rejects caller-supplied source fields.
-        return rpc(tool, json.encodeToString(wireRequest.copy(source = null)))
+        val response = rpc(tool, json.encodeToString(wireRequest.copy(source = null)), generation)
+        val current = store.data.first()
+        if ((current[GENERATION] ?: 0) != generation || current[ENABLED] != true ||
+            tool !in (current[TOOLS] ?: AGENTLINK_TOOLS) || current[SIGNER] != identity()
+        ) {
+            return failure(ToolErrorCode.PERMISSION_DENIED, "AgentLink access changed; remote work is not cancelled")
+        }
+        return response
     }
 
     /** Only UI events create this explicit intent; no model-supplied component or URI is accepted. */
@@ -173,7 +224,10 @@ class AndroidAgentLinkClient(
                     val links = store.data.first()[LINKS]?.let {
                         json.decodeFromString<List<AgentLinkChatLink>>(it)
                     }.orEmpty()
-                    require(chat in links) { "Unknown linked chat" }
+                    require(links.any { it.machineId == chat.machineId && it.chatId == chat.chatId } ||
+                        results?.state?.value?.tasks.orEmpty().any { it.machineId == chat.machineId && it.chatId == chat.chatId }) {
+                        "Unknown linked chat"
+                    }
                     putExtra("machineId", chat.machineId)
                     putExtra("chatId", chat.chatId)
                 }
@@ -204,7 +258,7 @@ class AndroidAgentLinkClient(
         }.sorted().joinToString(":")
     }
 
-    private suspend fun rpc(method: String, arguments: String): ToolResultEnvelope =
+    private suspend fun rpc(method: String, arguments: String, accessGeneration: Long? = null): ToolResultEnvelope =
         withContext(Dispatchers.IO) {
             if (!fitsPayload(arguments, 128 * 1024)) {
                 return@withContext failure(ToolErrorCode.INVALID_ARGS, "AgentLink request too large")
@@ -262,6 +316,12 @@ class AndroidAgentLinkClient(
                     val remote = connected.await()
                     binder = remote
                     remote.linkToDeath(death, 0)
+                    if (accessGeneration != null) {
+                        val current = store.data.first()
+                        if ((current[GENERATION] ?: 0) != accessGeneration || current[ENABLED] != true ||
+                            method !in (current[TOOLS] ?: AGENTLINK_TOOLS) || current[SIGNER] != identity()
+                        ) throw SecurityException("AgentLink access changed before dispatch")
+                    }
                     Messenger(remote).send(Message.obtain(null, 1).apply {
                         data = Bundle().apply {
                             putString("requestId", requestId)
@@ -276,6 +336,8 @@ class AndroidAgentLinkClient(
                 failure(ToolErrorCode.TIMEOUT, "AgentLink timed out; do not resend writes; read state after reconnecting")
             } catch (error: CancellationException) {
                 throw error
+            } catch (_: SecurityException) {
+                failure(ToolErrorCode.PERMISSION_DENIED, "AgentLink access changed; refresh authorization")
             } catch (_: Exception) {
                 failure(ToolErrorCode.PROVIDER_ERROR, "AgentLink disconnected or identity changed; refresh authorization")
             } finally {
@@ -301,5 +363,6 @@ class AndroidAgentLinkClient(
         private val ENABLED = booleanPreferencesKey("agentlink_enabled")
         private val TOOLS = stringSetPreferencesKey("agentlink_tools")
         private val LINKS = stringPreferencesKey("agentlink_links")
+        private val GENERATION = longPreferencesKey("agentlink_access_generation")
     }
 }

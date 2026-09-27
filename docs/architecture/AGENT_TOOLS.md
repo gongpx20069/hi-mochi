@@ -111,6 +111,15 @@ it does not accept or execute a URI, Intent or component from the model.
 Linked task IDs and cursors are not cached-live state. Remote tasks survive
 Mochi cancellation; explicit `cancel` is the only task-cancellation request.
 
+The application, not a model Tool or scheduled Agent, follows newly submitted
+operations with the additive read-only `agentlink_chat` IPC action `task`
+(`task.read` in the Bridge). It requires exact machine/chat/task identity,
+Mochi provenance and a bounded typed receipt. This action is not added to the
+model schema. Durable per-task revisions make collection idempotent without
+depending on retained event pages. The monitor never sends, approves, cancels or
+restores a run-local human-revision write guard. Older companions/bridges expose
+an explicit update-needed state; there is no browser/network fallback.
+
 Both provider and individual switches are required, along with fresh connection
 and authorization. Disabled/unavailable definitions and the dependent Skill are
 excluded from discovery. AgentLink is unavailable to Subagents and Scheduled

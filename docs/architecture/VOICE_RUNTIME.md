@@ -56,7 +56,7 @@ outside the audio thread.
 - Background thread; never block the main thread.
 - Bounded chunk cadence and two-second duplicate suppression.
 - Stop wake capture before STT obtains the microphone.
-- After a confirmed `HI MOCHI` keyword detection, speak a fixed one-syllable
+- Without new task results, after a confirmed `HI MOCHI` keyword detection, speak a fixed one-syllable
   acknowledgement ("嗯？" in Chinese, "Yes?" in English) before STT starts. This
   acknowledgement is transient audio only and never enters conversation
   history or model context. Direct microphone and media-button triggers skip it.
@@ -84,6 +84,33 @@ outside the audio thread.
   available to reduce self-triggering from Mochi's speaker output.
 - Release AudioRecord, streams, and native objects on every stop path.
 - Native initialization errors are visible; no silent slow fallback.
+
+### Next-wake task briefing
+
+The ViewModel selects one factual, localized sentence from already persisted
+AgentLink receipt metadata. No model, remote read or cloud synthesis is awaited
+on wake. `startListeningWithBriefing` defaults to `SKIPPED` plus normal listening;
+Android system STT uses this conservative path.
+
+For configured iFlytek/Azure input, the single STT AudioRecord starts first.
+Briefing playback requires the prewarmed local keyword detector and an enabled
+platform acoustic echo canceler on the voice-communication capture session.
+Unavailable capability skips speech, not input. After a 400 ms listening window,
+an installed offline Android voice plays the brief while that same capture keeps
+all PCM for STT. Local speech detection stops playback; focus remains owned by
+recognition. This path does not acquire another microphone or cloud TTS.
+The initial no-speech window is bounded to ten seconds when a briefing is attempted.
+
+The same recorded samples feed local keyword detection while the briefing is
+pending/playing. A deliberate second keyword dismisses that selected result
+batch, clears its unread markers and leaves history/remote work intact. A
+recognized leading wake phrase is removed without removing the following
+command; wake-only input opens another listening window. Exact briefing echo is
+not dispatched as a user command. Ordinary interruption/failure keeps the batch
+pending; only complete audio acknowledges speech without marking it viewed.
+Version checks reject stale playback callbacks. Real-device AEC, echo rejection,
+keyword interruption and immediate speech acceptance are required acceptance
+gates; platform capability detection alone is not evidence of acoustic quality.
 
 ### Optional cloud synthesis
 

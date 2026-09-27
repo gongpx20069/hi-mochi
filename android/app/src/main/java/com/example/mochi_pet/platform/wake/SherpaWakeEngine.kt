@@ -46,37 +46,7 @@ class SherpaWakeEngine(
             return
         }
         val models = WakeModelInstaller(context).install()
-        val transducer = OnlineTransducerModelConfig(
-            models.encoder.path,
-            models.decoder.path,
-            models.joiner.path,
-        )
-        val onlineModel = OnlineModelConfig(
-            transducer,
-            OnlineParaformerModelConfig(),
-            OnlineZipformer2CtcModelConfig(),
-            OnlineNeMoCtcModelConfig(),
-            OnlineToneCtcModelConfig(),
-            models.tokens.path,
-            1,
-            false,
-            "cpu",
-            "",
-            "cjkchar",
-            "",
-        )
-        keywordSpotter = KeywordSpotter(
-            null,
-            KeywordSpotterConfig(
-                FeatureConfig(SAMPLE_RATE, 80, 0.0f),
-                onlineModel,
-                MAX_ACTIVE_PATHS,
-                models.keywords.path,
-                KEYWORD_SCORE,
-                KEYWORD_THRESHOLD,
-                NUM_TRAILING_BLANKS,
-            ),
-        )
+        keywordSpotter = createKeywordSpotter(models)
         vad = Vad(
             null,
             VadModelConfig(
@@ -274,10 +244,6 @@ class SherpaWakeEngine(
         const val CHUNK_MILLIS = 100
         const val STOP_JOIN_MILLIS = 500L
         const val TRIGGER_DEBOUNCE_MILLIS = 2_000L
-        const val MAX_ACTIVE_PATHS = 32
-        const val NUM_TRAILING_BLANKS = 0
-        const val KEYWORD_SCORE = 2.0f
-        const val KEYWORD_THRESHOLD = 0.005f
         const val VAD_THRESHOLD = 0.5f
         const val VAD_MIN_SILENCE_SECONDS = 1.2f
         const val VAD_MIN_SPEECH_SECONDS = 0.25f
@@ -285,6 +251,48 @@ class SherpaWakeEngine(
         const val VAD_MAX_SPEECH_SECONDS = 30.0f
     }
 }
+
+/** Consumes the STT recorder's samples; never opens a second microphone. */
+internal class BriefingKeywordDetector(context: Context) : AutoCloseable {
+    private val spotter = createKeywordSpotter(WakeModelInstaller(context).install())
+    private var stream = spotter.createStream("")
+
+    @Synchronized fun reset() {
+        stream.release()
+        stream = spotter.createStream("")
+    }
+
+    @Synchronized fun accept(samples: ShortArray, count: Int): Boolean {
+        stream.acceptWaveform(FloatArray(count) { samples[it] / 32768f }, 16_000)
+        while (spotter.isReady(stream)) {
+            spotter.decode(stream)
+            if (!spotter.getResult(stream).keyword.isNullOrBlank()) {
+                spotter.reset(stream)
+                return true
+            }
+        }
+        return false
+    }
+
+    @Synchronized override fun close() {
+        stream.release()
+        spotter.release()
+    }
+}
+
+private fun createKeywordSpotter(models: WakeModelFiles): KeywordSpotter = KeywordSpotter(
+    null,
+    KeywordSpotterConfig(
+        FeatureConfig(16_000, 80, 0.0f),
+        OnlineModelConfig(
+            OnlineTransducerModelConfig(models.encoder.path, models.decoder.path, models.joiner.path),
+            OnlineParaformerModelConfig(), OnlineZipformer2CtcModelConfig(),
+            OnlineNeMoCtcModelConfig(), OnlineToneCtcModelConfig(),
+            models.tokens.path, 1, false, "cpu", "", "cjkchar", "",
+        ),
+        32, models.keywords.path, 2.0f, 0.005f, 0,
+    ),
+)
 
 private data class WakeModelFiles(
     val encoder: File,
@@ -298,7 +306,7 @@ private data class WakeModelFiles(
 private class WakeModelInstaller(
     private val context: Context,
 ) {
-    fun install(): WakeModelFiles {
+    fun install(): WakeModelFiles = synchronized(WakeModelInstaller::class.java) {
         val directory = File(context.filesDir, MODEL_DIRECTORY)
         if (!directory.exists() && !directory.mkdirs()) {
             throw IOException("Failed to create wake model directory")
@@ -315,7 +323,7 @@ private class WakeModelInstaller(
         ) {
             keywords.writeText("$WAKE_KEYWORD_TOKENS\n")
         }
-        return WakeModelFiles(
+        WakeModelFiles(
             encoder = encoder,
             decoder = decoder,
             joiner = joiner,

@@ -1,5 +1,8 @@
 package com.example.mochi_pet.feature.home
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.text.style.TextOverflow
+
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -348,6 +351,7 @@ fun MochiApp(
     }
     if (taskCenterState.visible) {
         TaskCenterDialog(
+            onViewRemoteResult = taskCenter::viewRemoteResult,
             state = taskCenterState, agents = agentTasks, termux = termuxTasks,
             onClose = taskCenter::close, onPage = taskCenter::showDiagnostics,
             onRefresh = { taskCenter.refresh() }, onCheck = taskCenter::checkConfiguration,
@@ -1767,6 +1771,7 @@ private fun SurfaceContent(
                     onNavigate(MochiNavigationIntent.ShowSettings)
                 },
                 onCardAction = onCardAction,
+                onRemoteTask = { onAgentLinkAction(AgentLinkUiAction.OpenChat(it.link)) },
             )
             MochiSurface.Settings -> ProviderSettingsSurface(
                 state = providerSettingsState,
@@ -5814,6 +5819,7 @@ private fun ConversationSurface(
     onStopVoice: () -> Unit,
     onOpenSpeechSettings: () -> Unit,
     onCardAction: (CardPresentation, CardAction) -> Unit,
+    onRemoteTask: (com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask) -> Unit,
 ) {
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -5909,6 +5915,35 @@ private fun ConversationSurface(
                     message = message,
                     onCardAction = onCardAction,
                 )
+            }
+            items(state.remoteTasks, key = { "remote:${it.key}" }) { task ->
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = .3f)),
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("AgentLink", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                        Text(task.title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (task.unread) Text("New result", color = MaterialTheme.colorScheme.secondary)
+                        Text(when (task.receipt?.state) {
+                            "completed" -> "Remote run ended"
+                            "waitingApproval" -> "Waiting for your approval"
+                            "failed" -> "Failed"
+                            "cancelled" -> "Cancelled"
+                            "interrupted" -> "Outcome unconfirmed"
+                            "running" -> "Running"
+                            "starting", "queued" -> "Queued"
+                            else -> "Remote status not checked"
+                        })
+                        task.receipt?.resultText?.takeIf(String::isNotBlank)?.let {
+                            Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis)
+                        }
+                        Text("Remote run state is not verification that your request was fulfilled.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton({ onRemoteTask(task) }) { Text("Open or continue in AgentLink") }
+                    }
+                }
             }
         }
         val errorMessage = state.errorMessage ?: voiceState.errorMessage

@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.mochi_pet.core.agentlink.AgentLinkChatLink
+import com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask
 import com.example.mochi_pet.core.diagnostics.CheckStatus
 import com.example.mochi_pet.core.diagnostics.ConfigurationCheck
 import com.example.mochi_pet.core.diagnostics.RepairTarget
@@ -100,12 +101,17 @@ internal fun TaskCenterDialog(
     onPlanner: () -> Unit,
     onRunSchedule: (String) -> Unit,
     onScheduleEnabled: (String, Boolean) -> Unit,
+    onViewRemoteResult: (FollowedAgentLinkTask) -> Unit = {},
 ) {
     val tasks = remember(state, agents, termux) { taskDashboard(state, agents, termux) }
     var filter by rememberSaveable { mutableStateOf(TaskFilter.ALL) }
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     var showHelp by rememberSaveable { mutableStateOf(false) }
     val selected = tasks.firstOrNull { it.key == selectedKey }
+    val selectedResult = (selected?.reference as? TaskReference.Remote)?.result
+    LaunchedEffect(selectedResult?.key, selectedResult?.receipt?.revision) {
+        selectedResult?.let(onViewRemoteResult)
+    }
     LaunchedEffect(selectedKey, selected == null) {
         if (selectedKey != null && selected == null) selectedKey = null
     }
@@ -179,6 +185,9 @@ internal fun TaskCenterDialog(
                                     TextButton({ onPage(true) }) { Text("Configuration check") }
                                     state.errors.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
                                 }
+                            }
+                            state.remoteFollowUpError?.let { error ->
+                                item(key = "remote-followup") { DashboardPanel { Text(error) } }
                             }
                             val visible = tasks.filter { it.matches(filter) }
                             if (visible.isEmpty()) item(key = "empty") {
@@ -347,6 +356,8 @@ private fun DashboardTaskCard(task: DashboardTask, onClick: () -> Unit) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusPill(task.statusLabel, accent, Modifier.weight(1f, fill = false))
+                if (task.unread) Text("New result", color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.labelSmall)
                 task.time?.let { Text(taskTime(it), style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
@@ -415,8 +426,8 @@ private fun StatusPill(label: String, accent: Color, modifier: Modifier = Modifi
 
 @Composable
 private fun taskAccent(task: DashboardTask): Color = when {
-    task.attention -> MaterialTheme.colorScheme.error
     task.status == TaskStatus.SUCCEEDED -> Color(0xFF9BD8C6)
+    task.attention -> MaterialTheme.colorScheme.error
     task.active -> MaterialTheme.colorScheme.secondary
     task.reference is TaskReference.Shell -> MaterialTheme.colorScheme.primary
     else -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -516,6 +527,14 @@ private fun TaskDetails(
                 is TaskReference.Remote -> {
                     if (reference.link.outcomeUnknown) Text("Remote outcome unknown. Read the chat before resubmitting.")
                     state.remoteCheckedAt?.let { DetailLine("Last checked", taskTime(it)) }
+                    reference.result?.receipt?.let { receipt ->
+                        Text("Remote run state is not verification that your request was fulfilled.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (receipt.resultText.isNotBlank()) OutputBlock("Remote answer", receipt.resultText)
+                        if (receipt.resultTruncated) Text("Result excerpt shortened. Open AgentLink for the full answer.")
+                        Text(if (reference.result.pendingAnnouncement) "Briefing pending" else "Briefing dismissed or played",
+                            style = MaterialTheme.typography.labelSmall)
+                    }
                     Text("Open the linked chat for live progress, results and Stop. Mochi never automatically resubmits a remote task.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

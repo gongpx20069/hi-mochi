@@ -54,8 +54,10 @@ ordinary commands run in the background without switching away from Mochi.
 ### 3.2 Voice interaction
 
 1. Wake with `Hi Mochi`, microphone, media button, or text.
-   A confirmed `Hi Mochi` wake receives a one-syllable spoken
-   acknowledgement before listening; this feedback is not conversation data.
+   A confirmed `Hi Mochi` wake normally receives a one-syllable acknowledgement.
+   New AgentLink outcomes may replace it with one short local task briefing.
+   User input takes priority; unsupported simultaneous input skips the briefing
+   and starts listening. This feedback is not conversation data.
 2. Recognize speech with Android `SpeechRecognizer` by default, or with an
    optional user-configured iFlytek/Azure Speech connection.
 3. Run the local agent loop against the user's BYOK model.
@@ -275,6 +277,13 @@ support is an optional import/export adapter.
   Permission escalation requires AgentLink native confirmation, never auto-approval.
 - AgentLink credentials stay in AgentLink and are excluded from export/share.
   Subagents, schedules and network/browser workarounds do not gain these Tools.
+- New Mochi-submitted operations are followed with exact read-only task receipts.
+  Bounded encrypted results survive process restart, appear in the conversation
+  and task center, and distinguish remote execution from verified fulfillment.
+  No default unsolicited speech or new system completion notification is added.
+  Viewed and announced are independent. A deliberate second `Hi Mochi` during
+  a briefing dismisses that batch's speech and unread markers, keeps its history,
+  and never cancels remote execution. Failed/ordinary-interrupted audio stays pending.
 
 ### 3.12 Task center and configuration checks
 
@@ -306,8 +315,13 @@ available directly in its details.
   cancellation open the trusted native chat. No automatic resend is offered.
 - While the task page is resumed, local schedule and Termux snapshots refresh
   every five seconds without overlapping refreshes. AgentLink reads occur
-  only on opening/manual refresh. Closing the page stops its refresh work,
-  not execution or previously submitted side effects.
+  for general chat snapshots only on opening/manual refresh. Separately,
+  application-owned receipt collection follows newly submitted Mochi tasks
+  while authorized: up to four pending receipts per pass, then a 20-second
+  pause while the process lives; WorkManager supplies a 15-minute minimum,
+  best-effort background cadence. Android power policy and offline computers
+  can delay updates. Closing the page stops its own refresh work, not receipt
+  collection, execution or previously submitted side effects.
 
 Configuration checks are explicit and cancellable. They use saved settings
 without modifying switches, credentials or permissions. The disclosure states

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -28,12 +29,16 @@ internal class RecordedSpeechCapture(
         NO_SPEECH_TIMEOUT_SECONDS,
     private val onCaptured: (File) -> Unit,
     private val onFailure: (String) -> Unit,
+    private val echoCancellation: Boolean = false,
+    private val onReady: (Boolean) -> Unit = {},
+    private val onSpeechStarted: () -> Unit = {},
 ) : AutoCloseable {
     private val recording = AtomicBoolean(false)
     private val providerEndpointReached = AtomicBoolean(false)
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
     private var outputFile: File? = null
+    private var echoCanceler: AcousticEchoCanceler? = null
 
     fun start() {
         check(recording.compareAndSet(false, true)) {
@@ -60,7 +65,7 @@ internal class RecordedSpeechCapture(
             return
         }
         val recorder = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            if (echoCancellation) MediaRecorder.AudioSource.VOICE_COMMUNICATION else MediaRecorder.AudioSource.VOICE_RECOGNITION,
             SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
@@ -87,6 +92,13 @@ internal class RecordedSpeechCapture(
         val file = File(directory, "${UUID.randomUUID()}.pcm")
         outputFile = file
         audioRecord = recorder
+        if (echoCancellation && AcousticEchoCanceler.isAvailable()) {
+            try {
+                echoCanceler = AcousticEchoCanceler.create(recorder.audioSessionId)?.apply { enabled = true }
+            } catch (_: RuntimeException) {
+                Log.w(SPEECH_LOG_TAG, "briefing_echo_cancellation_unavailable")
+            }
+        }
         try {
             recorder.startRecording()
         } catch (error: IllegalStateException) {
@@ -94,12 +106,20 @@ internal class RecordedSpeechCapture(
             audioRecord = null
             outputFile = null
             recorder.release()
+            echoCanceler?.release()
+            echoCanceler = null
             file.delete()
             onFailure("Microphone could not start")
             return
         }
+        val echoReady = try {
+            echoCanceler?.enabled == true
+        } catch (_: RuntimeException) {
+            Log.w(SPEECH_LOG_TAG, "briefing_echo_cancellation_unavailable")
+            false
+        }
         recordingThread = Thread(
-            { captureLoop(recorder, file) },
+            { captureLoop(recorder, file, echoReady) },
             "MochiSpeechCapture",
         ).apply {
             isDaemon = true
@@ -132,6 +152,8 @@ internal class RecordedSpeechCapture(
         }
         audioRecord?.release()
         audioRecord = null
+        echoCanceler?.release()
+        echoCanceler = null
         outputFile?.delete()
         outputFile = null
     }
@@ -156,6 +178,7 @@ internal class RecordedSpeechCapture(
     private fun captureLoop(
         recorder: AudioRecord,
         file: File,
+        echoReady: Boolean,
     ) {
         val samples = ShortArray(CHUNK_SAMPLES)
         var detector: SherpaSpeechEndpointDetector? = null
@@ -163,6 +186,7 @@ internal class RecordedSpeechCapture(
         var failure: String? = null
         val captureStartedAt = SystemClock.elapsedRealtime()
         var speechStartLogged = false
+        var ready = false
         try {
             val activeDetector = try {
                 SherpaSpeechEndpointDetector(
@@ -189,6 +213,10 @@ internal class RecordedSpeechCapture(
                         if (count == 0) {
                             continue
                         }
+                        if (!ready) {
+                            ready = true
+                            onReady(echoReady)
+                        }
                         writePcm16(output, samples, count)
                         onAudioSamples?.invoke(samples, count)
                         val endpoint = activeDetector.accept(samples, count)
@@ -197,6 +225,7 @@ internal class RecordedSpeechCapture(
                             !speechStartLogged
                         ) {
                             speechStartLogged = true
+                            onSpeechStarted()
                             Log.i(
                                 SPEECH_LOG_TAG,
                                 "vad_speech_started elapsedMs=" +
@@ -267,6 +296,8 @@ internal class RecordedSpeechCapture(
                 failure = failure ?: "Microphone could not stop cleanly"
             }
             recorder.release()
+            echoCanceler?.release()
+            echoCanceler = null
             if (audioRecord === recorder) {
                 audioRecord = null
             }

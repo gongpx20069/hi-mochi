@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.mochi_pet.MochiApplication
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agentlink.AgentLinkState
+import com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask
+import com.example.mochi_pet.core.agentlink.AgentLinkResultVersion
 import com.example.mochi_pet.core.diagnostics.ConfigurationCheck
 import com.example.mochi_pet.core.diagnostics.runConfigurationChecks
 import com.example.mochi_pet.core.model.MochiSurface
@@ -53,6 +55,8 @@ data class TaskCenterUiState(
     val checkingTitle: String? = null,
     val checkedAt: Instant? = null,
     val checkCancelled: Boolean = false,
+    val remoteResults: List<FollowedAgentLinkTask> = emptyList(),
+    val remoteFollowUpError: String? = null,
 )
 
 class TaskCenterViewModel(private val app: MochiApplication) : ViewModel() {
@@ -65,6 +69,23 @@ class TaskCenterViewModel(private val app: MochiApplication) : ViewModel() {
     @Volatile private var checkVersion = 0L
     @Volatile private var refreshVersion = 0L
     private val termuxMutex = Mutex()
+
+    init {
+        viewModelScope.launch {
+            app.agentLinkResults.state.collect { results ->
+                mutableState.update { it.copy(remoteResults = results.tasks, remoteFollowUpError = results.error) }
+            }
+        }
+    }
+
+    fun viewRemoteResult(task: FollowedAgentLinkTask) {
+        val receipt = task.receipt ?: return
+        viewModelScope.launch {
+            checkSource("Remote results could not be read or saved. Check AgentLink and retry.") {
+                app.agentLinkResults.acknowledge(listOf(AgentLinkResultVersion(task.key, receipt.revision)), viewed = true, announced = false)
+            }
+        }
+    }
 
     fun open(diagnostics: Boolean = false) {
         mutableState.update { it.copy(visible = true, diagnosticsPage = diagnostics, diagnosticsStandalone = diagnostics) }
@@ -97,6 +118,7 @@ class TaskCenterViewModel(private val app: MochiApplication) : ViewModel() {
                     updateRefresh(version) { it.copy(schedules = schedules, scheduleStatuses = statuses) }
                 }
                 if (includeRemote) checkSource("Could not refresh AgentLink. Open Tools to check its connection.", version) {
+                    app.agentLinkResultMonitor.refresh()
                     val link = app.agentLinkClient.refresh()
                     updateRefresh(version) { it.copy(
                         agentLink = link, remoteTasks = emptyList(), remoteCheckedAt = null, checkedChats = emptySet(),
