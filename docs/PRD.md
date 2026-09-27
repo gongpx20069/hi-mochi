@@ -46,9 +46,9 @@ ordinary commands run in the background without switching away from Mochi.
   dedicates the full display to the active Home presentation. The same Focus
   mode control toggles the presentation into and out of full screen.
 - Focus mode enters an optional low-power standby presentation after 30 seconds
-  of idle time by default. Standby uses pure black with a small, static gray-white
-  sleeping Mochi (no colored accents or illuminated body fill), local
-  date, and large local time, and restores the prior Home presentation on
+  of idle time by default. Standby uses pure black with a static gray-white,
+  earless cartoon-cat Mochi, a bold local date/weekday at least half the time's
+  font size, and rounded bold 24-hour local time. It restores the prior Home presentation on
   touch or voice activity. Settings may disable standby or select a longer
   idle delay.
 

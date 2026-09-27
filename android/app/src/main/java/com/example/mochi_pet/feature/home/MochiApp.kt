@@ -11,7 +11,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.os.Build
-import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1362,7 +1361,6 @@ private fun MochiSurface.isHomePresentation(): Boolean =
 private fun FocusStandbyScreen(
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     var now by remember { mutableStateOf(ZonedDateTime.now()) }
 
     LaunchedEffect(Unit) {
@@ -1377,16 +1375,11 @@ private fun FocusStandbyScreen(
         }
     }
 
-    val timePattern = if (DateFormat.is24HourFormat(context)) {
-        "HH:mm"
-    } else {
-        "h:mm"
-    }
-    val time = now.format(DateTimeFormatter.ofPattern(timePattern))
+    val time = focusStandbyTime(now.toLocalTime())
     val date = now.format(
         uiDateFormatter(
-            englishPattern = "EEEE, MMMM d",
-            chinesePattern = "M月d日 EEEE",
+            englishPattern = "EEEE\nMMMM d",
+            chinesePattern = "M月d日\nEEEE",
         ),
     )
     val offset = focusStandbyOffset(now.toEpochSecond() / 60L)

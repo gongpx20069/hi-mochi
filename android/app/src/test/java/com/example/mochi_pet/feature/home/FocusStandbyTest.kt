@@ -4,8 +4,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalTime
 
 class FocusStandbyTest {
+    @Test
+    fun `standby always uses zero padded twenty four hour time without seconds`() {
+        assertEquals("00:05", focusStandbyTime(LocalTime.of(0, 5, 59)))
+        assertEquals("09:07", focusStandbyTime(LocalTime.of(9, 7)))
+        assertEquals("13:42", focusStandbyTime(LocalTime.of(13, 42)))
+        assertEquals("23:59", focusStandbyTime(LocalTime.of(23, 59)))
+    }
+
     @Test
     fun `Focus mode control toggles full screen on and off`() {
         assertTrue(focusModeAfterToggle(false))

@@ -36,6 +36,13 @@ its upstream GitHub release and verifies its SHA-256 before use.
 
 ## Build and verify
 
+The standby clock bundles the unmodified Nunito variable font from
+`google/fonts` revision `23e54b51ddffbc7713c583748e3bd86f62b1fa4a`
+(`ofl/nunito/Nunito[wght].ttf`) as `app/src/main/res/font/nunito.ttf`.
+Its SIL Open Font License and copyright notice ship in
+`app/src/main/assets/licenses/nunito-OFL.txt`. Font rendering is offline;
+unsupported glyphs (including Chinese) use Android's font fallback.
+
 From PowerShell:
 
 ```powershell

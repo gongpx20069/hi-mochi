@@ -1,5 +1,12 @@
 package com.example.mochi_pet.feature.home
 
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+internal fun focusStandbyTime(time: LocalTime): String =
+    time.format(DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT))
+
 internal data class FocusStandbyOffset(
     val xDp: Int,
     val yDp: Int,

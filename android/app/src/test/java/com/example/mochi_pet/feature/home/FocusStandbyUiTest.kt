@@ -17,10 +17,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import com.example.mochi_pet.ui.theme.MochiTheme
 import java.io.File
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,33 +37,33 @@ class FocusStandbyUiTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun `portrait keeps time date and cute monochrome mascot with sparse pixels`() {
-        render("23:48", "9月27日 星期日")
+        render("23:48", "9月27日\n星期日")
         checkFixture("standby-portrait.png")
     }
 
     @Test
     @Config(qualifiers = "w640dp-h320dp-land")
-    fun `landscape keeps full twelve hour time and English date`() {
-        render("11:48", "Sunday, September 27")
+    fun `landscape keeps full twenty four hour time and English date`() {
+        render("23:48", "Sunday\nSeptember 27")
         checkFixture("standby-landscape.png")
     }
 
     @Test fun `large fonts still show full time and date on narrow screens`() {
-        render("23:48", "Sunday, September 27", 2f)
+        render("23:48", "Sunday\nSeptember 27", 2f)
         checkFixture("standby-large-font.png")
     }
 
     @Test
     @Config(qualifiers = "w568dp-h240dp-land")
     fun `short landscape fits large text and the longest English date`() {
-        render("12:58", "Wednesday, September 30", 2f)
+        render("12:58", "Wednesday\nSeptember 30", 2f)
         checkFixture("standby-short-landscape.png")
     }
 
     @Test
     @Config(qualifiers = "w1280dp-h800dp-land")
     fun `tablet keeps the mascot and clock compact instead of stretching across the display`() {
-        render("23:48", "Wednesday, September 30")
+        render("23:48", "Wednesday\nSeptember 30")
         checkFixture("standby-tablet.png")
     }
 
@@ -82,12 +84,18 @@ class FocusStandbyUiTest {
             assertTrue("$tag clipped", bounds.left >= clock.left && bounds.right <= clock.right &&
                 bounds.top >= clock.top && bounds.bottom <= clock.bottom)
         }
+        val fontSizes = mutableListOf<Float>()
         for (tag in listOf("standby-time", "standby-date")) {
             val layouts = mutableListOf<TextLayoutResult>()
             compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertTrue("$tag text overflows: ${layouts.map { "${it.size}, ${it.multiParagraph.width}, ${it.multiParagraph.height}" }}",
                 layouts.isNotEmpty() && layouts.none { it.hasVisualOverflow })
+            val input = layouts.single().layoutInput
+            assertEquals(if (tag == "standby-date") 2 else 1, layouts.single().lineCount)
+            assertEquals(FontWeight.ExtraBold, input.style.fontWeight)
+            fontSizes += with(input.density) { input.style.fontSize.toPx() }
         }
+        assertTrue("Date must be at least half the clock font size in pixels", fontSizes[1] + .1f >= fontSizes[0] / 2f)
     }
 
     private fun checkFixture(name: String) {
@@ -115,7 +123,7 @@ class FocusStandbyUiTest {
         file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         bitmap.recycle()
         assertTrue("Fixture must contain visible clock and mascot", illuminated > count * .005)
-        assertTrue("At least 94% of pixels must remain black", illuminated < count * .06)
-        assertTrue("Average channel intensity ${intensity.toDouble() / count} must stay below 8/255", intensity.toDouble() / count < 8.0)
+        assertTrue("At least 72% of pixels must remain black", illuminated < count * .28)
+        assertTrue("Average channel intensity ${intensity.toDouble() / count} must stay below 30/255", intensity.toDouble() / count < 30.0)
     }
 }

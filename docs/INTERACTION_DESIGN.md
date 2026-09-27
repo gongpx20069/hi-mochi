@@ -128,11 +128,18 @@ seconds by default. Settings places this low-priority option last and offers
 30-second, 1-minute, 2-minute, 5-minute, and 10-minute delays. Standby never
 starts while voice recognition, the Agent pipeline, or Agent Browser is active.
 It replaces every Home presentation with the same pure-black display: a
-small rounded sleeping Mochi with closed eyes, a tiny smile and tucked paws,
-small localized date/weekday, and large system-format time without seconds.
-The palette is neutral gray/white only, never peach/purple. The silhouette has
-a black interior instead of an illuminated body; light-weight clock numerals,
-dim secondary text and generous black space limit illuminated pixel area.
+round, earless anime-cat Mochi with large glossy eyes, short whiskers, a tiny
+cat smile and tucked paws. Its silhouette has no ears or head protrusions.
+The clock always uses zero-padded 24-hour `HH:mm`, regardless of Android's
+12/24-hour preference. Numerals use bundled rounded Nunito ExtraBold.
+The localized date and weekday occupy separate lines, both bold and at least
+half the clock's rendered font size. Fit the clock and date together rather
+than shrinking the date independently; preserve the ratio at large font scales.
+The palette is neutral gray/white only, never peach/purple. A small dark-gray
+face fill, restrained highlights and generous black space limit illuminated
+pixel area. Bold type and the larger date intentionally light more pixels
+than the former thin-clock design; readability takes priority over that
+design's stricter pixel budget.
 Portrait stacks Mochi, time, and date vertically; landscape places Mochi beside
 the time/date column. Typography fits the available width rather than clipping
 large numerals on small screens. No breathing, blinking, particles, glow,
