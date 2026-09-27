@@ -3,6 +3,9 @@ package com.example.mochi_pet.core.agent.llm
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
+import java.io.InterruptedIOException
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -24,6 +27,53 @@ class OkHttpOpenAiChatClientTest {
     @After
     fun tearDown() {
         server.shutdown()
+    }
+
+    @Test
+    fun `foreground timeout preserves shorter limits and all provider options`() {
+        for (timeout in listOf(1L, 10L, 20L, 60L, 300L)) {
+            val original = OpenAiProviderConfig(
+                providerType = ProviderType.AZURE_OPENAI,
+                endpoint = server.url("/").toString(),
+                apiKey = "test-key",
+                model = "test-deployment",
+                apiVersion = "2024-10-21",
+                timeoutSeconds = timeout,
+                maxResponseBytes = 1234,
+                imageInputEnabled = false,
+            )
+            val foreground = original.forForegroundRequest()
+
+            assertEquals(minOf(timeout, 20L), foreground.timeoutSeconds)
+            assertEquals(timeout, original.timeoutSeconds)
+            assertEquals(original.providerType, foreground.providerType)
+            assertEquals(original.endpoint, foreground.endpoint)
+            assertEquals(original.apiKey, foreground.apiKey)
+            assertEquals(original.model, foreground.model)
+            assertEquals(original.apiVersion, foreground.apiVersion)
+            assertEquals(original.maxResponseBytes, foreground.maxResponseBytes)
+            assertEquals(original.imageInputEnabled, foreground.imageInputEnabled)
+        }
+    }
+
+    @Test(timeout = 30_000)
+    fun `stalled foreground request times out at twenty seconds without replay`() {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        val start = System.nanoTime()
+
+        val error = assertThrows(ProviderNetworkException::class.java) {
+            runBlocking {
+                client.complete(
+                    config = config(server.url("/").toString()).forForegroundRequest(),
+                    request = request(),
+                )
+            }
+        }
+
+        val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
+        assertTrue("Elapsed: $elapsed ms", elapsed in 19_000L..25_000L)
+        assertTrue(error.cause is InterruptedIOException)
+        assertEquals(1, server.requestCount)
     }
 
     @Test

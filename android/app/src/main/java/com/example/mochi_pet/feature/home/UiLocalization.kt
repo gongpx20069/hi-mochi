@@ -666,6 +666,8 @@ private val ZH_UI_TEXT = mapOf(
     "Recent conversation turns" to "最近对话轮数",
     "Default 20; allowed range 1-50." to "默认 20；允许范围 1–50。",
     "Timeout seconds" to "超时秒数",
+    "Per AI request. Chat and voice use at most 20 seconds; scheduled agents use this value." to
+        "每次 AI 请求的超时。聊天和语音最多等待 20 秒；定时任务使用此设置值。",
     "Wake word" to "唤醒词",
     "Say Hi Mochi hands-free" to "免手持说“Hi Mochi”",
     "Disable" to "禁用",

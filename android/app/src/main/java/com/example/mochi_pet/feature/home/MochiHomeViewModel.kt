@@ -590,6 +590,7 @@ class MochiHomeViewModel(
             var interactionWeather: CurrentWeather? = null
             try {
                 val provider = settingsRepository.loadRuntimeConfig()
+                    .forForegroundRequest()
                 val agentSettings = agentSettingsRepository?.load()
                     ?: AgentSettings()
                 val persona = personaRepository?.load()

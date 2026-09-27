@@ -64,6 +64,33 @@ import org.junit.Test
 
 class MochiHomeViewModelTest {
     @Test
+    fun `text and voice cap model requests without changing stored provider timeout`() {
+        for (voiceInput in listOf(false, true)) {
+            val settings = ProviderSettingsRepositoryFake()
+            val timeouts = mutableListOf<Long>()
+            val viewModel = MochiHomeViewModel(
+                plannerStore = PlannerStoreFake(),
+                providerSettingsRepository = settings,
+                agentRunnerBuilder = { _, _, _ ->
+                    AgentRunner { request ->
+                        timeouts += request.provider.timeoutSeconds
+                        AgentReply("Done.", "neutral")
+                    }
+                },
+                voiceRuntime = VoiceRuntimeFake("Hello"),
+                ioDispatcher = Dispatchers.Unconfined,
+            )
+
+            if (voiceInput) viewModel.startVoiceInput() else viewModel.sendConversation("Hello")
+
+            assertEquals(listOf(20L), timeouts)
+            kotlinx.coroutines.runBlocking {
+                assertEquals(60L, settings.loadRuntimeConfig().timeoutSeconds)
+            }
+        }
+    }
+
+    @Test
     fun `wake briefing completion and deliberate dismissal acknowledge different states`() {
         for (result in WakeBriefingResult.entries) {
             val repository = ResultsFake(AgentLinkResultState(listOf(followed().copy(receipt = receipt())), true,

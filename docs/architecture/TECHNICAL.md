@@ -310,6 +310,15 @@ runtime `OpenAiProviderConfig`.
 Provider errors are bounded and redact the configured key. Endpoints must be
 absolute HTTP(S) URLs without embedded credentials.
 
+Foreground text and voice cap each model HTTP request at 20 seconds, including
+Tool continuations, final-response repair and delegated model/image requests.
+A shorter configured Provider timeout is preserved. Scheduled Agents and their
+children retain the configured Provider timeout (60 seconds by default), as do
+explicit configuration probes. This is a per-request deadline, not a whole-task
+or Tool-execution deadline. Timing out fails the request without an application
+retry or replay of previous Tool actions. The stored Provider setting and
+Provider-share data are unchanged; Settings explains the foreground cap.
+
 The native Conversation surface sends text through `AgentOrchestrator`, applies
 validated UI directives, supports cancellation, and rejects stale results from
 superseded interactions. Successful user/assistant messages are persisted in

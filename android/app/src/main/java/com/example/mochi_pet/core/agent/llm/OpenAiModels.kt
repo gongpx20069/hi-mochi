@@ -38,6 +38,18 @@ class OpenAiProviderConfig(
     val maxResponseBytes: Long = 2L * 1024L * 1024L,
     val imageInputEnabled: Boolean = DEFAULT_MULTIMODAL_INPUT_ENABLED,
 ) {
+    fun forForegroundRequest(): OpenAiProviderConfig =
+        OpenAiProviderConfig(
+            providerType = providerType,
+            endpoint = endpoint,
+            apiKey = apiKey,
+            model = model,
+            apiVersion = apiVersion,
+            timeoutSeconds = minOf(timeoutSeconds, 20L),
+            maxResponseBytes = maxResponseBytes,
+            imageInputEnabled = imageInputEnabled,
+        )
+
     init {
         require(endpoint.isNotBlank()) { "Provider endpoint must not be empty" }
         require(apiKey.isNotBlank()) { "Provider API key must not be empty" }

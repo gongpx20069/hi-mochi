@@ -6867,6 +6867,11 @@ internal fun ProviderSettingsSurface(
                     value = timeout,
                     onValueChange = { timeout = it.filter(Char::isDigit) },
                     label = { Text("Timeout seconds") },
+                    supportingText = {
+                        Text(
+                            "Per AI request. Chat and voice use at most 20 seconds; scheduled agents use this value.",
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
                 )
