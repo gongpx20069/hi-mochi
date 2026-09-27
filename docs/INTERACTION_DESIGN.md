@@ -128,16 +128,26 @@ seconds by default. Settings places this low-priority option last and offers
 30-second, 1-minute, 2-minute, 5-minute, and 10-minute delays. Standby never
 starts while voice recognition, the Agent pipeline, or Agent Browser is active.
 It replaces every Home presentation with the same pure-black display: a
-minimal low-contrast Mochi, small localized date, and large system-format time
-without seconds. Portrait stacks Mochi, date, and time vertically; landscape
-places Mochi beside the date/time column. The content shifts among bounded
-positions once per minute to reduce OLED burn-in.
+small rounded sleeping Mochi with closed eyes, a tiny smile and tucked paws,
+small localized date/weekday, and large system-format time without seconds.
+The palette is neutral gray/white only, never peach/purple. The silhouette has
+a black interior instead of an illuminated body; light-weight clock numerals,
+dim secondary text and generous black space limit illuminated pixel area.
+Portrait stacks Mochi, time, and date vertically; landscape places Mochi beside
+the time/date column. Typography fits the available width rather than clipping
+large numerals on small screens. No breathing, blinking, particles, glow,
+animated transitions or per-second redraws run in standby; vector paths are
+cached. The clock updates and content shifts among bounded positions once per
+minute to reduce OLED burn-in.
 
 Standby keeps the screen and wake-word pipeline active but lowers only Mochi's
 window brightness. Touch, listening, or any Agent pipeline activity restores
 the exact prior Home presentation and restarts the idle timer. Exiting Focus,
 leaving Home, backgrounding, or destroying the Activity restores the original
 window brightness.
+
+These are rendering/power-saving measures, not a measured battery-life claim:
+the display remains on and voice wake continues to use the microphone.
 
 The visual transition never replaces the spoken response. Mochi's reply must
 explicitly contain the displayed local date/time or weather facts, and

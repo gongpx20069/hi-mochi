@@ -10,7 +10,6 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.res.Configuration
 import android.content.pm.PackageManager
-import android.graphics.Typeface
 import android.os.Build
 import android.text.format.DateFormat
 import android.widget.Toast
@@ -96,7 +95,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -1365,7 +1363,6 @@ private fun FocusStandbyScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
     var now by remember { mutableStateOf(ZonedDateTime.now()) }
 
     LaunchedEffect(Unit) {
@@ -1406,257 +1403,7 @@ private fun FocusStandbyScreen(
             },
         contentAlignment = Alignment.Center,
     ) {
-        if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            FocusStandbyLandscape(
-                time = time,
-                date = date,
-                modifier = contentModifier,
-            )
-        } else {
-            FocusStandbyPortrait(
-                time = time,
-                date = date,
-                modifier = contentModifier,
-            )
-        }
-    }
-}
-
-@Composable
-private fun FocusStandbyPortrait(
-    time: String,
-    date: String,
-    modifier: Modifier = Modifier,
-) {
-    val roundedFont = remember {
-        FontFamily(
-            Typeface.create("sans-serif-rounded", Typeface.BOLD),
-        )
-    }
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        MinimalStandbyMochi(
-            modifier = Modifier.size(width = 176.dp, height = 136.dp),
-        )
-        Spacer(modifier = Modifier.height(34.dp))
-        MaterialText(
-            text = date,
-            color = STANDBY_DATE_COLOR,
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = roundedFont,
-            letterSpacing = 0.6.sp,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        MaterialText(
-            text = time,
-            color = STANDBY_PRIMARY_COLOR,
-            fontSize = 114.sp,
-            fontWeight = FontWeight.ExtraBold,
-            fontFamily = roundedFont,
-            letterSpacing = (-3).sp,
-        )
-    }
-}
-
-@Composable
-private fun FocusStandbyLandscape(
-    time: String,
-    date: String,
-    modifier: Modifier = Modifier,
-) {
-    val roundedFont = remember {
-        FontFamily(
-            Typeface.create("sans-serif-rounded", Typeface.BOLD),
-        )
-    }
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(88.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        MinimalStandbyMochi(
-            modifier = Modifier.size(width = 218.dp, height = 166.dp),
-        )
-        Column(
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            MaterialText(
-                text = date,
-                color = STANDBY_DATE_COLOR,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = roundedFont,
-                letterSpacing = 0.7.sp,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            MaterialText(
-                text = time,
-                color = STANDBY_PRIMARY_COLOR,
-                fontSize = 136.sp,
-                fontWeight = FontWeight.ExtraBold,
-                fontFamily = roundedFont,
-                letterSpacing = (-4).sp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun MinimalStandbyMochi(
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val outlineWidth = 2.5.dp.toPx()
-            val horizontalInset = size.width * 0.06f
-            val verticalInset = size.height * 0.08f
-            drawRoundRect(
-                color = STANDBY_FACE_FILL_COLOR,
-                topLeft = Offset(horizontalInset, verticalInset),
-                size = Size(
-                    width = size.width - horizontalInset * 2,
-                    height = size.height - verticalInset * 2,
-                ),
-                cornerRadius = CornerRadius(
-                    x = size.minDimension * 0.34f,
-                    y = size.minDimension * 0.34f,
-                ),
-            )
-            drawRoundRect(
-                color = STANDBY_OUTLINE_COLOR,
-                topLeft = Offset(horizontalInset, verticalInset),
-                size = Size(
-                    width = size.width - horizontalInset * 2,
-                    height = size.height - verticalInset * 2,
-                ),
-                cornerRadius = CornerRadius(
-                    x = size.minDimension * 0.34f,
-                    y = size.minDimension * 0.34f,
-                ),
-                style = Stroke(width = outlineWidth),
-            )
-
-            fun sleepingEye(centerX: Float) {
-                val eye = Path().apply {
-                    moveTo(centerX - size.width * 0.075f, size.height * 0.43f)
-                    cubicTo(
-                        centerX - size.width * 0.035f,
-                        size.height * 0.37f,
-                        centerX + size.width * 0.035f,
-                        size.height * 0.37f,
-                        centerX + size.width * 0.075f,
-                        size.height * 0.43f,
-                    )
-                }
-                drawPath(
-                    path = eye,
-                    color = STANDBY_PRIMARY_COLOR,
-                    style = Stroke(
-                        width = 4.dp.toPx(),
-                        cap = StrokeCap.Round,
-                    ),
-                )
-                drawLine(
-                    color = STANDBY_PRIMARY_COLOR,
-                    start = Offset(
-                        centerX - size.width * 0.068f,
-                        size.height * 0.415f,
-                    ),
-                    end = Offset(
-                        centerX - size.width * 0.095f,
-                        size.height * 0.39f,
-                    ),
-                    strokeWidth = 2.dp.toPx(),
-                    cap = StrokeCap.Round,
-                )
-            }
-            sleepingEye(size.width * 0.36f)
-            sleepingEye(size.width * 0.64f)
-
-            drawOval(
-                color = STANDBY_CHEEK_COLOR,
-                topLeft = Offset(
-                    size.width * 0.19f,
-                    size.height * 0.57f,
-                ),
-                size = Size(size.width * 0.13f, size.height * 0.055f),
-            )
-            drawOval(
-                color = STANDBY_CHEEK_COLOR,
-                topLeft = Offset(
-                    size.width * 0.68f,
-                    size.height * 0.57f,
-                ),
-                size = Size(size.width * 0.13f, size.height * 0.055f),
-            )
-
-            drawOval(
-                color = STANDBY_NOSE_COLOR,
-                topLeft = Offset(
-                    size.width * 0.47f,
-                    size.height * 0.56f,
-                ),
-                size = Size(size.width * 0.06f, size.height * 0.055f),
-            )
-            drawOval(
-                color = STANDBY_MOUTH_COLOR,
-                topLeft = Offset(
-                    size.width * 0.465f,
-                    size.height * 0.65f,
-                ),
-                size = Size(size.width * 0.07f, size.height * 0.065f),
-                style = Stroke(
-                    width = 2.5.dp.toPx(),
-                ),
-            )
-            drawArc(
-                color = STANDBY_MOUTH_HIGHLIGHT_COLOR,
-                startAngle = 20f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = Offset(
-                    size.width * 0.478f,
-                    size.height * 0.672f,
-                ),
-                size = Size(size.width * 0.044f, size.height * 0.025f),
-                style = Stroke(width = 1.5.dp.toPx()),
-            )
-        }
-        MaterialText(
-            text = "Z",
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 1.dp, end = 1.dp),
-            color = STANDBY_SLEEP_COLOR,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Cursive,
-        )
-        MaterialText(
-            text = "z",
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 22.dp, end = 22.dp),
-            color = STANDBY_SLEEP_COLOR.copy(alpha = 0.72f),
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Cursive,
-        )
-        MaterialText(
-            text = "z",
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 39.dp, end = 36.dp),
-            color = STANDBY_SLEEP_COLOR.copy(alpha = 0.48f),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Cursive,
-        )
+        StandbyClock(time, date, contentModifier)
     }
 }
 
@@ -7533,15 +7280,6 @@ private const val AZURE_SPEECH_SIGNUP_URL =
 private const val FOCUS_STANDBY_BRIGHTNESS = 0.03f
 private val FOCUS_STANDBY_DELAY_OPTIONS_SECONDS =
     ALLOWED_FOCUS_STANDBY_DELAYS_SECONDS.sorted()
-private val STANDBY_PRIMARY_COLOR = Color(0xFFD8D8D8)
-private val STANDBY_DATE_COLOR = Color(0xFFA8A8A8)
-private val STANDBY_OUTLINE_COLOR = Color(0xFF5A5A5A)
-private val STANDBY_FACE_FILL_COLOR = Color(0xFF111111)
-private val STANDBY_CHEEK_COLOR = Color(0xFF696969)
-private val STANDBY_NOSE_COLOR = Color(0xFFB0B0B0)
-private val STANDBY_MOUTH_COLOR = Color(0xFFC8C8C8)
-private val STANDBY_MOUTH_HIGHLIGHT_COLOR = Color(0xFF888888)
-private val STANDBY_SLEEP_COLOR = Color(0xFF909090)
 
 private fun focusStandbyDelayLabel(delaySeconds: Int): String =
     if (delaySeconds < 60) {
