@@ -39,7 +39,14 @@ intentional because GitHub Pages serves that document for arbitrary missing
 URLs.
 
 English and Simplified Chinese homepages keep the same product feature
-structure. The smart-home feature describes the optional signed Mi Home
+structure, including named AI and speech accounts, document collaboration
+with Notion/Tencent Docs/Feishu, and the task center. Keep onboarding and
+connection-switching semantics aligned with the shipped app. Ordinary
+foreground chat is not a task-center item. Feishu requires guided self-built-app
+setup and authorization; do not present it as one-click login or claim support
+for whole-document deletion, native spreadsheets, Bitable, or PPT editing.
+Sharing copy must warn that a full link grants use of the included credentials.
+The smart-home feature describes the optional signed Mi Home
 extension, its supported device categories, and foreground-only latest camera
 event images. It must not imply support for camera live view, playback, PTZ,
 two-way audio, locks, alarms, body-composition measurements, or sharing Xiaomi
@@ -50,6 +57,12 @@ Download controls include a checked-in current-release fallback. On page load,
 repository URLs, and updates the displayed version, ARM64 download, and release
 page links. If the API is unavailable or rate-limited, the fallback remains
 usable.
+
+The bundled fallback is **v1.0.13**. After publishing a new release, update
+both homepages' download URLs, release-page URLs, and version labels together.
+The static check enforces consistency within and between languages; it does
+not query GitHub or infer an unpublished version. An API outage must not send
+visitors back to an obsolete installation guide.
 
 ## Validation
 
@@ -62,6 +75,21 @@ python website\tests\validate_site.py
 The deployment workflow runs the same check before constructing the public
 artifact. Website documentation, tests, and harness files are deliberately
 excluded from that artifact.
+
+For layout or interaction changes, run the browser smoke check with optional
+Playwright test tooling (not a website runtime or build dependency):
+
+```powershell
+python -m pip install --only-binary=:all: playwright
+python -m playwright install chromium
+python website\tests\browser_smoke.py
+```
+
+Alternatively, use `--channel msedge` or `--channel chrome` with an installed
+browser instead of downloading Chromium. The check serves only `website/` at
+the project path, checks both languages at 320/390/768/1280 pixels, exercises
+mobile navigation, and mocks GitHub responses to verify release updates,
+API-outage fallback, and rejection of untrusted download URLs.
 
 ## Deployment
 

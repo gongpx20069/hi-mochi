@@ -69,6 +69,7 @@ def png_dimensions(path: Path) -> tuple[int, int]:
 def main() -> None:
     errors: list[str] = []
     pages = sorted(SITE_ROOT.rglob("*.html"))
+    fallback_versions: set[str] = set()
 
     for page in pages:
         parser = PageParser()
@@ -98,10 +99,11 @@ def main() -> None:
 
         if page.name == "index.html":
             source = page.read_text(encoding="utf-8")
-            if source.count("data-smart-home-feature") != 1:
-                errors.append(
-                    f"{relative_page}: expected one smart-home feature",
-                )
+            for feature in ("smart-home", "speech", "documents", "connections", "tasks"):
+                if source.count(f"data-{feature}-feature") != 1:
+                    errors.append(
+                        f"{relative_page}: expected one {feature} feature",
+                    )
             smart_home_label = (
                 "智能家居 · 米家"
                 if "zh-CN" in page.parts
@@ -125,6 +127,7 @@ def main() -> None:
                 source,
             )
             versions = set(download_versions + page_versions + label_versions)
+            fallback_versions.update(versions)
             if (
                 len(download_versions) != 2
                 or len(page_versions) != 2
@@ -134,6 +137,9 @@ def main() -> None:
                 errors.append(
                     f"{relative_page}: inconsistent release fallback metadata",
                 )
+
+    if len(fallback_versions) != 1:
+        errors.append("Homepages must use the same release fallback in both languages.")
 
     og_image = SITE_ROOT / "assets" / "mochi-og.png"
     if png_dimensions(og_image) != (1200, 630):

@@ -894,10 +894,6 @@ img {
   background: radial-gradient(circle, rgba(151, 215, 197, 0.11), transparent 67%);
 }
 
-.knowledge-feature {
-  padding-bottom: 118px;
-}
-
 .knowledge-feature::after {
   top: -120px;
   right: -130px;
@@ -956,12 +952,9 @@ img {
 }
 
 .waveform {
-  position: absolute;
-  right: 32px;
-  bottom: 28px;
-  left: 32px;
   display: flex;
   height: 65px;
+  margin-top: 28px;
   align-items: center;
   justify-content: center;
   gap: 11px;
@@ -1088,17 +1081,16 @@ img {
   transform: translate(6px, -4px);
 }
 
-.knowledge-workspaces {
-  position: absolute;
-  right: 34px;
-  bottom: 34px;
-  left: 34px;
+.knowledge-workspaces,
+.connection-presets {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  margin-top: 28px;
 }
 
+.connection-presets span,
 .knowledge-workspaces span,
 .knowledge-workspaces i {
   padding: 8px 12px;
@@ -1114,6 +1106,11 @@ img {
   border-color: rgba(151, 215, 197, 0.15);
   background: rgba(151, 215, 197, 0.06);
   color: var(--mint);
+}
+
+.feature-card .feature-note {
+  margin-top: 18px;
+  font-size: 0.85rem;
 }
 
 .feature-wide {
@@ -1506,8 +1503,8 @@ img {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 390px;
-  height: 390px;
+  width: min(390px, 100%);
+  aspect-ratio: 1;
   border: 1px solid rgba(213, 193, 255, 0.1);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(213, 193, 255, 0.12), transparent 66%);
@@ -2028,7 +2025,10 @@ img {
   .site-nav {
     position: fixed;
     inset: 0;
+    bottom: auto;
     display: flex;
+    height: 100vh;
+    height: 100dvh;
     visibility: hidden;
     flex-direction: column;
     align-items: flex-start;
