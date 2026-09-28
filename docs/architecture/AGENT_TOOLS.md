@@ -69,7 +69,7 @@ The request-scoped coordinator permits at most two delegations. Child
 registries never contain `delegate_agent`. Researcher may use enabled Browser
 Tools, read-only MCP Tools, and `load_skill`; Analyst adds
 `run_sandboxed_javascript`. Read-only MCP access uses application-controlled
-allowlists for built-in Notion and Tencent Docs providers. Remote
+allowlists for built-in Notion, Tencent Docs, and Feishu providers. Remote
 `readOnlyHint` annotations and manually configured MCP servers do not grant
 Subagent access.
 Both child roles can additionally receive `termux_exec` and `termux_task`
@@ -78,12 +78,22 @@ are enabled. No other extension or companion provider gains child access.
 
 ### Document-provider defaults
 
-Connecting Notion or Tencent Docs enables the discovered Tools in the exact
+Connecting Notion, Tencent Docs, or Feishu enables the discovered Tools in the exact
 allowlists below. These defaults cover document/spreadsheet operations, not
 sharing, permission changes, membership, comments, or remote Agent execution.
 Unrecognized Tools remain off; never enable a name merely because it starts
 with a provider prefix or has a remote read-only annotation. Availability and
 supported operations always come from that connection's actual MCP schemas.
+
+Feishu defaults are exactly `search-doc`, `fetch-doc`, `create-doc`,
+`update-doc`, and `list-docs`. Discovery must return all five before connection
+succeeds; other remote names are excluded. Only search/fetch/list enter
+read-only Subagent registries. The optional Feishu Knowledge Skill requires
+all five, starts disabled, and teaches search pagination, wiki browsing,
+read-before-write, ambiguity resolution, and post-write readback. It must
+disclose that search covers doc/docx only, wiki listing is node-scoped, embedded
+sheet/Bitable content is unsupported, and whole-document deletion, spreadsheets,
+Bitable, PPT, comments, downloads, and permissions are not exposed.
 
 Notion defaults:
 
@@ -507,13 +517,11 @@ such as `notion_search`; manual servers use
 `mcp_<server>_<remote_tool>`. Responses, pagination, names, descriptions, and
 tool counts are bounded.
 
-Notion and Tencent Docs enable their core discovery and reading Tools on first
-connection. Tencent Docs Tool descriptions are normalized to bounded English
-labels locally, including for previously discovered definitions. Up to 256
-remote Tools can be cataloged; older Tencent Docs catalogs truncated at 64
-Tools are rediscovered automatically while retaining enabled selections. The
-Tencent Docs UI and Agent registry retain only the 32 highest-priority Tools,
-with workspace listing, search, and content reading always prioritized.
+Document-provider defaults are defined in section 1 above. Tencent Docs Tool
+descriptions are normalized to bounded English labels locally, including for
+previously discovered definitions. Up to 256 remote Tools can be discovered;
+Tencent retains the 51 explicitly selected candidates, with 44 default-on and
+seven optional. Versioned rediscovery and default migration follow section 1.
 Current Tencent Docs deployments expose workspace search as
 `manage.search_file`; the older `search_space_file` name remains supported.
 
@@ -533,6 +541,65 @@ default after successful discovery. The separate Tencent Docs Knowledge Skill
 is read-only and disabled by default. Its readiness prerequisite is presented
 as the single **Tencent Docs MCP** aggregate; the aggregate is unavailable when
 the server or any Tencent Docs Tool required by the Skill is unavailable.
+
+### Feishu user authorization
+
+The dedicated provider uses `https://mcp.feishu.cn/mcp`, never a personal
+seven-day MCP URL or the local Node/OpenAPI server. Users supply their own
+enterprise self-built application's App ID and App Secret through Tools.
+Ordinary Feishu applications are confidential clients: PKCE does not remove
+the App Secret requirement. No common secret or public callback backend is
+embedded in Mochi.
+
+Authorization uses the system browser and official
+`https://accounts.feishu.cn/open-apis/authen/v1/authorize`, random state,
+S256 PKCE, and the exact allowlisted redirect
+`http://127.0.0.1:43827/oauth/feishu`. A temporary IPv4 loopback-only listener
+binds before launching the browser. It checks method, path, Host and a single
+matching state, bounds HTTP input, rejects unrelated requests without consuming
+the attempt, and never reflects codes into its response. The listener closes
+on callback, rejection, cancellation, error, or the five-minute authorization
+deadline. Port conflicts are explicit errors; no LAN/wildcard listener or
+public network-policy exception is introduced. The browser must run on the
+same phone. Process death requires a new authorization attempt.
+
+Code exchange and refresh use the fixed
+`https://accounts.feishu.cn/oauth/v3/token`, form encoding, a 25-second request
+deadline, cancellable body reads, no redirects, and no automatic retries.
+HTTP-200 nonzero business codes, missing tokens, invalid lifetimes, and
+insufficient actual granted scopes are failures. Error feedback never reflects
+raw provider descriptions or credentials.
+
+The guided five-tool permission set is `offline_access`, `search:docs:read`,
+`wiki:wiki:readonly`, `docx:document:readonly`, `task:task:read`, `im:chat:read`,
+`docx:document:create`, `wiki:node:read`, `wiki:node:create`,
+`docs:document.media:upload`, `board:whiteboard:node:create`, and
+`docx:document:write_only`, all with user identity. The official service
+requires every listed permission per Tool, including its non-document-looking
+dependencies. These do not add task/chat/member Tools. The user must publish
+permission changes and have application availability. See the
+[official remote service contract](https://open.feishu.cn/document/mcp_open_tools/developers-call-remote-mcp-server)
+and [OAuth refresh contract](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/refresh-user-access-token-v3).
+
+App secrets and both tokens are Keystore-encrypted in the Tool catalog, never
+in Skills, prompts, logs, backups, or Provider shares. Expiry uses the returned
+lifetimes. Refresh is serialized and persists the rotated token pair atomically.
+The single-use refresh token is removed from storage before transmission;
+ambiguous network results, cancellation, or process death cannot replay it and
+require reconnect. Connection revisions prevent disconnect/reconnect from
+being overwritten by late authorization or refresh. Separate registry revisions
+invalidate captured tools after switches change without discarding refreshed
+credentials. Disconnect removes local credentials, not Feishu-side consent;
+the user can revoke that in Feishu.
+
+Feishu transport sends `X-Lark-MCP-UAT` and `X-Lark-MCP-Allowed-Tools`, never
+Bearer/TAT mode. Discovery requests only the five candidates; each execution
+allows only its currently enabled target. These headers are restricted to the
+fixed Feishu provider and endpoint. Requests have a 30-second deadline,
+cancellable response-body reads, no redirects and no automatic retry.
+Schemas use `feishu_` aliases, while calls retain the discovered remote name.
+Top-level JSON-RPC errors and `isError=true` results are failures, not writes
+to be retried automatically.
 
 FlyAI's public CLI calls `https://flyai.open.fliggy.com/mcp` with a stateless
 `tools/call` request plus proprietary `x-ff-ctx`, timestamp, nonce, HMAC, and

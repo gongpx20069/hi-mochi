@@ -71,6 +71,30 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Feishu integration regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*Feishu*Test" `
+  --tests "*McpClientTest" --tests "*ToolCatalogTest" `
+  --tests "*MochiDatabaseTest" --no-daemon
+```
+
+These use synthetic credentials and local fixtures, not an actual Feishu account.
+Device acceptance separately requires a user-owned published Feishu app: follow
+Tools > Feishu MCP, confirm browser return, permission denial, cancellation,
+refresh and process-death retry, then read/search an authorized document.
+Only with explicit permission create/update a test document and verify readback.
+Never request App Secret/tokens in chat or put them in logs/screenshots.
+The callback is `http://127.0.0.1:43827/oauth/feishu` on the same phone; do not
+configure it as a manual MCP endpoint or weaken the public HTTPS policy.
+
+After an in-place app/test APK update, the opt-in
+`com.example.mochi_pet.core.tools.FeishuCallbackDiagnosticTest` with
+`-e mochiFeishuCallbackDiagnostic true` opens the phone's browser on a synthetic
+localhost callback and checks receipt and port release. It does not contact
+Feishu, exchange tokens, or modify provider settings. This proves local browser
+return only, not acceptance of the redirect by a real Feishu app.
+
 Task center and configuration-check regression coverage:
 
 ```powershell

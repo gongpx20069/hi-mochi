@@ -120,6 +120,15 @@ For document collaboration, use [Notion MCP OAuth](https://www.notion.com/help/n
 or a [Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html), then
 enable the corresponding Tools and Skill.
 
+**Feishu:** open **Tools > Feishu MCP > Connect Feishu** for guided
+[enterprise self-built app setup](https://open.feishu.cn/app), permissions,
+publication, and account authorization. Copy the exact redirect URL shown by
+Mochi into Feishu Security Settings; a temporary phone-local callback means no
+server deployment. Enter your own App ID/Secret only in that dialog, not chat.
+Search, wiki browsing, reading, creation, and updates are enabled after connection;
+enable **Feishu Knowledge** separately. Whole-document deletion, native
+spreadsheets, Bitable, and PPT editing are not supported.
+
 ### Language, updates, and Provider sharing
 
 Mochi follows the Android system language by default and can be fixed to
@@ -130,7 +139,7 @@ each time it opens; you decide whether to download an available update.
 Speech connections start selected; Amap, Tencent Docs, and manual MCP Tool
 credentials are optional and start unselected. The encrypted link also contains
 its decryption key: **anyone holding the full link can use the selected API
-resources and consume their quota**. Persona, memories, planner data, Notion
+resources and consume their quota**. Persona, memories, planner data, Feishu/Notion
 OAuth, Mi Home sessions, and Android permissions are not shared.
 
 ## Core features
@@ -209,6 +218,7 @@ once its provider is connected and its Tools are enabled.
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
 | **Notion Knowledge** | Disabled | Coworks with you to research, organize material, draft new pages, and find or update information in your authorized private knowledge base | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
 | **Tencent Docs Knowledge** | Disabled | Coworks with you to research, organize material, draft new documents, and find or update information in your authorized private knowledge base | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
+| **Feishu Knowledge** | Disabled | Searches and browses authorized cloud documents, reads before editing, and verifies requested creation/updates by readback | Tools > Feishu MCP; [self-built app and user authorization](https://open.feishu.cn/app) |
 | Travel Planning | Enabled | Uses Amap for grounded routes and weather, then Agent Browser to research public no-login train or flight options without booking | [Create an Amap Web Service Key](https://console.amap.com/); enable Agent Browser |
 | Merchant Discovery | Enabled | Finds and compares merchants using available Amap ratings, average cost, hours, phone, tags, and photos | [Create an Amap Web Service Key](https://console.amap.com/) |
 
@@ -225,7 +235,7 @@ Skills requiring separately installed apps are listed under
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Research public HTTPS pages in one visible, bounded Android WebView session. |
 | **Native UX** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | Open trusted Mochi surfaces or run bounded pure JavaScript calculations locally. |
 | **Amap Maps** | Place search · Merchant details · Routes<br>Geocoding · Reverse geocoding · Weather | Search places and merchants, compare available ratings and average cost, and plan routes with trusted GCJ-02 coordinates. Requires a Web Service Key. |
-| **Connected MCP** | **Notion** · **Tencent Docs**<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
+| **Connected MCP** | **Notion** · **Tencent Docs** · **Feishu**<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
 
 Agent Browser, Mochi built-ins, and provider Tool details are grouped and
 collapsed by default in Tools. Scheduled runs receive only the read-only

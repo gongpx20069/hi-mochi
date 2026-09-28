@@ -142,7 +142,7 @@ support is an optional import/export adapter.
 - Import requires one explicit confirmation, replaces only included
   connections, stores imported secrets with the receiver's Keystore-backed
   storage, and immediately enables the shared Providers and selected Tools.
-- Notion OAuth, Mi Home sessions and device selection, Android permissions,
+- Notion and Feishu OAuth, Mi Home sessions and device selection, Android permissions,
   persona, memories, and planner data are never shared.
 
 ### 3.6 Agent Browser

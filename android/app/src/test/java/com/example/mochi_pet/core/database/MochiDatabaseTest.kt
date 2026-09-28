@@ -162,7 +162,7 @@ class MochiDatabaseTest {
         assertEquals(false, installed.enabled)
         assertEquals(true, edited.modified)
         val skills = repository.listSkills()
-        assertEquals(15, skills.size)
+        assertEquals(16, skills.size)
         assertEquals(
             listOf("Web Search"),
             skills.filter { it.id.contains("web-search") }.map { it.name },
@@ -208,6 +208,25 @@ class MochiDatabaseTest {
             assertFalse(repository.listEnabledMetadata(available - search).any { it.name == "tencent-docs-knowledge" })
             assertEquals("error", LoadSkillTool(repository, available - search).execute(arguments, context).status)
         }
+    }
+
+    @Test
+    fun `Feishu skill stays optional and requires all five document tools`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val id = "builtin:feishu-knowledge"
+        val skill = repository.listSkills().single { it.id == id }
+        assertFalse(skill.enabled)
+        val tools = setOf("feishu_search_doc", "feishu_fetch_doc", "feishu_list_docs",
+            "feishu_create_doc", "feishu_update_doc")
+        assertEquals(tools, skill.requiredToolNames)
+        repository.setEnabled(id, true)
+        assertTrue(repository.listEnabledMetadata(tools).any { it.name == "feishu-knowledge" })
+        tools.forEach { missing ->
+            assertFalse(repository.listEnabledMetadata(tools - missing).any { it.name == "feishu-knowledge" })
+        }
+        assertTrue(skill.content.contains("fetch the affected content"))
+        assertTrue(skill.content.contains("no whole-document delete tool"))
+        assertTrue(skill.content.contains("Never repeat create/update"))
     }
 
     @Test

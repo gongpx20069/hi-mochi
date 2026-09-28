@@ -227,6 +227,12 @@ The Tools Compose surface never executes a Tool directly. It sends typed events
 to `MochiHomeViewModel`, which updates `ToolCatalogRepository`. Notion OAuth
 returns through the Activity deep-link channel and is completed by the
 repository before discovered schemas become eligible for prompt registration.
+Feishu setup sends typed `FeishuUiAction` events to the same ViewModel.
+Its cancellable ViewModel authorization job owns a temporary localhost callback
+through `FeishuOAuthClient`; no Activity deep link or hosted callback is needed.
+The repository owns encrypted app credentials/tokens, serialized rotation,
+connection revisions, and independent registry revocation. See `AGENT_TOOLS.md`
+for the fixed transport and exact permission contract.
 Agent Browser enablement follows the provider-card pattern: one master switch
 and five adjacent individual Tool switches. The session controller is created
 lazily by the first Browser Tool call and destroyed after the final model

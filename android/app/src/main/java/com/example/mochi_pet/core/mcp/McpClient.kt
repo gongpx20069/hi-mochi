@@ -7,8 +7,11 @@ import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -26,6 +29,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -47,6 +53,7 @@ data class McpServerRuntime(
     val accessToken: String?,
     val authorizationHeader: String? =
         accessToken?.let { "Bearer $it" },
+    val feishuAllowedTools: Set<String>? = null,
 )
 
 open class McpException(message: String, cause: Throwable? = null) :
@@ -66,6 +73,12 @@ open class McpStreamableHttpClient(
         ignoreUnknownKeys = true
         explicitNulls = false
     }
+    private val feishuClient = this.client.newBuilder()
+        .callTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .retryOnConnectionFailure(false)
+        .build()
 
     open suspend fun listTools(server: McpServerRuntime): List<McpRemoteTool> =
         withContext(Dispatchers.IO) {
@@ -136,6 +149,11 @@ open class McpStreamableHttpClient(
         arguments: JsonObject,
     ): JsonObject = withContext(Dispatchers.IO) {
         requireSafeToolName(toolName)
+        if (server.id == FEISHU_SERVER_ID) {
+            require(server.feishuAllowedTools?.contains(toolName) == true) {
+                "Feishu tool is not enabled"
+            }
+        }
         val response = initialize(server).request(
             method = "tools/call",
             params = buildJsonObject {
@@ -165,7 +183,15 @@ open class McpStreamableHttpClient(
         }
     }
 
-    private fun initialize(server: McpServerRuntime): Session {
+    private suspend fun initialize(server: McpServerRuntime): Session {
+        if (server.feishuAllowedTools != null || server.id == FEISHU_SERVER_ID) {
+            require(server.id == FEISHU_SERVER_ID && server.endpoint == FEISHU_MCP_ENDPOINT &&
+                !server.accessToken.isNullOrBlank() &&
+                !server.feishuAllowedTools.isNullOrEmpty() &&
+                FEISHU_MCP_TOOLS.containsAll(server.feishuAllowedTools)) {
+                "Invalid Feishu MCP configuration"
+            }
+        }
         val endpoint = try {
             PublicWebUrlPolicy.validate(server.endpoint).toString()
         } catch (error: Exception) {
@@ -175,8 +201,9 @@ open class McpStreamableHttpClient(
             endpoint = endpoint,
             accessToken = server.accessToken,
             authorizationHeader = server.authorizationHeader,
+            feishuAllowedTools = server.feishuAllowedTools,
         )
-        val response = session.requestBlocking(
+        val response = session.requestResponse(
             method = "initialize",
             params = buildJsonObject {
                 put("protocolVersion", MCP_PROTOCOL_VERSION)
@@ -195,7 +222,7 @@ open class McpStreamableHttpClient(
         )
         response.payload.result()
         session.sessionId = response.sessionId
-        session.notifyBlocking(
+        session.notify(
             method = "notifications/initialized",
             params = buildJsonObject {},
         )
@@ -206,16 +233,17 @@ open class McpStreamableHttpClient(
         private val endpoint: String,
         private val accessToken: String?,
         private val authorizationHeader: String?,
+        private val feishuAllowedTools: Set<String>?,
     ) {
         var sessionId: String? = null
         private var nextId = 1L
 
-        fun request(
+        suspend fun request(
             method: String,
             params: JsonObject,
-        ): JsonObject = requestBlocking(method, params).payload
+        ): JsonObject = requestResponse(method, params).payload
 
-        fun requestBlocking(
+        suspend fun requestResponse(
             method: String,
             params: JsonObject,
         ): McpHttpResponse {
@@ -233,7 +261,7 @@ open class McpStreamableHttpClient(
             return response.copy(payload = payload)
         }
 
-        fun notifyBlocking(
+        suspend fun notify(
             method: String,
             params: JsonObject,
         ) {
@@ -247,7 +275,7 @@ open class McpStreamableHttpClient(
             )
         }
 
-        private fun execute(
+        private suspend fun execute(
             payload: JsonObject,
             notification: Boolean,
         ): McpHttpResponse {
@@ -280,63 +308,83 @@ open class McpStreamableHttpClient(
                             header("Authorization", value)
                         }
                 }
-                .build()
-            try {
-                client.newCall(request).execute().use { response ->
-                    if (response.code == 401 || response.code == 403) {
-                        throw McpAuthenticationException(
-                            "MCP authorization is required or expired",
-                        )
+                .apply {
+                    if (feishuAllowedTools != null) {
+                        removeHeader("Authorization")
+                        header("X-Lark-MCP-UAT", requireNotNull(accessToken))
+                        header("X-Lark-MCP-Allowed-Tools", feishuAllowedTools.joinToString(","))
                     }
-                    if (!response.isSuccessful) {
-                        throw McpException(
-                            "MCP request failed with HTTP ${response.code}",
-                        )
-                    }
-                    val returnedSession =
-                        response.header("Mcp-Session-Id") ?: sessionId
-                    if (notification) {
-                        return McpHttpResponse(
-                            payload = buildJsonObject {},
-                            sessionId = returnedSession,
-                        )
-                    }
-                    val body = response.body
-                        ?: throw McpException("MCP response body was empty")
-                    if (body.contentLength() > MAX_RESPONSE_BYTES) {
-                        throw McpException("MCP response was too large")
-                    }
-                    val source = body.source()
-                    source.request(MAX_RESPONSE_BYTES + 1)
-                    if (source.buffer.size > MAX_RESPONSE_BYTES) {
-                        throw McpException("MCP response was too large")
-                    }
-                    val raw = source.readUtf8()
-                    val messages = if (
-                        response.header("Content-Type")
-                            ?.startsWith("text/event-stream") == true
-                    ) {
-                        raw.lineSequence()
-                            .filter { it.startsWith("data:") }
-                            .map { it.removePrefix("data:").trim() }
-                            .filter(String::isNotEmpty)
-                            .map(::parseObject)
-                            .toList()
-                    } else {
-                        listOf(parseObject(raw))
-                    }
-                    return McpHttpResponse(
-                        payload = messages.last(),
-                        messages = messages,
-                        sessionId = returnedSession,
-                    )
                 }
-            } catch (error: McpException) {
-                throw error
+                .build()
+            if (feishuAllowedTools != null) {
+                return suspendCancellableCoroutine { continuation ->
+                    val call = feishuClient.newCall(request)
+                    continuation.invokeOnCancellation { call.cancel() }
+                    call.enqueue(object : Callback {
+                        override fun onFailure(call: Call, e: IOException) {
+                            continuation.resumeWithException(McpException("MCP network request failed", e))
+                        }
+
+                        override fun onResponse(call: Call, response: Response) {
+                            try {
+                                continuation.resume(parseResponse(response, notification))
+                            } catch (error: McpException) {
+                                continuation.resumeWithException(error)
+                            } catch (error: IOException) {
+                                continuation.resumeWithException(McpException("MCP network request failed", error))
+                            }
+                        }
+                    })
+                }
+            }
+            try {
+                return parseResponse(client.newCall(request).execute(), notification)
             } catch (error: IOException) {
                 throw McpException("MCP network request failed", error)
             }
         }
+
+        private fun parseResponse(response: Response, notification: Boolean): McpHttpResponse =
+            response.use {
+                if (response.code == 401 || response.code == 403) {
+                    throw McpAuthenticationException("MCP authorization is required or expired")
+                }
+                if (!response.isSuccessful) {
+                    throw McpException("MCP request failed with HTTP ${response.code}")
+                }
+                val returnedSession = response.header("Mcp-Session-Id") ?: sessionId
+                if (notification) {
+                    return@use McpHttpResponse(
+                        payload = buildJsonObject {},
+                        sessionId = returnedSession,
+                    )
+                }
+                val body = response.body
+                if (body.contentLength() > MAX_RESPONSE_BYTES) {
+                    throw McpException("MCP response was too large")
+                }
+                val source = body.source()
+                source.request(MAX_RESPONSE_BYTES + 1)
+                if (source.buffer.size > MAX_RESPONSE_BYTES) {
+                    throw McpException("MCP response was too large")
+                }
+                val raw = source.readUtf8()
+                val messages = if (response.header("Content-Type")?.startsWith("text/event-stream") == true) {
+                    raw.lineSequence()
+                        .filter { it.startsWith("data:") }
+                        .map { it.removePrefix("data:").trim() }
+                        .filter(String::isNotEmpty)
+                        .map(::parseObject)
+                        .toList()
+                } else {
+                    listOf(parseObject(raw))
+                }
+                McpHttpResponse(
+                    payload = messages.lastOrNull() ?: throw McpException("MCP response contained no messages"),
+                    messages = messages,
+                    sessionId = returnedSession,
+                )
+            }
     }
 
     private fun parseObject(raw: String): JsonObject =
@@ -400,12 +448,12 @@ class McpAgentTool(
         arguments: JsonObject,
         context: ToolExecutionContext,
     ): ToolResultEnvelope {
-        val runtime = server()
-            ?: return ToolResultEnvelope.error(
-                ToolErrorCode.PERMISSION_DENIED,
-                "MCP connection is not configured or enabled",
-            )
         return try {
+            val runtime = server()
+                ?: return ToolResultEnvelope.error(
+                    ToolErrorCode.PERMISSION_DENIED,
+                    "MCP connection is not configured or enabled",
+                )
             ToolResultEnvelope.success(
                 client.callTool(
                     server = runtime,
@@ -449,6 +497,9 @@ fun mcpToolAlias(
     }
     if (server == TENCENT_DOCS_SERVER_ID) {
         return "tencent_docs_${tool.take(51)}".take(MAX_ALIAS_CHARS)
+    }
+    if (server == FEISHU_SERVER_ID) {
+        return "feishu_${tool.take(57)}"
     }
     val suffix = (serverId + '\u0000' + remoteName)
         .hashCode()
@@ -494,6 +545,9 @@ const val NOTION_SERVER_ID = "notion"
 const val NOTION_MCP_ENDPOINT = "https://mcp.notion.com/mcp"
 const val TENCENT_DOCS_SERVER_ID = "tencent-docs"
 const val TENCENT_DOCS_MCP_ENDPOINT = "https://docs.qq.com/openapi/mcp"
+const val FEISHU_SERVER_ID = "feishu"
+const val FEISHU_MCP_ENDPOINT = "https://mcp.feishu.cn/mcp"
+val FEISHU_MCP_TOOLS = setOf("search-doc", "fetch-doc", "create-doc", "update-doc", "list-docs")
 private const val MCP_PROTOCOL_VERSION = "2025-06-18"
 private const val DEFAULT_TIMEOUT_SECONDS = 30L
 private const val MAX_RESPONSE_BYTES = 2L * 1024L * 1024L

@@ -15,6 +15,9 @@ import com.example.mochi_pet.core.extensions.ExtensionToolScope
 import com.example.mochi_pet.core.extensions.UnavailableExtensionClient
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpAgentTool
+import com.example.mochi_pet.core.mcp.McpAuthenticationException
+import com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID
+import com.example.mochi_pet.core.mcp.FEISHU_MCP_ENDPOINT
 import com.example.mochi_pet.core.mcp.McpException
 import com.example.mochi_pet.core.mcp.McpRemoteTool
 import com.example.mochi_pet.core.mcp.McpServerRuntime
@@ -36,6 +39,9 @@ import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -181,6 +187,7 @@ private fun ToolCatalogSummary.skillRequirementName(
         toolName.startsWith("tencent_docs_") ->
             servers.firstOrNull { it.id == TENCENT_DOCS_SERVER_ID }?.name
                 ?: "Tencent Docs MCP"
+        toolName.startsWith("feishu_") -> "Feishu MCP"
         else -> servers.firstNotNullOfOrNull { server ->
             server.tools
                 .firstOrNull { it.alias == toolName }
@@ -272,6 +279,13 @@ interface ToolCatalogRepository {
 
     suspend fun disconnectNotion(): ToolCatalogSummary
 
+    suspend fun authorizeFeishu(
+        credentials: FeishuAppCredentials,
+        openAuthorization: suspend (String) -> Unit,
+    ): ToolCatalogSummary
+
+    suspend fun disconnectFeishu(): ToolCatalogSummary
+
     suspend fun configureTencentDocs(token: String): ToolCatalogSummary
 
     suspend fun disconnectTencentDocs(): ToolCatalogSummary
@@ -357,8 +371,11 @@ class DataStoreToolCatalogRepository(
     private val termuxClient: MochiExtensionClient = UnavailableExtensionClient,
     private val termuxRuntime: com.example.mochi_pet.core.extensions.TermuxRuntimeState =
         com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
+    private val feishuOAuthClient: FeishuOAuthClient = FeishuOAuthClient(),
 ) : ToolCatalogRepository {
     private val tencentCatalogMutex = Mutex()
+    private val feishuAuthorizationMutex = Mutex()
+    private val feishuRefreshMutex = Mutex()
     private val json = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
@@ -404,6 +421,159 @@ class DataStoreToolCatalogRepository(
             )
         }
         return loadSummary()
+    }
+
+    override suspend fun authorizeFeishu(
+        credentials: FeishuAppCredentials,
+        openAuthorization: suspend (String) -> Unit,
+    ): ToolCatalogSummary {
+        check(feishuAuthorizationMutex.tryLock()) { "Feishu authorization is already running." }
+        try {
+            val revision = UUID.randomUUID().toString()
+            updateCatalog { catalog ->
+                catalog.copy(servers = catalog.servers.map {
+                    if (it.id == FEISHU_SERVER_ID) it.disconnectedFeishu(revision) else it
+                })
+            }
+            val tokens = feishuOAuthClient.authorize(credentials, openAuthorization)
+            validateFeishuToken(tokens)
+            val receivedAt = nowMillis()
+            val definitions = mcpClient.listTools(feishuRuntime(tokens.accessToken, FEISHU_DOCUMENT_TOOLS))
+                .filter { it.name in FEISHU_DOCUMENT_TOOLS }
+                .distinctBy { it.name }
+            if (definitions.map { it.name }.toSet() != FEISHU_DOCUMENT_TOOLS) {
+                throw McpAuthenticationException(
+                    "Feishu document tools are missing. Check user permissions and app publication, then reconnect.",
+                )
+            }
+            currentCoroutineContext().ensureActive()
+            updateCatalog { catalog ->
+                catalog.copy(servers = catalog.servers.map { server ->
+                    if (server.id == FEISHU_SERVER_ID && server.connectionRevision == revision) {
+                        server.withFeishuTokens(tokens, receivedAt).copy(
+                            enabled = true,
+                            oauthClientId = credentials.appId,
+                            oauthClientSecret = encrypt(credentials.appSecret),
+                            tools = definitions.map { PersistedMcpTool(it, enabled = true) },
+                        )
+                    } else server
+                })
+            }
+            val current = loadCatalog().servers.first { it.id == FEISHU_SERVER_ID }
+            check(current.connectionRevision == revision && current.isConnected()) {
+                "Feishu connection changed. Return to Tools and authorize again."
+            }
+            return loadSummary()
+        } finally {
+            feishuAuthorizationMutex.unlock()
+        }
+    }
+
+    override suspend fun disconnectFeishu(): ToolCatalogSummary {
+        updateCatalog { catalog ->
+            catalog.copy(servers = catalog.servers.map {
+                if (it.id == FEISHU_SERVER_ID) it.disconnectedFeishu() else it
+            })
+        }
+        return loadSummary()
+    }
+
+    private fun PersistedMcpServer.disconnectedFeishu(
+        revision: String = UUID.randomUUID().toString(),
+    ): PersistedMcpServer = copy(
+        enabled = false, accessToken = null, refreshToken = null,
+        oauthClientId = null, oauthClientSecret = null, oauthTokenEndpoint = null,
+        tokenExpiresAtEpochMillis = null, refreshExpiresAtEpochMillis = null,
+        grantedScopes = emptySet(), tools = emptyList(),
+        connectionRevision = revision, registryRevision = revision,
+    )
+
+    private fun PersistedMcpServer.withFeishuTokens(
+        tokens: FeishuTokenResponse,
+        receivedAt: Long,
+    ): PersistedMcpServer = copy(
+        accessToken = encrypt(tokens.accessToken),
+        refreshToken = encrypt(tokens.refreshToken),
+        tokenExpiresAtEpochMillis = receivedAt + tokens.expiresIn * 1_000,
+        refreshExpiresAtEpochMillis = receivedAt + tokens.refreshExpiresIn * 1_000,
+        grantedScopes = tokens.scope.split(' ').toSet(),
+    )
+
+    private fun feishuRuntime(token: String, tools: Set<String>): McpServerRuntime =
+        McpServerRuntime(
+            id = FEISHU_SERVER_ID, name = "Feishu MCP", endpoint = FEISHU_MCP_ENDPOINT,
+            accessToken = token, authorizationHeader = null, feishuAllowedTools = tools,
+        )
+
+    private suspend fun runtimeFeishu(
+        revision: String,
+        registryRevision: String,
+        toolName: String,
+    ): McpServerRuntime? = feishuRefreshMutex.withLock {
+        var server = loadCatalog().servers.first { it.id == FEISHU_SERVER_ID }
+        if (!server.enabled || server.connectionRevision != revision || server.registryRevision != registryRevision ||
+            server.tools.none { it.enabled && it.definition.name == toolName } ||
+            toolName !in FEISHU_DOCUMENT_TOOLS
+        ) return@withLock null
+        if (!server.isConnected() || !server.grantedScopes.containsAll(FEISHU_SCOPES)) {
+            throw McpAuthenticationException(FEISHU_RECONNECT)
+        }
+        if ((server.tokenExpiresAtEpochMillis ?: 0) <= nowMillis() + TOKEN_REFRESH_WINDOW_MS) {
+            val old = server
+            val refresh = old.refreshToken
+            val appId = old.oauthClientId
+            val secret = old.oauthClientSecret
+            if (refresh == null || appId == null || secret == null ||
+                (old.refreshExpiresAtEpochMillis ?: 0) <= nowMillis()
+            ) {
+                clearFeishuRevision(revision)
+                throw McpAuthenticationException(FEISHU_RECONNECT)
+            }
+            // Reserve the single-use refresh token before sending it. A crash or ambiguous network
+            // outcome must require authorization, never replay a possibly consumed token.
+            updateCatalog { catalog ->
+                catalog.copy(servers = catalog.servers.map {
+                    if (it.id == FEISHU_SERVER_ID && it.connectionRevision == revision) {
+                        it.copy(refreshToken = null, accessToken = null)
+                    } else it
+                })
+            }
+            var committed = false
+            try {
+                val tokens = feishuOAuthClient.refresh(
+                    FeishuAppCredentials(appId, decrypt(secret)), decrypt(refresh),
+                )
+                validateFeishuToken(tokens)
+                withContext(NonCancellable) {
+                    updateCatalog { catalog ->
+                        catalog.copy(servers = catalog.servers.map {
+                            if (it.id == FEISHU_SERVER_ID && it.connectionRevision == revision) {
+                                it.withFeishuTokens(tokens, nowMillis())
+                            } else it
+                        })
+                    }
+                    committed = true
+                }
+            } finally {
+                if (!committed) withContext(NonCancellable) { clearFeishuRevision(revision) }
+            }
+            server = loadCatalog().servers.first { it.id == FEISHU_SERVER_ID }
+        }
+        if (!server.enabled || server.connectionRevision != revision || server.registryRevision != registryRevision ||
+            server.tools.none { it.enabled && it.definition.name == toolName }
+        ) return@withLock null
+        val token = server.accessToken ?: throw McpAuthenticationException(FEISHU_RECONNECT)
+        feishuRuntime(decrypt(token), setOf(toolName))
+    }
+
+    private suspend fun clearFeishuRevision(revision: String) {
+        updateCatalog { catalog ->
+            catalog.copy(servers = catalog.servers.map {
+                if (it.id == FEISHU_SERVER_ID && it.connectionRevision == revision) {
+                    it.disconnectedFeishu()
+                } else it
+            })
+        }
     }
 
     override suspend fun beginNotionAuthorization(): String {
@@ -1040,7 +1210,8 @@ class DataStoreToolCatalogRepository(
     override suspend fun removeManualServer(id: String): ToolCatalogSummary {
         require(
             id != NOTION_SERVER_ID &&
-                id != TENCENT_DOCS_SERVER_ID,
+                id != TENCENT_DOCS_SERVER_ID &&
+                id != FEISHU_SERVER_ID,
         ) {
             "Built-in MCP servers cannot be removed"
         }
@@ -1064,7 +1235,12 @@ class DataStoreToolCatalogRepository(
                                 "Configure authorization before enabling this server"
                             }
                         }
-                        server.copy(enabled = enabled)
+                        server.copy(
+                            enabled = enabled,
+                            registryRevision = if (id == FEISHU_SERVER_ID) {
+                                UUID.randomUUID().toString()
+                            } else server.registryRevision,
+                        )
                     } else {
                         server
                     }
@@ -1085,6 +1261,9 @@ class DataStoreToolCatalogRepository(
                 servers = catalog.servers.map { server ->
                     if (server.id == serverId) {
                         server.copy(
+                            registryRevision = if (serverId == FEISHU_SERVER_ID) {
+                                UUID.randomUUID().toString()
+                            } else server.registryRevision,
                             tools = server.tools.map { tool ->
                                 if (tool.definition.name == remoteName) {
                                     tool.copy(enabled = enabled)
@@ -1125,6 +1304,7 @@ class DataStoreToolCatalogRepository(
             tool.definition.name in when (server.id) {
                 NOTION_SERVER_ID -> READ_ONLY_NOTION_TOOLS
                 TENCENT_DOCS_SERVER_ID -> READ_ONLY_TENCENT_DOCS_TOOLS
+                FEISHU_SERVER_ID -> FEISHU_READ_ONLY_TOOLS
                 else -> emptySet()
             }
         }
@@ -1198,7 +1378,11 @@ class DataStoreToolCatalogRepository(
                             remoteName = tool.definition.name,
                         ),
                         remoteTool = tool.definition,
-                        server = { runtimeServer(server.id) },
+                        server = {
+                            if (server.id == FEISHU_SERVER_ID) {
+                                runtimeFeishu(server.connectionRevision, server.registryRevision, tool.definition.name)
+                            } else runtimeServer(server.id)
+                        },
                         client = mcpClient,
                     )
                 }
@@ -1475,6 +1659,14 @@ class DataStoreToolCatalogRepository(
             PersistedMcpServer::id,
         )
         val missing = listOf(
+            PersistedMcpServer(
+                id = FEISHU_SERVER_ID,
+                name = "Feishu MCP",
+                endpoint = FEISHU_MCP_ENDPOINT,
+                builtIn = true,
+                enabled = false,
+                authMode = McpAuthMode.OAUTH,
+            ),
             PersistedMcpServer(
                 id = NOTION_SERVER_ID,
                 name = "Notion MCP",
@@ -1839,6 +2031,10 @@ private data class PersistedMcpServer(
     val oauthClientId: String? = null,
     val oauthClientSecret: StoredSecret? = null,
     val oauthTokenEndpoint: String? = null,
+    val refreshExpiresAtEpochMillis: Long? = null,
+    val grantedScopes: Set<String> = emptySet(),
+    val connectionRevision: String = "",
+    val registryRevision: String = "",
     val toolDefaultsVersion: Int = 0,
     val toolSelectionVersion: Int = 0,
     val tools: List<PersistedMcpTool> = emptyList(),

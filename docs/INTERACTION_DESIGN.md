@@ -337,7 +337,7 @@ entry begins unselected on each opening. Available Tool entries are Amap,
 Tencent Docs, and each configured manual MCP server. The confirmation screen
 warns that possession of the complete link grants access to the selected API
 resources. Import replaces only included connections and then enables their
-Provider switches and the Tool selections carried by the share. Notion OAuth,
+Provider switches and the Tool selections carried by the share. Notion and Feishu OAuth,
 Mi Home sessions, and Android permissions require setup on the receiving
 device and never appear in the checklist.
 Speech shares include the synthesis opt-in and selected voice. Older v2 speech
@@ -356,12 +356,26 @@ A group is ready only when its provider and every member Tool required by that
 Skill are ready. A previously enabled Skill whose dependencies become
 unavailable remains switchable off but is suspended from Agent discovery.
 Existing built-ins default to enabled; the
-Notion Knowledge, Tencent Docs Knowledge, and Mi Home Smart Home built-ins
+Notion Knowledge, Tencent Docs Knowledge, Feishu Knowledge, and Mi Home Smart Home built-ins
 default to disabled.
 Each MCP server's detailed Tool list starts collapsed and can be expanded
 without disabling the server or changing individual Tool selections. Built-in
 knowledge providers enable their core search, listing, and reading Tools on
 first connection.
+The Feishu MCP card opens a scrollable English/Chinese setup dialog rather
+than a token-paste shortcut. It explains enterprise app creation, required
+user-identity permissions (with Copy), the exact localhost redirect (with Copy),
+publication and user availability, then masked App Secret entry and explicit
+browser authorization. The dialog prevents screenshots and does not save secret
+fields across recreation. Official console/help links leave credentials local.
+It discloses the five default-on cloud-document Tools and unsupported document
+deletion, sheet/Bitable/PPT operations, plus the separate Skill enablement step.
+Authorization stays cancellable from the card, waits up to five minutes, and
+instructs the user to return from the same-phone browser without killing Mochi.
+Denied, expired, incomplete-permission, port-conflict and network states have
+actionable feedback. A received browser callback is not displayed as completed
+connection until token validation and Tool discovery succeed. Local disconnect
+and Feishu-side consent revocation are clearly distinguished.
 Tools also contains an Amap Maps provider card. It opens the official console,
 stores the pasted Web Service Key and optional Security Key encrypted
 on-device, and exposes a provider switch. Its connection guidance explicitly

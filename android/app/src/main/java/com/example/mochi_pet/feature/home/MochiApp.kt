@@ -773,6 +773,7 @@ private fun MochiAppContent(
             onSetBuiltInToolEnabled = viewModel::setBuiltInToolEnabled,
             onConnectNotion = viewModel::beginNotionAuthorization,
             onDisconnectNotion = viewModel::disconnectNotion,
+            onFeishuAction = viewModel::handleFeishuAction,
             onOpenTencentDocsTokenPage =
                 viewModel::openTencentDocsTokenPage,
             onConfigureTencentDocs = viewModel::configureTencentDocs,
@@ -1450,6 +1451,7 @@ private fun SurfaceContent(
     onSetBuiltInToolEnabled: (String, Boolean) -> Unit,
     onConnectNotion: () -> Unit,
     onDisconnectNotion: () -> Unit,
+    onFeishuAction: (FeishuUiAction) -> Unit,
     onOpenTencentDocsTokenPage: () -> Unit,
     onConfigureTencentDocs: (String) -> Unit,
     onDisconnectTencentDocs: () -> Unit,
@@ -1558,6 +1560,7 @@ private fun SurfaceContent(
                 onSetBuiltInEnabled = onSetBuiltInToolEnabled,
                 onConnectNotion = onConnectNotion,
                 onDisconnectNotion = onDisconnectNotion,
+                onFeishuAction = onFeishuAction,
                 onOpenTencentDocsTokenPage =
                     onOpenTencentDocsTokenPage,
                 onConfigureTencentDocs = onConfigureTencentDocs,
@@ -3682,6 +3685,7 @@ private fun ToolsSurface(
     onSetBuiltInEnabled: (String, Boolean) -> Unit,
     onConnectNotion: () -> Unit,
     onDisconnectNotion: () -> Unit,
+    onFeishuAction: (FeishuUiAction) -> Unit,
     onOpenTencentDocsTokenPage: () -> Unit,
     onConfigureTencentDocs: (String) -> Unit,
     onDisconnectTencentDocs: () -> Unit,
@@ -3703,6 +3707,7 @@ private fun ToolsSurface(
     onSetToolEnabled: (String, String, Boolean) -> Unit,
 ) {
     var showAddServer by remember { mutableStateOf(false) }
+    var showFeishuSetup by remember { mutableStateOf(false) }
     var showTencentDocsToken by remember { mutableStateOf(false) }
     var showAmapCredentials by remember { mutableStateOf(false) }
     var amapToolsExpanded by rememberSaveable {
@@ -4026,8 +4031,12 @@ private fun ToolsSurface(
                 McpServerCard(
                     server = server,
                     disabled = state.isLoading,
-                    onConnectNotion = onConnectNotion,
-                    onDisconnectNotion = onDisconnectNotion,
+                    onConnectNotion = if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) {
+                        { showFeishuSetup = true }
+                    } else onConnectNotion,
+                    onDisconnectNotion = if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) {
+                        { onFeishuAction(FeishuUiAction.Disconnect) }
+                    } else onDisconnectNotion,
                     onConfigureTencentDocs = {
                         showTencentDocsToken = true
                     },
@@ -4040,6 +4049,13 @@ private fun ToolsSurface(
                         onSetToolEnabled(server.id, remoteName, enabled)
                     },
                 )
+                if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID &&
+                    state.awaitingFeishuAuthorization
+                ) {
+                    TextButton(onClick = { onFeishuAction(FeishuUiAction.Cancel) }) {
+                        Text("Cancel Feishu authorization")
+                    }
+                }
             }
             item {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -4088,6 +4104,9 @@ private fun ToolsSurface(
                 showAddServer = false
             },
         )
+    }
+    if (showFeishuSetup) {
+        FeishuSetupDialog(onAction = onFeishuAction, onDismiss = { showFeishuSetup = false })
     }
     if (showTencentDocsToken) {
         TencentDocsTokenDialog(
@@ -4365,7 +4384,9 @@ private fun McpServerCard(
                         onClick = onConnectNotion,
                         enabled = !disabled,
                     ) {
-                        Text("Connect Notion")
+                        Text(if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) {
+                            "Connect Feishu"
+                        } else "Connect Notion")
                     }
                 }
             }

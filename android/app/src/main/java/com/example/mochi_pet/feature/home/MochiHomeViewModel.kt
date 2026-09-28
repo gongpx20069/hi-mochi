@@ -251,6 +251,7 @@ data class ToolsUiState(
     val isLoading: Boolean = true,
     val feedback: String? = null,
     val authorizationUrl: String? = null,
+    val awaitingFeishuAuthorization: Boolean = false,
     val extensionActivityTarget: ExtensionActivityTarget? = null,
     val agentLinkActivityRequest: AgentLinkActivityRequest? = null,
 )
@@ -347,6 +348,7 @@ class MochiHomeViewModel(
     private val mutableSpeechVoiceState = MutableStateFlow(SpeechVoiceUiState())
     val speechVoiceState = mutableSpeechVoiceState.asStateFlow()
     private var voiceCatalogJob: Job? = null
+    private var feishuAuthorizationJob: Job? = null
     private var voiceCatalogVersion = 0L
     private var voicePreviewVersion = 0L
     private var resumeWakeAfterPreview = false
@@ -1583,6 +1585,66 @@ class MochiHomeViewModel(
                     )
                 }
             }.onFailure(::showToolError)
+        }
+    }
+
+    fun handleFeishuAction(action: FeishuUiAction) {
+        when (action) {
+            FeishuUiAction.OpenConsole, FeishuUiAction.OpenGuide -> mutableToolsState.update {
+                it.copy(authorizationUrl = if (action == FeishuUiAction.OpenConsole) {
+                    com.example.mochi_pet.core.tools.FEISHU_CONSOLE_URL
+                } else com.example.mochi_pet.core.tools.FEISHU_SETUP_URL)
+            }
+            FeishuUiAction.Cancel -> {
+                feishuAuthorizationJob?.cancel()
+                mutableToolsState.update {
+                    it.copy(authorizationUrl = null, feedback = "Feishu authorization cancelled.")
+                }
+            }
+            FeishuUiAction.Disconnect -> {
+                feishuAuthorizationJob?.cancel()
+                updateTools("Feishu disconnected") { requireRepository().disconnectFeishu() }
+            }
+            is FeishuUiAction.Connect -> {
+                if (feishuAuthorizationJob?.isActive == true) return
+                mutableToolsState.update {
+                    it.copy(isLoading = true, awaitingFeishuAuthorization = true,
+                        feedback = "Preparing Feishu authorization...")
+                }
+                feishuAuthorizationJob = viewModelScope.launch(ioDispatcher) {
+                    try {
+                        val credentials = com.example.mochi_pet.core.tools.FeishuAppCredentials(
+                            action.appId, action.appSecret,
+                        )
+                        val catalog = requireRepository().authorizeFeishu(credentials) { url ->
+                            mutableToolsState.update {
+                                it.copy(authorizationUrl = url,
+                                    feedback = "Authorize in the browser on this phone, then return to Mochi.")
+                            }
+                        }
+                        mutableToolsState.update {
+                            it.copy(catalog = catalog, feedback = "Feishu document tools connected")
+                        }
+                        refreshSkillReadiness(catalog)
+                    } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                        showToolError(IllegalStateException(com.example.mochi_pet.core.tools.FEISHU_TIMEOUT))
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: com.example.mochi_pet.core.mcp.McpException) {
+                        showToolError(error)
+                    } catch (error: IOException) {
+                        showToolError(IllegalStateException(com.example.mochi_pet.core.tools.FEISHU_NETWORK_ERROR))
+                    } catch (error: IllegalArgumentException) {
+                        showToolError(error)
+                    } catch (error: IllegalStateException) {
+                        showToolError(error)
+                    } finally {
+                        mutableToolsState.update {
+                            it.copy(isLoading = false, awaitingFeishuAuthorization = false, authorizationUrl = null)
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -44,7 +44,7 @@ in a `mochi://provider/import#v2` link. No password or backend is required, but
 possession of the complete link grants the selected API access and quota.
 Import requires confirmation, rediscovers shared MCP schemas, writes secrets
 through the receiver's Keystore-backed repositories, replaces only included
-connections, and enables their Providers and selected Tools. Notion OAuth,
+connections, and enables their Providers and selected Tools. Notion and Feishu OAuth,
 Mi Home sessions, Android permissions, persona, memories, and planner data are
 excluded.
 

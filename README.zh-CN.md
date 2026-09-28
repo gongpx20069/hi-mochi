@@ -118,6 +118,14 @@ Mochi 中可选的“安全密钥”也不是 SHA1，仅在高德控制台启用
 或[腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html)，再启用对应
 Tools 和 Skill。
 
+**飞书：**进入 **工具 > 飞书 MCP > 连接飞书**，按引导完成
+[企业自建应用](https://open.feishu.cn/app)、用户身份权限、发布和账号授权。
+把 Mochi 显示的完整回调地址复制到飞书「安全设置」；回调临时运行在手机本机，
+无需部署服务器。只在配置弹窗填写自己的 App ID/Secret，不要发到聊天中。
+连接后默认开启搜索、知识库目录浏览、读取、创建和更新云文档；
+另外在 Skills 中启用 **飞书知识**。暂不支持整篇删除、原生电子表格、
+多维表格和 PPT 编辑。
+
 ### 语言、更新与 Provider 分享
 
 Mochi 默认跟随 Android 系统语言，也可以在设置中固定使用中文或英文。
@@ -126,7 +134,7 @@ Mochi 默认跟随 Android 系统语言，也可以在设置中固定使用中�
 **分享 Providers**会先让你选择要包含的连接。LLM 与 Speech 默认选中；
 高德、腾讯文档和手动配置的 MCP 工具凭据是可选项，默认不选中。
 加密链接本身包含解密密钥：**任何拿到完整链接的人都能使用所选 API 资源并
-消耗其额度**。Persona、记忆、Planner 数据、Notion OAuth、米家会话和
+消耗其额度**。Persona、记忆、Planner 数据、飞书/Notion OAuth、米家会话和
 Android 系统权限不会被分享。
 
 ## 核心功能
@@ -189,6 +197,7 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | Douban Ratings | 启用 | 获取公开豆瓣评分、评分人数和评论主题 | 无 |
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
 | **Notion Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新页面，并在已授权的私人知识库中查找或更新信息 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
+| **Feishu Knowledge（飞书知识）** | 禁用 | 搜索与浏览已授权云文档，编辑前读取内容，并回读验证创建或更新结果 | 工具 > 飞书 MCP；[自建应用与用户授权](https://open.feishu.cn/app) |
 | **腾讯文档 Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新文档，并在已授权的私人知识库中查找或更新信息 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
 | 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过智能体浏览器调研无需登录的公开火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用智能体浏览器 |
 | 商家发现 | 启用 | 使用高德提供的评分、人均、营业时间、电话、标签和图片发现并比较商家 | [创建高德 Web 服务 Key](https://console.amap.com/) |
@@ -206,7 +215,7 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | **智能体浏览器（Agent Browser）** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
 | **原生体验** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | 打开可信 Mochi 界面，或在本地运行有界的纯 JavaScript 计算。 |
 | **高德地图** | 地点搜索 · 商家详情 · 路线<br>地理编码 · 逆地理编码 · 天气 | 使用可信 GCJ-02 坐标搜索地点和商家、比较可用评分与人均并规划路线，需要 Web 服务 Key。 |
-| **已连接 MCP** | **Notion** · **腾讯文档**<br>手动配置的 MCP Server | 检索私人知识、开展调研，并在已授权工作区中协作创建或更新文档。 |
+| **已连接 MCP** | **Notion** · **腾讯文档** · **飞书**<br>手动配置的 MCP Server | 检索私人知识、开展调研，并在已授权工作区中协作创建或更新文档。 |
 
 Tools 页面会将智能体浏览器、Mochi 内建能力和 Provider Tools 分组并默认
 收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
