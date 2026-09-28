@@ -71,6 +71,22 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Saved AI connection regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*ProviderSettingsRepositoryTest" `
+  --tests "*ProviderShareManagerTest" --tests "*ProviderSharingTest" `
+  --tests "*ProviderProfilesUiTest" --tests "*OkHttpOpenAiChatClientTest" `
+  --tests "*MochiHomeViewModelTest" --no-daemon
+```
+
+These use synthetic credentials and intercept preset requests without contacting
+real providers. Device `feature.home.ProviderProfilesSmokeTest` opens Settings,
+checks Share/import is first, confirms saved active key decryption without
+printing it, and verifies the catalog is unchanged. Update with `adb install -r`;
+never uninstall or clear data. Real account/model Tool compatibility still needs
+authorized provider-specific testing and is not implied by endpoint presets.
+
 Feishu integration regressions:
 
 ```powershell

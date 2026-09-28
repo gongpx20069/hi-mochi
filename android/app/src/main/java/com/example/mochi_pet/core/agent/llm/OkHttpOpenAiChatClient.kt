@@ -61,47 +61,45 @@ class OkHttpOpenAiChatClient(
             .callTimeout(config.timeoutSeconds, TimeUnit.SECONDS)
             .build()
         val response = try {
-            client.newCall(requestBuilder.build()).await()
+            client.newCall(requestBuilder.build()).await(config.maxResponseBytes)
         } catch (error: IOException) {
             throw ProviderNetworkException(
                 "Provider network request failed",
                 error,
             )
         }
-        response.use {
-            val responseText = it.readBoundedBody(config.maxResponseBytes)
-            if (!it.isSuccessful) {
-                throw ProviderHttpException(
-                    statusCode = it.code,
-                    message = providerErrorMessage(
-                        statusCode = it.code,
-                        responseText = responseText,
-                        apiKey = config.apiKey,
-                    ),
-                )
-            }
-            val parsed = try {
-                json.decodeFromString(
-                    OpenAiChatResponse.serializer(),
-                    responseText,
-                )
-            } catch (error: SerializationException) {
-                throw ProviderProtocolException(
-                    "Provider returned invalid chat completion JSON",
-                )
-            }
-            if (parsed.error != null) {
-                throw ProviderProtocolException(
-                    parsed.error.message ?: "Provider returned an error payload",
-                )
-            }
-            if (parsed.choices.isEmpty()) {
-                throw ProviderProtocolException(
-                    "Provider response did not contain any choices",
-                )
-            }
-            return parsed
+        val responseText = response.text
+        if (response.code !in 200..299) {
+            throw ProviderHttpException(
+                statusCode = response.code,
+                message = providerErrorMessage(
+                    statusCode = response.code,
+                    responseText = responseText,
+                    apiKey = config.apiKey,
+                ),
+            )
         }
+        val parsed = try {
+            json.decodeFromString(
+                OpenAiChatResponse.serializer(),
+                responseText,
+            )
+        } catch (error: SerializationException) {
+            throw ProviderProtocolException(
+                "Provider returned invalid chat completion JSON",
+            )
+        }
+        if (parsed.error != null) {
+            throw ProviderProtocolException(
+                parsed.error.message ?: "Provider returned an error payload",
+            )
+        }
+        if (parsed.choices.isEmpty()) {
+            throw ProviderProtocolException(
+                "Provider response did not contain any choices",
+            )
+        }
+        return parsed
     }
 
     private fun chatCompletionsUrl(config: OpenAiProviderConfig): HttpUrl {
@@ -179,7 +177,9 @@ class OkHttpOpenAiChatClient(
             ?: "Provider request failed with HTTP $statusCode"
     }
 
-    private suspend fun Call.await(): Response =
+    private class BufferedResponse(val code: Int, val text: String)
+
+    private suspend fun Call.await(maxBytes: Long): BufferedResponse =
         suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { cancel() }
             enqueue(
@@ -197,10 +197,14 @@ class OkHttpOpenAiChatClient(
                         call: Call,
                         response: Response,
                     ) {
-                        if (continuation.isCancelled) {
-                            response.close()
-                        } else {
-                            continuation.resume(response)
+                        try {
+                            response.use {
+                                continuation.resume(BufferedResponse(it.code, it.readBoundedBody(maxBytes)))
+                            }
+                        } catch (error: IOException) {
+                            continuation.resumeWithException(error)
+                        } catch (error: OpenAiProviderException) {
+                            continuation.resumeWithException(error)
                         }
                     }
                 },

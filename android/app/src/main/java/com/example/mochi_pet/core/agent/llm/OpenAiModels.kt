@@ -92,6 +92,7 @@ data class OpenAiChatMessage(
     @SerialName("tool_call_id")
     val toolCallId: String? = null,
     val name: String? = null,
+    val reasoningContent: String? = null,
 )
 
 object OpenAiChatMessageSerializer : KSerializer<OpenAiChatMessage> {
@@ -135,6 +136,7 @@ object OpenAiChatMessageSerializer : KSerializer<OpenAiChatMessage> {
                 }
                 value.toolCallId?.let { put("tool_call_id", it) }
                 value.name?.let { put("name", it) }
+                value.reasoningContent?.let { put("reasoning_content", it) }
             },
         )
     }
@@ -165,6 +167,7 @@ object OpenAiChatMessageSerializer : KSerializer<OpenAiChatMessage> {
             toolCallId = value["tool_call_id"]
                 ?.jsonPrimitive?.contentOrNull,
             name = value["name"]?.jsonPrimitive?.contentOrNull,
+            reasoningContent = value["reasoning_content"]?.jsonPrimitive?.contentOrNull,
         )
     }
 }

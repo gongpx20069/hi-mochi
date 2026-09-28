@@ -1,5 +1,7 @@
 package com.example.mochi_pet.feature.home
 
+import androidx.compose.ui.platform.testTag
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.text.style.TextOverflow
 
@@ -136,7 +138,6 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.example.mochi_pet.MochiApplication
 import com.example.mochi_pet.core.update.AppUpdate
 import com.example.mochi_pet.core.agent.llm.DEFAULT_AZURE_API_VERSION
-import com.example.mochi_pet.core.agent.llm.ProviderType
 import com.example.mochi_pet.core.model.CalendarEvent
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.model.MochiTodo
@@ -150,7 +151,6 @@ import com.example.mochi_pet.core.presentation.CardPresentation
 import com.example.mochi_pet.core.presentation.CardType
 import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.ALLOWED_FOCUS_STANDBY_DELAYS_SECONDS
-import com.example.mochi_pet.core.settings.ProviderSettingsInput
 import com.example.mochi_pet.core.settings.ProviderShareSelection
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.settings.SpeechSettingsInput
@@ -747,7 +747,7 @@ private fun MochiAppContent(
             onStopVoice = viewModel::stopVoiceInput,
             onEnableWake = onEnableWake,
             onDisableWake = viewModel::disableWakeWord,
-            onSaveProviderSettings = viewModel::saveProviderSettings,
+            onProviderProfileAction = viewModel::handleProviderProfileAction,
             onSaveSpeechSettings = viewModel::saveSpeechSettings,
             onLoadSpeechVoices = viewModel::loadSpeechVoices,
             onPreviewSpeechVoice = viewModel::previewSpeechVoice,
@@ -981,11 +981,9 @@ private fun MochiAppContent(
             title = { Text("Import shared Providers?") },
             text = {
                 Text(
-                    "This link grants access to another user's selected API " +
-                        "resources. Importing replaces only included " +
-                        "connections, stores their credentials on this " +
-                        "device, and enables their selected Providers and " +
-                        "Tools. Only continue if you trust the sender.",
+                    "Import adds saved AI connections and selects the shared active connection, cancelling running Agent tasks. " +
+                        "Included speech and Tool connections replace their existing settings. " +
+                        "Credentials are stored on this device and selected Tools are enabled. Only import links from someone you trust.",
                 )
             },
             confirmButton = {
@@ -1428,7 +1426,7 @@ private fun SurfaceContent(
     onStopVoice: () -> Unit,
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
-    onSaveProviderSettings: (ProviderSettingsInput) -> Unit,
+    onProviderProfileAction: (ProviderProfileAction) -> Unit,
     onSaveSpeechSettings: (SpeechSettingsInput) -> Unit,
     onLoadSpeechVoices: (SpeechProvider) -> Unit,
     onPreviewSpeechVoice: (SpeechProvider, String) -> Unit,
@@ -1528,7 +1526,7 @@ private fun SurfaceContent(
                 wakeFeedback = wakeFeedback,
                 onEnableWake = onEnableWake,
                 onDisableWake = onDisableWake,
-                onSave = onSaveProviderSettings,
+                onProviderAction = onProviderProfileAction,
                 onSaveSpeech = onSaveSpeechSettings,
                 onLoadSpeechVoices = onLoadSpeechVoices,
                 onPreviewSpeechVoice = onPreviewSpeechVoice,
@@ -5999,7 +5997,7 @@ internal fun ProviderSettingsSurface(
     wakeFeedback: String?,
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
-    onSave: (ProviderSettingsInput) -> Unit,
+    onProviderAction: (ProviderProfileAction) -> Unit,
     onSaveSpeech: (SpeechSettingsInput) -> Unit,
     onCreateProviderShareLink: (ProviderShareSelection) -> Unit,
     onReceiveProviderShareLink: (String) -> Unit,
@@ -6012,24 +6010,6 @@ internal fun ProviderSettingsSurface(
     onPreviewSpeechVoice: (SpeechProvider, String) -> Unit = { _, _ -> },
     onStopVoicePreview: () -> Unit = {},
 ) {
-    val summary = state.summary
-    var providerType by remember(summary) {
-        mutableStateOf(
-            if (summary.isReady) {
-                summary.providerType
-            } else {
-                ProviderType.AZURE_OPENAI
-            },
-        )
-    }
-    var endpoint by remember(summary) { mutableStateOf(summary.endpoint) }
-    var model by remember(summary) { mutableStateOf(summary.model) }
-    var apiVersion by remember(summary) {
-        mutableStateOf(summary.apiVersion)
-    }
-    var timeout by remember(summary) {
-        mutableStateOf(summary.timeoutSeconds.toString())
-    }
     var recentTurns by remember(agentSettingsState.settings) {
         mutableStateOf(
             agentSettingsState.settings.recentConversationTurns.toString(),
@@ -6051,10 +6031,6 @@ internal fun ProviderSettingsSurface(
     }
     var agents by remember(personaState.context) {
         mutableStateOf(personaState.context.agents)
-    }
-    var apiKeyReplacement by remember(summary) { mutableStateOf("") }
-    var imageInputEnabled by remember(summary) {
-        mutableStateOf(summary.imageInputEnabled)
     }
     val speechSummary = speechState.summary
     var speechProvider by remember(speechSummary) {
@@ -6084,7 +6060,7 @@ internal fun ProviderSettingsSurface(
         mutableStateOf(speechSummary.systemVoice)
     }
     var showShareProviders by remember { mutableStateOf(false) }
-    var shareLlm by remember { mutableStateOf(true) }
+    var sharedLlmIds by remember { mutableStateOf(emptySet<String>()) }
     var shareSpeech by remember { mutableStateOf(true) }
     var shareAmap by remember { mutableStateOf(false) }
     var shareTencentDocs by remember { mutableStateOf(false) }
@@ -6149,19 +6125,12 @@ internal fun ProviderSettingsSurface(
         }
         val providerShareSection: LazyListScope.() -> Unit = {
             item {
-                Text(
-                    text = "Share Providers",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
+                SettingsPartHeading("Share and import", "Choose what to share, or add trusted connections.")
             }
             item {
                 PlannerCard {
                     Text(
-                        text = "Creates an encrypted link containing the " +
-                            "Providers and Tool connections selected for this " +
-                            "share. LLM and speech are selected by default; " +
-                            "Tool credentials are not.",
+                        text = "Share selected saved AI connections, speech, and Tools. The current AI connection and speech start selected; other connections are opt-in.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -6173,7 +6142,7 @@ internal fun ProviderSettingsSurface(
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        text = "Notion OAuth, Mi Home sessions, Android " +
+                        text = "Feishu/Notion OAuth, Mi Home sessions, Android " +
                             "permissions, persona, memories, and planner data " +
                             "are never included.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -6195,7 +6164,8 @@ internal fun ProviderSettingsSurface(
                     ) {
                         Button(
                             onClick = {
-                                shareLlm = state.summary.isReady
+                                sharedLlmIds = state.profiles.active?.takeIf { it.settings.isReady }
+                                    ?.let { setOf(it.id) }.orEmpty()
                                 shareSpeech = speechState.summary.isReady
                                 shareAmap = false
                                 shareTencentDocs = false
@@ -6204,12 +6174,11 @@ internal fun ProviderSettingsSurface(
                             },
                             enabled = !providerShareState.isWorking &&
                                 (
-                                    state.summary.isReady ||
+                                    state.profiles.profiles.any { it.settings.isReady } ||
                                         speechState.summary.isReady ||
                                         toolsState.catalog.amap.connected ||
                                         toolsState.catalog.servers.any {
-                                            it.connected &&
-                                                it.id != NOTION_SERVER_ID
+                                            it.connected && (!it.builtIn || it.id == TENCENT_DOCS_SERVER_ID)
                                         }
                                     ),
                             modifier = Modifier.weight(1f),
@@ -6664,164 +6633,7 @@ internal fun ProviderSettingsSurface(
                 }
             }
         }
-        val llmSection: LazyListScope.() -> Unit = {
-            item {
-                Text(
-                    text = "AI provider",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ProviderOptionCard(
-                        title = "Azure OpenAI",
-                        detail = "Azure resource endpoint + deployment + API key",
-                        selected = providerType == ProviderType.AZURE_OPENAI,
-                        onClick = {
-                            providerType = ProviderType.AZURE_OPENAI
-                            if (endpoint == OPENAI_ENDPOINT) {
-                                endpoint = ""
-                            }
-                            apiVersion = apiVersion.ifBlank {
-                                DEFAULT_AZURE_API_VERSION
-                            }
-                        },
-                    )
-                    ProviderOptionCard(
-                        title = "OpenAI",
-                        detail = "api.openai.com with a model name",
-                        selected = providerType == ProviderType.OPENAI,
-                        onClick = {
-                            providerType = ProviderType.OPENAI
-                            if (endpoint.isBlank()) {
-                                endpoint = OPENAI_ENDPOINT
-                            }
-                        },
-                    )
-                    ProviderOptionCard(
-                        title = "Custom compatible API",
-                        detail = "Any OpenAI-compatible /chat/completions API",
-                        selected = providerType == ProviderType.CUSTOM,
-                        onClick = { providerType = ProviderType.CUSTOM },
-                    )
-                }
-            }
-            item {
-                Text(
-                    text = "Connection details",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            item {
-                OutlinedTextField(
-                    value = endpoint,
-                    onValueChange = { endpoint = it },
-                    label = {
-                        Text(
-                            if (providerType == ProviderType.AZURE_OPENAI) {
-                                "Azure resource endpoint"
-                            } else {
-                                "API endpoint"
-                            },
-                        )
-                    },
-                    placeholder = {
-                        Text(
-                            if (providerType == ProviderType.AZURE_OPENAI) {
-                                "https://your-resource.openai.azure.com"
-                            } else {
-                                OPENAI_ENDPOINT
-                            },
-                        )
-                    },
-                    supportingText = {
-                        Text(
-                            if (providerType == ProviderType.AZURE_OPENAI) {
-                                "Azure Portal → Azure OpenAI → Keys and Endpoint"
-                            } else {
-                                "Mochi appends /chat/completions when needed."
-                            },
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                )
-            }
-            item {
-                OutlinedTextField(
-                    value = model,
-                    onValueChange = { model = it },
-                    label = {
-                        Text(
-                            if (providerType == ProviderType.AZURE_OPENAI) {
-                                "Deployment name"
-                            } else {
-                                "Model name"
-                            },
-                        )
-                    },
-                    placeholder = {
-                        Text(
-                            if (providerType == ProviderType.AZURE_OPENAI) {
-                                "Your Azure deployment name"
-                            } else {
-                                "gpt-4.1-mini"
-                            },
-                        )
-                    },
-                    supportingText = {
-                        if (providerType == ProviderType.AZURE_OPENAI) {
-                            Text(
-                                "Use the deployment name, not the base model name.",
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                )
-            }
-            if (providerType == ProviderType.AZURE_OPENAI) {
-                item {
-                    OutlinedTextField(
-                        value = apiVersion,
-                        onValueChange = { apiVersion = it },
-                        label = { Text("Azure API version") },
-                        supportingText = {
-                            Text("Default: $DEFAULT_AZURE_API_VERSION")
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                    )
-                }
-            }
-            item {
-                OutlinedTextField(
-                    value = apiKeyReplacement,
-                    onValueChange = { apiKeyReplacement = it },
-                    label = { Text("API key") },
-                    placeholder = {
-                        if (summary.hasApiKey) {
-                            Text("*****")
-                        }
-                    },
-                    supportingText = {
-                        Text(
-                            if (summary.hasApiKey) {
-                                "Leave blank to keep the stored key."
-                            } else {
-                                "Encrypted using Android Keystore."
-                            },
-                        )
-                    },
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                )
-            }
+        val conversationSection: LazyListScope.() -> Unit = {
             item {
                 Text(
                     text = "Conversation context",
@@ -6856,47 +6668,8 @@ internal fun ProviderSettingsSurface(
                     Text("Save conversation context")
                 }
             }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Multimodal input",
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "Allow supported images, currently " +
-                                "validated Mi Home camera event images, in " +
-                                "the current Main Agent run and one explicit " +
-                                "Subagent handoff. Enable only when the " +
-                                "configured model supports images.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Switch(
-                        checked = imageInputEnabled,
-                        onCheckedChange = { imageInputEnabled = it },
-                    )
-                }
-            }
-            item {
-                OutlinedTextField(
-                    value = timeout,
-                    onValueChange = { timeout = it.filter(Char::isDigit) },
-                    label = { Text("Timeout seconds") },
-                    supportingText = {
-                        Text(
-                            "Per AI request. Chat and voice use at most 20 seconds; scheduled agents use this value.",
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                )
-            }
+        }
+        val wakeSection: LazyListScope.() -> Unit = {
             item {
                 PlannerCard {
                     Row(
@@ -6940,19 +6713,24 @@ internal fun ProviderSettingsSurface(
             }
         }
         LazyColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).testTag("settings-parts"),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             providerShareSection()
-            llmSection()
+            item { SettingsPartHeading("AI connections", "Save multiple providers and choose the connection Mochi uses.") }
+            item { ProviderConnectionsSection(state, onProviderAction) }
+            item { SettingsPartHeading("Speech and wake", "Configure recognition, reply voices, and hands-free wake.") }
             speechSection()
-            appLanguageSection()
+            wakeSection()
+            item { SettingsPartHeading("Conversation and persona", "Control conversation context and Mochi's personality.") }
+            conversationSection()
             personaSection()
+            item { SettingsPartHeading("Display and language", "Choose the app language and fullscreen standby behavior.") }
+            appLanguageSection()
             focusStandbySection()
         }
         (
-            state.feedback
-                ?: agentSettingsState.feedback
+            agentSettingsState.feedback
         )?.let {
             Text(
                 text = it,
@@ -6964,35 +6742,6 @@ internal fun ProviderSettingsSurface(
                     MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.error
-                },
-            )
-        }
-        Button(
-            onClick = {
-                onSave(
-                    ProviderSettingsInput(
-                        providerType = providerType,
-                        endpoint = endpoint,
-                        model = model,
-                        apiVersion = apiVersion,
-                        timeoutSeconds = timeout.toIntOrNull() ?: 0,
-                        maxResponseBytes = summary.maxResponseBytes,
-                        imageInputEnabled = imageInputEnabled,
-                        apiKeyReplacement = apiKeyReplacement,
-                    ),
-                )
-                apiKeyReplacement = ""
-            },
-            enabled = !state.isLoading && !state.isSaving,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                if (state.isSaving) {
-                    "Saving..."
-                } else if (summary.isReady) {
-                    "Save connection"
-                } else {
-                    "Connect Mochi"
                 },
             )
         }
@@ -7015,18 +6764,21 @@ internal fun ProviderSettingsSurface(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        "Providers are selected by default. Tool credentials " +
-                            "start unselected each time.",
+                        "Choose the saved AI connections to share. The current connection and speech start selected; other credentials remain unselected.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    ShareConnectionOption(
-                        title = "LLM Provider",
-                        detail = state.summary.providerType.shareDisplayName(),
-                        checked = shareLlm,
-                        enabled = state.summary.isReady,
-                        onCheckedChange = { shareLlm = it },
-                    )
+                    state.profiles.profiles.forEach { profile ->
+                        ShareConnectionOption(
+                            title = profile.name,
+                            detail = "${profile.preset.title} · ${profile.settings.model}",
+                            checked = profile.id in sharedLlmIds,
+                            enabled = profile.settings.isReady,
+                            onCheckedChange = { checked ->
+                                sharedLlmIds = if (checked) sharedLlmIds + profile.id else sharedLlmIds - profile.id
+                            },
+                        )
+                    }
                     ShareConnectionOption(
                         title = "Speech Provider",
                         detail = speechState.summary.provider.displayName(),
@@ -7075,7 +6827,8 @@ internal fun ProviderSettingsSurface(
                     onClick = {
                         onCreateProviderShareLink(
                             ProviderShareSelection(
-                                includeLlm = shareLlm,
+                                includeLlm = sharedLlmIds.isNotEmpty(),
+                                llmProfileIds = sharedLlmIds,
                                 includeSpeech = shareSpeech,
                                 tools = ToolShareSelection(
                                     includeAmap = shareAmap,
@@ -7087,7 +6840,7 @@ internal fun ProviderSettingsSurface(
                         )
                         showShareProviders = false
                     },
-                    enabled = shareLlm ||
+                    enabled = sharedLlmIds.isNotEmpty() ||
                         shareSpeech ||
                         shareAmap ||
                         shareTencentDocs ||
@@ -7113,10 +6866,7 @@ internal fun ProviderSettingsSurface(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "Paste the complete Mochi Provider link received from " +
-                            "someone you trust. Importing replaces only the " +
-                            "included connections and immediately enables " +
-                            "their selected Providers and Tools.",
+                        "Paste a trusted Mochi Provider link. AI connections are added without overwriting saved connections; the shared active connection (or first selected one) becomes active and cancels running Agent tasks. Included speech and Tool connections are replaced.",
                     )
                     OutlinedTextField(
                         value = receivedProviderLink,
@@ -7125,7 +6875,7 @@ internal fun ProviderSettingsSurface(
                         },
                         label = { Text("Mochi Provider link") },
                         placeholder = {
-                            Text("mochi://provider/import#v2...")
+                            Text("mochi://provider/import#v3...")
                         },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
@@ -7139,9 +6889,7 @@ internal fun ProviderSettingsSurface(
                         showReceiveProviders = false
                         receivedProviderLink = ""
                     },
-                    enabled = receivedProviderLink.startsWith(
-                        "mochi://provider/import#v2.",
-                    ),
+                    enabled = listOf("v2", "v3").any { receivedProviderLink.startsWith("mochi://provider/import#$it.") },
                 ) {
                     Text("Continue")
                 }
@@ -7203,13 +6951,6 @@ private fun AppLanguage.displayName(): String =
         AppLanguage.SYSTEM -> "Follow system"
         AppLanguage.CHINESE -> "Chinese"
         AppLanguage.ENGLISH -> "English"
-    }
-
-private fun ProviderType.shareDisplayName(): String =
-    when (this) {
-        ProviderType.OPENAI -> "OpenAI"
-        ProviderType.AZURE_OPENAI -> "Azure OpenAI"
-        ProviderType.CUSTOM -> "OpenAI-compatible"
     }
 
 private fun SpeechProvider.displayName(): String =
@@ -7291,7 +7032,6 @@ private fun ProviderOptionCard(
     }
 }
 
-private const val OPENAI_ENDPOINT = "https://api.openai.com/v1"
 private const val IFLYTEK_SPEECH_SIGNUP_URL =
     "https://www.xfyun.cn/services/voicedictation"
 private const val AZURE_SPEECH_SIGNUP_URL =

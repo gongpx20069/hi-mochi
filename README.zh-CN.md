@@ -79,6 +79,17 @@ LLM Provider 是必需配置。未配置时，首次启动会打开设置；之�
 | Azure OpenAI | Azure 资源 Endpoint、以 **Deployment 名称**填写模型、API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
 | 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需兼容 OpenAI Chat/Tool Call 协议 | 对应服务商签发的 API Key |
 
+**设置 > AI 连接**支持保存多个命名账号和模型。OpenAI、DeepSeek、Kimi、GLM、
+MiniMax（国内）和 Agnes-AI 会自动填入可编辑的官方地址；根据内置官方指南填写
+自己的 API Key 和支持工具调用的模型。这些是普通按量付费 API，不是 Coding Plan
+专用地址。新增连接不会切换当前选择；点击**使用**才切换，并取消正在运行的本地
+Agent 任务，未来的定时计划仍保留。旧版单连接配置及密钥自动迁移，无需重填。
+
+设置依次分为**分享与导入 → AI 连接 → 语音与唤醒 → 对话与人格 → 显示与语言**。
+分享时可勾选多个 LLM 连接；导入会新增而非覆盖已有账号，并切换到分享中的选中
+连接。新 v3 链接需要新版接收端，旧 v2 链接仍可导入。持有完整链接的人可以使用
+其中的 API 凭据，请仅发给可信的人。
+
 ### 支持的 Speech Provider
 
 进入**设置 > 语音识别与合成**。默认使用 Android 语音；云端语音是可选项，

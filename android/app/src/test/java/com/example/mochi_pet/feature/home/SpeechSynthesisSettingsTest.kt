@@ -114,7 +114,7 @@ class SpeechSynthesisSettingsTest {
                     wakeFeedback = null,
                     onEnableWake = {},
                     onDisableWake = {},
-                    onSave = {},
+                    onProviderAction = {},
                     onSaveSpeech = saved::add,
                     onCreateProviderShareLink = {},
                     onReceiveProviderShareLink = {},

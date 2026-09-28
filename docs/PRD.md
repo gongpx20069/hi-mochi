@@ -133,15 +133,29 @@ support is an optional import/export adapter.
 - A new installation without a configured provider opens Settings directly.
 - Azure OpenAI is a first-class option with resource endpoint, deployment
   name, API version, and API key fields.
-- OpenAI and custom OpenAI-compatible endpoints remain available.
+- Named LLM connections are saved independently, including multiple accounts
+  for one provider. Official editable endpoint presets cover OpenAI, DeepSeek,
+  Kimi, GLM, MiniMax (China), and Agnes-AI; Azure and custom endpoints remain.
+  Presets are standard usage-billed APIs, not Coding Plan subscriptions.
+- The first saved connection becomes active. Adding another preserves the
+  current selection; switching is explicit. Switching, changing active runtime
+  settings, or deleting the active connection cancels running local Agent
+  owners and children, including current scheduled runs. Future schedules and
+  already-submitted remote AgentLink/Termux jobs remain unaffected. Deletion
+  never silently selects a replacement.
+- Legacy single-provider configuration and encrypted keys migrate in place.
 - Settings is always discoverable from the primary app shell.
 - API keys are never displayed again after saving.
-- Every Provider share opens a selection step. The configured LLM and speech
-  Providers are selected by default; Amap, Tencent Docs, and manual MCP Tool
-  credentials default to unselected.
-- Import requires one explicit confirmation, replaces only included
-  connections, stores imported secrets with the receiver's Keystore-backed
-  storage, and immediately enables the shared Providers and selected Tools.
+- Settings groups are ordered: Share/import, AI connections, Speech/wake,
+  Conversation/persona, Display/language.
+- Every Provider share opens a selection step supporting multiple saved LLM
+  connections. Only the active ready LLM connection and speech start selected;
+  other LLM accounts and all Tool credentials start unselected.
+- Confirmed import appends LLM connections without overwriting existing ones
+  and activates the shared active connection (or first selected profile when
+  the active profile was excluded), cancelling running local Agents. Included
+  speech and Tool connections retain replace-included behavior. Imported
+  secrets use the receiver's Keystore-backed storage.
 - Notion and Feishu OAuth, Mi Home sessions and device selection, Android permissions,
   persona, memories, and planner data are never shared.
 

@@ -127,10 +127,13 @@ class MochiApplication : Application() {
         )
     }
 
+    val providerRuns = com.example.mochi_pet.core.settings.ProviderRunCoordinator()
+
     val providerSettingsRepository: ProviderSettingsRepository by lazy {
         DataStoreProviderSettingsRepository(
             dataStore = providerDataStore,
             apiKeyCipher = AndroidKeystoreApiKeyCipher(),
+            runs = providerRuns,
         )
     }
 
@@ -287,6 +290,7 @@ class MochiApplication : Application() {
         id: String,
         manual: Boolean,
     ): Boolean {
+        providerRuns.register(requireNotNull(currentCoroutineContext()[kotlinx.coroutines.Job]))
         val now = Instant.now()
         // Finish the claim before observing cancellation so a claimed alarm is always reconciled.
         val schedule = withContext(NonCancellable) {

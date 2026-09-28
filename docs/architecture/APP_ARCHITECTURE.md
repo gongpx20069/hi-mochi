@@ -108,6 +108,10 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 
 - Room transactions own planner consistency.
 - DataStore owns non-relational preferences.
+- The LLM DataStore owns the versioned named-connection catalog and active ID;
+  keys remain separately encrypted per profile using Android Keystore. The
+  application-scoped provider-run coordinator gates foreground/scheduled Agent
+  startup against active-configuration changes and cancellation, not UI state.
 - The Tool DataStore also owns AgentLink provider/individual switches, a
   user-confirmed package signer digest, and up to 20 non-secret machine/chat/task
   links with event cursors. No Room schema changes are needed. Human revision

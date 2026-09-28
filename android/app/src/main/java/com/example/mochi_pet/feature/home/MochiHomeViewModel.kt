@@ -208,6 +208,8 @@ data class ProviderSettingsUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val feedback: String? = null,
+    val profiles: com.example.mochi_pet.core.settings.ProviderProfilesSummary =
+        com.example.mochi_pet.core.settings.ProviderProfilesSummary(),
 )
 
 data class SpeechSettingsUiState(
@@ -286,6 +288,8 @@ class MochiHomeViewModel(
     private val agentScheduleStore: AgentScheduleStore? = null,
     private val agentScheduleController: AgentScheduleController? = null,
     private val providerSettingsRepository: ProviderSettingsRepository? = null,
+    private val providerRuns: com.example.mochi_pet.core.settings.ProviderRunCoordinator =
+        com.example.mochi_pet.core.settings.ProviderRunCoordinator(),
     private val speechSettingsRepository: SpeechSettingsRepository? = null,
     private val providerShareManager: ProviderShareManager? = null,
     private val agentSettingsRepository: AgentSettingsRepository? = null,
@@ -591,6 +595,7 @@ class MochiHomeViewModel(
         agentJob = viewModelScope.launch(ioDispatcher) {
             var interactionWeather: CurrentWeather? = null
             try {
+                providerRuns.register(requireNotNull(kotlinx.coroutines.currentCoroutineContext()[Job]))
                 val provider = settingsRepository.loadRuntimeConfig()
                     .forForegroundRequest()
                 val agentSettings = agentSettingsRepository?.load()
@@ -670,6 +675,8 @@ class MochiHomeViewModel(
                 }
             } catch (error: CancellationException) {
                 if (version == interactionVersion) {
+                    voiceRuntime?.stopListening()
+                    voiceRuntime?.stopSpeaking()
                     mutableConversationState.update { it.copy(isSending = false) }
                     mutablePipelineState.value = ChatPipelineUiState()
                     wakeRuntime?.resume()
@@ -963,7 +970,7 @@ class MochiHomeViewModel(
             "Microphone and notification permissions are required"
     }
 
-    fun saveProviderSettings(input: ProviderSettingsInput) {
+    fun handleProviderProfileAction(action: ProviderProfileAction) {
         val repository = providerSettingsRepository ?: return
         mutableProviderSettingsState.update {
             it.copy(isSaving = true, feedback = null)
@@ -971,11 +978,20 @@ class MochiHomeViewModel(
 
         viewModelScope.launch(ioDispatcher) {
             try {
-                val summary = repository.save(input)
+                val profiles = when (action) {
+                    is ProviderProfileAction.Save -> repository.saveProfile(action.input)
+                    is ProviderProfileAction.Activate -> repository.activateProfile(action.id)
+                    is ProviderProfileAction.Delete -> repository.deleteProfile(action.id)
+                }
                 mutableProviderSettingsState.value = ProviderSettingsUiState(
-                    summary = summary,
+                    summary = profiles.active?.settings ?: ProviderSettingsSummary(),
+                    profiles = profiles,
                     isLoading = false,
-                    feedback = "Provider settings saved",
+                    feedback = when (action) {
+                        is ProviderProfileAction.Save -> "AI connection saved"
+                        is ProviderProfileAction.Activate -> "AI connection selected"
+                        is ProviderProfileAction.Delete -> "AI connection deleted"
+                    },
                 )
             } catch (error: IllegalArgumentException) {
                 mutableProviderSettingsState.update {
@@ -984,6 +1000,12 @@ class MochiHomeViewModel(
                         feedback = error.message ?: "Invalid provider settings",
                     )
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: IllegalStateException) {
+                mutableProviderSettingsState.update { it.copy(isSaving = false, feedback = error.message) }
+            } catch (_: IOException) {
+                mutableProviderSettingsState.update { it.copy(isSaving = false, feedback = "AI connections could not be saved.") }
             }
         }
     }
@@ -1193,12 +1215,13 @@ class MochiHomeViewModel(
         viewModelScope.launch(ioDispatcher) {
             try {
                 manager.importShareLink(link)
-                val provider = providerSettingsRepository?.loadSummary()
+                val provider = providerSettingsRepository?.loadProfiles()
                 val speech = speechSettingsRepository?.loadSummary()
                 if (provider != null) {
                     mutableProviderSettingsState.value =
                         ProviderSettingsUiState(
-                            summary = provider,
+                            summary = provider.active?.settings ?: ProviderSettingsSummary(),
+                            profiles = provider,
                             isLoading = false,
                         )
                 }
@@ -1218,6 +1241,12 @@ class MochiHomeViewModel(
                 }
                 mutableProviderShareState.value = ProviderShareUiState(
                     feedback = "Shared Providers imported",
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: IOException) {
+                mutableProviderShareState.value = ProviderShareUiState(
+                    feedback = "Provider share link could not be imported",
                 )
             } catch (error: IllegalArgumentException) {
                 mutableProviderShareState.value = ProviderShareUiState(
@@ -1986,13 +2015,30 @@ class MochiHomeViewModel(
         }
 
         viewModelScope.launch(ioDispatcher) {
-            val summary = repository.loadSummary()
-            mutableProviderSettingsState.value = ProviderSettingsUiState(
-                summary = summary,
-                isLoading = false,
-            )
+            try {
+                val profiles = repository.loadProfiles()
+                mutableProviderSettingsState.value = ProviderSettingsUiState(
+                    summary = profiles.active?.settings ?: ProviderSettingsSummary(),
+                    profiles = profiles,
+                    isLoading = false,
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: IllegalArgumentException) {
+                mutableProviderSettingsState.update {
+                    it.copy(isLoading = false, feedback = "AI connections could not be loaded. Stored settings have not been replaced.")
+                }
+            } catch (_: IllegalStateException) {
+                mutableProviderSettingsState.update {
+                    it.copy(isLoading = false, feedback = "AI connections could not be loaded. Stored settings have not been replaced.")
+                }
+            } catch (_: IOException) {
+                mutableProviderSettingsState.update {
+                    it.copy(isLoading = false, feedback = "AI connections could not be loaded. Stored settings have not been replaced.")
+                }
+            }
             if (
-                !summary.isReady &&
+                !mutableProviderSettingsState.value.summary.isReady &&
                 mutableSurface.value == MochiSurface.Face
             ) {
                 mutableSurface.value = MochiSurface.Settings
@@ -2602,6 +2648,7 @@ class MochiHomeViewModel(
                             application.agentScheduleController,
                         providerSettingsRepository =
                             application.providerSettingsRepository,
+                        providerRuns = application.providerRuns,
                         speechSettingsRepository =
                             application.speechSettingsRepository,
                         providerShareManager =

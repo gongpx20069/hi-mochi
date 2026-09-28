@@ -64,6 +64,54 @@ import org.junit.Test
 
 class MochiHomeViewModelTest {
     @Test
+    fun `connection switch cancels foreground work and stops playback without error reply`() = kotlinx.coroutines.runBlocking {
+        val runs = com.example.mochi_pet.core.settings.ProviderRunCoordinator()
+        val settings = ProviderSettingsRepositoryFake()
+        val repository = object : ProviderSettingsRepository by settings {
+            override suspend fun activateProfile(id: String) =
+                runs.change { cancel -> cancel(); settings.loadProfiles() }
+        }
+        val started = CompletableDeferred<Unit>()
+        val stopped = CompletableDeferred<Unit>()
+        val voice = VoiceRuntimeFake("")
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), providerSettingsRepository = repository,
+            providerRuns = runs, voiceRuntime = voice, ioDispatcher = Dispatchers.Unconfined,
+            agentRunnerBuilder = { _, _, _ -> AgentRunner {
+                started.complete(Unit)
+                try { awaitCancellation() } finally { stopped.complete(Unit) }
+            } },
+        )
+        viewModel.sendConversation("Synthetic pending request")
+        started.await()
+        voice.stopSpeakingCount = 0
+        viewModel.handleProviderProfileAction(ProviderProfileAction.Activate("test"))
+        kotlinx.coroutines.withTimeout(5_000) { stopped.await() }
+        assertFalse(viewModel.conversationState.value.isSending)
+        assertEquals(null, viewModel.conversationState.value.errorMessage)
+        assertEquals("AI connection selected", viewModel.providerSettingsState.value.feedback)
+        assertTrue(voice.stopSpeakingCount > 0)
+    }
+
+    @Test
+    fun `profile load failure is shown without resetting storage`() {
+        val repository = object : ProviderSettingsRepository by ProviderSettingsRepositoryFake() {
+            override suspend fun loadProfiles(): com.example.mochi_pet.core.settings.ProviderProfilesSummary =
+                throw IllegalStateException("synthetic storage failure")
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), providerSettingsRepository = repository,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        assertFalse(viewModel.providerSettingsState.value.isLoading)
+        assertEquals(
+            "AI connections could not be loaded. Stored settings have not been replaced.",
+            viewModel.providerSettingsState.value.feedback,
+        )
+        assertEquals(MochiSurface.Settings, viewModel.surface.value)
+    }
+
+    @Test
     fun `text and voice cap model requests without changing stored provider timeout`() {
         for (voiceInput in listOf(false, true)) {
             val settings = ProviderSettingsRepositoryFake()
@@ -862,6 +910,17 @@ private class ProviderSettingsRepositoryFake(
     )
 
     override suspend fun loadSummary(): ProviderSettingsSummary = summary
+
+    override suspend fun loadProfiles() = com.example.mochi_pet.core.settings.ProviderProfilesSummary(
+        listOf(com.example.mochi_pet.core.settings.ProviderProfileSummary(
+            "test", "Test", com.example.mochi_pet.core.settings.ProviderPreset.CUSTOM, summary,
+        )), "test",
+    )
+    override suspend fun saveProfile(input: com.example.mochi_pet.core.settings.ProviderProfileInput) = loadProfiles()
+    override suspend fun activateProfile(id: String) = loadProfiles()
+    override suspend fun deleteProfile(id: String) = loadProfiles()
+    override suspend fun importProfiles(inputs: List<com.example.mochi_pet.core.settings.ProviderProfileInput>, activeIndex: Int) = loadProfiles()
+    override suspend fun loadProfileRuntimeConfig(id: String) = loadRuntimeConfig()
 
     override suspend fun save(
         input: ProviderSettingsInput,

@@ -50,6 +50,12 @@ class ConfigurationDiagnosticsTest {
         )
         override suspend fun save(input: ProviderSettingsInput): ProviderSettingsSummary = error("No writes allowed")
         override suspend fun clearApiKey(): ProviderSettingsSummary = error("No writes allowed")
+        override suspend fun loadProfiles() = com.example.mochi_pet.core.settings.ProviderProfilesSummary()
+        override suspend fun saveProfile(input: com.example.mochi_pet.core.settings.ProviderProfileInput): com.example.mochi_pet.core.settings.ProviderProfilesSummary = error("No writes allowed")
+        override suspend fun activateProfile(id: String): com.example.mochi_pet.core.settings.ProviderProfilesSummary = error("No writes allowed")
+        override suspend fun deleteProfile(id: String): com.example.mochi_pet.core.settings.ProviderProfilesSummary = error("No writes allowed")
+        override suspend fun importProfiles(inputs: List<com.example.mochi_pet.core.settings.ProviderProfileInput>, activeIndex: Int): com.example.mochi_pet.core.settings.ProviderProfilesSummary = error("No writes allowed")
+        override suspend fun loadProfileRuntimeConfig(id: String) = loadRuntimeConfig()
     }
 
     private class Client(

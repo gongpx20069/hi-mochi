@@ -53,7 +53,7 @@ class ProviderSharingTest {
     fun `round trip keeps provider secrets out of visible link`() {
         val link = ProviderShareCodec.encode(bundle)
 
-        assertTrue(link.startsWith("mochi://provider/import#v2."))
+        assertTrue(link.startsWith("mochi://provider/import#v3."))
         assertEquals(bundle, ProviderShareCodec.decode(link))
         assertTrue("llm-secret" !in link)
         assertTrue("speech-secret" !in link)
@@ -101,7 +101,7 @@ class ProviderSharingTest {
         assertThrows(IllegalArgumentException::class.java) {
             ProviderShareCodec.decode(
                 link.replace(
-                    "mochi://provider/import#v2.",
+                    "mochi://provider/import#v3.",
                     "mochi://provider/import#v1.",
                 ),
             )

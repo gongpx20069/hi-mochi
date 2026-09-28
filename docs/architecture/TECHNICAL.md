@@ -34,17 +34,24 @@ patch number but cannot roll back or overwrite a released version. At startup,
 Mochi checks only the latest stable release and opens its GitHub page after
 explicit user confirmation; Android remains responsible for APK installation.
 
-Provider sharing uses one current, non-backward-compatible bundle format.
-Each share selects any configured LLM and speech Provider plus optional Amap,
-Tencent Docs, and manual MCP connections. LLM and speech default selected;
-Tool credentials default unselected every time. MCP shares contain endpoint,
+Provider sharing generates v3 bundles and imports authenticated v2 or v3 links.
+Each share selects multiple saved LLM connections and a speech Provider plus
+optional Amap, Tencent Docs, and manual MCP connections. Only the active ready
+LLM profile and speech default selected; other LLM profiles and Tool credentials
+default unselected every time. MCP shares contain endpoint,
 credential, and enabled remote Tool names rather than cached schemas. Mochi
 encrypts the bundle with a fresh AES-256-GCM key and places ciphertext and key
-in a `mochi://provider/import#v2` link. No password or backend is required, but
+in a `mochi://provider/import#v3` link, with version-specific authenticated data.
+The envelope and payload versions must match. No password or backend is required, but
 possession of the complete link grants the selected API access and quota.
 Import requires confirmation, rediscovers shared MCP schemas, writes secrets
-through the receiver's Keystore-backed repositories, replaces only included
-connections, and enables their Providers and selected Tools. Notion and Feishu OAuth,
+through the receiver's Keystore-backed repositories, appends LLM profiles with
+fresh local IDs, and selects the shared active index. When the sender excludes
+its active profile, index zero is used. Legacy v2 single-LLM links append one
+profile. Included speech and Tool settings are replaced and selected Tools enabled.
+Input validation and MCP preparation precede writes; separate repositories are
+not a cross-store transaction. Links remain bounded to 32,768 characters.
+Notion and Feishu OAuth,
 Mi Home sessions, Android permissions, persona, memories, and planner data are
 excluded.
 
@@ -297,6 +304,20 @@ Provider metadata and encrypted API-key material are stored in Preferences
 DataStore. Android Keystore owns the AES-GCM key; Compose receives only
 `hasApiKey`, and the plaintext key is decrypted only when constructing the
 runtime `OpenAiProviderConfig`.
+
+The versioned `provider.profiles.v1` catalog contains named stable-ID profiles,
+brand preset metadata, protocol/configuration, encrypted key, and nullable active
+ID. Legacy preference fields migrate atomically, retaining their ciphertext and
+IV before old fields are removed; malformed storage is surfaced, never reset.
+`ProviderRunCoordinator` serializes profile mutations against Agent registration.
+Foreground and scheduled owners register before loading the active config.
+An effective active-config change cancels and joins owners (and structured
+children) before persistence; new owners wait for the switch. Invalid changes,
+renames and inactive edits do not cancel runs. Deleting active leaves no selection.
+Future alarms and already-submitted remote AgentLink/Termux jobs are not cancelled.
+HTTP cancellation remains attached through bounded response-body consumption.
+Compatible assistant `reasoning_content` is retained only for same-run Tool
+continuations, not persisted as conversation text or shown as a reply.
 
 `OpenAiProviderConfig` distinguishes three authentication and URL modes:
 

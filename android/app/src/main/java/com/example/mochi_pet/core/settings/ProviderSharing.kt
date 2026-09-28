@@ -22,14 +22,17 @@ class ProviderShareException(message: String) : IllegalArgumentException(message
 
 @Serializable
 internal data class SharedProviderBundle(
-    val version: Int = 2,
+    val version: Int = 3,
     val llm: SharedLlmProvider? = null,
+    val llmProfiles: List<SharedLlmProfile> = emptyList(),
+    val activeLlmIndex: Int = 0,
     val speech: SharedSpeechProvider? = null,
     val tools: SharedToolProviders = SharedToolProviders(),
 )
 
 data class ProviderShareSelection(
     val includeLlm: Boolean = true,
+    val llmProfileIds: Set<String>? = null,
     val includeSpeech: Boolean = true,
     val tools: ToolShareSelection = ToolShareSelection(),
 ) {
@@ -50,6 +53,14 @@ internal data class SharedLlmProvider(
     val timeoutSeconds: Long,
     val maxResponseBytes: Long,
     val apiKey: String,
+    val imageInputEnabled: Boolean = true,
+)
+
+@Serializable
+internal data class SharedLlmProfile(
+    val name: String,
+    val preset: ProviderPreset,
+    val config: SharedLlmProvider,
 )
 
 @Serializable
@@ -74,13 +85,25 @@ class ProviderShareManager(
         require(!selection.isEmpty) {
             "Select at least one Provider or Tool connection"
         }
+        val profiles = providerRepository.loadProfiles()
+        val selectedIds = if (selection.includeLlm) {
+            selection.llmProfileIds ?: setOfNotNull(profiles.activeId)
+        } else emptySet()
+        require(!selection.includeLlm || selectedIds.isNotEmpty()) { "Select at least one saved AI connection." }
+        val selected = profiles.profiles.filter { it.id in selectedIds }
+        require(selected.size == selectedIds.size && selected.all { it.settings.isReady }) {
+            "A selected AI connection is missing or incomplete."
+        }
+        val sharedProfiles = selected.map {
+            SharedLlmProfile(it.name, it.preset, providerRepository.loadProfileRuntimeConfig(it.id).toShared())
+        }
+        require(providerRepository.loadProfiles() == profiles) {
+            "AI connections changed while preparing the share. Select them again."
+        }
         return ProviderShareCodec.encode(
             SharedProviderBundle(
-                llm = if (selection.includeLlm) {
-                    providerRepository.loadRuntimeConfig().toShared()
-                } else {
-                    null
-                },
+                llmProfiles = sharedProfiles,
+                activeLlmIndex = selected.indexOfFirst { it.id == profiles.activeId }.coerceAtLeast(0),
                 speech = if (selection.includeSpeech) {
                     speechRepository.loadRuntimeConfig().toShared()
                 } else {
@@ -95,24 +118,42 @@ class ProviderShareManager(
 
     suspend fun importShareLink(link: String) {
         val bundle = ProviderShareCodec.decode(link)
-        require(bundle.version == 2) {
+        require(bundle.version in 2..3) {
             "This Provider share version is not supported"
         }
         require(
             bundle.llm != null ||
+                bundle.llmProfiles.isNotEmpty() ||
                 bundle.speech != null ||
                 bundle.tools != SharedToolProviders(),
         ) {
             "Provider share link does not contain any connections"
         }
-        val providerInput = bundle.llm?.let { llm ->
+        require(bundle.llm == null || bundle.llmProfiles.isEmpty()) { "Provider share contains conflicting AI connections." }
+        val sharedProfiles = bundle.llmProfiles.ifEmpty {
+            bundle.llm?.let {
+                val preset = when (it.providerType) {
+                    ProviderType.OPENAI -> ProviderPreset.OPENAI
+                    ProviderType.AZURE_OPENAI -> ProviderPreset.AZURE
+                    ProviderType.CUSTOM -> ProviderPreset.CUSTOM
+                }
+                listOf(SharedLlmProfile(preset.title, preset, it))
+            }.orEmpty()
+        }
+        require(sharedProfiles.isEmpty() || bundle.activeLlmIndex in sharedProfiles.indices) {
+            "Shared AI connection selection is invalid."
+        }
+        val providerInputs = sharedProfiles.map { profile ->
+            val llm = profile.config
+            require(profile.name.isNotBlank() && profile.name.length <= 120 &&
+                profile.preset.protocol == llm.providerType) { "Shared AI connection details are invalid." }
             require(llm.apiKey.isNotBlank()) {
                 "Shared LLM API key is required"
             }
             require(llm.timeoutSeconds in 1..300) {
                 "Shared Provider timeout is invalid"
             }
-            ProviderSettingsInput(
+            ProviderProfileInput(name = profile.name, preset = profile.preset, settings = ProviderSettingsInput(
                 providerType = llm.providerType,
                 endpoint = llm.endpoint,
                 model = llm.model,
@@ -120,9 +161,9 @@ class ProviderShareManager(
                 timeoutSeconds = llm.timeoutSeconds.toInt(),
                 maxResponseBytes = llm.maxResponseBytes,
                 apiKeyReplacement = llm.apiKey,
-            )
+                imageInputEnabled = llm.imageInputEnabled,
+            ).also { it.validate() })
         }
-        providerInput?.validate()
         val speechInput = bundle.speech?.let { speech ->
             when (speech.provider) {
                 SpeechProvider.SYSTEM -> Unit
@@ -157,7 +198,7 @@ class ProviderShareManager(
         val preparedTools =
             toolCatalogRepository.prepareSharedTools(bundle.tools)
 
-        providerInput?.let { providerRepository.save(it) }
+        if (providerInputs.isNotEmpty()) providerRepository.importProfiles(providerInputs, bundle.activeLlmIndex)
         speechInput?.let { speechRepository.save(it) }
         toolCatalogRepository.applySharedTools(preparedTools)
     }
@@ -171,6 +212,7 @@ class ProviderShareManager(
             timeoutSeconds = timeoutSeconds,
             maxResponseBytes = maxResponseBytes,
             apiKey = apiKey,
+            imageInputEnabled = imageInputEnabled,
         )
 
     private fun SpeechRuntimeConfig.toShared(): SharedSpeechProvider =
@@ -204,6 +246,7 @@ internal object ProviderShareCodec {
     private val random = SecureRandom()
 
     fun encode(bundle: SharedProviderBundle): String {
+        require(bundle.version in 2..3) { "This Provider share version is not supported" }
         val key = ByteArray(KEY_BYTES).also(random::nextBytes)
         val iv = ByteArray(IV_BYTES).also(random::nextBytes)
         val plaintext = json.encodeToString(bundle)
@@ -215,7 +258,7 @@ internal object ProviderShareCodec {
                     SecretKeySpec(key, KEY_ALGORITHM),
                     GCMParameterSpec(GCM_TAG_BITS, iv),
                 )
-                updateAAD(AAD)
+                updateAAD(aad(bundle.version))
                 doFinal(plaintext)
             }
         } catch (error: GeneralSecurityException) {
@@ -223,24 +266,25 @@ internal object ProviderShareCodec {
                 "Provider share link could not be encrypted",
             )
         }
-        val link = "$LINK_PREFIX${key.urlBase64()}.${iv.urlBase64()}." +
+        val link = "${linkPrefix(bundle.version)}${key.urlBase64()}.${iv.urlBase64()}." +
             ciphertext.urlBase64()
         if (link.length > MAX_LINK_CHARS) {
             throw ProviderShareException(
-                "Selected Provider share is too large; share fewer Tool connections",
+                "Selected Provider share is too large; share fewer connections",
             )
         }
         return link
     }
 
     fun decode(link: String): SharedProviderBundle {
-        require(link.startsWith(LINK_PREFIX)) {
+        val version = listOf(2, 3).firstOrNull { link.startsWith(linkPrefix(it)) }
+        require(version != null) {
             "This is not a Mochi Provider share link"
         }
         require(link.length <= MAX_LINK_CHARS) {
             "Provider share link is too large"
         }
-        val parts = link.removePrefix(LINK_PREFIX).split('.')
+        val parts = link.removePrefix(linkPrefix(version)).split('.')
         require(parts.size == 3) {
             "Provider share link is malformed"
         }
@@ -257,7 +301,7 @@ internal object ProviderShareCodec {
                     SecretKeySpec(key, KEY_ALGORITHM),
                     GCMParameterSpec(GCM_TAG_BITS, iv),
                 )
-                updateAAD(AAD)
+                updateAAD(aad(version))
                 doFinal(ciphertext)
             }
         } catch (_: AEADBadTagException) {
@@ -270,9 +314,9 @@ internal object ProviderShareCodec {
             )
         }
         return try {
-            json.decodeFromString(
+            json.decodeFromString<SharedProviderBundle>(
                 plaintext.toString(StandardCharsets.UTF_8),
-            )
+            ).also { require(it.version == version) { "Provider share version does not match its envelope." } }
         } catch (error: SerializationException) {
             throw ProviderShareException(
                 "Provider share link contains invalid settings",
@@ -292,13 +336,12 @@ internal object ProviderShareCodec {
             )
         }
 
-    private const val LINK_PREFIX = "mochi://provider/import#v2."
+    private fun linkPrefix(version: Int) = "mochi://provider/import#v$version."
     private const val MAX_LINK_CHARS = 32_768
     private const val KEY_BYTES = 32
     private const val IV_BYTES = 12
     private const val GCM_TAG_BITS = 128
     private const val KEY_ALGORITHM = "AES"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
-    private val AAD = "mochi-provider-share-v2"
-        .toByteArray(StandardCharsets.UTF_8)
+    private fun aad(version: Int) = "mochi-provider-share-v$version".toByteArray(StandardCharsets.UTF_8)
 }

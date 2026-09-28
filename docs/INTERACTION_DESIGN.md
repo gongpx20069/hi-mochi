@@ -288,10 +288,25 @@ All paths update the same `MochiSurface` state used by voice.
 
 Settings is always available from the top-right app action. If no provider is
 configured, first launch opens a guided connection screen before normal use.
-The provider choices are Azure OpenAI, OpenAI, and custom OpenAI-compatible.
-Azure OpenAI explains that the model field is the deployment name and exposes
-the API version separately. Saving a blank API-key replacement preserves the
-existing encrypted key.
+The Settings groups are ordered **Share/import**, **AI connections**,
+**Speech/wake**, **Conversation/persona**, **Display/language**, with visible
+section headings and descriptions. Share/import precedes every other group.
+AI connections shows named saved cards with current selection and Use/Edit/Delete.
+Add opens a screenshot-protected editor; OpenAI is prefilled, and presets also
+include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Azure, and custom. Each
+links to its official guide. Endpoint remains editable; model is supplied by
+the user because account access varies. Standard APIs are not Coding Plans.
+Azure calls its model field the deployment name and exposes API version.
+Keys are masked and never loaded into the editor. Blank preserves only that
+profile's encrypted key; changing provider protocol or endpoint host requires
+replacement. Each profile independently stores timeout and image-input policy.
+First save activates; subsequent additions do not switch. Use cancels running
+local Agents, children and current scheduled runs before the new configuration
+is selected. Editing active runtime settings has the same effect; renaming
+or editing an inactive connection does not. Future schedules remain enabled.
+Remote AgentLink tasks and submitted Termux processes are not stopped by this
+local cancellation. Deleting the active profile requires confirmation and leaves
+no active connection; there is no implicit fallback to another account.
 
 **Speech recognition and synthesis** retains Android as the zero-configuration
 default. Selecting iFlytek or Azure exposes a default-off **Also use this provider
@@ -332,17 +347,22 @@ no silent fallback or automatic retry after partial playback. A new wake or expl
 microphone action can start another turn.
 
 Share Providers always opens a checklist before Android's share sheet. The
-configured LLM and speech Providers begin selected; every Tool credential
+active ready LLM connection and speech Provider begin selected; other saved LLM
+connections and every Tool credential
 entry begins unselected on each opening. Available Tool entries are Amap,
 Tencent Docs, and each configured manual MCP server. The confirmation screen
 warns that possession of the complete link grants access to the selected API
-resources. Import replaces only included connections and then enables their
-Provider switches and the Tool selections carried by the share. Notion and Feishu OAuth,
+resources. Import adds LLM profiles without replacing existing accounts and
+selects the shared active profile, or the first selected profile when the
+sender excluded its active profile. This cancels running local Agent tasks.
+Included speech and Tool connections are replaced, enabling their switches
+and shared Tool selections. Notion and Feishu OAuth,
 Mi Home sessions, and Android permissions require setup on the receiving
 device and never appear in the checklist.
 Speech shares include the synthesis opt-in and selected voice. Older v2 speech
-shares without these fields import with system speech output; receivers need
-an updated app to accept shares carrying the new fields.
+shares without these fields import with system speech output. New shares use
+v3 and require an updated receiver; existing authenticated v2 links remain
+importable as additional saved connections.
 
 Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
 Installed/Explore uses a dark selected segment. Explore opens with the public
