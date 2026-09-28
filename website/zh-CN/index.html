@@ -35,6 +35,7 @@
         <nav class="site-nav" id="site-nav" aria-label="主要导航" data-nav>
           <a href="#why">为什么选择 Mochi</a>
           <a href="#features">功能</a>
+          <a href="#extensions">扩展能力</a>
           <a href="#privacy">隐私</a>
           <a href="#install">安装</a>
           <a href="../" lang="en">EN</a>
@@ -190,22 +191,6 @@
               <p class="feature-note">可选的 Mochi 签名 Termux 扩展需要另行安装 Termux。停止 Agent 不会自动停止已经提交的 Shell 或远端工作。</p>
             </article>
 
-            <article class="feature-card feature-wide smart-home-feature reveal" data-smart-home-feature>
-              <div class="smart-home-copy">
-                <div class="feature-icon smart-home-icon" aria-hidden="true"><span></span><i></i></div>
-                <span class="feature-label">智能家居 · 米家</span>
-                <h3>问问家里正在发生什么，<br>再让 Mochi 帮你行动。</h3>
-                <p>通过可选的 Mochi 签名扩展连接你选择的米家设备：控制常见家电和电视、查看摄像头与体重秤、触发场景，也能把摄像头最新事件截图带入当前前台对话进行查看和分析。</p>
-              </div>
-              <div class="smart-home-visual" aria-hidden="true">
-                <span class="smart-home-hub"><i></i><b>Mochi</b><small>已连接</small></span>
-                <span class="smart-device smart-device-tv"><i>电视</i><b>客厅</b><small>播放中 · 32%</small></span>
-                <span class="smart-device smart-device-camera"><i>相机</i><b>门口</b><small>最新事件</small></span>
-                <span class="smart-device smart-device-scale"><i>KG</i><b>体重秤</b><small>在线</small></span>
-                <span class="smart-device smart-device-scene"><i>◇</i><b>晚安</b><small>场景就绪</small></span>
-              </div>
-            </article>
-
             <article class="feature-card feature-wide tools-feature reveal">
               <div class="tools-copy">
                 <div class="feature-icon tools-icon" aria-hidden="true"><span></span><i></i></div>
@@ -226,31 +211,71 @@
         </div>
       </section>
 
-      <section class="section flow-section">
+      <section class="section extensions-section" id="extensions">
         <div class="shell">
           <div class="section-heading centered reveal">
-            <span class="kicker">让对话真正有去处</span>
-            <h2>自然地说，后续交给 Mochi。</h2>
+            <span class="kicker">按需连接，让能力走出对话</span>
+            <h2>从家里的设备，到手中的手机，<br>再到电脑上的工作。</h2>
+            <p>交流、记忆与计划，从 Mochi 开始。需要时再连接更多能力：两个签名扩展 APK，以及一个独立配套应用。不必一次装全，只选你需要的。</p>
           </div>
-          <div class="conversation-flow reveal">
-            <div class="flow-step">
-              <span class="flow-index">1</span>
-              <div class="flow-bubble user-bubble">“下周五我有什么安排？”</div>
-              <strong>提出问题</strong><small>使用语音或文字</small>
-            </div>
-            <span class="flow-arrow" aria-hidden="true">→</span>
-            <div class="flow-step">
-              <span class="flow-index">2</span>
-              <div class="flow-process" aria-hidden="true"><i></i><i></i><i></i></div>
-              <strong>理解意图</strong><small>召回上下文并使用可信 Tools</small>
-            </div>
-            <span class="flow-arrow" aria-hidden="true">→</span>
-            <div class="flow-step">
-              <span class="flow-index">3</span>
-              <div class="flow-bubble mochi-bubble"><span>12</span> 周五下午三点后没有安排。</div>
-              <strong>呈现结果</strong><small>打开相关原生界面</small>
-            </div>
+          <nav class="capability-map reveal" aria-label="探索扩展能力">
+            <a href="#mijia-extension"><span>01 / 家中设备</span><strong>米家</strong><small>家电控制与场景 ↗</small></a>
+            <a href="#termux-extension"><span>02 / 手机环境</span><strong>Termux</strong><small>命令与脚本执行 ↗</small></a>
+            <a href="#agentlink-extension"><span>03 / 电脑工作区</span><strong>AgentLink</strong><small>共享编程对话 ↗</small></a>
+          </nav>
+          <div class="feature-grid">
+            <article class="feature-card feature-wide smart-home-feature reveal" id="mijia-extension" data-smart-home-feature data-extension-card="mijia">
+              <div class="smart-home-copy">
+                <span class="extension-badge">Mochi 签名扩展 APK</span>
+                <h3>一句话，<br>照顾你的家。</h3>
+                <span class="feature-label">智能家居 · 米家</span>
+                <p>控制支持的家电和电视、查看设备状态、触发手动场景，也能在前台对话中查看和分析摄像头最新可用的事件图片。</p>
+                <blockquote class="example-prompt">“把客厅的电视关掉。”</blockquote>
+                <div class="extension-actions">
+                  <a class="button button-secondary" data-extension-download="mijia" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.13/Mochi-Mijia-Extension-v1.0.13.apk">下载米家扩展 ↓</a>
+                </div>
+                <details class="extension-setup">
+                  <summary>三步连接米家</summary>
+                  <ol><li>安装与 Mochi 同一发布及签名渠道的扩展 APK。</li><li>进入 Tools → Extensions → 米家，用另一台已登录米家的手机扫码确认，选择需要连接的设备。</li><li>返回 Mochi，准备好后选择“启用工具和 Skill”；仅安装不会自动启用权限。</li></ol>
+                </details>
+                <p class="feature-note">非小米官方连接器，能力取决于设备；事件图片不是实时视频。仅用于前台控制，设备无法读回状态时，“指令已接受”不代表物理效果已确认。</p>
+              </div>
+              <div class="smart-home-visual" aria-hidden="true">
+                <span class="smart-home-hub"><i></i><b>Mochi</b><small>与家连接</small></span>
+                <span class="smart-device smart-device-tv"><i>电视</i><b>客厅</b><small>电源与状态</small></span>
+                <span class="smart-device smart-device-camera"><i>相机</i><b>门口</b><small>最新事件</small></span>
+                <span class="smart-device smart-device-scale"><i>KG</i><b>体重秤</b><small>设备状态</small></span>
+                <span class="smart-device smart-device-scene"><i>◇</i><b>晚安</b><small>手动场景</small></span>
+              </div>
+            </article>
+            <article class="feature-card extension-card termux-card reveal" id="termux-extension" data-extension-card="termux">
+              <span class="extension-badge">Mochi 签名扩展 APK + Termux</span>
+              <h3>让手中的手机，<br>真正执行工作。</h3>
+              <p>在 Termux 中运行命令和脚本、处理它有权访问的文件，并在任务中心查看输出或停止工作。连接并启用后，前台对话、定时 Agent 和子 Agent 都能调用。</p>
+              <div class="execution-preview" aria-label="示例流程，非实时任务"><small>在手机上执行 / 流程示意</small><code>提出需求 → 执行脚本 → 查看输出</code><span>提交任务 · 跟进状态 · 检查结果</span></div>
+              <div class="extension-actions">
+                <a class="button button-secondary" data-extension-download="termux" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.13/Mochi-Termux-Extension-v1.0.13.apk">下载 Termux 扩展 ↓</a>
+                <a class="text-link" href="https://github.com/termux/termux-app#installation">安装官方 Termux ↗</a>
+              </div>
+              <details class="extension-setup">
+                <summary>三步连接 Termux</summary>
+                <ol><li>另行安装 Termux，以及与 Mochi 配套的扩展 APK。</li><li>从 Mochi Tools 打开配置，按引导允许外部命令、授予 Android 权限并测试连接。</li><li>启用需要的 Provider、Tools 和 Skill。已提交工作在任务中心管理；关闭开关只阻止新调用，不停止已有任务。</li></ol>
+              </details>
+              <p class="feature-note">这是 Termux 权限下的完整 Shell，不是 Root，也不是安全沙箱。启用后不逐条确认命令；供 Agent 分析的输出会发送给你配置的模型服务。</p>
+            </article>
+            <article class="feature-card extension-card agentlink-card reveal" id="agentlink-extension" data-extension-card="agentlink">
+              <span class="extension-badge">独立应用 + 电脑端 Bridge</span>
+              <h3>离开电脑，<br>也不中断工作。</h3>
+              <p>AgentLink 让 Android 手机连接电脑上的编程 Agent。手机与终端继续同一个对话；也可以明确授权 Mochi，替你发送工作、读取进展和结果。</p>
+              <div class="execution-preview link-preview" aria-label="连接关系示意"><small>在电脑上执行 / AGENTLINK</small><code>手机 ↔ Bridge ↔ 编程 Agent</code><span>同一对话 · 共享上下文 · 你的电脑</span></div>
+              <div class="extension-actions">
+                <a class="button button-primary" href="agentlink/">认识 AgentLink →</a>
+                <a class="text-link" href="https://github.com/gongpx20069/android-agent-link/releases">下载 Android 预览版 ↗</a>
+              </div>
+              <p class="feature-note">这是独立产品，不是 Mochi 扩展 APK。需要电脑运行 Bridge 并登录编程 Agent。Mochi 仅在明确授权后进行前台操作；关闭 Mochi 不会停止远端工作。</p>
+            </article>
           </div>
+          <p class="extensions-footnote">米家与 Termux 扩展不增加独立桌面图标，从 Mochi Tools 进入配置；AgentLink 则有自己的应用。它们都不是基础聊天的前提，请按需连接、明确启用。</p>
         </div>
       </section>
 
@@ -330,7 +355,7 @@
         </div>
         <div class="footer-links">
           <div><strong>项目</strong><a href="https://github.com/gongpx20069/hi-mochi">GitHub</a><a data-release-page href="https://github.com/gongpx20069/hi-mochi/releases/tag/v1.0.13"><span data-release-version>v1.0.13</span> 版本</a><a href="https://github.com/gongpx20069/hi-mochi/issues">问题反馈</a></div>
-          <div><strong>了解</strong><a href="#features">功能</a><a href="#privacy">隐私</a><a href="https://github.com/gongpx20069/hi-mochi/tree/main/docs">文档</a></div>
+          <div><strong>了解</strong><a href="#features">功能</a><a href="#extensions">扩展能力</a><a href="agentlink/">AgentLink</a><a href="#privacy">隐私</a><a href="https://github.com/gongpx20069/hi-mochi/tree/main/docs">文档</a></div>
           <div><strong>语言</strong><a href="../" lang="en">English</a><a href="./">简体中文</a></div>
         </div>
       </div>

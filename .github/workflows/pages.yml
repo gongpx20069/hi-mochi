@@ -39,7 +39,7 @@ jobs:
           cp website/index.html website/styles.css website/scripts.js _site/
           cp website/404.html website/robots.txt website/sitemap.xml _site/
           cp website/.nojekyll _site/
-          cp -R website/assets website/zh-CN _site/
+          cp -R website/assets website/zh-CN website/agentlink _site/
 
       - name: Upload website artifact
         uses: actions/upload-pages-artifact@v3

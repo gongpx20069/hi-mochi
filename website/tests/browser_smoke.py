@@ -39,10 +39,12 @@ def main() -> None:
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(channel=options.channel)
-            for language in ("", "zh-CN/"):
+            for language in ("", "zh-CN/", "agentlink/", "zh-CN/agentlink/"):
+                is_home = "agentlink/" not in language
                 source = (SITE_ROOT / language / "index.html").read_text(encoding="utf-8")
-                fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1)
-                for mode in ("latest", "unavailable", "untrusted"):
+                fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1) if is_home else None
+                modes = ("latest", "unavailable", "untrusted", "missing-extension", "untrusted-extension") if is_home else ("standalone",)
+                for mode in modes:
                     context = browser.new_context(reduced_motion="reduce")
                     asset_name = f"Mochi-{TEST_VERSION}-arm64-v8a.apk"
                     payload = {
@@ -59,6 +61,18 @@ def main() -> None:
                             ),
                         }],
                     }
+                    for extension in ("Mijia", "Termux"):
+                        if mode == "missing-extension" and extension == "Termux":
+                            continue
+                        filename = f"Mochi-{extension}-Extension-{TEST_VERSION}.apk"
+                        payload["assets"].append({
+                            "name": filename,
+                            "browser_download_url": (
+                                "https://example.invalid/extension.apk"
+                                if mode == "untrusted-extension"
+                                else f"{RELEASE_ROOT}download/{TEST_VERSION}/{filename}"
+                            ),
+                        })
                     context.route(API_URL, lambda route: route.fulfill(
                         status=403 if mode == "unavailable" else 200,
                         content_type="application/json",
@@ -66,6 +80,8 @@ def main() -> None:
                     ))
                     page = context.new_page()
                     failures = []
+                    page.on("request", lambda request: failures.append("AgentLink requested Mochi release API")
+                            if not is_home and request.url == API_URL else None)
                     page.on("pageerror", lambda error: failures.append(str(error)))
                     page.on("response", lambda response: failures.append(response.url)
                             if response.url.startswith("http://127.0.0.1") and response.status >= 400
@@ -73,13 +89,19 @@ def main() -> None:
                     page.goto(f"http://127.0.0.1:{server.server_port}/hi-mochi/{language}")
                     page.wait_for_load_state("networkidle")
                     expected = TEST_VERSION if mode == "latest" else fallback
-                    assert page.locator("[data-release-version]").all_text_contents() == [expected] * 3
+                    assert page.locator("[data-release-version]").all_text_contents() == ([expected] * 3 if is_home else [])
                     for link in page.locator("[data-release-download]").all():
                         assert link.get_attribute("href") == (
                             f"{RELEASE_ROOT}download/{expected}/Mochi-{expected}-arm64-v8a.apk"
                         )
                     for link in page.locator("[data-release-page]").all():
                         assert link.get_attribute("href") == f"{RELEASE_ROOT}tag/{expected}"
+                    for extension, name in (("mijia", "Mijia"), ("termux", "Termux")):
+                        if is_home:
+                            assert page.locator(f"[data-extension-download='{extension}']").get_attribute("href") == (
+                                f"{RELEASE_ROOT}download/{expected}/Mochi-{name}-Extension-{expected}.apk"
+                            )
+                    page.locator("details").evaluate_all("(items) => items.forEach(item => item.open = true)")
 
                     for width in (320, 390, 768, 1280):
                         page.set_viewport_size({"width": width, "height": 900})
@@ -90,12 +112,13 @@ def main() -> None:
                             }
                             const cards = document.querySelectorAll(
                                 "[data-speech-feature], [data-documents-feature], " +
-                                "[data-connections-feature], [data-tasks-feature]"
+                                "[data-connections-feature], [data-tasks-feature], " +
+                                "[data-extension-card], .link-benefits article, .link-stage"
                             );
                             for (const card of cards) {
                                 const bounds = card.getBoundingClientRect();
                                 const items = [...card.querySelectorAll(
-                                    "h3, p, .knowledge-workspaces, .connection-presets, .waveform"
+                                    "h3, p, .knowledge-workspaces, .connection-presets, .waveform, .execution-preview"
                                 )];
                                 for (const [index, item] of items.entries()) {
                                     const box = item.getBoundingClientRect();
@@ -122,10 +145,19 @@ def main() -> None:
                             page.locator("[data-nav] a[href='#features']").click()
                             assert toggle.get_attribute("aria-expanded") == "false"
                             assert page.evaluate("document.body.style.overflow") == ""
+                    if is_home:
+                        page.locator("[data-extension-card='agentlink'] .button").click()
+                        assert page.url.endswith(f"/hi-mochi/{language}agentlink/")
+                        page.locator(".site-nav a[href='../']").click()
+                        assert page.url.endswith(f"/hi-mochi/{language}")
+                    else:
+                        assert page.locator(".hero-actions a").first.get_attribute("href") == (
+                            "https://github.com/gongpx20069/android-agent-link/releases"
+                        )
                     assert not failures, failures
                     context.close()
             browser.close()
-        print("Browser checks passed: both languages, 4 widths, release update/fallback, and navigation.")
+        print("Browser checks passed: 4 pages, 4 widths, extension downloads/fallbacks, and cross-page navigation.")
     finally:
         server.shutdown()
         server.server_close()

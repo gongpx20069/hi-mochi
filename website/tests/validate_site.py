@@ -19,6 +19,8 @@ class PageParser(HTMLParser):
         self.resources: list[str] = []
         self.html_language: str | None = None
         self.canonical: str | None = None
+        self.stack: list[str] = []
+        self.errors: list[str] = []
 
     def handle_starttag(
         self,
@@ -26,9 +28,14 @@ class PageParser(HTMLParser):
         attrs: list[tuple[str, str | None]],
     ) -> None:
         values = dict(attrs)
+        if tag not in {"area", "base", "br", "col", "embed", "hr", "img", "input",
+                       "link", "meta", "param", "source", "track", "wbr"}:
+            self.stack.append(tag)
         if tag == "html":
             self.html_language = values.get("lang")
         if element_id := values.get("id"):
+            if element_id in self.ids:
+                self.errors.append(f"duplicate id: {element_id}")
             self.ids.add(element_id)
         if tag == "a" and (href := values.get("href", "")).startswith("#"):
             self.anchor_refs.append(href[1:])
@@ -38,6 +45,12 @@ class PageParser(HTMLParser):
         key = "href" if tag in {"a", "link"} else "src" if tag in {"img", "script"} else None
         if key and (resource := values.get(key)):
             self.resources.append(resource)
+
+    def handle_endtag(self, tag: str) -> None:
+        if not self.stack or self.stack[-1] != tag:
+            self.errors.append(f"unexpected closing tag: {tag}")
+        else:
+            self.stack.pop()
 
 
 def local_resource(page: Path, value: str) -> Path | None:
@@ -75,6 +88,9 @@ def main() -> None:
         parser = PageParser()
         parser.feed(page.read_text(encoding="utf-8"))
         relative_page = page.relative_to(SITE_ROOT)
+        errors.extend(f"{relative_page}: {error}" for error in parser.errors)
+        if parser.stack:
+            errors.append(f"{relative_page}: unclosed tags {parser.stack}")
 
         for anchor in parser.anchor_refs:
             if anchor and anchor not in parser.ids:
@@ -84,20 +100,21 @@ def main() -> None:
             target = local_resource(page, resource)
             if target is not None and not target.exists():
                 errors.append(f"{relative_page}: missing resource {resource}")
-
-        if page.name == "index.html" and "zh-CN" not in page.parts:
-            if parser.html_language != "en":
-                errors.append("index.html: expected lang=en")
-            if parser.canonical != "https://gongpx20069.github.io/hi-mochi/":
-                errors.append("index.html: incorrect canonical URL")
-
-        if "zh-CN" in page.parts:
-            if parser.html_language != "zh-CN":
-                errors.append("zh-CN/index.html: expected lang=zh-CN")
-            if parser.canonical != "https://gongpx20069.github.io/hi-mochi/zh-CN/":
-                errors.append("zh-CN/index.html: incorrect canonical URL")
+            elif target is not None and target.suffix == ".html" and urlsplit(resource).fragment:
+                linked_page = PageParser()
+                linked_page.feed(target.read_text(encoding="utf-8"))
+                if urlsplit(resource).fragment not in linked_page.ids:
+                    errors.append(f"{relative_page}: missing linked anchor {resource}")
 
         if page.name == "index.html":
+            language = "zh-CN" if "zh-CN" in relative_page.parts else "en"
+            if parser.html_language != language:
+                errors.append(f"{relative_page}: expected lang={language}")
+            route = relative_page.as_posix().removesuffix("index.html")
+            if parser.canonical != f"https://gongpx20069.github.io/hi-mochi/{route}":
+                errors.append(f"{relative_page}: incorrect canonical URL")
+
+        if page in (SITE_ROOT / "index.html", SITE_ROOT / "zh-CN" / "index.html"):
             source = page.read_text(encoding="utf-8")
             for feature in ("smart-home", "speech", "documents", "connections", "tasks"):
                 if source.count(f"data-{feature}-feature") != 1:
@@ -127,6 +144,19 @@ def main() -> None:
                 source,
             )
             versions = set(download_versions + page_versions + label_versions)
+            for extension, name in (("mijia", "Mijia"), ("termux", "Termux")):
+                extension_versions = re.findall(
+                    rf'data-extension-download="{extension}" href="https://github.com/'
+                    rf'gongpx20069/hi-mochi/releases/download/(v1\.0\.[1-9][0-9]*)/'
+                    rf'Mochi-{name}-Extension-\1\.apk"', source,
+                )
+                if len(extension_versions) != 1 or set(extension_versions) != versions:
+                    errors.append(f"{relative_page}: inconsistent {extension} download")
+            for extension in ("mijia", "termux", "agentlink"):
+                if source.count(f'data-extension-card="{extension}"') != 1:
+                    errors.append(f"{relative_page}: missing or duplicate {extension} card")
+            if "extensions" not in parser.ids:
+                errors.append(f"{relative_page}: missing extensions section")
             fallback_versions.update(versions)
             if (
                 len(download_versions) != 2
@@ -140,6 +170,13 @@ def main() -> None:
 
     if len(fallback_versions) != 1:
         errors.append("Homepages must use the same release fallback in both languages.")
+
+    for route in ("agentlink/index.html", "zh-CN/agentlink/index.html"):
+        page = SITE_ROOT / route
+        if not page.exists():
+            errors.append(f"Missing AgentLink page: {route}")
+        elif "data-release-download" in page.read_text(encoding="utf-8"):
+            errors.append(f"{route}: AgentLink must not download the Mochi APK")
 
     og_image = SITE_ROOT / "assets" / "mochi-og.png"
     if png_dimensions(og_image) != (1200, 630):

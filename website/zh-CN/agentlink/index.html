@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#100e16">
+    <meta name="description" content="AgentLink 将电脑上的编程 Agent 带到 Android 手机。在手机与终端继续同一个对话，查看进展、处理审批，也可按需授权 Mochi。">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="AgentLink — 离开电脑，也不中断工作">
+    <meta property="og:description" content="工作在你的电脑上执行，对话随你移动。认识 AgentLink：独立 Android 应用与电脑端 Bridge，连接你的编程 Agent。">
+    <meta property="og:url" content="https://gongpx20069.github.io/hi-mochi/zh-CN/agentlink/">
+    <link rel="canonical" href="https://gongpx20069.github.io/hi-mochi/zh-CN/agentlink/">
+    <link rel="alternate" hreflang="en" href="https://gongpx20069.github.io/hi-mochi/agentlink/">
+    <link rel="alternate" hreflang="zh-CN" href="https://gongpx20069.github.io/hi-mochi/zh-CN/agentlink/">
+    <link rel="alternate" hreflang="x-default" href="https://gongpx20069.github.io/hi-mochi/agentlink/">
+    <link rel="icon" href="../../assets/agentlink.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../styles.css">
+    <script src="../../scripts.js" defer></script>
+    <title>AgentLink — 离开电脑，也不中断工作</title>
+  </head>
+  <body class="agentlink-page">
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <header class="site-header" data-header>
+      <div class="nav-shell">
+        <a class="brand" href="./" aria-label="AgentLink 首页"><img src="../../assets/agentlink.svg" width="32" height="32" alt="">AgentLink</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">打开导航</span><span></span><span></span></button>
+        <nav class="site-nav" id="site-nav" aria-label="主要导航" data-nav>
+          <a href="#features">使用体验</a><a href="#setup">开始连接</a><a href="#mochi">与 Mochi 协作</a>
+          <a href="../">Mochi</a><a href="../../agentlink/" lang="en">EN</a>
+          <a class="nav-cta" href="https://github.com/gongpx20069/android-agent-link">GitHub ↗</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="agentlink-hero">
+        <div class="shell agentlink-hero-grid">
+          <div class="reveal">
+            <span class="eyebrow"><span></span> Android + 你的电脑 · 预览版</span>
+            <h1>离开电脑，<br><em>也不中断工作。</em></h1>
+            <p class="hero-lede">电脑继续执行工作，对话随你移动。用手机发起任务、跟进进展，回到终端时，继续的还是同一个聊天。</p>
+            <div class="hero-actions"><a class="button button-primary" href="https://github.com/gongpx20069/android-agent-link/releases">下载 Android 预览版 ↓</a><a class="button button-secondary" href="#setup">连接你的电脑 →</a></div>
+            <p class="hero-note">Android 8.0+ · GitHub Copilot CLI / Claude Code* · 可独立于 Mochi 使用</p>
+          </div>
+          <div class="link-stage reveal" aria-label="AgentLink 工作流程示意，非实时会话">
+            <div class="stage-title"><span class="status-dot" aria-hidden="true"></span> 两块屏幕，同一个对话。<small>流程示意</small></div>
+            <div class="link-screen phone-screen"><small>ANDROID / 你</small><strong>“帮我检查这个项目的代码改动。”</strong><span>发送工作 · 阅读回复 · 处理审批</span></div>
+            <div class="bridge-line"><span>↕</span> 经过鉴权的 Bridge <span>↕</span></div>
+            <div class="link-screen computer-screen"><small>你的电脑 / AGENT</small><strong>项目文件和 Agent 进程，都留在这里。</strong><span>Copilot CLI 或 Claude Code*</span></div>
+            <p class="stage-caption">在 AgentLink 终端界面继续同一个会话、任务队列与审批流程，而不是另开一段互不相干的 CLI 对话。</p>
+          </div>
+        </div>
+      </section>
+      <section class="section" id="features">
+        <div class="shell">
+          <div class="section-heading split-heading reveal"><div><span class="kicker">切换屏幕，不必重新交代</span><h2>屏幕小了，<br>与工作的连接没有。</h2></div><p>独立 Android 应用，加上电脑端 Bridge。AgentLink 连接已安装、已登录的编程 Agent，不需要把开发环境搬到手机上。</p></div>
+          <div class="link-benefits">
+            <article class="feature-card reveal"><span class="feature-label">01 / 跟得上进展</span><h3>看见工作，<br>一步步展开。</h3><p>流式阅读回复、查看工具活动，在手机上处理 Agent 的审批请求。随时切换机器、项目与聊天，不必守在电脑前。</p></article>
+            <article class="feature-card reveal"><span class="feature-label">02 / 接得上对话</span><h3>换一块键盘，<br>还是同一个聊天。</h3><p>可选的 AgentLink 交互式终端与 Android 共享 Agent 会话、消息、队列和审批。手机上说到哪里，回到电脑接着继续。</p></article>
+            <article class="feature-card reveal"><span class="feature-label">03 / 用自己的环境</span><h3>你的工具，<br>你的电脑。</h3><p>支持 GitHub Copilot CLI，以及具备 ACP 支持的 Claude Code 配置。可用模型、权限和可恢复会话，取决于连接的 Agent。</p></article>
+          </div>
+          <p class="extensions-footnote">* Claude Code 需要支持 <code>claude --acp</code> 的兼容配置，详见<a href="https://github.com/gongpx20069/android-agent-link/blob/main/docs/user-guide.md#coding-agents">兼容性指南 ↗</a>。Agent 服务本身的费用与账号要求仍然适用。</p>
+        </div>
+      </section>
+      <section class="section" id="setup">
+        <div class="shell">
+          <div class="install-panel reveal">
+            <div class="install-heading"><span class="kicker">把两端连接起来</span><h2>安装、启动、配对。</h2><p>电脑需要保持唤醒、联网并运行 Bridge。Android 安装包目前标记为 Pre-release。</p></div>
+            <ol class="install-steps">
+              <li><span>1</span><div><strong>安装 Android 应用</strong><p>从 AgentLink 自己的 Releases 下载，而不是 Mochi 扩展附件。更新时使用相同签名渠道覆盖安装，保留聊天记录。</p></div></li>
+              <li><span>2</span><div><strong>启动电脑端 Bridge</strong><p>准备 Python 3.11+、Git，以及已登录的受支持编程 Agent。按仓库指南安装并启动 Bridge；交互式终端聊天是可选项。</p></div></li>
+              <li><span>3</span><div><strong>扫码配对，开始聊天</strong><p>在 Android 打开 Machines → Scan QR，核对确认码并在电脑上批准配对。创建聊天时，选择电脑上的项目路径。</p></div></li>
+            </ol>
+            <div class="install-actions"><a class="button button-light" href="https://github.com/gongpx20069/android-agent-link/blob/main/README.zh-CN.md">电脑端配置指南 ↗</a><a class="text-link light-link" href="https://github.com/gongpx20069/android-agent-link/releases">Android 安装包 ↗</a></div>
+          </div>
+          <div class="connection-boundary reveal"><strong>私有连接，明确配对。</strong><p>默认使用经过身份验证的私有 Dev Tunnels，无需开放入站防火墙端口，也不需要给手机另装 VPN。不要开启匿名访问或分享配对令牌；凭据过期时需要重新配对。Android 后台监控最长一小时，并非永久在线服务。模型请求仍遵循编程 Agent 服务商的数据政策，项目保存在本机不等于完全离线处理。</p></div>
+        </div>
+      </section>
+      <section class="section" id="mochi">
+        <div class="shell">
+          <div class="mochi-handoff reveal">
+            <div><span class="kicker">再多一个语音入口</span><h2>已经在用 Mochi？<br>让它也能连接你的工作。</h2><p>AgentLink 可以独立使用。明确授权后，Mochi 能发现已授权的工作区、创建或继续共享聊天、发送任务，并读取进展和结果。</p><a class="text-link" href="../#extensions">探索 Mochi 的扩展能力 →</a></div>
+            <div class="handoff-steps"><span class="extension-badge">明确授权 · 前台控制</span><ol><li>安装 AgentLink，并连接电脑上的 Bridge。</li><li>在 Mochi Tools → AgentLink 打开配套应用，在原生界面确认限定范围的权限。</li><li>启用 Provider、三个 Tools 和 AgentLink Skill；同步更新应用与 Bridge。</li></ol><p>凭据保留在 AgentLink，不进入 Mochi 分享。由 Mochi 分析的结果会发送给其模型服务；不向定时 Agent 或子 Agent 开放。</p></div>
+          </div>
+          <p class="extensions-footnote">关闭 Mochi 不会停止远端任务。结果可进入对话卡片与任务中心，也可在之后唤醒时简短播报；后台补收受 Android 调度限制，不保证即时推送。人工在手机或终端的输入优先于过期自动操作。</p>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="shell footer-grid"><div><a class="brand" href="./"><img src="../../assets/agentlink.svg" width="32" height="32" alt="">AgentLink</a><p>你的 Agent、你的电脑，触手可及。</p></div><div class="footer-links"><div><strong>AgentLink</strong><a href="https://github.com/gongpx20069/android-agent-link">源代码</a><a href="https://github.com/gongpx20069/android-agent-link/blob/main/docs/user-guide.md">使用指南</a><a href="https://github.com/gongpx20069/android-agent-link/issues">问题反馈</a></div><div><strong>探索</strong><a href="../">Mochi</a><a href="../#extensions">扩展能力</a></div><div><strong>语言</strong><a href="../../agentlink/" lang="en">English</a><a href="./">简体中文</a></div></div></div>
+      <div class="shell footer-bottom"><span>© <span data-year></span> AgentLink contributors</span><span>独立配套产品，在 Mochi 官网认识它。</span></div>
+    </footer>
+  </body>
+</html>

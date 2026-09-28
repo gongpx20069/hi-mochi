@@ -77,6 +77,21 @@ const updateLatestRelease = async () => {
     throw new Error("GitHub returned an unexpected release URL");
   }
 
+  const extensionNames = { mijia: "Mijia", termux: "Termux" };
+  const extensionDownloads = [...document.querySelectorAll("[data-extension-download]")].map((link) => {
+    const name = extensionNames[link.dataset.extensionDownload];
+    const filename = `Mochi-${name}-Extension-${version}.apk`;
+    const extension = release.assets.find((item) => item.name === filename);
+    const url = extension && trustedReleaseUrl(
+      extension.browser_download_url,
+      `${releasePath}download/${version}/${filename}`,
+    );
+    if (!url) {
+      throw new Error(`GitHub release ${version} has no trusted ${name} extension`);
+    }
+    return { link, url };
+  });
+
   document.querySelectorAll("[data-release-version]").forEach((element) => {
     element.textContent = version;
   });
@@ -86,11 +101,16 @@ const updateLatestRelease = async () => {
   document.querySelectorAll("[data-release-download]").forEach((element) => {
     element.href = downloadUrl;
   });
+  extensionDownloads.forEach(({ link, url }) => {
+    link.href = url;
+  });
 };
 
-updateLatestRelease().catch((error) => {
-  console.warn("Using the bundled release fallback.", error);
-});
+if (document.querySelector("[data-release-download]")) {
+  updateLatestRelease().catch((error) => {
+    console.warn("Using the bundled release fallback.", error);
+  });
+}
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const revealItems = document.querySelectorAll(".reveal");
