@@ -144,6 +144,15 @@ with transient speech audio focus; it does not change system volume levels.
 
 ## Install on a device
 
+Document Tool catalog acceptance is an opt-in test:
+build `:app:assembleDebugAndroidTest`, update the matching-signed app/test APKs
+with `adb install -r`, then run
+`adb shell am instrument -w -e class com.example.mochi_pet.core.tools.DocumentToolCatalogDiagnosticTest -e mochiDocumentToolDiagnostic true com.example.mochi_pet.test/androidx.test.runner.AndroidJUnitRunner`.
+It applies the normal local default-policy migration and may rediscover schemas
+using saved authorization. It never calls document read/write Tools, and logs
+only built-in provider IDs, Tool names and enabled flags to `MochiDocumentTools`,
+not tokens, document content or account information.
+
 Mi Home television capability inspection is an explicit read-only device test:
 build `:extensions:mijia:assembleDebugAndroidTest`, install the matching-signed
 test APK with `adb install -r`, then run

@@ -733,6 +733,8 @@ private val ZH_UI_TEXT = mapOf(
     "Copy your personal Tencent Docs MCP token" to "复制你的腾讯文档 MCP 个人令牌",
     "Tencent Docs knowledge tools connected" to "腾讯文档知识工具已连接",
     "Tencent Docs disconnected" to "腾讯文档已断开",
+    "Tencent Docs tools could not be refreshed. Check the connection and reopen Tools." to
+        "无法刷新腾讯文档工具。请检查连接，然后重新打开 Tools。",
     "Create an Amap Web Service Key" to "创建高德 Web 服务 Key",
     "Amap connected. Travel Planning and Merchant Discovery are ready." to
         "高德地图已连接。出行规划和商家发现 Skills 已可使用。",

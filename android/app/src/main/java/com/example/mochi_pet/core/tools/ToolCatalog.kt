@@ -15,6 +15,7 @@ import com.example.mochi_pet.core.extensions.ExtensionToolScope
 import com.example.mochi_pet.core.extensions.UnavailableExtensionClient
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpAgentTool
+import com.example.mochi_pet.core.mcp.McpException
 import com.example.mochi_pet.core.mcp.McpRemoteTool
 import com.example.mochi_pet.core.mcp.McpServerRuntime
 import com.example.mochi_pet.core.mcp.McpStreamableHttpClient
@@ -26,6 +27,7 @@ import com.example.mochi_pet.core.mcp.mcpToolAlias
 import com.example.mochi_pet.core.settings.ApiKeyCipher
 import com.example.mochi_pet.core.settings.EncryptedSecret
 import com.example.mochi_pet.core.skills.SkillReadiness
+import com.example.mochi_pet.core.skills.satisfiedSkillTools
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -35,6 +37,8 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -155,7 +159,7 @@ fun ToolCatalogSummary.skillReadiness(
     val readyToolNames = readyToolNames()
     return SkillReadiness(
         requiredTools = requiredToolNames,
-        readyTools = requiredToolNames.intersect(readyToolNames),
+        readyTools = satisfiedSkillTools(requiredToolNames, readyToolNames),
         requirements = requiredToolNames
             .groupBy { skillRequirementName(it) }
             .mapValues { (_, tools) -> tools.toSet() },
@@ -354,6 +358,7 @@ class DataStoreToolCatalogRepository(
     private val termuxRuntime: com.example.mochi_pet.core.extensions.TermuxRuntimeState =
         com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
 ) : ToolCatalogRepository {
+    private val tencentCatalogMutex = Mutex()
     private val json = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
@@ -361,11 +366,12 @@ class DataStoreToolCatalogRepository(
     }
 
     override suspend fun loadSummary(): ToolCatalogSummary {
-        repairTruncatedTencentDocsCatalog()
+        val refreshFailed = refreshTencentDocsCatalog()
         updateCatalog { it }
         val catalog = loadCatalog()
         val termux = termuxClient.snapshot()
         return catalog.toSummary(extensionClient.snapshot()).copy(
+            feedback = if (refreshFailed) TENCENT_CATALOG_REFRESH_ERROR else null,
             agentLink = agentLinkClient?.refresh() ?: AgentLinkState(),
             termux = ExtensionProviderSummary(
                 installed = termux.installed,
@@ -580,6 +586,7 @@ class DataStoreToolCatalogRepository(
                         server.copy(
                             enabled = true,
                             accessToken = encrypt(normalized),
+                            toolSelectionVersion = TENCENT_DOCS_CATALOG_VERSION,
                             toolDefaultsVersion =
                                 BUILT_IN_TOOL_DEFAULTS_VERSION,
                             tools = tools.map { tool ->
@@ -891,6 +898,7 @@ class DataStoreToolCatalogRepository(
                         server.copy(
                             enabled = true,
                             accessToken = encrypt(providers.tencentDocs.token),
+                            toolSelectionVersion = TENCENT_DOCS_CATALOG_VERSION,
                             toolDefaultsVersion =
                                 BUILT_IN_TOOL_DEFAULTS_VERSION,
                             tools = importedTencent,
@@ -1196,20 +1204,19 @@ class DataStoreToolCatalogRepository(
                 }
             }
 
-    private suspend fun repairTruncatedTencentDocsCatalog() {
+    private suspend fun refreshTencentDocsCatalog(): Boolean = tencentCatalogMutex.withLock {
         val catalog = loadCatalog().withBuiltInServers()
         val server = catalog.servers.firstOrNull {
                 it.id == TENCENT_DOCS_SERVER_ID
-            } ?: return
+            } ?: return@withLock false
         if (
-            !server.isConnected() ||
-                server.tools.size < LEGACY_MAX_DISCOVERED_TOOLS ||
-                server.hasTencentDocsReadTools()
+            !server.enabled || !server.isConnected() ||
+                server.toolSelectionVersion >= TENCENT_DOCS_CATALOG_VERSION
         ) {
-            return
+            return@withLock false
         }
-        val token = server.accessToken?.let(::decrypt) ?: return
-        val discovered = runCatching {
+        val token = server.accessToken?.let(::decrypt) ?: return@withLock false
+        val discovered = try {
             mcpClient.listTools(
                 McpServerRuntime(
                     id = server.id,
@@ -1219,19 +1226,28 @@ class DataStoreToolCatalogRepository(
                     authorizationHeader = token,
                 ),
             ).let(::selectTencentDocsTools)
-        }.getOrNull() ?: return
+        } catch (error: McpException) {
+            return@withLock true
+        } catch (error: IOException) {
+            return@withLock true
+        }
         updateCatalog { existing ->
             val current = existing.withBuiltInServers()
             current.copy(
                 servers = current.servers.map { item ->
-                    if (item.id == TENCENT_DOCS_SERVER_ID) {
+                    if (item.id == TENCENT_DOCS_SERVER_ID && item.enabled &&
+                        item.accessToken == server.accessToken &&
+                        item.toolSelectionVersion < TENCENT_DOCS_CATALOG_VERSION
+                    ) {
+                        val previous = item.tools.associateBy { it.definition.name }
                         item.copy(
+                            toolSelectionVersion = TENCENT_DOCS_CATALOG_VERSION,
                             tools = discovered.map { tool ->
                                 PersistedMcpTool(
                                     definition =
                                         tool.withTencentEnglishDescription(),
-                                    enabled =
-                                        tool.name in DEFAULT_TENCENT_DOCS_TOOLS,
+                                    enabled = previous[tool.name]?.enabled
+                                        ?: (tool.name in DEFAULT_TENCENT_DOCS_TOOLS),
                                 )
                             },
                         )
@@ -1241,6 +1257,7 @@ class DataStoreToolCatalogRepository(
                 },
             )
         }
+        false
     }
 
     private suspend fun runtimeServer(id: String): McpServerRuntime? {
@@ -1534,13 +1551,6 @@ class DataStoreToolCatalogRepository(
             -> accessToken != null
         }
 
-    private fun PersistedMcpServer.hasTencentDocsReadTools(): Boolean {
-        val names = tools.mapTo(mutableSetOf()) { it.definition.name }
-        return "query_space_node" in names &&
-            "get_content" in names &&
-            TENCENT_DOCS_SEARCH_TOOLS.any(names::contains)
-    }
-
     private fun encrypt(value: String): StoredSecret =
         secretCipher.encrypt(value).let {
             StoredSecret(ciphertext = it.ciphertext, iv = it.iv)
@@ -1830,6 +1840,7 @@ private data class PersistedMcpServer(
     val oauthClientSecret: StoredSecret? = null,
     val oauthTokenEndpoint: String? = null,
     val toolDefaultsVersion: Int = 0,
+    val toolSelectionVersion: Int = 0,
     val tools: List<PersistedMcpTool> = emptyList(),
 )
 
@@ -2067,8 +2078,18 @@ private fun BuiltInToolDescriptor.isAgentBrowserTool(): Boolean =
 private val DEFAULT_NOTION_TOOLS = setOf(
     "notion-search",
     "notion-fetch",
+    "notion-get-tool-access",
     "notion-create-pages",
     "notion-update-page",
+    "notion-move-pages",
+    "notion-duplicate-page",
+    "notion-create-folder",
+    "notion-create-database",
+    "notion-update-data-source",
+    "notion-create-view",
+    "notion-update-view",
+    "notion-query-data-sources",
+    "notion-get-async-task",
 )
 private val READ_ONLY_NOTION_TOOLS = setOf(
     "notion-search",
@@ -2079,6 +2100,46 @@ private val DEFAULT_TENCENT_DOCS_TOOLS = setOf(
     "search_space_file",
     "manage.search_file",
     "get_content",
+    "manage.query_folder_meta",
+    "manage.create_file",
+    "create_space_node",
+    "delete_space_node",
+    "create_smartcanvas_by_markdown",
+    "create_word_by_markdown",
+    "create_excel_by_markdown",
+    "create_slide_by_markdown",
+    "create_mind_by_markdown",
+    "create_flowchart_by_mermaid",
+    "smartcanvas.get_top_level_pages",
+    "smartcanvas.get_page_info",
+    "smartcanvas.get_element_info",
+    "smartcanvas.find",
+    "smartcanvas.create_smartcanvas_element",
+    "smartcanvas.append_insert_smartcanvas_by_markdown",
+    "smartcanvas.update_element",
+    "smartcanvas.delete_element",
+    "doc.resolve_document_structure",
+    "doc.get_last_operable_pos",
+    "doc.insert_paragraph_with_text",
+    "doc.find_and_replace",
+    "doc.insert_image",
+    "doc.get_images",
+    "doc.insert_code_block",
+    "sheet.get_sheet_info",
+    "sheet.get_cell_data",
+    "sheet.operation_sheet",
+    "batch_update_sheet_range",
+    "smartsheet.list_tables",
+    "smartsheet.list_fields",
+    "smartsheet.list_records",
+    "smartsheet.add_fields",
+    "smartsheet.add_records",
+    "smartsheet.update_records",
+    "smartsheet.delete_records",
+    "smartsheet.add_view",
+    "slide_get_page_info",
+    "slide_find_text",
+    "slide_append_text",
 )
 private val READ_ONLY_TENCENT_DOCS_TOOLS = setOf(
     "query_space_node",
@@ -2090,50 +2151,21 @@ private val READ_ONLY_TENCENT_DOCS_TOOLS = setOf(
     "slide_get_page_info",
     "slide_find_text",
 )
-private val TENCENT_DOCS_SEARCH_TOOLS = setOf(
-    "search_space_file",
-    "manage.search_file",
-)
-private const val LEGACY_MAX_DISCOVERED_TOOLS = 64
-private const val MAX_VISIBLE_TENCENT_DOCS_TOOLS = 32
-private val TENCENT_DOCS_TOOL_PRIORITY = listOf(
-    "query_space_node",
-    "search_space_file",
-    "manage.search_file",
-    "get_content",
-    "manage.query_folder_meta",
-    "manage.create_file",
+private val TENCENT_DOCS_TOOL_PRIORITY = DEFAULT_TENCENT_DOCS_TOOLS.toList() + listOf(
     "manage.export_file",
     "manage.get_privilege",
     "manage.set_privilege",
-    "create_smartcanvas_by_markdown",
-    "smartcanvas.find",
-    "smartcanvas.append_insert_smartcanvas_by_markdown",
-    "smartcanvas.update_element",
-    "doc.resolve_document_structure",
-    "doc.get_last_operable_pos",
-    "doc.insert_paragraph_with_text",
-    "doc.find_and_replace",
-    "doc.insert_image",
-    "doc.get_images",
     "doc.get_comments",
-    "doc.insert_code_block",
     "doc.compare_documents",
-    "sheet.get_sheet_info",
-    "sheet.get_cell_data",
-    "sheet.operation_sheet",
     "sheet.set_link",
     "sheet.set_freeze",
-    "smartsheet.list_fields",
-    "smartsheet.update_records",
-    "slide_get_page_info",
-    "slide_find_text",
-    "slide_append_text",
-    "ocr.extract",
 )
 private val TENCENT_DOCS_TOOL_PRIORITY_INDEX =
     TENCENT_DOCS_TOOL_PRIORITY.withIndex().associate { it.value to it.index }
-private const val BUILT_IN_TOOL_DEFAULTS_VERSION = 2
+private const val BUILT_IN_TOOL_DEFAULTS_VERSION = 3
+private const val TENCENT_DOCS_CATALOG_VERSION = 1
+private const val TENCENT_CATALOG_REFRESH_ERROR =
+    "Tencent Docs tools could not be refreshed. Check the connection and reopen Tools."
 private val TENCENT_DOCS_TOOL_DESCRIPTIONS = mapOf(
     "query_space_node" to
         "List files and folders in a Tencent Docs workspace.",
@@ -2177,31 +2209,8 @@ private fun selectTencentDocsTools(
     tools: List<McpRemoteTool>,
 ): List<McpRemoteTool> =
     tools.distinctBy(McpRemoteTool::name)
-        .sortedWith(
-            compareBy<McpRemoteTool> {
-                TENCENT_DOCS_TOOL_PRIORITY_INDEX[it.name] ?: Int.MAX_VALUE
-            }.thenByDescending { it.tencentDocsImportance() }
-                .thenBy(McpRemoteTool::name),
-        )
-        .take(MAX_VISIBLE_TENCENT_DOCS_TOOLS)
-
-private fun McpRemoteTool.tencentDocsImportance(): Int {
-    val normalized = name.lowercase()
-    return when {
-        normalized.contains("search") -> 90
-        normalized.contains("query") ||
-            normalized.contains("list") ||
-            normalized.contains("get_") ||
-            normalized.contains(".get") -> 80
-        normalized.contains("create") -> 70
-        normalized.contains("update") ||
-            normalized.contains("insert") ||
-            normalized.contains("append") -> 60
-        normalized.contains("find") -> 50
-        normalized.contains("export") -> 40
-        else -> 0
-    }
-}
+        .filter { it.name in TENCENT_DOCS_TOOL_PRIORITY_INDEX }
+        .sortedBy { TENCENT_DOCS_TOOL_PRIORITY_INDEX.getValue(it.name) }
 
 private fun String.toEnglishToolLabel(): String =
     replace('.', ' ')

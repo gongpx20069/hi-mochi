@@ -76,6 +76,84 @@ Both child roles can additionally receive `termux_exec` and `termux_task`
 when the Termux provider is connected and enabled and the individual Tools
 are enabled. No other extension or companion provider gains child access.
 
+### Document-provider defaults
+
+Connecting Notion or Tencent Docs enables the discovered Tools in the exact
+allowlists below. These defaults cover document/spreadsheet operations, not
+sharing, permission changes, membership, comments, or remote Agent execution.
+Unrecognized Tools remain off; never enable a name merely because it starts
+with a provider prefix or has a remote read-only annotation. Availability and
+supported operations always come from that connection's actual MCP schemas.
+
+Notion defaults:
+
+| Purpose | Remote Tool names |
+| --- | --- |
+| Find, read, check access | `notion-search`, `notion-fetch`, `notion-get-tool-access` |
+| Create/edit pages | `notion-create-pages`, `notion-update-page` |
+| Organize/copy | `notion-create-folder`, `notion-move-pages`, `notion-duplicate-page` |
+| Databases and views | `notion-create-database`, `notion-update-data-source`, `notion-query-data-sources`, `notion-create-view`, `notion-update-view` |
+| Confirm async writes | `notion-get-async-task` |
+
+The [official Notion MCP tool list](https://developers.notion.com/guides/mcp/mcp-supported-tools)
+does not advertise a standalone whole-page deletion Tool. Do not invent one or
+claim that page updates can trash/archive a page unless the discovered schema
+explicitly supports it. Removing content is not the same as deleting its page.
+For asynchronous writes, consume the returned task status with its backoff
+instead of repeating the write or treating submission as completion.
+
+Tencent Docs has 51 selected candidate names: the following 44 default-enabled
+document Tools and seven optional Tools. Only actual discovered schemas appear.
+
+| Purpose | Remote Tool names |
+| --- | --- |
+| Find/read | `query_space_node`, `search_space_file`, `manage.search_file`, `get_content`, `manage.query_folder_meta` |
+| Create/delete files | `manage.create_file`, `create_space_node`, `delete_space_node` |
+| Create document formats | `create_smartcanvas_by_markdown`, `create_word_by_markdown`, `create_excel_by_markdown`, `create_slide_by_markdown`, `create_mind_by_markdown`, `create_flowchart_by_mermaid` |
+| Smart Canvas structure | `smartcanvas.get_top_level_pages`, `smartcanvas.get_page_info`, `smartcanvas.get_element_info`, `smartcanvas.find` |
+| Smart Canvas edits | `smartcanvas.create_smartcanvas_element`, `smartcanvas.append_insert_smartcanvas_by_markdown`, `smartcanvas.update_element`, `smartcanvas.delete_element` |
+| Document structure | `doc.resolve_document_structure`, `doc.get_last_operable_pos`, `doc.get_images` |
+| Document edits | `doc.insert_paragraph_with_text`, `doc.find_and_replace`, `doc.insert_image`, `doc.insert_code_block` |
+| Spreadsheets | `sheet.get_sheet_info`, `sheet.get_cell_data`, `sheet.operation_sheet`, `batch_update_sheet_range` |
+| SmartSheet structure | `smartsheet.list_tables`, `smartsheet.list_fields`, `smartsheet.add_fields`, `smartsheet.add_view` |
+| SmartSheet records | `smartsheet.list_records`, `smartsheet.add_records`, `smartsheet.update_records`, `smartsheet.delete_records` |
+| Slides | `slide_get_page_info`, `slide_find_text`, `slide_append_text` |
+
+The seven default-off candidates are `manage.export_file`, `manage.get_privilege`,
+`manage.set_privilege`, `doc.get_comments`, `doc.compare_documents`,
+`sheet.set_link`, and `sheet.set_freeze`. Selection is limited to these 51 names,
+not every Tool advertised by Tencent Docs. The default-enabled candidates sort
+first; duplicates and unknown names do not consume additional slots.
+File/element deletion requires explicit user intent and exact targets.
+Recursive `delete_space_node(remove_type=all)` requires explicit recursive
+intent; a request to delete one document must not expand to its descendants.
+
+Default policy version 3 resets existing connected built-in providers' child
+switches once, preserving credentials and master switches. Tencent catalog
+selection version 1 rediscovers enabled old connections once to replace the
+previously truncated catalog with the available subset of these 51 candidates.
+Disabled connections wait until enabled. Failed discovery keeps cached Tools,
+shows a localized Tools notice, and can be retried by reopening Tools.
+Cancellation propagates; stale discovery cannot restore a disconnected or
+reconfigured connection. This migration never reads or writes user documents.
+Subsequent individual switch changes persist across reloads and master toggles.
+Explicit shared-provider imports retain their selected switches. These expanded
+defaults do not expand the read-only Subagent allowlists or enable any Skill.
+
+The Tencent Docs Skill begins with global search and directory browsing, including
+scope discovery, pagination, deduplication and honest partial-coverage reporting.
+Its search requirement accepts either enabled `manage.search_file` or
+`search_space_file`; discovery, UI readiness and Skill loading use the same rule
+without inventing an executable alias. Browsing and content-read Tools remain
+required. Each document type has separate create/read/update/delete guidance:
+Smart Canvas resolves page/element IDs; Word uses document structure; ordinary
+spreadsheets resolve sheets/ranges; SmartSheet resolves field/record IDs; PPT
+distinguishes creation/append from unsupported arbitrary edits. Whole-file
+deletion is separate from deleting content, records or worksheets. Writes use
+targeted readback where possible and never replay solely to check their outcome.
+The Skill cannot grant unavailable APIs or claim full global search when the
+connection cannot discover/access all requested scopes.
+
 ## 1.1 AgentLink companion provider
 
 Exactly three application-defined schemas are registered:

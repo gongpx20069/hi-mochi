@@ -22,6 +22,7 @@ import com.example.mochi_pet.core.extensions.TrustedExtension
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.maps.AmapCredentials
 import com.example.mochi_pet.core.mcp.McpRemoteTool
+import com.example.mochi_pet.core.mcp.McpException
 import com.example.mochi_pet.core.mcp.McpServerRuntime
 import com.example.mochi_pet.core.mcp.NOTION_SERVER_ID
 import com.example.mochi_pet.core.mcp.McpStreamableHttpClient
@@ -32,6 +33,7 @@ import java.io.File
 import java.time.LocalDate
 import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -40,6 +42,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
@@ -388,7 +391,7 @@ class ToolCatalogTest {
     }
 
     @Test
-    fun `Tencent Docs token discovers and selects knowledge tools`() =
+    fun `Tencent Docs token enables document writes and deletion by default`() =
         runBlocking {
             val initial = repository.loadSummary().servers.first {
                 it.id == TENCENT_DOCS_SERVER_ID
@@ -415,12 +418,12 @@ class ToolCatalogTest {
                     it.remoteName == "search_space_file"
                 }.enabled,
             )
-            assertFalse(
+            assertTrue(
                 server.tools.first {
                     it.remoteName == "smartcanvas.update_element"
                 }.enabled,
             )
-            assertFalse(
+            assertTrue(
                 server.tools.first {
                     it.remoteName == "delete_space_node"
                 }.enabled,
@@ -439,7 +442,7 @@ class ToolCatalogTest {
         }
 
     @Test
-    fun `Tencent Docs catalog keeps only the 32 most important tools`() =
+    fun `Tencent Docs catalog excludes unknown tools instead of filling arbitrary slots`() =
         runBlocking {
             client.tools = buildList {
                 repeat(40) { index ->
@@ -453,7 +456,7 @@ class ToolCatalogTest {
             val server = repository.configureTencentDocs("personal-token")
                 .servers.first { it.id == TENCENT_DOCS_SERVER_ID }
 
-            assertEquals(32, server.tools.size)
+            assertEquals(3, server.tools.size)
             assertTrue(
                 server.tools.any {
                     it.remoteName == "manage.search_file" && it.enabled
@@ -470,6 +473,138 @@ class ToolCatalogTest {
                 },
             )
         }
+
+    @Test
+    fun `document defaults cover common operations but not sharing members or arbitrary tools`() = runBlocking {
+        for ((id, defaults, excluded) in listOf(
+            Triple(TENCENT_DOCS_SERVER_ID, tencentDocumentDefaults,
+                setOf("manage.set_privilege", "manage.get_privilege", "manage.add_member", "unknown_create_file")),
+            Triple(NOTION_SERVER_ID, notionDocumentDefaults,
+                setOf("notion-get-users", "notion-get-teams", "notion-create-comment", "notion-spawn-session", "notion-delete-page")),
+        )) {
+            client.tools = (defaults + excluded).map { McpRemoteTool(it) }
+            if (id == TENCENT_DOCS_SERVER_ID) {
+                val fresh = repository.configureTencentDocs("fixture-token").servers.single { it.id == id }
+                assertEquals(46, fresh.tools.size)
+                val retained = fresh.tools.map { it.remoteName }.toSet()
+                assertEquals(defaults.intersect(retained), fresh.tools.filter { it.enabled }.map { it.remoteName }.toSet())
+            }
+            for (batch in defaults.toList().chunked(24)) {
+                seedDocumentServer(id, batch.toSet() + excluded)
+                val server = repository.loadSummary().servers.single { it.id == id }
+                assertEquals(batch.toSet(), server.tools.filter { it.enabled }.map { it.remoteName }.toSet())
+                assertEquals(batch.toSet() + excluded, server.tools.map { it.remoteName }.toSet())
+                assertTrue(repository.loadEnabledReadOnlyMcpTools().none {
+                    it.name.contains("delete") || it.name.contains("create") ||
+                        it.name.contains("update") || it.name.contains("move") || it.name.contains("duplicate")
+                })
+            }
+        }
+    }
+
+    @Test
+    fun `legacy catalog expands once and later manual switches survive`() = runBlocking {
+        val oldTools = setOf("query_space_node", "get_content", "search_space_file", "delete_space_node") +
+            (1..28).map { "old_tool_$it" }
+        seedDocumentServer(TENCENT_DOCS_SERVER_ID, oldTools, selectionVersion = 0)
+        client.tools = (tencentDocumentDefaults + oldTools).map { McpRemoteTool(it) }
+        val upgraded = repository.loadSummary().servers.single { it.id == TENCENT_DOCS_SERVER_ID }
+        assertEquals(tencentDocumentDefaults, upgraded.tools.map { it.remoteName }.toSet())
+        assertEquals(tencentDocumentDefaults, upgraded.tools.filter { it.enabled }.map { it.remoteName }.toSet())
+        assertEquals(1, client.listCalls)
+        repository.setMcpToolEnabled(TENCENT_DOCS_SERVER_ID, "delete_space_node", false)
+        repository.setServerEnabled(TENCENT_DOCS_SERVER_ID, false)
+        val restored = repository.setServerEnabled(TENCENT_DOCS_SERVER_ID, true)
+        assertFalse(restored.servers.single { it.id == TENCENT_DOCS_SERVER_ID }
+            .tools.single { it.remoteName == "delete_space_node" }.enabled)
+        assertEquals(1, client.listCalls)
+        val persisted = dataStore.data.first()[stringPreferencesKey("tools.catalog")].orEmpty()
+        assertTrue(persisted.contains("\"toolDefaultsVersion\":3"))
+        assertTrue(persisted.contains("\"toolSelectionVersion\":1"))
+    }
+
+    @Test
+    fun `51 candidates preserve original 32 tools and enable exactly 44 document tools`() = runBlocking {
+        val original = listOf(
+            "query_space_node", "search_space_file", "manage.search_file", "get_content",
+            "manage.query_folder_meta", "manage.create_file", "manage.export_file",
+            "manage.get_privilege", "manage.set_privilege", "create_smartcanvas_by_markdown",
+            "smartcanvas.find", "smartcanvas.append_insert_smartcanvas_by_markdown", "smartcanvas.update_element",
+            "doc.resolve_document_structure", "doc.get_last_operable_pos", "doc.insert_paragraph_with_text",
+            "doc.find_and_replace", "doc.insert_image", "doc.get_images", "doc.get_comments",
+            "doc.insert_code_block", "doc.compare_documents", "sheet.get_sheet_info", "sheet.get_cell_data",
+            "sheet.operation_sheet", "sheet.set_link", "sheet.set_freeze", "smartsheet.list_fields",
+            "smartsheet.update_records", "slide_get_page_info", "slide_find_text", "slide_append_text",
+        )
+        client.tools = (tencentDocumentDefaults + original + listOf("ocr.extract")).reversed().map { McpRemoteTool(it) }
+        val server = repository.configureTencentDocs("fixture-token").servers.single { it.id == TENCENT_DOCS_SERVER_ID }
+        assertEquals(51, server.tools.size)
+        assertEquals(tencentDocumentDefaults + original, server.tools.map { it.remoteName }.toSet())
+        assertEquals(7, server.tools.count { !it.enabled })
+        assertEquals(tencentDocumentDefaults,
+            server.tools.filter { it.enabled }.map { it.remoteName }.toSet())
+    }
+
+    @Test
+    fun `Tencent Skill readiness accepts either enabled search alias but requires search and browsing`() = runBlocking {
+        val required = setOf("tencent_docs_manage_search_file", "tencent_docs_query_space_node", "tencent_docs_get_content")
+        for (search in listOf("search_space_file", "manage.search_file")) {
+            client.tools = listOf(search, "query_space_node", "get_content").map { McpRemoteTool(it) }
+            assertTrue(repository.configureTencentDocs("fixture-token").skillReadiness(required).isReady)
+            assertFalse(repository.setMcpToolEnabled(TENCENT_DOCS_SERVER_ID, search, false).skillReadiness(required).isReady)
+            repository.setMcpToolEnabled(TENCENT_DOCS_SERVER_ID, search, true)
+            assertFalse(repository.setMcpToolEnabled(TENCENT_DOCS_SERVER_ID, "query_space_node", false).skillReadiness(required).isReady)
+        }
+    }
+
+    @Test
+    fun `failed catalog expansion is visible retryable and cancellation propagates`() = runBlocking {
+        seedDocumentServer(TENCENT_DOCS_SERVER_ID, setOf("get_content"), selectionVersion = 0)
+        client.listFailure = McpException("Offline")
+        val failed = repository.loadSummary()
+        assertTrue(failed.feedback.orEmpty().contains("could not be refreshed"))
+        assertEquals(1, failed.servers.single { it.id == TENCENT_DOCS_SERVER_ID }.tools.size)
+        client.listFailure = CancellationException("Stopped")
+        assertThrows(CancellationException::class.java) {
+            runBlocking { repository.loadSummary() }
+        }
+        client.listFailure = null
+        val recovered = repository.loadSummary()
+        assertNull(recovered.feedback)
+        assertTrue(recovered.servers.single { it.id == TENCENT_DOCS_SERVER_ID }
+            .tools.single { it.remoteName == "delete_space_node" }.enabled)
+        assertEquals(3, client.listCalls)
+    }
+
+    private suspend fun seedDocumentServer(
+        id: String,
+        tools: Set<String>,
+        enabled: Boolean = true,
+        selectionVersion: Int = 1,
+    ) {
+        val server = buildJsonObject {
+            put("id", id)
+            put("name", if (id == NOTION_SERVER_ID) "Notion" else "Tencent Docs")
+            put("endpoint", if (id == NOTION_SERVER_ID) "https://mcp.notion.com/mcp" else "https://mcp.docs.qq.com/mcp")
+            put("builtIn", true)
+            put("enabled", enabled)
+            put("authMode", if (id == NOTION_SERVER_ID) "OAUTH" else "TOKEN")
+            put("accessToken", buildJsonObject { put("ciphertext", "fixture-token"); put("iv", "test") })
+            put("toolDefaultsVersion", 2)
+            put("toolSelectionVersion", selectionVersion)
+            put("tools", JsonArray(tools.map { name ->
+                buildJsonObject {
+                    put("definition", buildJsonObject { put("name", name) })
+                    put("enabled", name == "manage.set_privilege")
+                }
+            }))
+        }
+        dataStore.edit {
+            it[stringPreferencesKey("tools.catalog")] = buildJsonObject {
+                put("servers", JsonArray(listOf(server)))
+            }.toString()
+        }
+    }
 
     @Test
     fun `Amap credentials configure and disable provider`() = runBlocking {
@@ -534,7 +669,8 @@ class ToolCatalogTest {
             assertEquals("map-key", shared.amap?.credentials?.webServiceKey)
             assertEquals("personal-token", shared.tencentDocs?.token)
             assertEquals(
-                setOf("get_content", "query_space_node", "search_space_file"),
+                setOf("get_content", "query_space_node", "search_space_file",
+                    "smartcanvas.update_element", "delete_space_node"),
                 shared.tencentDocs?.enabledToolNames,
             )
             assertEquals(
@@ -691,11 +827,15 @@ class ToolCatalogTest {
 private class RecordingMcpClient : McpStreamableHttpClient() {
     var runtime: McpServerRuntime? = null
     var tools: List<McpRemoteTool>? = null
+    var listCalls = 0
+    var listFailure: Exception? = null
 
     override suspend fun listTools(
         server: McpServerRuntime,
     ): List<McpRemoteTool> {
         runtime = server
+        listCalls++
+        listFailure?.let { throw it }
         return tools ?: listOf(
             McpRemoteTool(
                 name = "query_space_node",
@@ -707,8 +847,32 @@ private class RecordingMcpClient : McpStreamableHttpClient() {
             McpRemoteTool("delete_space_node"),
         )
     }
+
 }
 
+private val notionDocumentDefaults = setOf(
+        "notion-search", "notion-fetch", "notion-get-tool-access",
+        "notion-create-pages", "notion-update-page", "notion-move-pages",
+        "notion-duplicate-page", "notion-create-folder", "notion-create-database",
+        "notion-update-data-source", "notion-create-view", "notion-update-view",
+        "notion-query-data-sources", "notion-get-async-task",
+    )
+
+private val tencentDocumentDefaults = setOf(
+        "query_space_node", "search_space_file", "manage.search_file", "get_content",
+        "manage.query_folder_meta", "manage.create_file", "create_space_node", "delete_space_node",
+        "create_smartcanvas_by_markdown", "create_word_by_markdown", "create_excel_by_markdown",
+        "create_slide_by_markdown", "create_mind_by_markdown", "create_flowchart_by_mermaid",
+        "smartcanvas.get_top_level_pages", "smartcanvas.get_page_info", "smartcanvas.get_element_info",
+        "smartcanvas.find", "smartcanvas.create_smartcanvas_element",
+        "smartcanvas.append_insert_smartcanvas_by_markdown", "smartcanvas.update_element", "smartcanvas.delete_element",
+        "doc.resolve_document_structure", "doc.get_last_operable_pos", "doc.insert_paragraph_with_text",
+        "doc.find_and_replace", "doc.insert_image", "doc.get_images", "doc.insert_code_block",
+        "sheet.get_sheet_info", "sheet.get_cell_data", "sheet.operation_sheet", "batch_update_sheet_range",
+        "smartsheet.list_tables", "smartsheet.list_fields", "smartsheet.list_records", "smartsheet.add_fields",
+        "smartsheet.add_records", "smartsheet.update_records", "smartsheet.delete_records", "smartsheet.add_view",
+        "slide_get_page_info", "slide_find_text", "slide_append_text",
+    )
 private object PlaintextCipher : ApiKeyCipher {
     override fun encrypt(plaintext: String): EncryptedSecret =
         EncryptedSecret(ciphertext = plaintext, iv = "test")

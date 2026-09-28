@@ -182,6 +182,35 @@ class MochiDatabaseTest {
     }
 
     @Test
+    fun `Tencent Skill upgrades workflows and accepts either real search entry point`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val id = "builtin:tencent-docs-knowledge"
+        repository.setEnabled(id, true)
+        val stored = database.skillDao().listAll().single { it.id == id }
+        database.skillDao().upsert(stored.copy(content = "Old search-only guidance"))
+        val skill = repository.listSkills().single { it.id == id }
+        assertTrue(skill.enabled)
+        for (section in listOf("Global search and browsing first", "Smart Canvas:", "Ordinary documents:",
+            "Ordinary spreadsheets", "SmartSheet:", "Presentations:", "Whole-file deletion and result checks")) {
+            assertTrue(section, skill.content.contains(section))
+        }
+        assertTrue(skill.content.contains("remove_type=all"))
+        assertTrue(skill.content.contains("not proof of deletion"))
+        assertFalse(skill.content.contains("Old search-only guidance"))
+        for (search in listOf("tencent_docs_manage_search_file", "tencent_docs_search_space_file")) {
+            val available = setOf(search, "tencent_docs_query_space_node", "tencent_docs_get_content")
+            assertTrue(skill.readiness(available).isReady)
+            assertTrue(repository.listEnabledMetadata(available).any { it.name == "tencent-docs-knowledge" })
+            val arguments = buildJsonObject { put("skill_name", "tencent-docs-knowledge") }
+            val context = ToolExecutionContext(LocalDate.of(2026, 1, 1), MochiSurface.Face)
+            assertEquals("ok", LoadSkillTool(repository, available).execute(arguments, context).status)
+            assertFalse(skill.readiness(available - search).isReady)
+            assertFalse(repository.listEnabledMetadata(available - search).any { it.name == "tencent-docs-knowledge" })
+            assertEquals("error", LoadSkillTool(repository, available - search).execute(arguments, context).status)
+        }
+    }
+
+    @Test
     fun `built in skills persist enablement with knowledge providers disabled`() =
         runBlocking {
             val repository = RoomSkillRepository(database.skillDao())
