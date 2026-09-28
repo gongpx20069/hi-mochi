@@ -10,6 +10,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 class MiotRepository(
@@ -78,7 +79,7 @@ class MiotRepository(
     suspend fun getProperties(
         device: MijiaDevice,
         properties: List<MiotPropertyReference>,
-    ): Map<MiotPropertyReference, JsonElement?> {
+    ): Map<MiotPropertyReference, MiotPropertyResult> {
         if (properties.isEmpty()) return emptyMap()
         val session = ensureRegion()
         val response = post(
@@ -99,15 +100,7 @@ class MiotRepository(
                 )
             },
         )
-        val results = response.resultArray()
-        return properties.mapIndexed { index, property ->
-            val item = results.getOrNull(index)?.jsonObject
-                ?: throw MijiaProviderException(
-                    "Mi Home omitted a property result.",
-                )
-            val code = item["code"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1
-            property to if (code == 0) item["value"] else null
-        }.toMap()
+        return parsePropertyResults(device.id, properties, response.resultArray())
     }
 
     suspend fun setProperty(
@@ -348,6 +341,33 @@ class MiotRepository(
         val REGIONS = listOf("cn", "de", "sg", "us", "ru", "i2", "tw")
     }
 }
+
+data class MiotPropertyResult(val code: Int, val value: JsonElement?)
+
+internal fun parsePropertyResults(
+    deviceId: String,
+    properties: List<MiotPropertyReference>,
+    results: JsonArray,
+): Map<MiotPropertyReference, MiotPropertyResult> =
+    properties.associateWith { property ->
+        val matches = results.filter { element ->
+            val item = element as? JsonObject ?: return@filter false
+            (item["did"] as? JsonPrimitive)?.content == deviceId &&
+                (item["siid"] as? JsonPrimitive)?.intOrNull == property.serviceId &&
+                (item["piid"] as? JsonPrimitive)?.intOrNull == property.propertyId
+        }
+        if (matches.size != 1) {
+            throw MijiaProviderException("Mi Home omitted or duplicated a property result.")
+        }
+        val item = matches.single().jsonObject
+        val code = (item["code"] as? JsonPrimitive)?.intOrNull
+            ?: throw MijiaProviderException("Mi Home omitted a property status.")
+        val value = item["value"]
+        if (code == 0 && (value == null || value == kotlinx.serialization.json.JsonNull)) {
+            throw MijiaProviderException("Mi Home omitted a successful property value.")
+        }
+        MiotPropertyResult(code, if (code == 0) value else null)
+    }
 
 data class MiotPropertyReference(
     val serviceId: Int,

@@ -172,7 +172,7 @@ class PassportQrClient(
                     }
                     .get()
                     .build(),
-            ).awaitResponse().also { response ->
+            ).awaitBufferedResponse().also { response ->
                 if (!response.isSuccessful) {
                     response.close()
                     throw MijiaProviderException(

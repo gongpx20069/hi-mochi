@@ -144,6 +144,21 @@ with transient speech audio focus; it does not change system volume levels.
 
 ## Install on a device
 
+Mi Home television capability inspection is an explicit read-only device test:
+build `:extensions:mijia:assembleDebugAndroidTest`, install the matching-signed
+test APK with `adb install -r`, then run
+`adb shell am instrument -w -e class com.example.mochi_mijia.TelevisionCapabilityDiagnosticTest -e mochiTvDiagnostic true com.example.mochi_pet.extension.mijia.test/androidx.test.runner.AndroidJUnitRunner`.
+It uses the extension's existing authorization in-process and queries selected
+televisions only. `MochiTvDiagnostic` logs public model/specification identifiers
+and capability IDs, never credentials, home names or device IDs. It also reads
+supported state to validate response identity, logging only counts/errors.
+Without the opt-in it is skipped. The ordinary diagnostic does not control a
+device. Only after explicit user authorization for a physical shutdown, add
+`-e mochiTvPowerOff <exact-model>`; this requires exactly one selected television,
+sends one power-off through the production Tool, and reports verification
+without claiming visual confirmation. Ask the user to observe whether it
+actually shuts down or only opens a menu. Never automatically repeat the write.
+
 List connected devices:
 
 ```powershell

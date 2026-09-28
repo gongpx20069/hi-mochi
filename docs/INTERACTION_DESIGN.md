@@ -199,6 +199,9 @@ fabricated percentages. Text and status badges carry meaning without color.
 Content is bounded to 680 dp and respects system insets.
 
 The overview summarizes active, attention-needed and finished records.
+Only scheduled Agent work, remote work and independent Shell tasks contribute
+cards and counters. Ordinary chat, immediate device commands and their foreground
+Subagents stay in the conversation, regardless of duration or success/failure.
 Tapping a metric filters the same list. One horizontally scrollable filter
 strip offers All, In progress, Needs attention, Schedules and Finished; task
 sources are badges, not four long repeated sections. Active work sorts first,
@@ -210,7 +213,7 @@ Each task card has one action: tap for a focused, full-height-capable detail
 sheet. Primary controls stay in its footer while output/body content scrolls;
 long Shell output must never scroll Stop or Refresh out of reach.
 Runtime-specific operations live there, normally within two taps of the
-list. Foreground/child details open conversation results and explicitly label
+list. Scheduled-run/child details open conversation results and explicitly label
 Stop parent task for children. Schedule details support Run now, Stop current
 run, and Pause future runs/Resume without visiting another page. Pausing future
 alarms does not stop a current run; past one-time schedules cannot silently

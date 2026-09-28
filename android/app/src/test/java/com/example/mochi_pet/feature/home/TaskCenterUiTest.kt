@@ -48,7 +48,7 @@ class TaskCenterUiTest {
     @After fun restore() { Locale.setDefault(locale) }
 
     @Test fun `task card opens focused details and stopping a child clearly affects its parent`() {
-        val child = AgentTaskView("child", "researcher", null, "Researcher", TaskStatus.RUNNING, Instant.EPOCH)
+        val child = AgentTaskView("child", "researcher", "schedule", "Researcher", TaskStatus.RUNNING, Instant.EPOCH)
         var stopped: AgentTaskView? = null
         render(TaskCenterUiState(), listOf(child), stop = { stopped = it })
         compose.onNodeWithText("Stop parent task").assertDoesNotExist()
@@ -98,7 +98,7 @@ class TaskCenterUiTest {
     }
 
     @Test fun `finished filter hides active cards without hiding the fixed setup entry`() {
-        val agent = AgentTaskView("active", "main", null, "Conversation", TaskStatus.RUNNING, Instant.EPOCH)
+        val agent = AgentTaskView("active", "main", "schedule", "Scheduled research", TaskStatus.RUNNING, Instant.EPOCH)
         render(TaskCenterUiState(), listOf(agent))
         compose.onNodeWithTag("task-center-list").performScrollToNode(hasText("Activity"))
         compose.onNodeWithTag("task-filter-HISTORY").performScrollTo().performClick()
@@ -123,7 +123,7 @@ class TaskCenterUiTest {
     }
 
     @Test fun `dashboard visual fixture uses real Mochi theme and no user data`() {
-        val child = AgentTaskView("fixture", "researcher", null, "Researcher", TaskStatus.RUNNING,
+        val child = AgentTaskView("fixture", "researcher", "schedule", "Researcher", TaskStatus.RUNNING,
             Instant.parse("2026-09-25T12:00:00Z"))
         val shell = TermuxTaskView("fixture-shell", ToolResultEnvelope.success(buildJsonObject {
             put("state", "succeeded")

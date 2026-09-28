@@ -93,14 +93,21 @@ class MijiaToolExecutor(
                                 put("home", device.homeName)
                                 device.roomName?.let { put("room", it) }
                                 val capabilities = runCatching {
-                                    capabilities(device).operationNames
+                                    capabilities(device)
                                 }
 
-                                capabilities.onSuccess { names ->
+                                capabilities.onSuccess { supported ->
                                     put(
                                         "operations",
-                                        JsonArray(names.map(::JsonPrimitive)),
+                                        JsonArray(supported.operationNames.map(::JsonPrimitive)),
                                     )
+                                    put("readable_state", JsonArray(supported.stateProperties.keys.map(::JsonPrimitive)))
+                                    if (device.category == MijiaDeviceCategory.TELEVISION) {
+                                        put("power_values", buildJsonArray {
+                                            if ("power" in supported.writableProperties || "turn_off" in supported.actions) add(JsonPrimitive(false))
+                                            if ("power" in supported.writableProperties || "turn_on" in supported.actions) add(JsonPrimitive(true))
+                                        })
+                                    }
                                 }.onFailure { error ->
                                     put("operations", JsonArray(emptyList()))
                                     put(
@@ -140,10 +147,16 @@ class MijiaToolExecutor(
                 "state",
                 buildJsonObject {
                     capabilities.stateProperties.forEach { (name, property) ->
-                        put(name, values[property.reference] ?: JsonNull)
+                        put(name, values[property.reference]?.value ?: JsonNull)
                     }
                 },
             )
+            put("state_errors", buildJsonObject {
+                capabilities.stateProperties.forEach { (name, property) ->
+                    val result = values.getValue(property.reference)
+                    if (result.code != 0) put(name, result.code)
+                }
+            })
         }
     }
 
@@ -163,12 +176,7 @@ class MijiaToolExecutor(
             "Use a category-specific Tool for this device."
         }
         val operation = arguments.requiredArgumentString("operation")
-        executeOperation(
-            device = device,
-            operation = operation,
-            value = arguments["value"],
-        )
-        return commandAccepted(device, operation)
+        return controlAndVerify(device, operation, arguments["value"])
     }
 
     private suspend fun controlTelevision(arguments: JsonObject): JsonObject {
@@ -179,8 +187,7 @@ class MijiaToolExecutor(
             "The selected device is not a television."
         }
         val operation = arguments.requiredArgumentString("operation")
-        executeOperation(device, operation, arguments["value"])
-        return commandAccepted(device, operation)
+        return controlAndVerify(device, operation, arguments["value"])
     }
 
     private suspend fun configureCamera(arguments: JsonObject): JsonObject {
@@ -194,16 +201,31 @@ class MijiaToolExecutor(
             "The selected device is not a camera."
         }
         val setting = arguments.requiredArgumentString("setting")
-        executeOperation(device, setting, arguments["value"])
-        return commandAccepted(device, setting)
+        return controlAndVerify(device, setting, arguments["value"])
+    }
+
+    private suspend fun controlAndVerify(
+        device: MijiaDevice,
+        operation: String,
+        value: JsonElement?,
+    ): JsonObject {
+        val supported = capabilities(device)
+        executeOperation(device, supported, operation, value)
+        val property = supported.stateProperties[
+            if (operation == "position") "current_position" else operation
+        ]
+        val verification = verifyDeviceControl(property, value, read = { reference ->
+            repository.getProperties(device, listOf(reference)).getValue(reference)
+        })
+        return commandAccepted(device, operation, verification)
     }
 
     private suspend fun executeOperation(
         device: MijiaDevice,
+        capabilities: SemanticCapabilities,
         operation: String,
         value: JsonElement?,
     ) {
-        val capabilities = capabilities(device)
         val property = capabilities.writableProperties[operation]
         if (property != null) {
             val requiredValue = value
@@ -293,16 +315,27 @@ class MijiaToolExecutor(
     private fun commandAccepted(
         device: MijiaDevice,
         operation: String,
+        verification: DeviceControlVerification,
     ): JsonObject =
         buildJsonObject {
             put("device_id", device.id)
             put("name", device.name)
             put("operation", operation)
             put("command_accepted", true)
+            put("verification", buildJsonObject {
+                put("status", verification.status)
+                put("reason", verification.reason)
+                put("attempts", verification.attempts)
+                verification.observed?.let { put("observed", it) }
+                verification.errorCode?.let { put("error_code", it) }
+            })
             put(
                 "message",
-                "Mi Home accepted the command; the resulting device state " +
-                    "was not independently verified.",
+                when (verification.status) {
+                    "confirmed" -> "Mi Home accepted the command; a subsequent property read matches the requested value."
+                    "not_confirmed" -> "Mi Home accepted the command, but subsequent state still differs. Do not claim completion or resend automatically."
+                    else -> "Mi Home accepted the command, but state verification is unavailable. Explain the verification reason briefly; do not claim completion, promise a later check, or resend automatically."
+                },
             )
         }
 

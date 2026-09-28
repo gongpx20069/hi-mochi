@@ -64,7 +64,7 @@ class MiotCloudClient(
             )
             .build()
         val response = try {
-            client.newCall(request).awaitResponse()
+            client.newCall(request).awaitBufferedResponse()
         } catch (error: IOException) {
             throw MijiaProviderException("Mi Home network request failed.", error)
         }

@@ -123,6 +123,44 @@ extension results.
 Mi Home Tools remain excluded from Scheduled Agents and Subagents. Termux
 is available to both only through the explicit background authorization below.
 
+### Mi Home control and verification
+
+MIoT properties/actions retain their owning service name. Television power
+uses only the `television` service's writable `on` property or zero-input
+`turn-on`/`turn-off` actions. A `remote-control` power action opens a menu on
+some models; it is not a direct shutdown fallback. BLE-local power actions
+are not advertised as cloud controls. Discovery reports `power_values` and
+`readable_state` alongside the normalized `power` operation.
+
+The public `xiaomi.tv.rmi1` specification has a direct shutdown at service 2,
+action 1 and a same-named power-menu action at service 7, action 1. Selecting
+by action name alone must never let the latter overwrite the former. It has no
+readable power property, so cloud acceptance cannot prove physical shutdown.
+
+Device, television and camera-setting controls write once, then automatically
+read the corresponding result property up to three times, 500 ms apart,
+within a six-second readback deadline. Curtain position checks current position,
+not the target-position setting. Actions without a comparable readable result
+return unavailable immediately; no unrelated-property polling or blind OK key.
+Verification returns `confirmed`, `not_confirmed`, or `unavailable`, with a
+reason, attempts, and available observation/property error code. A successful
+write followed by a failed read remains `command_accepted=true` with explicit
+failed verification, not a generic command failure that invites resubmission.
+Parent cancellation propagates; no write is retried to obtain verification.
+Cloud and authorization responses remain cancellable through body consumption,
+so stalled response bodies cannot outlive the readback deadline.
+
+Property reads match device/service/property IDs rather than array order and
+preserve per-property error codes in `state_errors`. Missing/duplicate identities
+are protocol errors. Offline, null, errors and expired authorization do not
+confirm power-off. Matching a setpoint confirms the setting, not a physical
+effect such as the room reaching the requested temperature.
+
+The Mi Home Skill consumes this result rather than promising a later check.
+With older extensions it requests one post-control state read when the relevant
+property is available. Scenes retain command-acceptance-only semantics because
+they can affect several devices without a declared comparable result.
+
 ### Termux execution
 
 The trusted Termux connector has exactly `termux_exec` and `termux_task`.

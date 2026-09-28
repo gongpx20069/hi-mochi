@@ -18,6 +18,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TaskDashboardTest {
+    @Test fun `ordinary chats and their children never enter any task filter`() {
+        val agents = TaskStatus.entries.flatMap { status ->
+            listOf("main", "researcher", "analyst").map { actor ->
+                AgentTaskView("$actor-$status", actor, null, "Conversation", status, Instant.EPOCH)
+            }
+        }
+        val rows = taskDashboard(TaskCenterUiState(), agents, emptyList())
+        assertTrue(rows.isEmpty())
+        TaskFilter.entries.forEach { filter -> assertTrue(rows.none { it.matches(filter) }) }
+    }
+
     @Test fun `active schedule is one card rather than duplicate run and schedule cards`() {
         val schedule = AgentSchedule(
             "schedule", "Morning briefing", "Brief me", AgentScheduleType.EVERY, null, null, emptySet(), 60,
@@ -45,7 +56,7 @@ class TaskDashboardTest {
         )
         assertEquals("shell:running", rows.first().key)
         assertEquals(2, rows.count { it.matches(TaskFilter.ATTENTION) })
-        assertEquals(2, rows.count { it.matches(TaskFilter.HISTORY) })
+        assertEquals(1, rows.count { it.matches(TaskFilter.HISTORY) })
         val remote = rows.single { it.reference is TaskReference.Remote }
         assertFalse(remote.active)
         assertEquals(null, remote.status)

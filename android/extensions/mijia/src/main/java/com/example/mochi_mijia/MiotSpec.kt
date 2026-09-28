@@ -36,6 +36,7 @@ data class MiotProperty(
     val writable: Boolean,
     val range: List<Double>?,
     val allowedValues: Set<String>,
+    val serviceName: String = "",
 ) {
     val reference = MiotPropertyReference(serviceId, propertyId)
 
@@ -83,6 +84,7 @@ data class MiotAction(
     val actionId: Int,
     val name: String,
     val inputPropertyIds: List<Int>,
+    val serviceName: String = "",
 ) {
     val reference = MiotActionReference(serviceId, actionId)
 }
@@ -93,7 +95,9 @@ data class SemanticCapabilities(
     val actions: Map<String, MiotAction>,
 ) {
     val operationNames: List<String>
-        get() = (writableProperties.keys + actions.keys).distinct().sorted()
+        get() = (writableProperties.keys + actions.keys.map {
+            if (it in setOf("turn_on", "turn_off")) "power" else it
+        }).distinct().sorted()
 }
 
 class MiotSpecClient(
@@ -147,7 +151,7 @@ class MiotSpecClient(
         }
     }
 
-    private fun parseSpecification(
+    internal fun parseSpecification(
         type: String,
         root: JsonObject,
     ): MiotSpecification {
@@ -157,6 +161,7 @@ class MiotSpecClient(
             val service = serviceValue.jsonObject
             val serviceId = service["iid"]?.jsonPrimitive?.intOrNull
                 ?: return@forEach
+            val serviceName = urnName(service["type"]?.jsonPrimitive?.contentOrNull)
             service.arrayOrEmpty("properties").forEach propertyLoop@{ value ->
                 val property = value.jsonObject
                 val propertyId = property["iid"]?.jsonPrimitive?.intOrNull
@@ -181,6 +186,7 @@ class MiotSpecClient(
                             enumValue.jsonObject["value"]
                                 ?.jsonPrimitive?.contentOrNull
                         }?.toSet().orEmpty(),
+                    serviceName = serviceName,
                 )
             }
             service.arrayOrEmpty("actions").forEach actionLoop@{ value ->
@@ -195,6 +201,7 @@ class MiotSpecClient(
                     ),
                     inputPropertyIds = action.arrayOrEmpty("in")
                         .mapNotNull { it.jsonPrimitive.intOrNull },
+                    serviceName = serviceName,
                 )
             }
         }
@@ -242,12 +249,19 @@ object SemanticCapabilityReducer {
         }
         val state = specification.properties
             .filter { it.readable && (it.name in readableNames || it.name in writableNames) }
+            .filter { category != MijiaDeviceCategory.TELEVISION || it.name != "on" || it.serviceName == "television" }
             .associateBy { semanticOperation(it.name) }
         val writable = specification.properties
             .filter { it.writable && it.name in writableNames }
+            .filter { category != MijiaDeviceCategory.TELEVISION || it.name != "on" || it.serviceName == "television" }
             .associateBy { semanticOperation(it.name) }
         val actions = specification.actions
             .filter { it.name in actionNames && it.inputPropertyIds.isEmpty() }
+            .filter {
+                category != MijiaDeviceCategory.TELEVISION ||
+                    it.name !in setOf("turn-on", "turn-off") ||
+                    it.serviceName == "television"
+            }
             .associateBy { semanticOperation(it.name) }
         return SemanticCapabilities(state, writable, actions)
     }

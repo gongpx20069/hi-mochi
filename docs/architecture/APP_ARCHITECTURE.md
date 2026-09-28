@@ -167,6 +167,11 @@ uses the exact owning Job, while scheduled cancellation uses its unique
 WorkManager name without removing the next alarm. Cancelled claimed schedules
 record the new `CANCELLED` enum value in the existing nullable text result
 column and reschedule recurrence; this adds no Room column or schema migration.
+Its dashboard excludes foreground conversation runs and their children in every
+filter/counter; their internal diagnostics and conversation cancellation remain.
+Only schedule-associated Agent runs, independent Termux tasks and AgentLink work
+are shown. Merely taking longer or moving the app offscreen does not reclassify
+a foreground conversation as independent background work.
 Subagents retain their parent's schedule ID/Job, not another lifecycle.
 
 Task snapshots come from Room/WorkManager, the existing Termux task Tool and

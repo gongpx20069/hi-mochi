@@ -50,7 +50,7 @@ internal fun taskDashboard(
     agents: List<AgentTaskView>,
     termux: List<TermuxTaskView>,
 ): List<DashboardTask> = buildList {
-    agents.forEach { task ->
+    agents.filter { it.scheduleId != null }.forEach { task ->
         val mergedSchedule = task.active && task.actor == "main" &&
             state.schedules.any { it.id == task.scheduleId }
         if (!mergedSchedule) add(DashboardTask(

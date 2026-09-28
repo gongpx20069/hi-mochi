@@ -1311,9 +1311,26 @@ private val BUILT_IN_SKILLS = listOf(
             4. Use `mijia_control_device` for lights, switches, plugs, fans,
                climate and air devices, humidifiers, and curtains.
             5. Use `mijia_control_television` only for capabilities declared by
-               that television.
-            6. Report a command as accepted, not completed, unless a later
-               state read independently confirms the result.
+               that television. Honor `power_values`; some televisions only
+               expose cloud power-off, not power-on.
+            6. Control Tools automatically attempt a bounded post-command
+               state verification. Read `verification.status`:
+               - `confirmed`: a subsequent property read matches the requested
+                 value. Report the verified setting, not an inferred physical
+                 effect such as a room already reaching its target temperature.
+               - `not_confirmed`: the observed state still differs. Explain
+                 that the requested result was not confirmed; do not resend.
+               - `unavailable`: explain `verification.reason` briefly. In
+                 particular, `no_readable_result_property` means the device
+                 exposes no readable result for this operation, not that a
+                 later check has been scheduled. Never treat offline/null/error
+                 as confirmation, promise later verification, or blindly send
+                 an OK/Enter key to dismiss a television power menu.
+            7. For older extension results without `verification`, perform one
+               `mijia_get_device_state` after control when the corresponding
+               readable property is available. Do not merely defer checking to
+               the user. If no readable property exists, state that limitation.
+               Never repeat control just because verification failed.
 
             ## Cameras
 

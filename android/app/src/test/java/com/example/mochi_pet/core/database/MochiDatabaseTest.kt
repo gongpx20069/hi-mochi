@@ -122,6 +122,20 @@ class MochiDatabaseTest {
     }
 
     @Test
+    fun `Mi Home skill upgrades verification guidance without losing enablement`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val id = "builtin:mi-home-smart-home"
+        repository.setEnabled(id, true)
+        val stored = database.skillDao().listAll().single { it.id == id }
+        database.skillDao().upsert(stored.copy(content = "Old acceptance-only instructions"))
+        val upgraded = repository.listSkills().single { it.id == id }
+        assertEquals(true, upgraded.enabled)
+        assertEquals(true, upgraded.content.contains("verification.status"))
+        assertEquals(true, upgraded.content.contains("perform one"))
+        assertEquals(false, upgraded.content.contains("Old acceptance-only instructions"))
+    }
+
+    @Test
     fun `market skill can be installed and locally edited`() = runBlocking {
         val repository = RoomSkillRepository(database.skillDao())
         repository.install(

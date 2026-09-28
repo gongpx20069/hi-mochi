@@ -298,10 +298,13 @@ header entry and a separate page. Common task actions need at most a card tap
 and one explicit action; schedule Run now and future-run pause/resume are
 available directly in its details.
 
-- Foreground and Subagent runs show runtime status, current Tool, timestamp
-  and cancellation. Stopping a child stops its owning parent interaction.
-  The process-local view retains up to 100 finished runs plus active runs.
-  Results remain in the conversation; it is not a new persistent chat archive.
+- Ordinary foreground conversations, immediate device commands and their
+  Subagents do not appear in Tasks, including failed/finished runs. Their
+  progress, results and cancellation stay in the conversation. Internal
+  diagnostics still retain up to 100 finished runs plus active runs.
+  Scheduled Agent runs/children, independent Termux work and AgentLink work
+  remain visible with their existing progress, cancellation and result entry.
+  Duration alone does not promote a chat into an independent background task.
 - All persisted schedules appear regardless of their next run date. Actual
   running/queued state comes from WorkManager, separately from the next alarm
   and persisted last result. Stopping a run does not disable future recurrence.
