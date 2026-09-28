@@ -69,7 +69,9 @@ absence of a sandbox, and model-provider access to output used by the Agent.
 AgentLink has independent bilingual introduction pages within this site, not
 an invented external homepage. Its product/setup claims follow the
 [AgentLink README](https://github.com/gongpx20069/android-agent-link) and
-[user guide](https://github.com/gongpx20069/android-agent-link/blob/main/docs/user-guide.md).
+[user guide](https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.md).
+AgentLink uses the `master` branch, not this repository's `main`; retain the
+correct branch in its documentation links.
 Distinguish standalone phone/terminal chat from optional scoped Mochi control.
 Link to AgentLink's own Releases (which include previews), never Mochi APKs or
 an assumed stable `releases/latest` endpoint. Explain the running-computer

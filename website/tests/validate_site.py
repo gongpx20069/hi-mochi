@@ -97,6 +97,8 @@ def main() -> None:
                 errors.append(f"{relative_page}: missing anchor #{anchor}")
 
         for resource in parser.resources:
+            if resource.startswith("https://github.com/gongpx20069/android-agent-link/blob/main/"):
+                errors.append(f"{relative_page}: AgentLink documentation lives on master, not main")
             target = local_resource(page, resource)
             if target is not None and not target.exists():
                 errors.append(f"{relative_page}: missing resource {resource}")
