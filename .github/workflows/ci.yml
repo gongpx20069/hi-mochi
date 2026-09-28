@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   android-native:
     name: Native Android Verification
@@ -22,6 +25,10 @@ jobs:
           java-version: "17"
 
       - uses: gradle/actions/setup-gradle@v4
+
+      - uses: ./.github/actions/prepare-sherpa
+        with:
+          github-token: ${{ github.token }}
 
       - name: Verify native project
         run: |

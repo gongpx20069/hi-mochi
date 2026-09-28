@@ -52,9 +52,9 @@
 | 不清楚设备架构，或需要一个文件兼容不同设备 | `universal`——下载体积最大 |
 
 1. 从上述发布页下载并安装与设备架构匹配的 APK。
-2. 打开**设置**，配置
-   [AI Provider 端点、模型名称和 API 密钥](#支持的-llm-provider)，并按需设置
-   [Speech Provider](#支持的-speech-provider)。
+2. 打开**设置 > AI 连接 > 添加 AI 连接**，选择官方预设或自定义地址，
+   填写模型名称和 API Key。按需添加[语音连接](#支持的-speech-provider)，
+   并点击**使用**。
 3. 通过文字或麦克风开始交流；语音输入需授予麦克风权限，准备好后可启用
    **“Hi Mochi”** 唤醒词。其他 Tools 和 Skills 按需配置即可。
 
@@ -75,8 +75,13 @@ LLM Provider 是必需配置。未配置时，首次启动会打开设置；之�
 
 | Provider | 配置 | 凭据 |
 | --- | --- | --- |
-| OpenAI | OpenAI Endpoint 和模型名称 | [OpenAI API Key](https://platform.openai.com/api-keys) |
+| OpenAI | 自动填写 `https://api.openai.com/v1`，再填写模型 | [OpenAI API Key](https://platform.openai.com/api-keys) |
 | Azure OpenAI | Azure 资源 Endpoint、以 **Deployment 名称**填写模型、API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| DeepSeek | 自动填写 `https://api.deepseek.com`，再填写模型 | [官方 API 指南](https://api-docs.deepseek.com/) |
+| Kimi | 自动填写 `https://api.moonshot.cn/v1`，再填写模型 | [官方 API 指南](https://platform.kimi.com/docs/get-api-key) |
+| GLM | 自动填写 `https://open.bigmodel.cn/api/paas/v4`，再填写模型 | [官方 API 指南](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
+| MiniMax（国内） | 自动填写 `https://api.minimax.cn/v1`，填写模型并确认账号区域 | [官方 API 指南](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
+| Agnes-AI | 自动填写 `https://apihub.agnes-ai.com/v1`，再填写模型 | [官方 API 指南](https://wiki.agnes-ai.com/en/docs/quickstart) |
 | 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需兼容 OpenAI Chat/Tool Call 协议 | 对应服务商签发的 API Key |
 
 **设置 > AI 连接**支持保存多个命名账号和模型。OpenAI、DeepSeek、Kimi、GLM、
@@ -147,8 +152,9 @@ Tools 和 Skill。
 Mochi 默认跟随 Android 系统语言，也可以在设置中固定使用中文或英文。
 每次打开应用时会检查最新稳定 GitHub Release，由你决定是否下载更新。
 
-**分享 Providers**会先让你选择要包含的连接。LLM 与 Speech 默认选中；
-高德、腾讯文档和手动配置的 MCP 工具凭据是可选项，默认不选中。
+位于设置顶部的**分享 Providers**支持勾选多个已保存的 LLM 和语音账号。
+默认只勾选两类账号中当前已就绪的连接；其他账号、高德、腾讯文档和手动 MCP
+工具凭据默认不选中。导入会新增账号，不覆盖已有账号。
 加密链接本身包含解密密钥：**任何拿到完整链接的人都能使用所选 API 资源并
 消耗其额度**。Persona、记忆、Planner 数据、飞书/Notion OAuth、米家会话和
 Android 系统权限不会被分享。
@@ -157,8 +163,9 @@ Android 系统权限不会被分享。
 
 ### 统一任务中心
 
-点击顶部**任务**，查看普通对话与子 Agent 的执行状态、全部定时任务、Termux
-任务及已授权 AgentLink 聊天的任务快照。可按各执行器的能力停止任务、查看
+点击顶部**任务**，查看定时 Agent 执行状态、全部定时计划、Termux 任务及
+已授权 AgentLink 聊天的任务快照。普通聊天及其前台子 Agent 留在对话中，不进入
+任务列表。可按各执行器的能力停止任务、查看
 对话或命令输出，并打开 AgentLink 查看远程结果。停止父 Agent 不会自动停止
 已提交的 Shell 或远程任务；关闭任务中心也不会停止任务。Agent 执行记录是
 本次应用进程内的最近记录，定时任务和扩展保留记录仍由原执行器负责。
@@ -189,6 +196,9 @@ Mochi 可将已授权的 **Notion** 或 **腾讯文档** 工作区连接为你�
 研究 Tools 调研新主题、收集并整理信息，再与你共同撰写新的页面或文档。
 完成后，Mochi 会将成稿写回指定工作区，并通过官方 MCP 集成继续更新已有
 知识。
+
+飞书云文档也可通过前述自建应用向导接入，支持搜索、创建、更新和回读验证；
+各平台的实际权限与工具范围仍分别生效。
 
 ### 串行 Subagent
 

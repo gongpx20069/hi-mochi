@@ -53,9 +53,9 @@ and choose the APK that matches the device:
 | Architecture is unknown, or one file must support different devices | `universal` — largest download |
 
 1. Download and install the matching APK from the release page above.
-2. Open **Settings** and configure an
-   [AI provider endpoint, model, and API key](#supported-llm-providers), plus
-   an optional [Speech Provider](#supported-speech-providers).
+2. Open **Settings > AI connections > Add AI connection**, choose an official
+   preset or custom endpoint, and enter your model and API key.
+   Optionally add a [speech connection](#supported-speech-providers) and tap **Use**.
 3. Start a conversation by text or microphone; grant microphone permission
    for voice input and enable the **“Hi Mochi”** wake word when ready.
    Configure additional Tools and Skills only as you need them.
@@ -78,8 +78,13 @@ Settings remains available from the top-right action.
 
 | Provider | Configuration | Credentials |
 | --- | --- | --- |
-| OpenAI | OpenAI endpoint and model | [OpenAI API key](https://platform.openai.com/api-keys) |
+| OpenAI | Prefilled `https://api.openai.com/v1`; enter model | [OpenAI API key](https://platform.openai.com/api-keys) |
 | Azure OpenAI | Azure resource endpoint, **deployment name** as the model, and API version | [Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| DeepSeek | Prefilled `https://api.deepseek.com`; enter model | [Official API guide](https://api-docs.deepseek.com/) |
+| Kimi | Prefilled `https://api.moonshot.cn/v1`; enter model | [Official API guide](https://platform.kimi.com/docs/get-api-key) |
+| GLM | Prefilled `https://open.bigmodel.cn/api/paas/v4`; enter model | [Official API guide](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
+| MiniMax (China) | Prefilled `https://api.minimax.cn/v1`; enter model and verify account region | [Official API guide](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
+| Agnes-AI | Prefilled `https://apihub.agnes-ai.com/v1`; enter model | [Official API guide](https://wiki.agnes-ai.com/en/docs/quickstart) |
 | Custom OpenAI-compatible | User-defined HTTPS endpoint and model using the OpenAI chat/tool-call protocol | API key issued by that provider |
 
 **Settings > AI connections** saves multiple named accounts and models, with
@@ -158,9 +163,10 @@ Mochi follows the Android system language by default and can be fixed to
 English or Chinese in Settings. It checks the latest stable GitHub Release
 each time it opens; you decide whether to download an available update.
 
-**Share Providers** lets you choose which connections to include. LLM and
-Speech connections start selected; Amap, Tencent Docs, and manual MCP Tool
-credentials are optional and start unselected. The encrypted link also contains
+**Share Providers**, at the top of Settings, lets you select multiple saved
+LLM and speech accounts. Only the current ready account of each kind starts
+selected; other accounts, Amap, Tencent Docs, and manual MCP Tool credentials
+start unselected. Import adds accounts instead of overwriting them. The encrypted link also contains
 its decryption key: **anyone holding the full link can use the selected API
 resources and consume their quota**. Persona, memories, planner data, Feishu/Notion
 OAuth, Mi Home sessions, and Android permissions are not shared.
@@ -169,8 +175,9 @@ OAuth, Mi Home sessions, and Android permissions are not shared.
 
 ### Unified task center
 
-Open **Tasks** in the app header for foreground/Subagent runs, all schedules,
-Termux tasks, and authorized AgentLink chat task snapshots. Stop supported
+Open **Tasks** in the app header for scheduled Agent runs, all schedules,
+Termux tasks, and authorized AgentLink chat task snapshots. Ordinary chat and
+its foreground Subagents stay in the conversation, not the task list. Stop supported
 tasks, open conversation results, inspect command output, or open the native
 AgentLink chat. Stopping an Agent does not stop already submitted Shell or
 remote work. Closing the task center does not stop execution. Agent run
@@ -214,6 +221,10 @@ investigate new topics, collect and organize sources, and cowork with you to
 draft a new page or document. Mochi can then write the finished work back to
 the selected workspace and continue updating it through the official MCP
 integration.
+
+Feishu cloud documents are also available through the guided self-built-app
+connection described above, with search, creation, updates and readback
+verification; each service's actual permissions and Tool scope still apply.
 
 ### Serial Subagents
 

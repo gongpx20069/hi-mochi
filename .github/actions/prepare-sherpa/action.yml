@@ -1,0 +1,38 @@
+name: Prepare pinned Sherpa ONNX
+description: Cache and authenticate the pinned speech dependency download, then verify its digest.
+inputs:
+  github-token:
+    description: Read-only GitHub token for the public upstream release API.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: android/app/libs/sherpa-onnx-1.13.2.aar
+        key: sherpa-onnx-aar-aa5505c0ec4f8bdaee5f214a64ba3012be64f2aecc022e82a64f33392b8dd245
+
+    - name: Download and verify pinned speech dependency
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+        directory="$GITHUB_WORKSPACE/android/app/libs"
+        artifact="$directory/sherpa-onnx-1.13.2.aar"
+        expected="aa5505c0ec4f8bdaee5f214a64ba3012be64f2aecc022e82a64f33392b8dd245"
+        mkdir -p "$directory"
+        if [[ ! -f "$artifact" ]]; then
+          for attempt in 1 2 3; do
+            if gh release download v1.13.2 --repo k2-fsa/sherpa-onnx \
+              --pattern sherpa-onnx-1.13.2.aar --dir "$directory" --clobber; then
+              break
+            fi
+            echo "::warning::Pinned speech dependency download failed (attempt $attempt/3)."
+            if [[ "$attempt" == 3 ]]; then
+              exit 1
+            fi
+            sleep "$((attempt * 5))"
+          done
+        fi
+        printf '%s  %s\n' "$expected" "$artifact" | sha256sum --check --strict

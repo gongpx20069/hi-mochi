@@ -29,6 +29,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - uses: ./.github/actions/prepare-sherpa
+        with:
+          github-token: ${{ github.token }}
+
       - name: Allocate next Android version
         id: version
         shell: pwsh

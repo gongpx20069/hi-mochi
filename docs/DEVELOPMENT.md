@@ -34,6 +34,13 @@ Keep machine-specific SDK paths in `android/local.properties`; do not commit
 that file. The first build downloads the pinned sherpa-onnx Android AAR from
 its upstream GitHub release and verifies its SHA-256 before use.
 
+CI and the manual release workflow share `.github/actions/prepare-sherpa`.
+It caches that exact AAR by its pinned SHA-256, uses the job token only in the
+GitHub CLI download step to avoid anonymous API rate-limit failures, retries
+download failures at most three times, and checks the digest on cache hits too.
+A failed download or checksum fails the build; no alternate unpinned artifact
+or skipped speech dependency is allowed.
+
 ## Build and verify
 
 The standby clock bundles the unmodified Fredoka variable font from
