@@ -153,7 +153,6 @@ import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.ALLOWED_FOCUS_STANDBY_DELAYS_SECONDS
 import com.example.mochi_pet.core.settings.ProviderShareSelection
 import com.example.mochi_pet.core.settings.SpeechProvider
-import com.example.mochi_pet.core.settings.SpeechSettingsInput
 import com.example.mochi_pet.core.schedule.AgentSchedule
 import com.example.mochi_pet.core.schedule.AgentScheduleResult
 import com.example.mochi_pet.core.skills.MarketSkillSummary
@@ -748,7 +747,7 @@ private fun MochiAppContent(
             onEnableWake = onEnableWake,
             onDisableWake = viewModel::disableWakeWord,
             onProviderProfileAction = viewModel::handleProviderProfileAction,
-            onSaveSpeechSettings = viewModel::saveSpeechSettings,
+            onSpeechAction = viewModel::handleSpeechProfileAction,
             onLoadSpeechVoices = viewModel::loadSpeechVoices,
             onPreviewSpeechVoice = viewModel::previewSpeechVoice,
             onStopVoicePreview = viewModel::stopVoicePreview,
@@ -981,9 +980,9 @@ private fun MochiAppContent(
             title = { Text("Import shared Providers?") },
             text = {
                 Text(
-                    "Import adds saved AI connections and selects the shared active connection, cancelling running Agent tasks. " +
-                        "Included speech and Tool connections replace their existing settings. " +
-                        "Credentials are stored on this device and selected Tools are enabled. Only import links from someone you trust.",
+                    "Import adds AI and speech connections without overwriting saved accounts and selects the shared connections. " +
+                        "Changing AI cancels running local Agent tasks; changing speech stops only the current voice interaction and preview. " +
+                        "Included Tool settings are replaced. Credentials stay encrypted on this device. Only import trusted links.",
                 )
             },
             confirmButton = {
@@ -1427,9 +1426,9 @@ private fun SurfaceContent(
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
     onProviderProfileAction: (ProviderProfileAction) -> Unit,
-    onSaveSpeechSettings: (SpeechSettingsInput) -> Unit,
-    onLoadSpeechVoices: (SpeechProvider) -> Unit,
-    onPreviewSpeechVoice: (SpeechProvider, String) -> Unit,
+    onSpeechAction: (SpeechProfileAction) -> Unit,
+    onLoadSpeechVoices: (SpeechProvider, String?) -> Unit,
+    onPreviewSpeechVoice: (SpeechProvider, String, String?) -> Unit,
     onStopVoicePreview: () -> Unit,
     onCreateProviderShareLink: (ProviderShareSelection) -> Unit,
     onReceiveProviderShareLink: (String) -> Unit,
@@ -1527,7 +1526,7 @@ private fun SurfaceContent(
                 onEnableWake = onEnableWake,
                 onDisableWake = onDisableWake,
                 onProviderAction = onProviderProfileAction,
-                onSaveSpeech = onSaveSpeechSettings,
+                onSpeechAction = onSpeechAction,
                 onLoadSpeechVoices = onLoadSpeechVoices,
                 onPreviewSpeechVoice = onPreviewSpeechVoice,
                 onStopVoicePreview = onStopVoicePreview,
@@ -5998,7 +5997,7 @@ internal fun ProviderSettingsSurface(
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
     onProviderAction: (ProviderProfileAction) -> Unit,
-    onSaveSpeech: (SpeechSettingsInput) -> Unit,
+    onSpeechAction: (SpeechProfileAction) -> Unit,
     onCreateProviderShareLink: (ProviderShareSelection) -> Unit,
     onReceiveProviderShareLink: (String) -> Unit,
     onSetRecentConversationTurns: (Int) -> Unit,
@@ -6006,8 +6005,8 @@ internal fun ProviderSettingsSurface(
     onSavePersona: (String, String, String) -> Unit,
     speechVoiceState: SpeechVoiceUiState = SpeechVoiceUiState(),
     playbackState: VoiceRuntimeState = VoiceRuntimeState(),
-    onLoadSpeechVoices: (SpeechProvider) -> Unit = {},
-    onPreviewSpeechVoice: (SpeechProvider, String) -> Unit = { _, _ -> },
+    onLoadSpeechVoices: (SpeechProvider, String?) -> Unit = { _, _ -> },
+    onPreviewSpeechVoice: (SpeechProvider, String, String?) -> Unit = { _, _, _ -> },
     onStopVoicePreview: () -> Unit = {},
 ) {
     var recentTurns by remember(agentSettingsState.settings) {
@@ -6032,36 +6031,9 @@ internal fun ProviderSettingsSurface(
     var agents by remember(personaState.context) {
         mutableStateOf(personaState.context.agents)
     }
-    val speechSummary = speechState.summary
-    var speechProvider by remember(speechSummary) {
-        mutableStateOf(speechSummary.provider)
-    }
-    var iFlytekAppId by remember(speechSummary) {
-        mutableStateOf(speechSummary.iFlytekAppId)
-    }
-    var iFlytekApiKey by remember(speechSummary) { mutableStateOf("") }
-    var iFlytekApiSecret by remember(speechSummary) { mutableStateOf("") }
-    var azureSpeechEndpoint by remember(speechSummary) {
-        mutableStateOf(speechSummary.azureEndpoint)
-    }
-    var azureSpeechApiKey by remember(speechSummary) {
-        mutableStateOf("")
-    }
-    var speechSynthesisEnabled by remember(speechSummary) {
-        mutableStateOf(speechSummary.synthesisEnabled)
-    }
-    var iFlytekVoice by remember(speechSummary) {
-        mutableStateOf(speechSummary.iFlytekVoice)
-    }
-    var azureVoice by remember(speechSummary) {
-        mutableStateOf(speechSummary.azureVoice)
-    }
-    var systemVoice by remember(speechSummary) {
-        mutableStateOf(speechSummary.systemVoice)
-    }
     var showShareProviders by remember { mutableStateOf(false) }
     var sharedLlmIds by remember { mutableStateOf(emptySet<String>()) }
-    var shareSpeech by remember { mutableStateOf(true) }
+    var sharedSpeechIds by remember { mutableStateOf(emptySet<String>()) }
     var shareAmap by remember { mutableStateOf(false) }
     var shareTencentDocs by remember { mutableStateOf(false) }
     var sharedManualMcpIds by remember {
@@ -6130,7 +6102,7 @@ internal fun ProviderSettingsSurface(
             item {
                 PlannerCard {
                     Text(
-                        text = "Share selected saved AI connections, speech, and Tools. The current AI connection and speech start selected; other connections are opt-in.",
+                        text = "Share selected saved AI and speech connections and Tools. Only the current ready connections start selected; other accounts are opt-in.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -6166,7 +6138,7 @@ internal fun ProviderSettingsSurface(
                             onClick = {
                                 sharedLlmIds = state.profiles.active?.takeIf { it.settings.isReady }
                                     ?.let { setOf(it.id) }.orEmpty()
-                                shareSpeech = speechState.summary.isReady
+                                sharedSpeechIds = speechState.profiles.active.takeIf { it.settings.isReady }?.let { setOf(it.id) }.orEmpty()
                                 shareAmap = false
                                 shareTencentDocs = false
                                 sharedManualMcpIds = emptySet()
@@ -6175,7 +6147,7 @@ internal fun ProviderSettingsSurface(
                             enabled = !providerShareState.isWorking &&
                                 (
                                     state.profiles.profiles.any { it.settings.isReady } ||
-                                        speechState.summary.isReady ||
+                                        speechState.profiles.profiles.any { it.settings.isReady } ||
                                         toolsState.catalog.amap.connected ||
                                         toolsState.catalog.servers.any {
                                             it.connected && (!it.builtIn || it.id == TENCENT_DOCS_SERVER_ID)
@@ -6361,276 +6333,10 @@ internal fun ProviderSettingsSurface(
         }
         val speechSection: LazyListScope.() -> Unit = {
             item {
-                Text(
-                    text = "Speech recognition and synthesis",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                SpeechConnectionsSection(
+                    speechState, speechVoiceState, playbackState, onSpeechAction,
+                    onLoadSpeechVoices, onPreviewSpeechVoice, onStopVoicePreview,
                 )
-            }
-            item {
-                PlannerCard {
-                    Text(
-                        text = "Optional: Android speech recognition is used " +
-                            "when no cloud provider is configured. It may be " +
-                            "unstable on some phones, so you might need to try " +
-                            "a voice request more than once.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    ProviderOptionCard(
-                        title = "Android default",
-                        detail = "No setup · device service may be unstable",
-                        selected =
-                            speechProvider == SpeechProvider.SYSTEM,
-                        onClick = {
-                            speechProvider = SpeechProvider.SYSTEM
-                        },
-                    )
-                    ProviderOptionCard(
-                        title = "iFlytek Speech",
-                        detail = "Recommended for speech recognition in China",
-                        selected =
-                            speechProvider == SpeechProvider.IFLYTEK,
-                        onClick = {
-                            speechProvider = SpeechProvider.IFLYTEK
-                        },
-                    )
-                    ProviderOptionCard(
-                        title = "Azure Speech",
-                        detail = "Azure Speech-to-Text short audio API",
-                        selected =
-                            speechProvider == SpeechProvider.AZURE,
-                        onClick = {
-                            speechProvider = SpeechProvider.AZURE
-                        },
-                    )
-                    if (speechProvider == SpeechProvider.IFLYTEK) {
-                        OutlinedTextField(
-                            value = iFlytekAppId,
-                            onValueChange = { iFlytekAppId = it },
-                            label = { Text("iFlytek AppID") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
-                        )
-                        OutlinedTextField(
-                            value = iFlytekApiKey,
-                            onValueChange = { iFlytekApiKey = it },
-                            label = { Text("iFlytek APIKey") },
-                            placeholder = {
-                                if (speechSummary.hasIFlytekApiKey) {
-                                    Text("*****")
-                                }
-                            },
-                            supportingText = {
-                                Text(
-                                    if (speechSummary.hasIFlytekApiKey) {
-                                        "Leave blank to keep the stored key."
-                                    } else {
-                                        "Encrypted using Android Keystore."
-                                    },
-                                )
-                            },
-                            visualTransformation =
-                                PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
-                        )
-                        OutlinedTextField(
-                            value = iFlytekApiSecret,
-                            onValueChange = { iFlytekApiSecret = it },
-                            label = { Text("iFlytek APISecret") },
-                            placeholder = {
-                                if (speechSummary.hasIFlytekApiSecret) {
-                                    Text("*****")
-                                }
-                            },
-                            supportingText = {
-                                Text(
-                                    if (
-                                        speechSummary
-                                            .hasIFlytekApiSecret
-                                    ) {
-                                        "Leave blank to keep the stored secret."
-                                    } else {
-                                        "Encrypted using Android Keystore."
-                                    },
-                                )
-                            },
-                            visualTransformation =
-                                PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
-                        )
-                        OutlinedButton(
-                            onClick = {
-                                openExternalPage(
-                                    context,
-                                    IFLYTEK_SPEECH_SIGNUP_URL,
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Open iFlytek registration")
-                        }
-                    }
-                    if (speechProvider == SpeechProvider.AZURE) {
-                        OutlinedTextField(
-                            value = azureSpeechEndpoint,
-                            onValueChange = { azureSpeechEndpoint = it },
-                            label = { Text("Azure Speech endpoint") },
-                            placeholder = {
-                                Text(
-                                    "https://your-resource.cognitiveservices.azure.com",
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
-                        )
-                        OutlinedTextField(
-                            value = azureSpeechApiKey,
-                            onValueChange = { azureSpeechApiKey = it },
-                            label = { Text("Azure Speech key") },
-                            placeholder = {
-                                if (speechSummary.hasAzureApiKey) {
-                                    Text("*****")
-                                }
-                            },
-                            supportingText = {
-                                Text(
-                                    if (speechSummary.hasAzureApiKey) {
-                                        "Leave blank to keep the stored key."
-                                    } else {
-                                        "Encrypted using Android Keystore."
-                                    },
-                                )
-                            },
-                            visualTransformation =
-                                PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
-                        )
-                        OutlinedButton(
-                            onClick = {
-                                openExternalPage(
-                                    context,
-                                    AZURE_SPEECH_SIGNUP_URL,
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Open Azure Speech setup")
-                        }
-                    }
-                    if (speechProvider != SpeechProvider.SYSTEM) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Text(
-                                "Also use this provider for speech synthesis",
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(
-                                checked = speechSynthesisEnabled,
-                                onCheckedChange = { speechSynthesisEnabled = it },
-                            )
-                        }
-                        Text(
-                            "Reuses the saved credentials. When enabled, assistant " +
-                                "reply text is sent to this provider. Wake acknowledgements " +
-                                "always use Android speech. Disabled by default.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (speechProvider == SpeechProvider.SYSTEM || speechSynthesisEnabled) {
-                        val connectionReady =
-                            !speechState.isLoading && !speechState.isSaving &&
-                                speechSummary.isReady && speechProvider == speechSummary.provider &&
-                                when (speechProvider) {
-                                    SpeechProvider.SYSTEM -> true
-                                    SpeechProvider.IFLYTEK ->
-                                        iFlytekAppId.trim() == speechSummary.iFlytekAppId &&
-                                            iFlytekApiKey.isBlank() && iFlytekApiSecret.isBlank()
-                                    SpeechProvider.AZURE ->
-                                        azureSpeechEndpoint.trim().trimEnd('/') == speechSummary.azureEndpoint &&
-                                            azureSpeechApiKey.isBlank()
-                                }
-                        SpeechVoicePicker(
-                            provider = speechProvider,
-                            voiceId = when (speechProvider) {
-                                SpeechProvider.SYSTEM -> systemVoice
-                                SpeechProvider.IFLYTEK -> iFlytekVoice
-                                SpeechProvider.AZURE -> azureVoice
-                            },
-                            catalog = if (speechVoiceState.provider == speechProvider) {
-                                speechVoiceState
-                            } else {
-                                SpeechVoiceUiState(provider = speechProvider)
-                            },
-                            playback = playbackState,
-                            connectionReady = connectionReady,
-                            onChoose = {
-                                when (speechProvider) {
-                                    SpeechProvider.SYSTEM -> systemVoice = it
-                                    SpeechProvider.IFLYTEK -> iFlytekVoice = it
-                                    SpeechProvider.AZURE -> azureVoice = it
-                                }
-                            },
-                            onLoad = { onLoadSpeechVoices(speechProvider) },
-                            onPreview = { onPreviewSpeechVoice(speechProvider, it) },
-                            onStop = onStopVoicePreview,
-                        )
-                    }
-                    speechState.feedback?.let {
-                        Text(
-                            text = it,
-                            color = if (it == "Speech settings saved") {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.error
-                            },
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            onSaveSpeech(
-                                SpeechSettingsInput(
-                                    provider = speechProvider,
-                                    iFlytekAppId = iFlytekAppId,
-                                    iFlytekApiKeyReplacement =
-                                        iFlytekApiKey,
-                                    iFlytekApiSecretReplacement =
-                                        iFlytekApiSecret,
-                                    azureEndpoint = azureSpeechEndpoint,
-                                    azureApiKeyReplacement =
-                                        azureSpeechApiKey,
-                                    synthesisEnabled = speechSynthesisEnabled,
-                                    iFlytekVoice = iFlytekVoice,
-                                    azureVoice = azureVoice,
-                                    systemVoice = systemVoice,
-                                ),
-                            )
-                            iFlytekApiKey = ""
-                            iFlytekApiSecret = ""
-                            azureSpeechApiKey = ""
-                        },
-                        enabled =
-                            !speechState.isLoading &&
-                                !speechState.isSaving,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            if (speechState.isSaving) {
-                                "Saving..."
-                            } else {
-                                "Save speech settings"
-                            },
-                        )
-                    }
-                }
             }
         }
         val conversationSection: LazyListScope.() -> Unit = {
@@ -6764,7 +6470,7 @@ internal fun ProviderSettingsSurface(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        "Choose the saved AI connections to share. The current connection and speech start selected; other credentials remain unselected.",
+                        "Choose the saved AI and speech connections to share. Only the current ready connections start selected.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -6779,13 +6485,16 @@ internal fun ProviderSettingsSurface(
                             },
                         )
                     }
-                    ShareConnectionOption(
-                        title = "Speech Provider",
-                        detail = speechState.summary.provider.displayName(),
-                        checked = shareSpeech,
-                        enabled = speechState.summary.isReady,
-                        onCheckedChange = { shareSpeech = it },
-                    )
+                    Text("Speech connections", fontWeight = FontWeight.Bold)
+                    speechState.profiles.profiles.forEach { profile ->
+                        ShareConnectionOption(
+                            title = profile.name, detail = profile.settings.provider.displayName(),
+                            checked = profile.id in sharedSpeechIds, enabled = profile.settings.isReady,
+                            onCheckedChange = { checked ->
+                                sharedSpeechIds = if (checked) sharedSpeechIds + profile.id else sharedSpeechIds - profile.id
+                            },
+                        )
+                    }
                     Text(
                         "Tool credentials",
                         style = MaterialTheme.typography.titleSmall,
@@ -6829,7 +6538,8 @@ internal fun ProviderSettingsSurface(
                             ProviderShareSelection(
                                 includeLlm = sharedLlmIds.isNotEmpty(),
                                 llmProfileIds = sharedLlmIds,
-                                includeSpeech = shareSpeech,
+                                includeSpeech = sharedSpeechIds.isNotEmpty(),
+                                speechProfileIds = sharedSpeechIds,
                                 tools = ToolShareSelection(
                                     includeAmap = shareAmap,
                                     includeTencentDocs = shareTencentDocs,
@@ -6841,7 +6551,7 @@ internal fun ProviderSettingsSurface(
                         showShareProviders = false
                     },
                     enabled = sharedLlmIds.isNotEmpty() ||
-                        shareSpeech ||
+                        sharedSpeechIds.isNotEmpty() ||
                         shareAmap ||
                         shareTencentDocs ||
                         sharedManualMcpIds.isNotEmpty(),
@@ -6866,7 +6576,7 @@ internal fun ProviderSettingsSurface(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "Paste a trusted Mochi Provider link. AI connections are added without overwriting saved connections; the shared active connection (or first selected one) becomes active and cancels running Agent tasks. Included speech and Tool connections are replaced.",
+                        "AI and speech connections are added, not overwritten. Each shared active connection (or first selected one) becomes active. AI changes cancel local Agent tasks; speech changes stop the current voice interaction. Included Tool settings are replaced.",
                     )
                     OutlinedTextField(
                         value = receivedProviderLink,
@@ -6875,7 +6585,7 @@ internal fun ProviderSettingsSurface(
                         },
                         label = { Text("Mochi Provider link") },
                         placeholder = {
-                            Text("mochi://provider/import#v3...")
+                            Text("mochi://provider/import#v4...")
                         },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
@@ -6889,7 +6599,7 @@ internal fun ProviderSettingsSurface(
                         showReceiveProviders = false
                         receivedProviderLink = ""
                     },
-                    enabled = listOf("v2", "v3").any { receivedProviderLink.startsWith("mochi://provider/import#$it.") },
+                    enabled = listOf("v2", "v3", "v4").any { receivedProviderLink.startsWith("mochi://provider/import#$it.") },
                 ) {
                     Text("Continue")
                 }
@@ -6960,82 +6670,6 @@ private fun SpeechProvider.displayName(): String =
         SpeechProvider.AZURE -> "Azure Speech"
     }
 
-@Composable
-private fun ProviderOptionCard(
-    title: String,
-    detail: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-        } else {
-            Color.Transparent
-        },
-        shape = RoundedCornerShape(18.dp),
-        border = if (selected) {
-            androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.primary,
-            )
-        } else {
-            androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outline,
-            )
-        },
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outline
-                        },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (selected) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onPrimary),
-                    )
-                }
-            }
-            Column {
-                Text(
-                    text = title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = detail,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-    }
-}
-
-private const val IFLYTEK_SPEECH_SIGNUP_URL =
-    "https://www.xfyun.cn/services/voicedictation"
-private const val AZURE_SPEECH_SIGNUP_URL =
-    "https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices"
 private const val FOCUS_STANDBY_BRIGHTNESS = 0.03f
 private val FOCUS_STANDBY_DELAY_OPTIONS_SECONDS =
     ALLOWED_FOCUS_STANDBY_DELAYS_SECONDS.sorted()

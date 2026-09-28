@@ -3,6 +3,8 @@ package com.example.mochi_pet.core.settings
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -12,6 +14,82 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class SpeechSettingsRepositoryTest {
+    @Test fun `migrates active and inactive legacy accounts without decrypting or losing voices`() = runBlocking {
+        val store = SpeechPreferencesDataStore()
+        store.updateData { it.toMutablePreferences().apply {
+            this[stringPreferencesKey("speech.provider")] = "AZURE"
+            this[booleanPreferencesKey("speech.synthesis_enabled")] = true
+            this[stringPreferencesKey("speech.iflytek.app_id")] = "legacy-app"
+            this[stringPreferencesKey("speech.iflytek.api_key_ciphertext")] = "iflytek-key".reversed()
+            this[stringPreferencesKey("speech.iflytek.api_key_iv")] = "speech-test-iv"
+            this[stringPreferencesKey("speech.iflytek.api_secret_ciphertext")] = "iflytek-secret".reversed()
+            this[stringPreferencesKey("speech.iflytek.api_secret_iv")] = "speech-test-iv"
+            this[stringPreferencesKey("speech.iflytek.voice")] = "x4_yezi"
+            this[stringPreferencesKey("speech.azure.endpoint")] = "https://fixture.cognitiveservices.azure.com"
+            this[stringPreferencesKey("speech.azure.api_key_ciphertext")] = "azure-key".reversed()
+            this[stringPreferencesKey("speech.azure.api_key_iv")] = "speech-test-iv"
+            this[stringPreferencesKey("speech.azure.voice")] = "zh-CN-XiaoxiaoNeural"
+            this[stringPreferencesKey("speech.system.voice")] = "offline-fixture"
+        } }
+        val repo = DataStoreSpeechSettingsRepository(store, SpeechFakeCipher())
+        val profiles = repo.loadProfiles()
+        assertEquals(3, profiles.profiles.size)
+        assertEquals(SpeechProvider.AZURE, profiles.active.settings.provider)
+        assertEquals("azure-key", (repo.loadSynthesisConfig() as SpeechRuntimeConfig.Azure).apiKey)
+        val iflytek = profiles.profiles.single { it.settings.provider == SpeechProvider.IFLYTEK }
+        assertEquals("iflytek-key", (repo.loadProfileRuntimeConfig(iflytek.id) as SpeechRuntimeConfig.IFlytek).apiKey)
+        assertEquals("x4_yezi", iflytek.settings.iFlytekVoice)
+        assertEquals(null, store.data.value[stringPreferencesKey("speech.azure.api_key_ciphertext")])
+        assertEquals(profiles, DataStoreSpeechSettingsRepository(store, SpeechFakeCipher()).loadProfiles())
+    }
+
+    @Test fun `same-provider accounts keep independent keys voices and explicit selection`() = runBlocking {
+        val repo = repository()
+        val first = repo.saveProfile(azureProfile("One", "one", "en-US-JennyNeural")).profiles.last()
+        val second = repo.saveProfile(azureProfile("Two", "two", "zh-CN-XiaoxiaoNeural")).profiles.last()
+        assertEquals(SYSTEM_SPEECH_PROFILE_ID, repo.loadProfiles().activeId)
+        repo.activateProfile(first.id)
+        repo.saveProfile(azureProfile("Two renamed", null, "zh-CN-XiaoxiaoNeural").copy(id = second.id))
+        assertEquals("one", (repo.loadRuntimeConfig() as SpeechRuntimeConfig.Azure).apiKey)
+        assertEquals("two", (repo.loadProfileRuntimeConfig(second.id) as SpeechRuntimeConfig.Azure).apiKey)
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.deleteProfile(first.id) } }
+        repo.activateProfile(second.id)
+        repo.deleteProfile(first.id)
+        assertEquals("zh-CN-XiaoxiaoNeural", (repo.loadSynthesisConfig() as SpeechRuntimeConfig.Azure).voice)
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.deleteProfile(SYSTEM_SPEECH_PROFILE_ID) } }
+        Unit
+    }
+
+    @Test fun `invalid save import and cross-host key reuse leave catalog unchanged`() = runBlocking {
+        val repo = repository()
+        val first = repo.saveProfile(azureProfile("One", "one", "")).profiles.last()
+        val before = repo.loadProfiles()
+        assertThrows(IllegalArgumentException::class.java) { runBlocking {
+            repo.saveProfile(azureProfile("Other", null, "").let { it.copy(id = first.id,
+                settings = it.settings.copy(azureEndpoint = "https://other.example")) })
+        } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking {
+            repo.importProfiles(listOf(azureProfile("Valid", "key", ""), azureProfile("Invalid", null, "")), 0)
+        } }
+        assertEquals(before, repo.loadProfiles())
+    }
+
+    @Test fun `corrupt catalog and half legacy secret are reported without replacing data`() = runBlocking {
+        for ((key, value) in listOf("speech.profiles.v1" to "broken", "speech.azure.api_key_ciphertext" to "partial")) {
+            val store = SpeechPreferencesDataStore()
+            store.updateData { it.toMutablePreferences().apply { this[stringPreferencesKey(key)] = value } }
+            val repo = DataStoreSpeechSettingsRepository(store, SpeechFakeCipher())
+            assertThrows(IllegalStateException::class.java) { runBlocking { repo.loadProfiles() } }
+            assertEquals(value, store.data.value[stringPreferencesKey(key)])
+        }
+    }
+
+    private fun azureProfile(name: String, key: String?, voice: String) = SpeechProfileInput(
+        name = name, settings = SpeechSettingsInput(SpeechProvider.AZURE,
+            azureEndpoint = "https://fixture.cognitiveservices.azure.com", azureApiKeyReplacement = key,
+            synthesisEnabled = true, azureVoice = voice),
+    )
+
     @Test
     fun `saving other providers preserves all voice selections including local system voice`() = runBlocking {
         val repository = repository()
@@ -34,8 +112,9 @@ class SpeechSettingsRepositoryTest {
         )
         repository.save(SpeechSettingsInput(SpeechProvider.SYSTEM, systemVoice = "en-us-x-test-local"))
         val summary = repository.loadSummary()
-        assertEquals("x4_yezi", summary.iFlytekVoice)
-        assertEquals("en-US-JennyNeural", summary.azureVoice)
+        val profiles = repository.loadProfiles().profiles
+        assertEquals("x4_yezi", profiles.single { it.settings.provider == SpeechProvider.IFLYTEK }.settings.iFlytekVoice)
+        assertEquals("en-US-JennyNeural", profiles.single { it.settings.provider == SpeechProvider.AZURE }.settings.azureVoice)
         assertEquals(SpeechRuntimeConfig.System("en-us-x-test-local"), repository.loadSynthesisConfig())
         repository.save(SpeechSettingsInput(SpeechProvider.SYSTEM, systemVoice = ""))
         assertEquals(SpeechRuntimeConfig.System(), repository.loadSynthesisConfig())
@@ -182,7 +261,7 @@ class SpeechSettingsRepositoryTest {
         )
 }
 
-private class SpeechFakeCipher : ApiKeyCipher {
+internal class SpeechFakeCipher : ApiKeyCipher {
     override fun encrypt(plaintext: String): EncryptedSecret =
         EncryptedSecret(
             ciphertext = plaintext.reversed(),
@@ -195,7 +274,7 @@ private class SpeechFakeCipher : ApiKeyCipher {
     }
 }
 
-private class SpeechPreferencesDataStore : DataStore<Preferences> {
+internal class SpeechPreferencesDataStore : DataStore<Preferences> {
     private val state = MutableStateFlow(emptyPreferences())
 
     override val data = state

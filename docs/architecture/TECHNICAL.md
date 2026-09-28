@@ -34,21 +34,23 @@ patch number but cannot roll back or overwrite a released version. At startup,
 Mochi checks only the latest stable release and opens its GitHub page after
 explicit user confirmation; Android remains responsible for APK installation.
 
-Provider sharing generates v3 bundles and imports authenticated v2 or v3 links.
-Each share selects multiple saved LLM connections and a speech Provider plus
+Provider sharing generates v4 bundles and imports authenticated v2/v3/v4 links.
+Each share selects multiple saved LLM and speech connections plus
 optional Amap, Tencent Docs, and manual MCP connections. Only the active ready
-LLM profile and speech default selected; other LLM profiles and Tool credentials
+LLM and speech profiles default selected; other profiles and Tool credentials
 default unselected every time. MCP shares contain endpoint,
 credential, and enabled remote Tool names rather than cached schemas. Mochi
 encrypts the bundle with a fresh AES-256-GCM key and places ciphertext and key
-in a `mochi://provider/import#v3` link, with version-specific authenticated data.
+in a `mochi://provider/import#v4` link, with version-specific authenticated data.
 The envelope and payload versions must match. No password or backend is required, but
 possession of the complete link grants the selected API access and quota.
 Import requires confirmation, rediscovers shared MCP schemas, writes secrets
-through the receiver's Keystore-backed repositories, appends LLM profiles with
-fresh local IDs, and selects the shared active index. When the sender excludes
-its active profile, index zero is used. Legacy v2 single-LLM links append one
-profile. Included speech and Tool settings are replaced and selected Tools enabled.
+through the receiver's Keystore-backed repositories, appends LLM and cloud speech
+profiles with fresh local IDs, and selects their respective shared active indices.
+When the sender excludes an active profile, index zero is used for that kind.
+Legacy v2/v3 single-speech fields append one cloud account; system speech selects
+the existing built-in profile without replacing its local voice.
+Included Tool settings are replaced and selected Tools enabled.
 Input validation and MCP preparation precede writes; separate repositories are
 not a cross-store transaction. Links remain bounded to 32,768 characters.
 Notion and Feishu OAuth,

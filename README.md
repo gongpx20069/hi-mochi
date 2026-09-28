@@ -92,14 +92,14 @@ single-provider settings migrate without re-entering the key.
 
 Settings starts with **Share/import**, followed by AI connections, Speech/wake,
 Conversation/persona, and Display/language. Sharing can include multiple checked
-LLM connections. Import adds them instead of overwriting saved accounts and
-selects the shared active connection. New v3 links require an updated receiver;
-existing v2 links remain importable. Anyone holding a full link can use the
+LLM and speech connections. Import adds them instead of overwriting saved accounts
+and selects each shared active connection. New v4 links require an updated receiver;
+existing v2/v3 links remain importable. Anyone holding a full link can use the
 included API credentials.
 
 ### Supported Speech Providers
 
-Open **Settings > Speech recognition and synthesis**. Android speech is the
+Open **Settings > Speech and wake**. Android speech is the
 default; cloud speech is optional and separate from the LLM configuration.
 
 | Provider | Default | Configuration |
@@ -110,10 +110,18 @@ default; cloud speech is optional and separate from the LLM configuration.
 
 For iFlytek or Azure, **Also use this provider for speech synthesis** reuses
 the saved speech credentials for replies. It is off by default. Choose and
-preview a voice, then **Save speech settings** to apply it. Cloud synthesis
+preview a voice, then **Save speech connection** to apply it. Cloud synthesis
 sends reply text to that Provider; previews also consume its service quota.
 Listed voices do not guarantee account access or free usage. Wake
 acknowledgements remain local.
+
+Speech uses the same named-card/editor pattern as AI connections, including
+multiple accounts of the same provider. **Add** saves without switching; **Use**
+selects the account and stops only the current voice interaction/preview, leaving
+text conversations and background Agent tasks running. Edit any saved account
+to preview its voices without activating it. Existing accounts, keys and voices
+migrate in place. Android remains built in; switch away before deleting an active
+cloud account.
 
 Need another LLM or Speech Provider? Please
 [open an issue](https://github.com/gongpx20069/hi-mochi/issues/new) describing

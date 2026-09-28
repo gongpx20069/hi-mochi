@@ -25,6 +25,10 @@ import com.example.mochi_pet.core.settings.ProviderProfileSummary
 import com.example.mochi_pet.core.settings.ProviderProfilesSummary
 import com.example.mochi_pet.core.settings.ProviderSettingsSummary
 import com.example.mochi_pet.core.settings.ProviderShareSelection
+import com.example.mochi_pet.core.settings.SpeechProfileSummary
+import com.example.mochi_pet.core.settings.SpeechProfilesSummary
+import com.example.mochi_pet.core.settings.SpeechSettingsSummary
+import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.wake.WakeRuntimeState
 import java.util.Locale
 import org.junit.After
@@ -95,18 +99,40 @@ class ProviderProfilesUiTest {
         compose.onNodeWithText("AI 连接").assertIsDisplayed()
     }
 
-    private fun render(fontScale: Float = 1f, share: (ProviderShareSelection) -> Unit = {}) {
+    @Test fun `speech shares select the active account by default and permit a second account`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var selection: ProviderShareSelection? = null
+        val summary = SpeechSettingsSummary(provider = SpeechProvider.AZURE,
+            azureEndpoint = "https://fixture.cognitiveservices.azure.com", hasAzureApiKey = true)
+        val profiles = SpeechProfilesSummary(listOf(
+            SpeechProfileSummary("voice-one", "Voice One", summary),
+            SpeechProfileSummary("voice-two", "Voice Two", summary),
+        ), "voice-one")
+        render(speechProfiles = profiles, share = { selection = it })
+        compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Share Providers"))
+        compose.onNodeWithText("Share Providers").performClick()
+        compose.onNode(hasText("Voice Two") and hasClickAction()).performScrollTo().performClick()
+        compose.onNodeWithText("Share selected").performClick()
+        assertEquals(setOf("voice-one", "voice-two"), selection!!.speechProfileIds)
+    }
+
+    private fun render(
+        fontScale: Float = 1f,
+        share: (ProviderShareSelection) -> Unit = {},
+        speechProfiles: SpeechProfilesSummary = SpeechProfilesSummary(),
+    ) {
         compose.setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
                     ProviderSettingsSurface(
                         state = ProviderSettingsUiState(summary = first.settings, isLoading = false,
                             profiles = ProviderProfilesSummary(listOf(first, second), first.id)),
-                        speechState = SpeechSettingsUiState(isLoading = false),
+                        speechState = SpeechSettingsUiState(summary = speechProfiles.active.settings,
+                            profiles = speechProfiles, isLoading = false),
                         providerShareState = ProviderShareUiState(), toolsState = ToolsUiState(),
                         agentSettingsState = AgentSettingsUiState(), personaState = PersonaUiState(),
                         wakeState = WakeRuntimeState(), wakeFeedback = null,
-                        onEnableWake = {}, onDisableWake = {}, onProviderAction = {}, onSaveSpeech = {},
+                        onEnableWake = {}, onDisableWake = {}, onProviderAction = {}, onSpeechAction = {},
                         onCreateProviderShareLink = share, onReceiveProviderShareLink = {},
                         onSetRecentConversationTurns = {}, onSetFocusStandby = { _, _ -> },
                         onSavePersona = { _, _, _ -> },

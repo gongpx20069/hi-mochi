@@ -232,6 +232,7 @@ class AndroidVoiceRuntime internal constructor(
         text: String,
         purpose: SpeechPurpose,
         previewVoiceId: String?,
+        previewProfileId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) {
         val bounded = text.trim().take(MAX_TRANSCRIPT_CHARS)
@@ -270,7 +271,8 @@ class AndroidVoiceRuntime internal constructor(
                 var provider = "settings"
                 val failure = try {
                     val savedConfig = if (purpose == SpeechPurpose.PREVIEW) {
-                        speechSettingsRepository.loadRuntimeConfig()
+                        if (previewProfileId == null) speechSettingsRepository.loadRuntimeConfig()
+                        else speechSettingsRepository.loadProfileRuntimeConfig(previewProfileId)
                     } else {
                         speechSettingsRepository.loadSynthesisConfig()
                     }
@@ -399,11 +401,12 @@ class AndroidVoiceRuntime internal constructor(
         }
     }
 
-    override suspend fun availableVoices(provider: SpeechProvider): List<SpeechVoice> =
+    override suspend fun availableVoices(provider: SpeechProvider, profileId: String?): List<SpeechVoice> =
         when (provider) {
             SpeechProvider.IFLYTEK -> IFLYTEK_BASIC_VOICES
             SpeechProvider.AZURE -> {
-                val config = speechSettingsRepository.loadRuntimeConfig()
+                val config = if (profileId == null) speechSettingsRepository.loadRuntimeConfig()
+                    else speechSettingsRepository.loadProfileRuntimeConfig(profileId)
                 check(config is SpeechRuntimeConfig.Azure) { "Save the connection settings first" }
                 AzureSpeechVoices().load(config)
             }

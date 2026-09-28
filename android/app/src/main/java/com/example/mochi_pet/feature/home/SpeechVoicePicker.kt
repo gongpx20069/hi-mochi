@@ -192,7 +192,7 @@ internal fun SpeechVoicePicker(
                         selected.isBlank() || selected.trim().matches(Regex("[A-Za-z0-9_:-]{1,100}")),
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Confirm selection") }
-                Text("Save speech settings to apply this selection.", style = MaterialTheme.typography.bodySmall)
+                Text("Save the speech connection to apply this voice. Preview does not switch connections.", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

@@ -308,10 +308,19 @@ Remote AgentLink tasks and submitted Termux processes are not stopped by this
 local cancellation. Deleting the active profile requires confirmation and leaves
 no active connection; there is no implicit fallback to another account.
 
-**Speech recognition and synthesis** retains Android as the zero-configuration
-default. Selecting iFlytek or Azure exposes a default-off **Also use this provider
-for speech synthesis** switch. It reuses the existing encrypted credentials;
-blank secret fields still preserve them. The adjacent disclosure explains that
+**Speech/wake** shows saved connection cards with Use/Edit/Delete and a separate
+Add speech connection button. Android is a built-in, nondeletable default card;
+iFlytek and Azure support multiple named accounts. Add/Edit opens a masked,
+screenshot-protected dialog. New accounts never inherit another account's keys.
+Blank secret fields preserve only the edited account. A changed Azure host
+requires a new key. Adding saves without activating; Use changes the selection.
+Active cloud connections cannot be deleted until another connection is selected.
+Switching or changing active runtime settings stops the current voice interaction
+(including its pending foreground Agent reply) and preview, but never a pure
+text conversation or scheduled/background Agent. Inactive edits do not stop the
+current voice conversation. Each account independently remembers its voice and
+default-off **Also use this provider for speech synthesis** switch.
+The adjacent disclosure explains that
 assistant reply text leaves the device when enabled. Cloud voice selection appears
 while enabled; the Android offline voice picker is available for the system Provider.
 This is one shared Provider selection, not independent STT and TTS accounts.
@@ -326,11 +335,14 @@ Cloud Providers retain an advanced custom-ID field, including previously saved I
 that are not in the catalog. Listing does not imply account authorization or free
 usage; only a completed preview earns a transient **Last preview succeeded** label.
 
-Confirming the sheet changes the draft only; **Save speech settings** applies it.
-Each Provider remembers its own voice, including when other Providers are saved.
+Confirming the sheet changes the draft only; **Save speech connection** applies it.
+Each connection remembers its own voice, including accounts of the same Provider.
 Android voice names are device-local and are not copied in Provider shares.
 Connection edits (Provider, endpoint, AppID, or replacement secrets) must be saved
-before preview; voice-only edits can be previewed without saving. Preview sends
+before preview; save a new account then edit it to load/preview its voices.
+Catalog and preview use that saved profile ID, even when inactive, without
+temporarily switching the live connection. Voice-only edits can be previewed
+without saving. Preview sends
 only a fixed localized greeting, consumes cloud quota when applicable, never calls
 the LLM or writes history, and leaves the saved voice unchanged. It cannot interrupt
 an active conversation. During preview, pause wake and restore its prior enabled
@@ -347,21 +359,22 @@ no silent fallback or automatic retry after partial playback. A new wake or expl
 microphone action can start another turn.
 
 Share Providers always opens a checklist before Android's share sheet. The
-active ready LLM connection and speech Provider begin selected; other saved LLM
-connections and every Tool credential
+active ready LLM and speech connections begin selected; other saved connections
+and every Tool credential
 entry begins unselected on each opening. Available Tool entries are Amap,
 Tencent Docs, and each configured manual MCP server. The confirmation screen
 warns that possession of the complete link grants access to the selected API
-resources. Import adds LLM profiles without replacing existing accounts and
-selects the shared active profile, or the first selected profile when the
-sender excluded its active profile. This cancels running local Agent tasks.
-Included speech and Tool connections are replaced, enabling their switches
-and shared Tool selections. Notion and Feishu OAuth,
+resources. Import adds LLM and speech profiles without replacing existing accounts
+and selects each shared active profile, or its first selected profile when the
+sender excluded its active profile. LLM changes cancel local Agent tasks; speech
+changes stop only the voice interaction/preview. Android shares select the
+receiver's built-in connection and preserve its device-local voice.
+Included Tool settings are replaced, enabling their shared selections. Notion and Feishu OAuth,
 Mi Home sessions, and Android permissions require setup on the receiving
 device and never appear in the checklist.
 Speech shares include the synthesis opt-in and selected voice. Older v2 speech
 shares without these fields import with system speech output. New shares use
-v3 and require an updated receiver; existing authenticated v2 links remain
+v4 and require an updated receiver; existing authenticated v2/v3 links remain
 importable as additional saved connections.
 
 Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.

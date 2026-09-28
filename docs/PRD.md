@@ -148,14 +148,21 @@ support is an optional import/export adapter.
 - API keys are never displayed again after saving.
 - Settings groups are ordered: Share/import, AI connections, Speech/wake,
   Conversation/persona, Display/language.
-- Every Provider share opens a selection step supporting multiple saved LLM
-  connections. Only the active ready LLM connection and speech start selected;
-  other LLM accounts and all Tool credentials start unselected.
-- Confirmed import appends LLM connections without overwriting existing ones
-  and activates the shared active connection (or first selected profile when
-  the active profile was excluded), cancelling running local Agents. Included
-  speech and Tool connections retain replace-included behavior. Imported
-  secrets use the receiver's Keystore-backed storage.
+- Speech also uses named connection cards and a secure editor, including multiple
+  iFlytek/Azure accounts with independent credentials, voice and synthesis opt-in.
+  Android is the built-in, nondeletable zero-configuration connection. Adding
+  cloud speech does not activate it; Use switches explicitly. Switch away before
+  deleting an active cloud account. Legacy active and inactive accounts migrate.
+- A speech switch or active speech settings change stops the current voice
+  interaction and preview, but preserves pure text and background Agent work.
+  Preview/catalog requests target the edited saved account without activating it.
+- Every Provider share supports multiple saved LLM and speech connections.
+  Only each active ready connection starts selected; other accounts and all Tool
+  credentials start unselected. Import appends both kinds without overwriting
+  accounts and selects each shared active profile (or first selected profile).
+  LLM changes cancel local Agents; speech changes stop only the voice interaction.
+  Included Tool connections retain replace-included behavior. Secrets use the
+  receiver's Keystore; device-local Android voices never leave the device.
 - Notion and Feishu OAuth, Mi Home sessions and device selection, Android permissions,
   persona, memories, and planner data are never shared.
 

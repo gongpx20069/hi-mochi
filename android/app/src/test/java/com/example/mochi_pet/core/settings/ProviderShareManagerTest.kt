@@ -14,6 +14,57 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ProviderShareManagerTest {
+    @Test fun `speech share includes only checked accounts and imports additively with its active selection`() = runBlocking {
+        val source = DataStoreSpeechSettingsRepository(Store(), Cipher)
+        fun input(name: String, key: String) = SpeechProfileInput(name = name, settings = SpeechSettingsInput(
+            SpeechProvider.AZURE, azureEndpoint = "https://fixture.cognitiveservices.azure.com",
+            azureApiKeyReplacement = key, synthesisEnabled = true, azureVoice = "en-US-JennyNeural",
+        ))
+        val one = source.saveProfile(input("One", "one")).profiles.last()
+        val two = source.saveProfile(input("Two", "two")).profiles.last()
+        source.saveProfile(input("Excluded", "excluded"))
+        source.activateProfile(two.id)
+        val link = manager(repo(), source).createShareLink(ProviderShareSelection(
+            includeLlm = false, speechProfileIds = setOf(one.id, two.id),
+        ))
+        val bundle = ProviderShareCodec.decode(link)
+        assertEquals(listOf("One", "Two"), bundle.speechProfiles.map { it.name })
+        assertEquals(1, bundle.activeSpeechIndex)
+        val target = DataStoreSpeechSettingsRepository(Store(), Cipher)
+        val existing = target.saveProfile(input("Existing", "existing")).profiles.last()
+        manager(repo(), target).importShareLink(link)
+        assertEquals(4, target.loadProfiles().profiles.size)
+        assertEquals("Two", target.loadProfiles().active.name)
+        assertEquals("two", (target.loadSynthesisConfig() as SpeechRuntimeConfig.Azure).apiKey)
+        assertEquals("existing", (target.loadProfileRuntimeConfig(existing.id) as SpeechRuntimeConfig.Azure).apiKey)
+        val excludedActive = manager(repo(), source).createShareLink(ProviderShareSelection(
+            includeLlm = false, speechProfileIds = setOf(one.id),
+        ))
+        assertEquals(0, ProviderShareCodec.decode(excludedActive).activeSpeechIndex)
+    }
+
+    @Test fun `actual v2 and v3 speech payloads import without replacing old accounts or system voice`() = runBlocking {
+        for (version in listOf(2, 3)) {
+            val target = DataStoreSpeechSettingsRepository(Store(), Cipher)
+            target.save(SpeechSettingsInput(SpeechProvider.SYSTEM, systemVoice = "device-only"))
+            val plaintext = """{"version":$version,"speech":{"provider":"AZURE","azureEndpoint":"https://fixture.cognitiveservices.azure.com","azureApiKey":"legacy-key"}}"""
+            val key = ByteArray(32) { 7 }
+            val iv = ByteArray(12) { 9 }
+            val encrypted = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding").run {
+                init(javax.crypto.Cipher.ENCRYPT_MODE, javax.crypto.spec.SecretKeySpec(key, "AES"),
+                    javax.crypto.spec.GCMParameterSpec(128, iv))
+                updateAAD("mochi-provider-share-v$version".toByteArray())
+                doFinal(plaintext.toByteArray())
+            }
+            val encoder = java.util.Base64.getUrlEncoder().withoutPadding()
+            val link = "mochi://provider/import#v$version." + listOf(key, iv, encrypted).joinToString(".") { encoder.encodeToString(it) }
+            manager(repo(), target).importShareLink(link)
+            assertEquals(2, target.loadProfiles().profiles.size)
+            assertEquals("legacy-key", (target.loadRuntimeConfig() as SpeechRuntimeConfig.Azure).apiKey)
+            assertEquals(SpeechRuntimeConfig.System("device-only"), target.loadSynthesisConfig())
+        }
+    }
+
     @Test fun `shares only selected profiles and imports them without overwriting existing connections`() = runBlocking {
         val source = repo()
         val one = source.saveProfile(input("One", "one-key")).active!!
@@ -71,8 +122,8 @@ class ProviderShareManagerTest {
             model = "fixture-model", apiKeyReplacement = key, imageInputEnabled = false),
     )
     private fun repo() = DataStoreProviderSettingsRepository(Store(), Cipher)
-    private fun manager(repo: ProviderSettingsRepository) = ProviderShareManager(
-        repo, DataStoreSpeechSettingsRepository(Store(), Cipher),
+    private fun manager(repo: ProviderSettingsRepository, speech: SpeechSettingsRepository = DataStoreSpeechSettingsRepository(Store(), Cipher)) = ProviderShareManager(
+        repo, speech,
         DataStoreToolCatalogRepository(Store(), Cipher, McpStreamableHttpClient()),
     )
     private class Store : DataStore<Preferences> {

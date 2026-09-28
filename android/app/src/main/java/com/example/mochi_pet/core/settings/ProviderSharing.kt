@@ -22,11 +22,13 @@ class ProviderShareException(message: String) : IllegalArgumentException(message
 
 @Serializable
 internal data class SharedProviderBundle(
-    val version: Int = 3,
+    val version: Int = 4,
     val llm: SharedLlmProvider? = null,
     val llmProfiles: List<SharedLlmProfile> = emptyList(),
     val activeLlmIndex: Int = 0,
     val speech: SharedSpeechProvider? = null,
+    val speechProfiles: List<SharedSpeechProfile> = emptyList(),
+    val activeSpeechIndex: Int = 0,
     val tools: SharedToolProviders = SharedToolProviders(),
 )
 
@@ -34,6 +36,7 @@ data class ProviderShareSelection(
     val includeLlm: Boolean = true,
     val llmProfileIds: Set<String>? = null,
     val includeSpeech: Boolean = true,
+    val speechProfileIds: Set<String>? = null,
     val tools: ToolShareSelection = ToolShareSelection(),
 ) {
     val isEmpty: Boolean
@@ -76,6 +79,9 @@ internal data class SharedSpeechProvider(
     val azureVoice: String = "",
 )
 
+@Serializable
+internal data class SharedSpeechProfile(val name: String, val config: SharedSpeechProvider)
+
 class ProviderShareManager(
     private val providerRepository: ProviderSettingsRepository,
     private val speechRepository: SpeechSettingsRepository,
@@ -100,15 +106,25 @@ class ProviderShareManager(
         require(providerRepository.loadProfiles() == profiles) {
             "AI connections changed while preparing the share. Select them again."
         }
+        val speechProfiles = speechRepository.loadProfiles()
+        val speechIds = if (selection.includeSpeech) {
+            selection.speechProfileIds ?: setOf(speechProfiles.activeId)
+        } else emptySet()
+        require(!selection.includeSpeech || speechIds.isNotEmpty()) { "Select at least one saved speech connection." }
+        val selectedSpeech = speechProfiles.profiles.filter { it.id in speechIds }
+        require(selectedSpeech.size == speechIds.size && selectedSpeech.all { it.settings.isReady }) {
+            "A selected speech connection is missing or incomplete."
+        }
+        val sharedSpeech = selectedSpeech.map {
+            SharedSpeechProfile(it.name, speechRepository.loadProfileRuntimeConfig(it.id).toShared())
+        }
+        require(speechRepository.loadProfiles() == speechProfiles) { "Speech connections changed while preparing the share. Select them again." }
         return ProviderShareCodec.encode(
             SharedProviderBundle(
                 llmProfiles = sharedProfiles,
                 activeLlmIndex = selected.indexOfFirst { it.id == profiles.activeId }.coerceAtLeast(0),
-                speech = if (selection.includeSpeech) {
-                    speechRepository.loadRuntimeConfig().toShared()
-                } else {
-                    null
-                },
+                speechProfiles = sharedSpeech,
+                activeSpeechIndex = selectedSpeech.indexOfFirst { it.id == speechProfiles.activeId }.coerceAtLeast(0),
                 tools = toolCatalogRepository.exportSharedTools(
                     selection.tools,
                 ),
@@ -118,13 +134,14 @@ class ProviderShareManager(
 
     suspend fun importShareLink(link: String) {
         val bundle = ProviderShareCodec.decode(link)
-        require(bundle.version in 2..3) {
+        require(bundle.version in 2..4) {
             "This Provider share version is not supported"
         }
         require(
             bundle.llm != null ||
                 bundle.llmProfiles.isNotEmpty() ||
                 bundle.speech != null ||
+                bundle.speechProfiles.isNotEmpty() ||
                 bundle.tools != SharedToolProviders(),
         ) {
             "Provider share link does not contain any connections"
@@ -164,7 +181,14 @@ class ProviderShareManager(
                 imageInputEnabled = llm.imageInputEnabled,
             ).also { it.validate() })
         }
-        val speechInput = bundle.speech?.let { speech ->
+        require(bundle.speech == null || bundle.speechProfiles.isEmpty()) { "Provider share contains conflicting speech connections." }
+        val sharedSpeech = bundle.speechProfiles.ifEmpty {
+            bundle.speech?.let { listOf(SharedSpeechProfile(it.provider.connectionTitle, it)) }.orEmpty()
+        }
+        require(sharedSpeech.isEmpty() || bundle.activeSpeechIndex in sharedSpeech.indices) { "Shared speech connection selection is invalid." }
+        val speechInputs = sharedSpeech.map { profile ->
+            require(profile.name.trim().length in 1..120) { "Name the speech connection using 1-120 characters." }
+            val speech = profile.config
             when (speech.provider) {
                 SpeechProvider.SYSTEM -> Unit
                 SpeechProvider.IFLYTEK -> require(
@@ -179,7 +203,7 @@ class ProviderShareManager(
                     "Shared Azure Speech API key is required"
                 }
             }
-            SpeechSettingsInput(
+            SpeechProfileInput(name = profile.name, settings = SpeechSettingsInput(
                 provider = speech.provider,
                 iFlytekAppId = speech.iFlytekAppId,
                 iFlytekApiKeyReplacement =
@@ -192,14 +216,13 @@ class ProviderShareManager(
                 synthesisEnabled = speech.synthesisEnabled,
                 iFlytekVoice = speech.iFlytekVoice.takeIf { speech.provider == SpeechProvider.IFLYTEK },
                 azureVoice = speech.azureVoice.takeIf { speech.provider == SpeechProvider.AZURE },
-            )
+            ).also { it.validate() })
         }
-        speechInput?.validate()
         val preparedTools =
             toolCatalogRepository.prepareSharedTools(bundle.tools)
 
         if (providerInputs.isNotEmpty()) providerRepository.importProfiles(providerInputs, bundle.activeLlmIndex)
-        speechInput?.let { speechRepository.save(it) }
+        if (speechInputs.isNotEmpty()) speechRepository.importProfiles(speechInputs, bundle.activeSpeechIndex)
         toolCatalogRepository.applySharedTools(preparedTools)
     }
 
@@ -246,7 +269,7 @@ internal object ProviderShareCodec {
     private val random = SecureRandom()
 
     fun encode(bundle: SharedProviderBundle): String {
-        require(bundle.version in 2..3) { "This Provider share version is not supported" }
+        require(bundle.version in 2..4) { "This Provider share version is not supported" }
         val key = ByteArray(KEY_BYTES).also(random::nextBytes)
         val iv = ByteArray(IV_BYTES).also(random::nextBytes)
         val plaintext = json.encodeToString(bundle)
@@ -277,7 +300,7 @@ internal object ProviderShareCodec {
     }
 
     fun decode(link: String): SharedProviderBundle {
-        val version = listOf(2, 3).firstOrNull { link.startsWith(linkPrefix(it)) }
+        val version = listOf(2, 3, 4).firstOrNull { link.startsWith(linkPrefix(it)) }
         require(version != null) {
             "This is not a Mochi Provider share link"
         }

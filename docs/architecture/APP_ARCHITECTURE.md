@@ -112,6 +112,13 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   keys remain separately encrypted per profile using Android Keystore. The
   application-scoped provider-run coordinator gates foreground/scheduled Agent
   startup against active-configuration changes and cancellation, not UI state.
+- The speech DataStore owns `speech.profiles.v1`, a named per-account catalog and
+  active ID, with a permanent Android system profile. Migration atomically retains
+  active and inactive legacy cloud credentials/voices without decrypting their
+  ciphertext. UI holds only summaries and transient masked replacements. Voice
+  catalogs/previews resolve an explicit saved profile ID without changing active
+  selection. Speech changes cancel only the current voice interaction/preview,
+  not the application-wide LLM run coordinator.
 - The Tool DataStore also owns AgentLink provider/individual switches, a
   user-confirmed package signer digest, and up to 20 non-secret machine/chat/task
   links with event cursors. No Room schema changes are needed. Human revision

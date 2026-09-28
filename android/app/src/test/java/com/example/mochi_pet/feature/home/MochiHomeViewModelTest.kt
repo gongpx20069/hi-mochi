@@ -63,6 +63,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test fun `speech switching cancels voice interaction but leaves text Agent running`() = kotlinx.coroutines.runBlocking {
+        for (voiceInput in listOf(false, true)) {
+            val speech = com.example.mochi_pet.core.settings.DataStoreSpeechSettingsRepository(
+                com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+                com.example.mochi_pet.core.settings.SpeechFakeCipher(),
+            )
+            val profile = speech.saveProfile(com.example.mochi_pet.core.settings.SpeechProfileInput(
+                name = "Other", settings = SpeechSettingsInput(SpeechProvider.AZURE,
+                    azureEndpoint = "https://fixture.cognitiveservices.azure.com", azureApiKeyReplacement = "fixture-key"),
+            )).profiles.last()
+            val started = CompletableDeferred<Unit>()
+            var stopped = false
+            val viewModel = MochiHomeViewModel(
+                plannerStore = PlannerStoreFake(), providerSettingsRepository = ProviderSettingsRepositoryFake(),
+                speechSettingsRepository = speech, voiceRuntime = VoiceRuntimeFake("Synthetic voice request"),
+                ioDispatcher = Dispatchers.Unconfined,
+                agentRunnerBuilder = { _, _, _ -> AgentRunner {
+                    started.complete(Unit)
+                    try { awaitCancellation() } finally { stopped = true }
+                } },
+            )
+            if (voiceInput) viewModel.startVoiceInput() else viewModel.sendConversation("Synthetic text request")
+            started.await()
+            viewModel.handleSpeechProfileAction(SpeechProfileAction.Activate(profile.id))
+            assertEquals(voiceInput, stopped)
+            assertEquals(!voiceInput, viewModel.conversationState.value.isSending)
+            assertEquals(profile.id, viewModel.speechSettingsState.value.profiles.activeId)
+            viewModel.cancelConversation()
+        }
+    }
+
     @Test
     fun `connection switch cancels foreground work and stops playback without error reply`() = kotlinx.coroutines.runBlocking {
         val runs = com.example.mochi_pet.core.settings.ProviderRunCoordinator()
@@ -978,7 +1009,7 @@ private class BriefingVoiceFake : VoiceRuntime {
     }
     override fun stopListening() = Unit
     override fun stopSpeaking() = Unit
-    override fun speak(text: String, purpose: SpeechPurpose, previewVoiceId: String?, onCompleted: (SpeechPlaybackResult) -> Unit) {
+    override fun speak(text: String, purpose: SpeechPurpose, previewVoiceId: String?, previewProfileId: String?, onCompleted: (SpeechPlaybackResult) -> Unit) {
         acknowledgements++
         onCompleted(SpeechPlaybackResult.COMPLETED)
     }
@@ -1001,7 +1032,7 @@ private class VoiceRuntimeFake(
     var stopSpeakingCount = 0
     var voiceCatalogLoader: suspend (SpeechProvider) -> List<SpeechVoice> = { IFLYTEK_BASIC_VOICES }
 
-    override suspend fun availableVoices(provider: SpeechProvider) = voiceCatalogLoader(provider)
+    override suspend fun availableVoices(provider: SpeechProvider, profileId: String?) = voiceCatalogLoader(provider)
     var listenCount = 0
 
     override fun startListening(
@@ -1023,6 +1054,7 @@ private class VoiceRuntimeFake(
         text: String,
         purpose: SpeechPurpose,
         previewVoiceId: String?,
+        previewProfileId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) {
         spokenText = text
@@ -1036,7 +1068,10 @@ private class VoiceRuntimeFake(
     override fun stopSpeaking() { stopSpeakingCount += 1 }
 }
 
-private class PreviewSpeechSettingsFake : SpeechSettingsRepository {
+private class PreviewSpeechSettingsFake : SpeechSettingsRepository by com.example.mochi_pet.core.settings.DataStoreSpeechSettingsRepository(
+    com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+    com.example.mochi_pet.core.settings.SpeechFakeCipher(),
+) {
     var saveCount = 0
     override suspend fun loadSummary() = SpeechSettingsSummary(
         provider = SpeechProvider.IFLYTEK,
@@ -1050,6 +1085,9 @@ private class PreviewSpeechSettingsFake : SpeechSettingsRepository {
         return loadSummary()
     }
     override suspend fun loadRuntimeConfig() = SpeechRuntimeConfig.IFlytek("test-app", "test-key", "test-secret")
+    override suspend fun loadProfiles() = com.example.mochi_pet.core.settings.SpeechProfilesSummary(
+        listOf(com.example.mochi_pet.core.settings.SpeechProfileSummary("preview", "Preview", loadSummary())), "preview",
+    )
 }
 
 private class HoldingVoiceRuntimeFake : VoiceRuntime {
@@ -1078,6 +1116,7 @@ private class HoldingVoiceRuntimeFake : VoiceRuntime {
         text: String,
         purpose: SpeechPurpose,
         previewVoiceId: String?,
+        previewProfileId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) = onCompleted(SpeechPlaybackResult.COMPLETED)
 
@@ -1105,6 +1144,7 @@ private class InterruptibleVoiceRuntimeFake : VoiceRuntime {
         text: String,
         purpose: SpeechPurpose,
         previewVoiceId: String?,
+        previewProfileId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) = Unit
 

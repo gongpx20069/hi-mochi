@@ -82,10 +82,17 @@ Saved AI connection regressions:
 
 These use synthetic credentials and intercept preset requests without contacting
 real providers. Device `feature.home.ProviderProfilesSmokeTest` opens Settings,
-checks Share/import is first, confirms saved active key decryption without
-printing it, and verifies the catalog is unchanged. Update with `adb install -r`;
+checks Share/import is first, opens the saved speech profile editor, confirms
+active AI/speech credential decryption without printing it, and verifies both
+catalogs are unchanged. Update with `adb install -r`;
 never uninstall or clear data. Real account/model Tool compatibility still needs
 authorized provider-specific testing and is not implied by endpoint presets.
+
+Speech profile regressions additionally cover `SpeechSettingsRepositoryTest`,
+`SpeechSynthesisSettingsTest`, `CloudSpeechRuntimeTest`, and `WakeBriefingTest`:
+legacy active/inactive migration, isolated same-provider accounts, non-overwriting
+multi-share import, inactive-account preview, and voice-only switch cancellation.
+Device smoke does not send recognition audio or consume synthesis quota.
 
 Feishu integration regressions:
 

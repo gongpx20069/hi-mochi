@@ -68,8 +68,7 @@ class SpeechSynthesisSettingsTest {
         compose.onNodeWithText("Voice").performScrollTo().performClick()
         compose.onNodeWithText("Xiaoyan").performScrollTo().performClick()
         compose.onNodeWithText("Confirm selection").performScrollTo().performClick()
-        scrollTo("Save speech settings")
-        compose.onNodeWithText("Save speech settings").performScrollTo().performClick()
+        compose.onNodeWithText("Save speech connection").performClick()
         val input = saved.single()
         assertTrue(input.synthesisEnabled)
         assertEquals("x4_xiaoyan", input.iFlytekVoice)
@@ -97,30 +96,18 @@ class SpeechSynthesisSettingsTest {
     }
 
     private fun scrollTo(text: String) {
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text))
+        compose.onNodeWithText(text).performScrollTo()
     }
 
     private fun show(summary: SpeechSettingsSummary) {
         compose.setContent {
             MaterialTheme {
-                ProviderSettingsSurface(
-                    state = ProviderSettingsUiState(isLoading = false),
-                    speechState = SpeechSettingsUiState(summary = summary, isLoading = false),
-                    providerShareState = ProviderShareUiState(),
-                    toolsState = ToolsUiState(),
-                    agentSettingsState = AgentSettingsUiState(),
-                    personaState = PersonaUiState(),
-                    wakeState = WakeRuntimeState(),
-                    wakeFeedback = null,
-                    onEnableWake = {},
-                    onDisableWake = {},
-                    onProviderAction = {},
-                    onSaveSpeech = saved::add,
-                    onCreateProviderShareLink = {},
-                    onReceiveProviderShareLink = {},
-                    onSetRecentConversationTurns = {},
-                    onSetFocusStandby = { _, _ -> },
-                    onSavePersona = { _, _, _ -> },
+                SpeechConnectionDialog(
+                    profile = com.example.mochi_pet.core.settings.SpeechProfileSummary("test", "Test", summary),
+                    state = SpeechSettingsUiState(summary = summary, isLoading = false),
+                    catalog = SpeechVoiceUiState(), playback = com.example.mochi_pet.core.voice.VoiceRuntimeState(),
+                    onDismiss = {}, onSave = { saved += it.settings },
+                    onLoadVoices = { _, _ -> }, onPreview = { _, _, _ -> }, onStopPreview = {},
                 )
             }
         }

@@ -123,10 +123,11 @@ interface VoiceRuntime {
         text: String,
         purpose: SpeechPurpose = SpeechPurpose.REPLY,
         previewVoiceId: String? = null,
+        previewProfileId: String? = null,
         onCompleted: (SpeechPlaybackResult) -> Unit = {},
     )
 
-    suspend fun availableVoices(provider: SpeechProvider): List<SpeechVoice> =
+    suspend fun availableVoices(provider: SpeechProvider, profileId: String? = null): List<SpeechVoice> =
         throw IllegalStateException("Voice catalog is unavailable")
 
     fun stopSpeaking()

@@ -66,6 +66,15 @@ outside the audio thread.
   Android TextToSpeech remains the default output path. Wake acknowledgements
   bypass settings and cloud requests and require an installed non-network Android
   voice; if unavailable, listening still starts without waiting on a cloud voice.
+- Named saved speech profiles support multiple accounts per provider with
+  independent encrypted credentials, voice and synthesis opt-in. The built-in
+  Android profile remains selectable and cannot be deleted. Adding a profile
+  does not switch; active cloud profiles require switching away before deletion.
+  Legacy active and inactive accounts and local Android voice migrate atomically.
+- Switching or changing active speech settings stops recognition, playback,
+  preview and the current voice interaction, rejecting its late callbacks.
+  Text-only foreground and scheduled/background Agents continue. Editing an
+  inactive connection does not stop the live voice conversation.
 - Cloud STT captures each utterance once as temporary 16 kHz mono PCM16 and
   uses the local sherpa-onnx Silero VAD to detect its endpoint before upload.
   It retries that same audio up to three times for transient failures.
@@ -137,11 +146,16 @@ metadata, or Azure's authenticated `/cognitiveservices/voices/list` (prefixed wi
 seconds, 2 MiB, and 2000 entries; redirects are disabled and catalog errors remain
 visible. The catalog is transient and does not certify pricing or account quotas.
 
-An explicit preview purpose loads the saved connection but overrides only the voice
+An explicit preview purpose loads the edited saved profile by ID (including
+inactive accounts) but overrides only the voice
 for that invocation, even if cloud reply synthesis has not yet been enabled. It
 shares the production synthesis/playback path, never persists the draft voice,
 uses a fixed localized greeting, and never starts follow-up STT. The ViewModel owns
-preview cancellation/version checks and wake restoration. Only installed offline
+preview cancellation/version checks and wake restoration. Catalog and preview
+state are keyed by both provider and profile ID so two Azure accounts cannot
+reuse each other's catalogs or success badges. Save new/changed credentials
+before loading voices or previewing; preview never switches active profiles.
+Only installed offline
 voices are used for Android output; missing selected voices fail visibly. Local
 Android voice IDs are stored separately and excluded from cross-device shares.
 

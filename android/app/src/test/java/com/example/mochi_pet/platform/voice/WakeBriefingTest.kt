@@ -17,7 +17,7 @@ class WakeBriefingTest {
             override fun startListening(onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit) { listening = true }
             override fun stopListening() = Unit
             override fun stopSpeaking() = Unit
-            override fun speak(text: String, purpose: SpeechPurpose, previewVoiceId: String?, onCompleted: (SpeechPlaybackResult) -> Unit) {
+            override fun speak(text: String, purpose: SpeechPurpose, previewVoiceId: String?, previewProfileId: String?, onCompleted: (SpeechPlaybackResult) -> Unit) {
                 error("Unsupported simultaneous input must not play a briefing")
             }
         }

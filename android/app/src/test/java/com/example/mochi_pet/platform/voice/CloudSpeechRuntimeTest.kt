@@ -34,6 +34,20 @@ class CloudSpeechRuntimeTest {
     private var runtime: AndroidVoiceRuntime? = null
     private var settingsReads = 0
 
+    @Test fun `preview uses the selected inactive account without switching normal speech`() {
+        val configs = mutableListOf<SpeechRuntimeConfig.IFlytek>()
+        val voice = runtime(synthesizer = SpeechSynthesizer { config, _, _ ->
+            configs += config as SpeechRuntimeConfig.IFlytek
+            byteArrayOf(0, 0)
+        })
+        voice.speak("preview", SpeechPurpose.PREVIEW, "x4_yezi", "inactive")
+        idle()
+        voice.speak("normal reply")
+        idle()
+        assertEquals(listOf("other-key", "test-key"), configs.map { it.apiKey })
+        assertEquals("x4_yezi", configs.first().voice)
+    }
+
     @Test
     fun `preview overrides only invocation voice and bypasses reply synthesis opt out`() {
         val configs = mutableListOf<SpeechRuntimeConfig>()
@@ -167,12 +181,21 @@ class CloudSpeechRuntimeTest {
         synthesisEnabled: Boolean = true,
     ): AndroidVoiceRuntime = AndroidVoiceRuntime(
         context = RuntimeEnvironment.getApplication(),
-        speechSettingsRepository = object : SpeechSettingsRepository {
+        speechSettingsRepository = object : SpeechSettingsRepository by com.example.mochi_pet.core.settings.DataStoreSpeechSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+            com.example.mochi_pet.core.settings.SpeechFakeCipher(),
+        ) {
             override suspend fun loadSummary() = SpeechSettingsSummary(synthesisEnabled = synthesisEnabled)
             override suspend fun save(input: SpeechSettingsInput) = error("Not used")
             override suspend fun loadRuntimeConfig(): SpeechRuntimeConfig {
                 settingsReads += 1
                 return SpeechRuntimeConfig.IFlytek("test-app", "test-key", "test-secret")
+            }
+            override suspend fun loadSynthesisConfig(): SpeechRuntimeConfig =
+                if (synthesisEnabled) loadRuntimeConfig() else SpeechRuntimeConfig.System()
+            override suspend fun loadProfileRuntimeConfig(id: String): SpeechRuntimeConfig {
+                check(id == "inactive")
+                return SpeechRuntimeConfig.IFlytek("other-app", "other-key", "other-secret")
             }
         },
         synthesizer = synthesizer,

@@ -217,10 +217,13 @@ data class SpeechSettingsUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val feedback: String? = null,
+    val profiles: com.example.mochi_pet.core.settings.SpeechProfilesSummary =
+        com.example.mochi_pet.core.settings.SpeechProfilesSummary(),
 )
 
 data class SpeechVoiceUiState(
     val provider: SpeechProvider? = null,
+    val profileId: String? = null,
     val voices: List<SpeechVoice> = emptyList(),
     val isLoading: Boolean = false,
     val catalogError: String? = null,
@@ -348,6 +351,7 @@ class MochiHomeViewModel(
     private var loadVersion = 0L
     @Volatile private var activeBriefing: AgentLinkBriefing? = null
     private var interactionVersion = 0L
+    private var voiceInteraction = false
     private var agentJob: Job? = null
     private val mutableSpeechVoiceState = MutableStateFlow(SpeechVoiceUiState())
     val speechVoiceState = mutableSpeechVoiceState.asStateFlow()
@@ -576,6 +580,7 @@ class MochiHomeViewModel(
 
         voiceRuntime?.stopSpeaking()
         agentJob?.cancel()
+        voiceInteraction = continueListeningAfterReply
         val version = ++interactionVersion
         mutableConversationState.update {
             it.copy(
@@ -810,6 +815,7 @@ class MochiHomeViewModel(
         if (interruptedBriefing != null) acknowledgeBriefing(interruptedBriefing, dismissed = true)
         activeBriefing = null
         cancelAgentInteraction()
+        voiceInteraction = true
         val version = interactionVersion
         val candidate = if (acknowledgeWake && interruptedBriefing == null) {
             agentLinkResults?.state?.value?.briefing(AppLanguage.resolveContentLocale().language == "zh")
@@ -934,6 +940,7 @@ class MochiHomeViewModel(
     }
 
     private fun cancelAgentInteraction() {
+        voiceInteraction = false
         activeBriefing = null
         interactionVersion += 1
         agentJob?.cancel()
@@ -1010,7 +1017,7 @@ class MochiHomeViewModel(
         }
     }
 
-    fun saveSpeechSettings(input: SpeechSettingsInput) {
+    fun handleSpeechProfileAction(action: SpeechProfileAction) {
         stopVoicePreview()
         voiceCatalogVersion += 1
         voiceCatalogJob?.cancel()
@@ -1022,12 +1029,31 @@ class MochiHomeViewModel(
 
         viewModelScope.launch(ioDispatcher) {
             try {
-                val summary = repository.save(input)
+                val before = repository.loadProfiles()
+                val profiles = when (action) {
+                    is SpeechProfileAction.Save -> repository.saveProfile(action.input)
+                    is SpeechProfileAction.Activate -> repository.activateProfile(action.id)
+                    is SpeechProfileAction.Delete -> repository.deleteProfile(action.id)
+                }
+                if (before.active.id != profiles.active.id || before.active.settings != profiles.active.settings ||
+                    (action is SpeechProfileAction.Save && action.input.id == before.activeId &&
+                        listOf(action.input.settings.iFlytekApiKeyReplacement, action.input.settings.iFlytekApiSecretReplacement,
+                            action.input.settings.azureApiKeyReplacement).any { !it.isNullOrBlank() })
+                ) stopChangedSpeechConnection()
                 mutableSpeechSettingsState.value = SpeechSettingsUiState(
-                    summary = summary,
+                    summary = profiles.active.settings,
+                    profiles = profiles,
                     isLoading = false,
-                    feedback = "Speech settings saved",
+                    feedback = when (action) {
+                        is SpeechProfileAction.Save -> "Speech connection saved"
+                        is SpeechProfileAction.Activate -> "Speech connection selected"
+                        is SpeechProfileAction.Delete -> "Speech connection deleted"
+                    },
                 )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: IOException) {
+                mutableSpeechSettingsState.update { it.copy(isSaving = false, feedback = "Speech settings could not be saved") }
             } catch (error: IllegalArgumentException) {
                 mutableSpeechSettingsState.update {
                     it.copy(
@@ -1049,20 +1075,29 @@ class MochiHomeViewModel(
         }
     }
 
-    fun loadSpeechVoices(provider: SpeechProvider) {
+    private fun stopChangedSpeechConnection() {
+        stopVoicePreview()
+        if (voiceInteraction) cancelConversation()
+        else {
+            voiceRuntime?.stopListening()
+            voiceRuntime?.stopSpeaking()
+        }
+    }
+
+    fun loadSpeechVoices(provider: SpeechProvider, profileId: String? = null) {
         voiceCatalogJob?.cancel()
         val version = ++voiceCatalogVersion
         val previous = mutableSpeechVoiceState.value
-        mutableSpeechVoiceState.value = if (previous.provider == provider) {
+        mutableSpeechVoiceState.value = if (previous.provider == provider && previous.profileId == profileId) {
             previous.copy(isLoading = true, catalogError = null)
         } else {
             stopVoicePreview()
-            SpeechVoiceUiState(provider = provider, isLoading = true)
+            SpeechVoiceUiState(provider = provider, profileId = profileId, isLoading = true)
         }
         voiceCatalogJob = viewModelScope.launch(ioDispatcher) {
             try {
                 val runtime = checkNotNull(voiceRuntime) { "Voice catalog is unavailable" }
-                val voices = runtime.availableVoices(provider)
+                val voices = runtime.availableVoices(provider, profileId)
                 if (version == voiceCatalogVersion) {
                     mutableSpeechVoiceState.update { it.copy(voices = voices, isLoading = false) }
                 }
@@ -1086,16 +1121,17 @@ class MochiHomeViewModel(
         }
     }
 
-    fun previewSpeechVoice(provider: SpeechProvider, voiceId: String) {
+    fun previewSpeechVoice(provider: SpeechProvider, voiceId: String, profileId: String? = null) {
         val alreadyPausedForPreview = resumeWakeAfterPreview
         cancelVoicePreview(restoreWake = false)
         val runtime = voiceRuntime
-        val summary = mutableSpeechSettingsState.value.summary
+        val summary = if (profileId == null) mutableSpeechSettingsState.value.summary else
+            mutableSpeechSettingsState.value.profiles.profiles.firstOrNull { it.id == profileId }?.settings
         val error = when {
             runtime == null -> "Voice preview is unavailable"
             mutablePipelineState.value.isActive || mutableConversationState.value.isSending ->
                 "Finish the current voice interaction before previewing"
-            summary.provider != provider || !summary.isReady -> "Save the connection settings first"
+            summary?.provider != provider || !summary.isReady -> "Save the connection settings first"
             voiceId.length > 256 || voiceId.any(Char::isISOControl) ||
                 (provider != SpeechProvider.SYSTEM && voiceId.isNotEmpty() &&
                     !voiceId.matches(Regex("[A-Za-z0-9_:-]{1,100}"))) -> "Speech voice must be a valid provider voice ID"
@@ -1108,7 +1144,9 @@ class MochiHomeViewModel(
         }
         val version = ++voicePreviewVersion
         mutableSpeechVoiceState.update {
-            it.copy(provider = provider, previewVoiceId = voiceId, previewError = null, diagnosticCode = null)
+            if (it.provider == provider && it.profileId == profileId) {
+                it.copy(previewVoiceId = voiceId, previewError = null, diagnosticCode = null)
+            } else SpeechVoiceUiState(provider = provider, profileId = profileId, previewVoiceId = voiceId)
         }
         val speak = {
             if (version == voicePreviewVersion) {
@@ -1120,6 +1158,7 @@ class MochiHomeViewModel(
                     },
                     purpose = SpeechPurpose.PREVIEW,
                     previewVoiceId = voiceId,
+                    previewProfileId = profileId,
                 ) { result ->
                     if (version == voicePreviewVersion) {
                         mutableSpeechVoiceState.update {
@@ -1216,7 +1255,7 @@ class MochiHomeViewModel(
             try {
                 manager.importShareLink(link)
                 val provider = providerSettingsRepository?.loadProfiles()
-                val speech = speechSettingsRepository?.loadSummary()
+                val speech = speechSettingsRepository?.loadProfiles()
                 if (provider != null) {
                     mutableProviderSettingsState.value =
                         ProviderSettingsUiState(
@@ -1226,9 +1265,11 @@ class MochiHomeViewModel(
                         )
                 }
                 if (speech != null) {
+                    if (speech.active != mutableSpeechSettingsState.value.profiles.active) stopChangedSpeechConnection()
                     mutableSpeechSettingsState.value =
                         SpeechSettingsUiState(
-                            summary = speech,
+                            summary = speech.active.settings,
+                            profiles = speech,
                             isLoading = false,
                         )
                 }
@@ -2053,11 +2094,18 @@ class MochiHomeViewModel(
             return
         }
         viewModelScope.launch(ioDispatcher) {
-            val summary = repository.loadSummary()
-            mutableSpeechSettingsState.value = SpeechSettingsUiState(
-                summary = summary,
-                isLoading = false,
-            )
+            try {
+                val profiles = repository.loadProfiles()
+                mutableSpeechSettingsState.value = SpeechSettingsUiState(
+                    summary = profiles.active.settings, profiles = profiles, isLoading = false,
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: IllegalStateException) {
+                mutableSpeechSettingsState.update { it.copy(isLoading = false, feedback = "Speech connections could not be loaded. Stored settings have not been replaced.") }
+            } catch (_: IOException) {
+                mutableSpeechSettingsState.update { it.copy(isLoading = false, feedback = "Speech connections could not be loaded. Stored settings have not been replaced.") }
+            }
         }
     }
 
