@@ -8,7 +8,7 @@
 Local-first data, BYOK intelligence, native actions.**
 
 [**Download APK**](https://github.com/gongpx20069/hi-mochi/releases/latest)
-· **Watch Demo: coming soon**
+· [**Watch introduction (Chinese, Bilibili)**](https://www.bilibili.com/video/BV1u6aB6GEDD/)
 · [**Build from source**](docs/DEVELOPMENT.md)
 
 **Android 8.0+** · **`arm64-v8a` recommended** ·

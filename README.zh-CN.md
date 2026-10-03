@@ -8,7 +8,7 @@
 模型由你选择，说话就能记事、查资料、规划生活并打开正确的原生界面。**
 
 [**下载 APK**](https://github.com/gongpx20069/hi-mochi/releases/latest)
-· **观看演示：即将提供**
+· [**观看中文介绍视频（哔哩哔哩）**](https://www.bilibili.com/video/BV1u6aB6GEDD/)
 · [**从源码构建**](docs/DEVELOPMENT.md)
 
 **Android 8.0+** · **推荐 `arm64-v8a`** ·
