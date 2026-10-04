@@ -78,6 +78,22 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Custom REST regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*Rest*Test" `
+  --tests "*ToolCatalogTest" --tests "*MochiHomeViewModelTest" --no-daemon
+```
+
+These cover typed requests, encrypted catalog persistence, revision revocation,
+single-dispatch HTTP fixtures, cancellation, response limits and Compose setup.
+Transport fixtures allow loopback only through an internal test client; the
+production client always applies the public-address policy. No real API
+credentials or provider calls are used.
+After `adb install -r`, `feature.home.RestApiSmokeTest` verifies both Add tool
+paths without saving or testing an endpoint and checks AI/speech catalogs remain
+unchanged. Real API business semantics require separate authorized testing.
+
 Saved AI connection regressions:
 
 ```powershell

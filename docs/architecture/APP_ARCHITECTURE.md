@@ -45,7 +45,8 @@ run in local JVM tests.
 | `ConversationRepository` | persisted turns and SQLite memory retrieval |
 | `SkillRepository` | Agent Skills metadata, resources, and enablement |
 | `ToolRegistry` | schema registration, validation, dispatch |
-| `ToolCatalogRepository` | built-in enablement, MCP servers, OAuth, selected schemas |
+| `ToolCatalogRepository` | built-in enablement, MCP/OAuth, REST definitions and encrypted credentials, selected schemas |
+| `RestHttpTransport` | bounded cancellable JSON HTTP, public-address checks, single dispatch and no redirects |
 | `AgentLinkClient` | typed shared-chat requests, scoped connection state, non-secret links |
 | `AndroidAgentLinkClient` | explicit Activity result authorization, signer pinning, bounded Messenger IPC |
 | `AgentLinkResultMonitor` / `AgentLinkResultRepository` | exact submitted-operation receipts, encrypted durability, separate viewed/announced revisions |
@@ -108,6 +109,14 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 
 - Room transactions own planner consistency.
 - DataStore owns non-relational preferences.
+- The Tool catalog stores REST connections and endpoint definitions alongside
+  existing settings with a default-empty field for older catalogs. Tokens use
+  the existing Keystore cipher; summaries exclude plaintext credentials.
+  Revision checks reject stale edits and calls, including results arriving after
+  disable/delete. Catalog decode failures block updates rather than replacing
+  saved settings with defaults. REST does not participate in Provider sharing
+  and requires no Room migration. Only the foreground Main Agent registry loads
+  these tools; editors invoke repository operations through the ViewModel.
 - The LLM DataStore owns the versioned named-connection catalog and active ID;
   keys remain separately encrypted per profile using Android Keystore. The
   application-scoped provider-run coordinator gates foreground/scheduled Agent

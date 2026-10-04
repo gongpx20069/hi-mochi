@@ -101,6 +101,9 @@ suspend fun MochiApplication.createAgentRunner(
             toolCatalogRepository.loadEnabledMcpTools() +
             toolCatalogRepository.loadEnabledExtensionTools(extensionScope)
     ).toMutableList()
+    if (extensionScope == ExtensionToolScope.FOREGROUND_MAIN) {
+        tools += toolCatalogRepository.loadEnabledRestTools()
+    }
     if (includeAgentLink) {
         val state = agentLinkClient.refresh()
         if (state.authorized && state.connected && state.enabled) {

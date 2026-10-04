@@ -395,6 +395,25 @@ Each MCP server's detailed Tool list starts collapsed and can be expanded
 without disabling the server or changing individual Tool selections. Built-in
 knowledge providers enable their core search, listing, and reading Tools on
 first connection.
+
+The former **Add MCP** action is **Add tool**, opening a choice between
+**Connect MCP service** and **Connect REST API**. REST cards follow MCP cards
+and precede Extensions. Save a named HTTPS origin and masked Token first;
+the connection starts disabled. Its card offers **Add API tool**, shared
+connection editing/deletion, a master switch, and individual Tool switches.
+Each Tool has a name, usage description, method, path, scalar path/query/body
+parameters, optional defaults and sample values. Advanced fields hold fixed
+JSON body values and an optional business-success JSON pointer/value.
+**Preview** never sends a request. **Test API** opens a native confirmation
+explaining real side effects and quota use. Successful tests expose bounded,
+credential-redacted field samples; users select output names and meanings/units
+before saving. Editing request fields invalidates the test. Saving requires a
+current successful test and matching scalar output selections. Both master and
+individual switches must be on for model use. Failures keep the editor open.
+Secure editors never save Token text across recreation; closing cancels local
+waiting but cannot undo an already submitted request. Deletion removes local
+configuration only, and cards disclose foreground-only, non-shared access.
+
 The Feishu MCP card opens a scrollable English/Chinese setup dialog rather
 than a token-paste shortcut. It explains enterprise app creation, required
 user-identity permissions (with Copy), the exact localhost redirect (with Copy),
@@ -432,7 +451,7 @@ switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
 
-Tools places its Extensions section after all MCP server cards. The Mi Home
+Tools places its Extensions section after all MCP and REST connection cards. The Mi Home
 card always occupies one stable position there, follows Mochi's selected
 Chinese or English UI language, and moves through these states:
 

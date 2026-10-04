@@ -157,6 +157,25 @@ Search, wiki browsing, reading, creation, and updates are enabled after connecti
 enable **Feishu Knowledge** separately. Whole-document deletion, native
 spreadsheets, Bitable, and PPT editing are not supported.
 
+### Connect your own REST API
+
+Open **Tools > Add tool > Connect REST API**. Save a named service origin
+(for example `https://api.example.com`) and choose no authentication, Bearer
+Token, an API-key header, or a complete Authorization value. Tokens stay encrypted
+on the phone and are reused by that connection's API tools.
+
+Tap **Add API tool**, describe when Mochi should use it, choose its method/path,
+and add any parameters/defaults. **Preview** is offline; **Test API** asks before
+sending a real request, which can consume quota or change remote data. Select
+returned fields and their meanings/units, save, and enable both the Tool and
+connection switches. Selected results go to your configured model.
+
+This first version supports public HTTPS:443 JSON APIs and scalar fields.
+Writes require explicit user intent/confirmation; GET may opt out only when
+trusted and read-only. No Python, OAuth, local-network endpoints, Provider
+sharing, Scheduled Agent, or Subagent access is included. Existing MCP creation
+remains under **Add tool > Connect MCP service**.
+
 ### Language, updates, and Provider sharing
 
 Mochi follows the Android system language by default and can be fixed to

@@ -29,6 +29,24 @@ import com.example.mochi_pet.core.mcp.TENCENT_DOCS_SERVER_ID
 import com.example.mochi_pet.core.mcp.mcpToolAlias
 import com.example.mochi_pet.core.settings.ApiKeyCipher
 import com.example.mochi_pet.core.settings.EncryptedSecret
+import com.example.mochi_pet.core.rest.RestApiChange
+import com.example.mochi_pet.core.rest.RestApiException
+import com.example.mochi_pet.core.rest.RestAgentTool
+import com.example.mochi_pet.core.rest.RestAuth
+import com.example.mochi_pet.core.rest.RestConnection
+import com.example.mochi_pet.core.rest.RestConnectionInput
+import com.example.mochi_pet.core.rest.RestConnectionSummary
+import com.example.mochi_pet.core.rest.RestHttpTransport
+import com.example.mochi_pet.core.rest.RestTestResult
+import com.example.mochi_pet.core.rest.RestToolDefinition
+import com.example.mochi_pet.core.rest.RestTransport
+import com.example.mochi_pet.core.rest.prepareRestRequest
+import com.example.mochi_pet.core.rest.redactRestResponse
+import com.example.mochi_pet.core.rest.restResponseFields
+import com.example.mochi_pet.core.rest.restToolAlias
+import com.example.mochi_pet.core.rest.selectRestOutput
+import com.example.mochi_pet.core.rest.validateRestConnection
+import com.example.mochi_pet.core.rest.validateRestTool
 import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_pet.core.skills.satisfiedSkillTools
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
@@ -72,6 +90,7 @@ data class ToolCatalogSummary(
     val termux: ExtensionProviderSummary = ExtensionProviderSummary(),
     val agentLink: AgentLinkState = AgentLinkState(),
     val servers: List<McpServerSummary> = emptyList(),
+    val restConnections: List<RestConnectionSummary> = emptyList(),
     val isLoading: Boolean = false,
     val feedback: String? = null,
 )
@@ -156,6 +175,11 @@ fun ToolCatalogSummary.readyToolNames(): Set<String> =
         }
         servers.filter { it.connected && it.enabled }.forEach { server ->
             server.tools.filter { it.enabled }.mapTo(this) { it.alias }
+        }
+        restConnections.filter { it.connection.enabled }.forEach { summary ->
+            summary.connection.tools.filter { it.enabled }.mapTo(this) {
+                restToolAlias(summary.connection.id, it.id)
+            }
         }
     }
 
@@ -266,6 +290,17 @@ enum class McpAuthMode {
 }
 
 interface ToolCatalogRepository {
+    suspend fun changeRestApi(change: RestApiChange): ToolCatalogSummary =
+        throw UnsupportedOperationException("REST API tools are unavailable.")
+
+    suspend fun testRestApi(
+        input: RestConnectionInput,
+        tool: RestToolDefinition,
+        arguments: kotlinx.serialization.json.JsonObject,
+    ): RestTestResult = throw UnsupportedOperationException("REST API tools are unavailable.")
+
+    suspend fun loadEnabledRestTools(): List<AgentTool> = emptyList()
+
     suspend fun loadSummary(): ToolCatalogSummary
 
     suspend fun setBuiltInEnabled(
@@ -372,6 +407,7 @@ class DataStoreToolCatalogRepository(
     private val termuxRuntime: com.example.mochi_pet.core.extensions.TermuxRuntimeState =
         com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
     private val feishuOAuthClient: FeishuOAuthClient = FeishuOAuthClient(),
+    private val restTransport: RestTransport = RestHttpTransport(),
 ) : ToolCatalogRepository {
     private val tencentCatalogMutex = Mutex()
     private val feishuAuthorizationMutex = Mutex()
@@ -381,6 +417,130 @@ class DataStoreToolCatalogRepository(
         ignoreUnknownKeys = true
         explicitNulls = false
     }
+
+    override suspend fun changeRestApi(change: RestApiChange): ToolCatalogSummary {
+        when (change) {
+            is RestApiChange.SaveConnection -> {
+                val requested = change.input.connection
+                validateRestConnection(requested)
+                val current = loadCatalog().restConnections.firstOrNull { it.connection.id == requested.id }
+                require(current != null || requested.revision.isEmpty()) { "REST connection no longer exists." }
+                val secret = resolveRestSecret(change.input, current)
+                require(secret.isEmpty() || !json.encodeToString(requested).contains(secret)) { "Keep credentials only in the Token field." }
+                val encrypted = secret.takeIf { it.isNotEmpty() }?.let(::encrypt)
+                updateCatalog { catalog ->
+                    val latest = catalog.restConnections.firstOrNull { it.connection.id == requested.id }
+                    require(latest?.connection?.revision == current?.connection?.revision &&
+                        (latest == null || latest.connection.revision == requested.revision)
+                    ) { "REST connection changed. Reopen the editor." }
+                    require(latest != null || catalog.restConnections.size < 20) { "At most 20 REST connections are supported." }
+                    val saved = PersistedRestConnection(
+                        requested.copy(
+                            baseUrl = validateRestConnection(requested).toString(),
+                            tools = latest?.connection?.tools.orEmpty(),
+                            enabled = latest?.connection?.enabled ?: false,
+                            revision = UUID.randomUUID().toString(),
+                        ),
+                        encrypted,
+                    )
+                    catalog.copy(restConnections = catalog.restConnections.filterNot { it.connection.id == requested.id } + saved)
+                }
+            }
+            else -> updateCatalog { catalog ->
+                val id = when (change) {
+                    is RestApiChange.SaveTool -> change.connectionId
+                    is RestApiChange.SetEnabled -> change.connectionId
+                    is RestApiChange.Delete -> change.connectionId
+                    is RestApiChange.SaveConnection -> error("Handled above")
+                }
+                val stored = catalog.restConnections.firstOrNull { it.connection.id == id }
+                    ?: throw IllegalArgumentException("REST connection no longer exists.")
+                val connection = stored.connection
+                if (change is RestApiChange.Delete && change.toolId == null) {
+                    catalog.copy(restConnections = catalog.restConnections.filterNot { it.connection.id == id })
+                } else {
+                    val updated = when (change) {
+                        is RestApiChange.SaveTool -> {
+                            require(change.revision == connection.revision) { "REST connection changed. Reopen the editor." }
+                            validateRestTool(change.tool)
+                            val token = stored.secret?.let(::decrypt).orEmpty()
+                            require(token.isEmpty() || !json.encodeToString(change.tool).contains(token)) { "Keep credentials only in the Token field." }
+                            require(connection.tools.any { it.id == change.tool.id } || connection.tools.size < 20) { "At most 20 tools per connection are supported." }
+                            connection.copy(tools = connection.tools.filterNot { it.id == change.tool.id } + change.tool)
+                        }
+                        is RestApiChange.SetEnabled -> {
+                            require(!change.enabled || connection.auth == RestAuth.NONE || stored.secret != null) { "Configure a Token before enabling this connection." }
+                            require(change.toolId == null || connection.tools.any { it.id == change.toolId }) { "REST tool no longer exists." }
+                            if (change.toolId == null) connection.copy(enabled = change.enabled)
+                            else connection.copy(tools = connection.tools.map {
+                                if (it.id == change.toolId) it.copy(enabled = change.enabled) else it
+                            })
+                        }
+                        is RestApiChange.Delete -> {
+                            require(connection.tools.any { it.id == change.toolId }) { "REST tool no longer exists." }
+                            connection.copy(tools = connection.tools.filterNot { it.id == change.toolId })
+                        }
+                        is RestApiChange.SaveConnection -> error("Handled above")
+                    }.copy(revision = UUID.randomUUID().toString())
+                    catalog.copy(restConnections = catalog.restConnections.map {
+                        if (it.connection.id == id) it.copy(connection = updated) else it
+                    })
+                }
+            }
+        }
+        return loadSummary()
+    }
+
+    private fun resolveRestSecret(input: RestConnectionInput, stored: PersistedRestConnection?): String {
+        if (input.connection.auth == RestAuth.NONE) return ""
+        val replacement = input.secret.trim()
+        require(replacement.length <= 8_192 && replacement.all { it.code in 32..126 }) { "Token must contain printable ASCII without line breaks." }
+        if (replacement.isNotEmpty()) return replacement
+        require(stored != null && stored.connection.baseUrl == validateRestConnection(input.connection).toString() &&
+            stored.connection.auth == input.connection.auth && stored.connection.headerName == input.connection.headerName
+        ) { "Enter a new Token when changing the service address or authentication." }
+        return stored.secret?.let(::decrypt) ?: throw IllegalArgumentException("Enter an API Token.")
+    }
+
+    override suspend fun testRestApi(
+        input: RestConnectionInput,
+        tool: RestToolDefinition,
+        arguments: kotlinx.serialization.json.JsonObject,
+    ): RestTestResult {
+        val stored = loadCatalog().restConnections.firstOrNull { it.connection.id == input.connection.id }
+        require(stored != null || input.connection.revision.isEmpty()) { "REST connection no longer exists." }
+        require(stored == null || stored.connection.revision == input.connection.revision) { "REST connection changed. Reopen the editor." }
+        val request = prepareRestRequest(input.connection, tool, arguments)
+        val secret = resolveRestSecret(input, stored)
+        val response = restTransport.execute(request, input.connection.auth, input.connection.headerName, secret)
+        require(loadCatalog().restConnections.firstOrNull { it.connection.id == input.connection.id }?.connection?.revision == stored?.connection?.revision) {
+            "REST connection changed during the request; its result was discarded."
+        }
+        val body = redactRestResponse(response.body, secret)
+        val output = selectRestOutput(tool, body)
+        return RestTestResult(response.status, restResponseFields(body), output.takeIf { tool.outputs.isNotEmpty() })
+    }
+
+    override suspend fun loadEnabledRestTools(): List<AgentTool> =
+        loadCatalog().restConnections.filter { it.connection.enabled }.flatMap { stored ->
+            val connection = stored.connection
+            connection.tools.filter { it.enabled }.map { tool ->
+                RestAgentTool(connection, tool) { arguments ->
+                    suspend fun checkCurrent() {
+                        val current = loadCatalog().restConnections.firstOrNull { it.connection.id == connection.id }
+                        if (current?.connection?.revision != connection.revision ||
+                            !current.connection.enabled || current.connection.tools.none { it.id == tool.id && it.enabled }
+                        ) throw RestApiException(com.example.mochi_pet.core.agent.tool.ToolErrorCode.PERMISSION_DENIED, "REST connection changed or was disabled. Start a new request.")
+                    }
+                    checkCurrent()
+                    val request = prepareRestRequest(connection, tool, arguments)
+                    val secret = resolveRestSecret(RestConnectionInput(connection), stored)
+                    val response = restTransport.execute(request, connection.auth, connection.headerName, secret)
+                    checkCurrent()
+                    selectRestOutput(tool, redactRestResponse(response.body, secret))
+                }
+            }
+        }
 
     override suspend fun loadSummary(): ToolCatalogSummary {
         val refreshFailed = refreshTencentDocsCatalog()
@@ -1554,14 +1714,13 @@ class DataStoreToolCatalogRepository(
         transform: (PersistedToolCatalog) -> PersistedToolCatalog,
     ) {
         dataStore.edit { preferences ->
-            val current = preferences[CATALOG]
-                ?.let {
-                    runCatching {
-                        json.decodeFromString<PersistedToolCatalog>(it)
-                    }.getOrNull()
-                }
-                ?.withBuiltInServers()
-                ?: PersistedToolCatalog().withBuiltInServers()
+            val raw = preferences[CATALOG]
+            val current = if (raw.isNullOrBlank()) PersistedToolCatalog().withBuiltInServers()
+            else try {
+                json.decodeFromString<PersistedToolCatalog>(raw).withBuiltInServers()
+            } catch (error: SerializationException) {
+                throw IllegalStateException("Stored Tool configuration is invalid", error)
+            }
             preferences[CATALOG] = json.encodeToString(transform(current))
         }
     }
@@ -1570,6 +1729,7 @@ class DataStoreToolCatalogRepository(
         extension: MochiExtensionSnapshot,
     ): ToolCatalogSummary =
         ToolCatalogSummary(
+            restConnections = restConnections.map { RestConnectionSummary(it.connection, it.secret != null) },
             builtInTools = BUILT_IN_TOOLS
                 .filterNot {
                     it.isAmapTool() || it.isAgentBrowserTool()
@@ -2005,6 +2165,7 @@ class McpOAuthClient(
 
 @Serializable
 private data class PersistedToolCatalog(
+    val restConnections: List<PersistedRestConnection> = emptyList(),
     val builtInEnabled: Map<String, Boolean> = emptyMap(),
     val amapCredentials: StoredSecret? = null,
     val amapEnabled: Boolean = false,
@@ -2016,6 +2177,9 @@ private data class PersistedToolCatalog(
     val servers: List<PersistedMcpServer> = emptyList(),
     val pendingNotionOAuth: PendingOAuthRecord? = null,
 )
+
+@Serializable
+private data class PersistedRestConnection(val connection: RestConnection, val secret: StoredSecret? = null)
 
 @Serializable
 private data class PersistedMcpServer(

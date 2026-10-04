@@ -166,6 +166,22 @@ support is an optional import/export adapter.
 - Notion and Feishu OAuth, Mi Home sessions and device selection, Android permissions,
   persona, memories, and planner data are never shared.
 
+### 3.5.1 Custom REST tools
+
+Custom REST APIs are optional foreground-only Tools, configured from
+**Tools > Add tool > Connect REST API** alongside manual MCP services.
+A named service shares one encrypted Token across multiple independently
+switchable JSON endpoints. No Python runtime or code editor is required.
+Users explicitly test a real request, select scalar response fields and their
+meanings/units, save, and enable both the connection and desired Tools.
+POST/PUT/PATCH/DELETE require the Agent's explicit-user-confirmation contract;
+only trusted read-only GET requests may opt out. Test requests have a separate
+native confirmation because they can change remote data or consume quota.
+Only public HTTPS services on port 443 are supported. Custom REST definitions
+and credentials are not part of Provider sharing, Scheduled Agents, or Subagent
+registries. Returned selected data may be sent to the model and stored in
+conversation history; authentication material is excluded.
+
 ### 3.6 Agent Browser
 
 - The Agent may use one lightweight Android System WebView through

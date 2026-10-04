@@ -790,6 +790,7 @@ private fun MochiAppContent(
             onSetMijiaToolEnabled = viewModel::setMijiaToolEnabled,
             onTermuxAction = viewModel::onTermuxAction,
             onAddMcpServer = viewModel::addManualMcpServer,
+            restActions = RestApiActions(viewModel::changeRestApi, viewModel::testRestApi),
             onRemoveMcpServer = viewModel::removeManualMcpServer,
             onSetMcpServerEnabled = viewModel::setMcpServerEnabled,
             onSetMcpToolEnabled = viewModel::setMcpToolEnabled,
@@ -1465,6 +1466,7 @@ private fun SurfaceContent(
     onSetMijiaToolEnabled: (String, Boolean) -> Unit,
     onTermuxAction: (TermuxUiAction) -> Unit,
     onAddMcpServer: (ManualMcpServerInput) -> Unit,
+    restActions: RestApiActions,
     onRemoveMcpServer: (String) -> Unit,
     onSetMcpServerEnabled: (String, Boolean) -> Unit,
     onSetMcpToolEnabled: (String, String, Boolean) -> Unit,
@@ -1575,6 +1577,7 @@ private fun SurfaceContent(
                 onSetMijiaToolEnabled = onSetMijiaToolEnabled,
                 onTermuxAction = onTermuxAction,
                 onAddServer = onAddMcpServer,
+                restActions = restActions,
                 onRemoveServer = onRemoveMcpServer,
                 onSetServerEnabled = onSetMcpServerEnabled,
                 onSetToolEnabled = onSetMcpToolEnabled,
@@ -3699,11 +3702,14 @@ private fun ToolsSurface(
     onSetMijiaToolEnabled: (String, Boolean) -> Unit,
     onTermuxAction: (TermuxUiAction) -> Unit,
     onAddServer: (ManualMcpServerInput) -> Unit,
+    restActions: RestApiActions,
     onRemoveServer: (String) -> Unit,
     onSetServerEnabled: (String, Boolean) -> Unit,
     onSetToolEnabled: (String, String, Boolean) -> Unit,
 ) {
     var showAddServer by remember { mutableStateOf(false) }
+    var showAddTool by remember { mutableStateOf(false) }
+    var showRestConnection by remember { mutableStateOf(false) }
     var showFeishuSetup by remember { mutableStateOf(false) }
     var showTencentDocsToken by remember { mutableStateOf(false) }
     var showAmapCredentials by remember { mutableStateOf(false) }
@@ -3747,7 +3753,7 @@ private fun ToolsSurface(
             }
         }
         LazyColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).testTag("tools-list"),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
@@ -4009,15 +4015,15 @@ private fun ToolsSurface(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "MCP servers",
+                        text = "Connected tools",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
                     OutlinedButton(
-                        onClick = { showAddServer = true },
+                        onClick = { showAddTool = true },
                         enabled = !state.isLoading,
                     ) {
-                        Text("Add MCP")
+                        Text("Add tool")
                     }
                 }
             }
@@ -4053,6 +4059,9 @@ private fun ToolsSurface(
                         Text("Cancel Feishu authorization")
                     }
                 }
+            }
+            items(state.catalog.restConnections, key = { "rest-${it.connection.id}" }) { connection ->
+                RestApiConnectionCard(connection, restActions)
             }
             item {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -4092,6 +4101,16 @@ private fun ToolsSurface(
                 )
             }
         }
+    }
+    if (showAddTool) {
+        AddToolDialog(
+            onMcp = { showAddTool = false; showAddServer = true },
+            onRest = { showAddTool = false; showRestConnection = true },
+            onDismiss = { showAddTool = false },
+        )
+    }
+    if (showRestConnection) {
+        RestConnectionDialog(null, restActions) { showRestConnection = false }
     }
     if (showAddServer) {
         AddMcpServerDialog(

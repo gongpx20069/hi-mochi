@@ -37,7 +37,55 @@ The native `ToolRegistry` currently supports:
 - `delegate_agent` in the Main Agent's request-scoped registry;
 - the five grouped Agent Browser Tools;
 - configured Amap map and merchant Tools;
-- enabled MCP tools discovered through the Tool catalog.
+- enabled MCP tools discovered through the Tool catalog;
+- enabled custom REST tools in foreground Main Agent conversations only.
+
+### Custom REST tools
+
+`core/rest` owns serializable definitions, validation, schemas, scalar response
+selection, and a cancellable HTTP adapter. `ToolCatalogRepository` owns encrypted
+credential persistence and live revision/enablement checks. A stable `rest_`
+alias derives from connection and endpoint IDs, not user names or secrets.
+Schemas include parameter types/defaults, selected output meanings/units, and
+`confirmed=true` when required. This is the existing Agent confirmation
+contract, not proof of a native per-call approval dialog. All writes require it;
+GET defaults to requiring it and can explicitly opt out for trusted reads.
+
+Supported authentication: none, Bearer Token, dedicated API-key header, or a
+complete Authorization header value. Secrets are attached only by native HTTP;
+they are never schema fields, returned summaries, shared-provider exports, or
+model arguments. A blank replacement preserves the saved Token only for the
+same origin and authentication/header. New origins or authentication require
+a replacement. Test and runtime responses redact known Token echoes before
+field discovery/selection. Other returned data remains untrusted external
+evidence, not instructions, and selected fields may enter model context/history.
+
+Limits: 20 connections, 20 tools per connection, 20 scalar parameters, 32 output
+fields. Origins must be public HTTPS:443 with no path, credentials, query, or
+fragment. Actual DNS/connected addresses must be public; proxies, redirects,
+and automatic request redispatch are disabled. Paths stay on the fixed origin;
+query/path values are encoded and body values retain validated JSON types.
+Methods are GET/POST/PUT/PATCH/DELETE; GET cannot carry a body. Only scalar string,
+finite-number and boolean inputs/outputs are supported. Fixed JSON bodies are
+limited to 16,000 characters; responses to 256 KiB after decompression and 64
+nesting levels; selected output to 32 KiB UTF-8. Discovery shows at most 128 scalar
+fields, eight levels deep and twenty items per array; a JSON pointer array
+index selects one item, not a dynamic list mapping.
+
+HTTP errors, missing/type-changed fields, and mismatched optional business-success
+pointer/value return typed failures. Without that condition, success means only
+HTTP success and valid selected fields, not verified business completion.
+Calls have a 20-second deadline (10-second connect, 15-second read). Cancellation
+cancels the HTTP call; timeout/cancellation cannot prove a mutation did not run.
+Never automatically repeat an unknown-outcome write. Every live call checks
+saved revision and both switches before dispatch and after response; revoked
+results are discarded, but already-submitted operations are not undone.
+
+The editor's test button has a separate native real-request confirmation and
+does not call the model. REST is intentionally absent from scheduled/child
+registries and Provider sharing. Python, OAuth, cURL/OpenAPI import, arbitrary
+transforms, streaming/binary responses, and local-network access are not part
+of this initial connector.
 
 Agent Browser provides five grouped schemas:
 

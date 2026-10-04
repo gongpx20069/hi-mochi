@@ -41,6 +41,10 @@ import com.example.mochi_pet.core.database.PlannerStore
 import com.example.mochi_pet.core.memory.AgentMemoryRepository
 import com.example.mochi_pet.core.persona.PersonaRepository
 import com.example.mochi_pet.core.persona.PersonaContext
+import com.example.mochi_pet.core.rest.RestApiChange
+import com.example.mochi_pet.core.rest.RestConnectionInput
+import com.example.mochi_pet.core.rest.RestTestResult
+import com.example.mochi_pet.core.rest.RestToolDefinition
 import com.example.mochi_pet.core.maps.AMAP_CONSOLE_URL
 import com.example.mochi_pet.core.model.CalendarEvent
 import com.example.mochi_pet.core.model.MochiSurface
@@ -2017,6 +2021,21 @@ class MochiHomeViewModel(
         updateTools("MCP server added; choose tools to enable") {
             requireRepository().addManualServer(input)
         }
+    }
+
+    suspend fun changeRestApi(change: RestApiChange) =
+        withContext(ioDispatcher) {
+            val catalog = requireRepository().changeRestApi(change)
+            mutableToolsState.update { it.copy(catalog = catalog, feedback = "REST API configuration saved") }
+            refreshSkillReadiness(catalog)
+        }
+
+    suspend fun testRestApi(
+        input: RestConnectionInput,
+        tool: RestToolDefinition,
+        arguments: kotlinx.serialization.json.JsonObject,
+    ): RestTestResult = withContext(ioDispatcher) {
+        requireRepository().testRestApi(input, tool, arguments)
     }
 
     fun removeManualMcpServer(id: String) {
