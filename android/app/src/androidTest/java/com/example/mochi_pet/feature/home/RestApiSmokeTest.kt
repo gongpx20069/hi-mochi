@@ -15,6 +15,7 @@ import com.example.mochi_pet.MochiApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,7 +24,12 @@ import org.junit.runner.RunWith
 class RestApiSmokeTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @After fun clearTestScreenFlag() {
+        compose.runOnUiThread { compose.activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
     @Test fun restAndMcpEditorsAreReachableWithoutChangingConnectionsOrSendingRequests() {
+        compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         val app = compose.activity.application as MochiApplication
         val before = runBlocking(Dispatchers.IO) { app.providerSettingsRepository.loadProfiles() }
         val speechBefore = runBlocking(Dispatchers.IO) { app.speechSettingsRepository.loadProfiles() }
