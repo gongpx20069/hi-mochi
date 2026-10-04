@@ -32,7 +32,10 @@ class SiteHandler(SimpleHTTPRequestHandler):
 def main() -> None:
     arguments = argparse.ArgumentParser()
     arguments.add_argument("--channel", help="Use installed msedge or chrome instead of Chromium")
+    arguments.add_argument("--screenshots", type=Path, help="Save AgentLink viewport and agent-card screenshots")
     options = arguments.parse_args()
+    if options.screenshots:
+        options.screenshots.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(SiteHandler, directory=str(SITE_ROOT)))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -101,6 +104,15 @@ def main() -> None:
                             assert page.locator(f"[data-extension-download='{extension}']").get_attribute("href") == (
                                 f"{RELEASE_ROOT}download/{expected}/Mochi-{name}-Extension-{expected}.apk"
                             )
+                    if not is_home:
+                        assert page.locator("[data-agent]").count() == 5
+                        summary = page.locator("#server-commands summary")
+                        summary.focus()
+                        page.keyboard.press("Enter")
+                        assert page.locator("#server-commands").evaluate("(item) => item.open")
+                        assert "bridge\\run.py start" in page.locator("#server-commands pre").inner_text()
+                        summary.press("Enter")
+                        assert not page.locator("#server-commands").evaluate("(item) => item.open")
                     page.locator("details").evaluate_all("(items) => items.forEach(item => item.open = true)")
 
                     for width in (320, 390, 768, 1280):
@@ -108,12 +120,19 @@ def main() -> None:
                         layout_errors = page.evaluate("""() => {
                             const errors = [];
                             if (document.documentElement.scrollWidth > innerWidth) {
-                                errors.push("Horizontal overflow");
+                                const overflow = [...document.querySelectorAll("main *")].filter(item => {
+                                    const box = item.getBoundingClientRect();
+                                    return box.right > innerWidth + 1 || box.left < -1;
+                                }).slice(0, 8).map(item =>
+                                    `${item.tagName}.${item.className} in ${item.parentElement.className}: ${item.textContent.trim().slice(0, 70)}`
+                                );
+                                errors.push(`Horizontal overflow: ${overflow.join(", ")}`);
                             }
                             const cards = document.querySelectorAll(
                                 "[data-speech-feature], [data-documents-feature], " +
                                 "[data-connections-feature], [data-tasks-feature], " +
-                                "[data-extension-card], .link-benefits article, .link-stage"
+                                "[data-extension-card], .link-benefits article, .link-stage, " +
+                                ".al-agent-card, .al-setup-grid li"
                             );
                             for (const card of cards) {
                                 const bounds = card.getBoundingClientRect();
@@ -135,6 +154,15 @@ def main() -> None:
                                     }
                                 }
                             }
+                            const nav = document.querySelector("[data-nav]");
+                            if (document.body.classList.contains("agentlink-page") &&
+                                innerWidth > 760 && getComputedStyle(nav).visibility === "visible") {
+                                const brand = document.querySelector(".nav-shell .brand").getBoundingClientRect();
+                                const box = nav.getBoundingClientRect();
+                                if (box.left < brand.right || box.right > innerWidth) {
+                                    errors.push("Desktop navigation overlaps brand or viewport");
+                                }
+                            }
                             return errors;
                         }""")
                         assert not layout_errors, (language, mode, width, layout_errors)
@@ -145,6 +173,16 @@ def main() -> None:
                             page.locator("[data-nav] a[href='#features']").click()
                             assert toggle.get_attribute("aria-expanded") == "false"
                             assert page.evaluate("document.body.style.overflow") == ""
+                        if not is_home:
+                            for agent in page.locator("[data-agent]").all():
+                                assert agent.locator("a").get_attribute("href").startswith(
+                                    "https://github.com/gongpx20069/android-agent-link/blob/master/"
+                                )
+                            if options.screenshots:
+                                prefix = language.strip("/").replace("/", "-")
+                                page.evaluate("scrollTo(0, 0)")
+                                page.screenshot(path=str(options.screenshots / f"{prefix}-{width}.png"))
+                                page.locator("#agents").screenshot(path=str(options.screenshots / f"{prefix}-agents-{width}.png"))
                     if is_home:
                         page.locator("[data-extension-card='agentlink'] .button").click()
                         assert page.url.endswith(f"/hi-mochi/{language}agentlink/")
@@ -154,8 +192,22 @@ def main() -> None:
                         assert page.locator(".hero-actions a").first.get_attribute("href") == (
                             "https://github.com/gongpx20069/android-agent-link/releases"
                         )
+                        language_link = "../zh-CN/agentlink/" if language == "agentlink/" else "../../agentlink/"
+                        page.locator(f".site-nav a[href='{language_link}']").click()
+                        assert page.url.endswith("/zh-CN/agentlink/" if language == "agentlink/" else "/hi-mochi/agentlink/")
                     assert not failures, failures
                     context.close()
+            for language in ("agentlink/", "zh-CN/agentlink/"):
+                context = browser.new_context(java_script_enabled=False)
+                page = context.new_page()
+                page.goto(f"http://127.0.0.1:{server.server_port}/hi-mochi/{language}")
+                assert page.locator(".agentlink-hero .reveal").first.evaluate(
+                    "(item) => getComputedStyle(item).opacity"
+                ) == "1"
+                page.locator("#server-commands summary").click()
+                assert page.locator("#server-commands pre").is_visible()
+                assert page.locator("[data-agent]").count() == 5
+                context.close()
             browser.close()
         print("Browser checks passed: 4 pages, 4 widths, extension downloads/fallbacks, and cross-page navigation.")
     finally:

@@ -10,7 +10,7 @@ directory.
 website/
 ├── index.html       English homepage
 ├── zh-CN/           Simplified Chinese homepage
-├── agentlink/       English AgentLink introduction (Chinese in zh-CN/agentlink/)
+├── agentlink/       Official AgentLink site (Chinese in zh-CN/agentlink/)
 ├── assets/          Favicon and social sharing image
 ├── docs/            Website-only documentation
 ├── styles.css       Shared responsive styles
@@ -66,8 +66,12 @@ Mi Home setup and Termux setup use native HTML disclosures, not JavaScript.
 Termux copy must disclose automatic command execution after enablement, the
 absence of a sandbox, and model-provider access to output used by the Agent.
 
-AgentLink has independent bilingual introduction pages within this site, not
-an invented external homepage. Its product/setup claims follow the
+AgentLink's official website lives at `agentlink/` and `zh-CN/agentlink/`.
+Treat these as a standalone product destination, not a Mochi extension detail:
+lead with phone/terminal continuity, Android download and computer setup.
+Follow with five agent cards, progressive setup instructions, connection/data
+boundaries, FAQ, and optional Mochi integration. Keep both languages equivalent.
+Its product/setup claims follow the
 [AgentLink README](https://github.com/gongpx20069/android-agent-link) and
 [user guide](https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.md).
 AgentLink uses the `master` branch, not this repository's `main`; retain the
@@ -77,6 +81,14 @@ Link to AgentLink's own Releases (which include previews), never Mochi APKs or
 an assumed stable `releases/latest` endpoint. Explain the running-computer
 requirement, authenticated pairing, background limits, and permission boundary.
 The connection diagrams are illustrations, not screenshots or live task status.
+Use the existing AgentLink mark, mint-accented styles scoped to `.agentlink-page`
+or `al-` classes, and native `details` for commands and FAQ. No runtime dependency
+or release API is needed on these pages. Keep setup readable without JavaScript.
+Agent cards must cover Copilot, Claude, Kimi, Qwen, and DeepSeek Harness, with
+guide links rather than independently maintained version pins. Claude uses
+`claude-agent-acp`, not `claude --acp`. Disclose DSH's context-only recovery and
+separate APK/Bridge upgrades. Do not equate executable discovery with working
+authentication or claim a fix for a reported picker discrepancy.
 
 ## Release links
 
@@ -122,6 +134,10 @@ the project path, checks all four pages at 320/390/768/1280 pixels, exercises
 mobile/cross-page navigation and expanded setup disclosures, and mocks GitHub
 responses to verify matching base/extension updates, API-outage fallback,
 missing extension assets, and rejection of untrusted download URLs.
+AgentLink checks also cover keyboard-operated setup disclosures, no-JavaScript
+setup, all five agent cards, language switching, and desktop navigation bounds.
+Use `--screenshots <directory>` to save AgentLink hero and agent-section images
+at each tested width for visual review; keep generated images out of the site.
 
 ## Deployment
 

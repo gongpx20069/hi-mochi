@@ -2082,7 +2082,303 @@ img {
   font-size: 0.85rem;
 }
 
+.agentlink-page {
+  --peach: #97d7c5;
+  --peach-strong: #6cccb2;
+}
+
+.agentlink-page :is(section, article, details)[id] {
+  scroll-margin-top: 100px;
+}
+
+.agentlink-page :is(a, summary):focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 5px;
+}
+
+.agentlink-page .button-primary {
+  background: linear-gradient(135deg, #b7f0de, var(--mint));
+  color: #102b25;
+  box-shadow: 0 12px 32px rgba(151, 215, 197, 0.12);
+}
+
+.agentlink-page .hero-note {
+  color: var(--muted);
+}
+
+.agentlink-page .agentlink-hero {
+  padding-bottom: 0;
+  background:
+    radial-gradient(ellipse at 85% 30%, rgba(151, 215, 197, 0.12), transparent 55%),
+    radial-gradient(ellipse at 10% 0%, rgba(213, 193, 255, 0.08), transparent 50%);
+}
+
+.agentlink-page .link-stage {
+  border-radius: 20px;
+  background: linear-gradient(155deg, #192a2b, #181720);
+}
+
+.al-window-dots {
+  color: var(--mint);
+  letter-spacing: 3px;
+}
+
+.al-session-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.al-session-tags span {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.65rem;
+}
+
+.computer-screen .al-prompt {
+  color: var(--mint);
+  font-size: inherit;
+}
+
+.al-agent-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  padding-block: 28px;
+  margin-top: 76px;
+  border-block: 1px solid var(--line);
+}
+
+.al-agent-strip > span,
+.al-agent-kind,
+.al-step {
+  color: var(--mint);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+}
+
+.al-agent-strip a {
+  padding-block: 8px;
+  font-size: 0.85rem;
+}
+
+.al-agent-strip small {
+  color: var(--muted);
+}
+
+.al-agent-strip a:hover,
+.al-disclosure-body a,
+.al-update-note a {
+  color: var(--mint);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.al-agents-section,
+.al-trust-section {
+  background: rgba(151, 215, 197, 0.025);
+  border-block: 1px solid var(--line);
+}
+
+.al-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.al-agent-card {
+  display: flex;
+  grid-column: span 2;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #181c22;
+}
+
+.al-agent-card:nth-last-child(-n+2) {
+  grid-column: span 3;
+}
+
+.al-agent-card h3,
+.al-setup-grid h3 {
+  margin: 14px 0 0;
+  font-size: 1.35rem;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+}
+
+.al-agent-card p,
+.al-setup-grid p {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.al-agent-card code,
+.al-disclosure code {
+  overflow-wrap: anywhere;
+  font-size: 0.88em;
+}
+
+.al-agent-card dl {
+  padding-top: 20px;
+  margin: auto 0 22px;
+}
+
+.al-agent-card dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.al-agent-card dd {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.al-agent-preview {
+  border-color: rgba(213, 193, 255, 0.25);
+  background: linear-gradient(135deg, #211e2c, #181c22);
+}
+
+.al-agent-preview .al-agent-kind {
+  color: var(--lavender);
+}
+
+.al-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  padding: 0;
+  margin: 0 0 40px;
+  list-style: none;
+}
+
+.al-setup-grid li {
+  padding: 24px 0;
+  border-top: 2px solid var(--mint);
+}
+
+.al-disclosure {
+  min-width: 0;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.al-disclosure summary {
+  padding: 22px 24px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.al-disclosure summary::marker {
+  color: var(--mint);
+}
+
+.al-disclosure[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.al-disclosure-body {
+  padding: 4px 24px 24px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.al-disclosure pre {
+  padding: 20px;
+  border-radius: 10px;
+  background: #0d1418;
+  color: #c9ebdf;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.9;
+}
+
+.al-update-note {
+  margin-top: 28px;
+  padding: 8px 0 8px 24px;
+  border-left: 3px solid var(--lavender);
+}
+
+.al-update-note p {
+  max-width: 880px;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.al-faq-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 60px;
+}
+
+.al-faq-list .al-disclosure:first-child {
+  margin-top: 0;
+}
+
+.al-final-cta {
+  padding: 100px 0;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 100%, rgba(151, 215, 197, 0.12), transparent 70%);
+}
+
+.al-final-cta img {
+  margin-inline: auto;
+}
+
+.al-final-cta h2 {
+  margin: 24px 0;
+  font-size: clamp(2rem, 4.5vw, 3.5rem);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+
+.al-final-cta p {
+  color: var(--muted);
+}
+
+.al-final-cta .hero-actions {
+  justify-content: center;
+}
+
+@media (min-width: 761px) and (max-width: 980px) {
+  .agentlink-page .site-nav {
+    gap: 12px;
+    font-size: 0.74rem;
+  }
+
+  .agentlink-page .nav-cta {
+    padding-inline: 12px;
+  }
+}
+
 @media (max-width: 980px) {
+  .al-agent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .al-agent-card,
+  .al-agent-card:nth-last-child(-n+2) {
+    grid-column: auto;
+  }
+
+  .al-agent-card:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .al-faq-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
   .site-nav {
     gap: 16px;
     font-size: 0.82rem;
@@ -2180,6 +2476,58 @@ img {
 }
 
 @media (max-width: 760px) {
+  .al-agent-grid,
+  .al-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .al-agent-strip {
+    justify-content: flex-start;
+    gap: 8px 20px;
+    margin-top: 40px;
+  }
+
+  .al-agent-strip > span {
+    width: 100%;
+  }
+
+  .agentlink-page .agentlink-hero h1 {
+    font-size: clamp(2rem, 8vw, 3.4rem);
+  }
+
+  .agentlink-page .section-heading h2 {
+    font-size: clamp(1.9rem, 7.5vw, 3.2rem);
+    overflow-wrap: anywhere;
+  }
+
+  .agentlink-page .split-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .agentlink-page .hero-actions {
+    justify-content: flex-start;
+  }
+
+  .agentlink-page .al-final-cta .hero-actions {
+    justify-content: center;
+  }
+
+  .al-disclosure summary {
+    padding: 20px;
+  }
+
+  .al-disclosure-body {
+    padding-inline: 20px;
+  }
+
+  .agentlink-page .site-nav {
+    overflow-y: auto;
+    justify-content: flex-start;
+    padding-top: 100px;
+    font-size: 1.2rem;
+    gap: 16px;
+  }
+
   .capability-map {
     grid-template-columns: 1fr;
     gap: 10px;

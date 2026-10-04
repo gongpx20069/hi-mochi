@@ -177,8 +177,34 @@ def main() -> None:
         page = SITE_ROOT / route
         if not page.exists():
             errors.append(f"Missing AgentLink page: {route}")
-        elif "data-release-download" in page.read_text(encoding="utf-8"):
+            continue
+        source = page.read_text(encoding="utf-8")
+        if "data-release-download" in source:
             errors.append(f"{route}: AgentLink must not download the Mochi APK")
+        agents = re.findall(r'data-agent="([^"]+)"', source)
+        expected_agents = {"copilot-cli", "claude-code", "kimi-cli", "qwen-code", "deepseek-harness"}
+        if len(agents) != 5 or set(agents) != expected_agents:
+            errors.append(f"{route}: expected exactly one card for each of the five agents")
+        for section in ("features", "agents", "setup", "server-commands", "connection", "faq", "mochi"):
+            if f'id="{section}"' not in source:
+                errors.append(f"{route}: missing official-site section {section}")
+        if "claude-agent-acp" not in source or "claude --acp" in source:
+            errors.append(f"{route}: Claude setup must use the ACP adapter")
+        if source.count("<h1>") != 1:
+            errors.append(f"{route}: expected one product heading")
+        for marker in (
+            "https://github.com/gongpx20069/android-agent-link/releases",
+            "https://github.com/gongpx20069/android-agent-link/issues",
+            r".\.venv\Scripts\python.exe .\bridge\run.py start",
+            r".\.venv\Scripts\python.exe .\bridge\run.py start --interactive",
+        ):
+            if marker not in source:
+                errors.append(f"{route}: missing setup/resource content {marker}")
+        recovery_note = "不回放旧消息" if route.startswith("zh-CN/") else "no old-message replay"
+        update_note = "更新 APK，不等于更新了电脑端。" if route.startswith("zh-CN/") else "Updating the APK does not update the computer."
+        for note in (recovery_note, update_note):
+            if note not in source:
+                errors.append(f"{route}: missing capability boundary: {note}")
 
     og_image = SITE_ROOT / "assets" / "mochi-og.png"
     if png_dimensions(og_image) != (1200, 630):
