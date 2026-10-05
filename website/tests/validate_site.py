@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import re
 import struct
+import xml.etree.ElementTree as ET
 
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,7 @@ class PageParser(HTMLParser):
         self.ids: set[str] = set()
         self.anchor_refs: list[str] = []
         self.resources: list[str] = []
+        self.images: list[dict[str, str | None]] = []
         self.html_language: str | None = None
         self.canonical: str | None = None
         self.stack: list[str] = []
@@ -33,6 +35,8 @@ class PageParser(HTMLParser):
             self.stack.append(tag)
         if tag == "html":
             self.html_language = values.get("lang")
+        if tag == "img":
+            self.images.append(values)
         if element_id := values.get("id"):
             if element_id in self.ids:
                 self.errors.append(f"duplicate id: {element_id}")
@@ -185,6 +189,33 @@ def main() -> None:
         expected_agents = {"copilot-cli", "claude-code", "kimi-cli", "qwen-code", "deepseek-harness"}
         if len(agents) != 5 or set(agents) != expected_agents:
             errors.append(f"{route}: expected exactly one card for each of the five agents")
+        agent_logos = {
+            "copilot-cli": "githubcopilot.svg",
+            "claude-code": "claude-color.svg",
+            "kimi-cli": "kimi-color.svg",
+            "qwen-code": "qwen-color.svg",
+            "deepseek-harness": "deepseek-color.svg",
+        }
+        for agent, markup in re.findall(
+            r'<article[^>]*data-agent="([^"]+)"[^>]*>(.*?)</article>', source, re.S,
+        ):
+            card = PageParser()
+            card.feed(markup)
+            expected_logo = SITE_ROOT / "assets" / "agents" / agent_logos.get(agent, "")
+            if len(card.images) != 1:
+                errors.append(f"{route}: {agent} must have one brand image")
+                continue
+            image = card.images[0]
+            if local_resource(page, image.get("src") or "") != expected_logo.resolve():
+                errors.append(f"{route}: {agent} must use its bundled brand logo")
+            if image.get("alt") != "" or image.get("width") != "56" or image.get("height") != "56":
+                errors.append(f"{route}: {agent} logo needs decorative alt and explicit dimensions")
+        order = [source.find(f'id="{section}"') for section in ("agents", "features", "setup", "connection", "faq")]
+        if -1 in order or order != sorted(order):
+            errors.append(f"{route}: expected agents, features, setup, connection, FAQ reading order")
+        for marker in ("data-image-feature", "0.0.39+", "1 MiB", "assets/agents/NOTICE.txt"):
+            if marker not in source:
+                errors.append(f"{route}: missing image feature or brand notice: {marker}")
         for section in ("features", "agents", "setup", "server-commands", "connection", "faq", "mochi"):
             if f'id="{section}"' not in source:
                 errors.append(f"{route}: missing official-site section {section}")
@@ -205,6 +236,23 @@ def main() -> None:
         for note in (recovery_note, update_note):
             if note not in source:
                 errors.append(f"{route}: missing capability boundary: {note}")
+
+    logo_root = SITE_ROOT / "assets" / "agents"
+    for filename in ("NOTICE.txt", "LICENSE-lobe-icons.txt"):
+        if not (logo_root / filename).is_file():
+            errors.append(f"Missing redistributed icon notice: {filename}")
+    for logo in logo_root.glob("*.svg"):
+        root = ET.fromstring(logo.read_text(encoding="utf-8"))
+        if root.tag != "{http://www.w3.org/2000/svg}svg" or not root.get("viewBox"):
+            errors.append(f"{logo.name}: expected a scalable SVG image")
+        for element in root.iter():
+            if element.tag.rsplit("}", 1)[-1] not in {
+                "svg", "title", "path", "g", "defs", "linearGradient", "stop",
+            }:
+                errors.append(f"{logo.name}: unexpected SVG element {element.tag}")
+            if any(key.lower().startswith("on") or key.rsplit("}", 1)[-1] == "href"
+                   for key in element.attrib):
+                errors.append(f"{logo.name}: logo must not execute scripts or load resources")
 
     og_image = SITE_ROOT / "assets" / "mochi-og.png"
     if png_dimensions(og_image) != (1200, 630):

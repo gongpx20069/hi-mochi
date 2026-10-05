@@ -1,0 +1,19 @@
+Agent brand icons
+=================
+
+Source: LobeHub Icons, https://github.com/lobehub/lobe-icons
+Revision: 82e641b4fece9d1028a127149af9ded00df5ac0c
+Directory: packages/static-svg/icons/
+Files (unmodified): githubcopilot.svg, claude-color.svg, kimi-color.svg,
+qwen-color.svg, deepseek-color.svg.
+
+Copyright (c) 2023 LobeHub. Distributed under the MIT License.
+The full license is included alongside these files as LICENSE-lobe-icons.txt.
+Immutable source:
+https://github.com/lobehub/lobe-icons/tree/82e641b4fece9d1028a127149af9ded00df5ac0c/packages/static-svg/icons
+
+Brand names and marks belong to their respective owners. These marks identify
+compatible tools/providers; they do not imply sponsorship, endorsement, or
+affiliation with AgentLink. The DeepSeek mark identifies the provider, not a
+distinct DeepSeek Harness product mark. Icon licensing does not grant trademark
+rights.

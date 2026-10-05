@@ -26,7 +26,7 @@
         <a class="brand" href="./" aria-label="AgentLink home"><img src="../assets/agentlink.svg" width="32" height="32" alt="">AgentLink</a>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">Open navigation</span><span></span><span></span></button>
         <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav>
-          <a href="#features">Experience</a><a href="#agents">Agents</a><a href="#setup">Get started</a><a href="#faq">FAQ</a>
+          <a href="#agents">Agents</a><a href="#features">Features</a><a href="#setup">Get started</a><a href="#faq">FAQ</a>
           <a href="../">Mochi</a><a href="../zh-CN/agentlink/" lang="zh-CN">中文</a>
           <a class="nav-cta" href="https://github.com/gongpx20069/android-agent-link">GitHub ↗</a>
         </nav>
@@ -37,7 +37,7 @@
         <div class="shell agentlink-hero-grid">
           <div class="reveal">
             <span class="eyebrow"><span></span> Your computer works. You stay connected.</span>
-            <h1>Your agents.<br>Your workspace.<br><em>Within reach.</em></h1>
+            <h1>Your coding agents.<br><em>Now within reach.</em></h1>
             <p class="hero-lede">Take your coding conversations with you. Send work from Android, review progress and approvals, then continue the same chat at your terminal.</p>
             <div class="hero-actions"><a class="button button-primary" href="https://github.com/gongpx20069/android-agent-link/releases">Download for Android ↓</a><a class="button button-secondary" href="#setup">Set up your computer →</a></div>
             <p class="hero-note">Android 8.0+ · Open source · Preview releases<br>Independent app. No Mochi installation required.</p>
@@ -50,36 +50,63 @@
             <p class="stage-caption">Your repository and agent processes stay on your computer. The terminal shown represents AgentLink's shared UI, not a separate vendor CLI.</p>
           </div>
         </div>
-        <div class="shell al-agent-strip" aria-label="Supported coding agents">
-          <span>CHOOSE YOUR AGENT</span><a href="#copilot">GitHub Copilot CLI</a><a href="#claude">Claude Code</a><a href="#kimi">Kimi Code</a><a href="#qwen">Qwen Code</a><a href="#deepseek">DeepSeek Harness <small>Preview</small></a>
+      </section>
+      <section class="section al-agents-section" id="agents">
+        <div class="shell">
+          <div class="section-heading reveal"><span class="kicker">01 / Choose your agent</span><h2>Familiar tools.<br>One mobile home.</h2><p>Keep the coding agent you already use. Install and sign in on your computer; AgentLink brings its conversations to your phone. One configured agent is enough.</p></div>
+          <div class="al-agent-grid">
+            <article class="al-agent-card" id="copilot" data-agent="copilot-cli">
+              <img class="al-agent-logo" src="../assets/agents/githubcopilot.svg" width="56" height="56" alt="">
+              <h3>GitHub Copilot CLI</h3><span class="al-agent-kind">Native SDK</span>
+              <p>Your installed Copilot CLI, with your local sign-in.</p>
+              <a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#copilot-background-task-lifecycle">Copilot setup ↗</a>
+            </article>
+            <article class="al-agent-card" id="claude" data-agent="claude-code">
+              <img class="al-agent-logo" src="../assets/agents/claude-color.svg" width="56" height="56" alt="">
+              <h3>Claude Code</h3><span class="al-agent-kind">ACP adapter</span>
+              <p>Claude on your computer, connected through its ACP adapter.</p>
+              <a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#claude-code">Claude setup ↗</a>
+            </article>
+            <article class="al-agent-card" id="kimi" data-agent="kimi-cli">
+              <img class="al-agent-logo" src="../assets/agents/kimi-color.svg" width="56" height="56" alt="">
+              <h3>Kimi Code</h3><span class="al-agent-kind">Native ACP</span>
+              <p>The current JavaScript CLI, using your Kimi login.</p>
+              <a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#kimi-code-and-qwen-code">Kimi setup ↗</a>
+            </article>
+            <article class="al-agent-card" id="qwen" data-agent="qwen-code">
+              <img class="al-agent-logo" src="../assets/agents/qwen-color.svg" width="56" height="56" alt="">
+              <h3>Qwen Code</h3><span class="al-agent-kind">Native ACP</span>
+              <p>Your locally authenticated Qwen Code, ready to connect.</p>
+              <a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#kimi-code-and-qwen-code">Qwen setup ↗</a>
+            </article>
+            <article class="al-agent-card al-agent-preview" id="deepseek" data-agent="deepseek-harness">
+              <img class="al-agent-logo" src="../assets/agents/deepseek-color.svg" width="56" height="56" alt="">
+              <h3>DeepSeek Harness</h3><span class="al-agent-kind">Developer preview</span>
+              <p>DSH with your local provider configuration. Preview limitations apply.</p>
+              <a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#deepseek-harness">DeepSeek setup ↗</a>
+            </article>
+          </div>
+          <p class="al-brand-note">Brand marks identify compatible tools, not partnerships or endorsements. DeepSeek's mark identifies the provider, not a separate Harness logo. <a href="../assets/agents/NOTICE.txt">Icon sources &amp; license</a></p>
+          <details class="al-disclosure">
+            <summary>Compatibility, session recovery, and accounts</summary>
+            <div class="al-disclosure-body"><p>Copilot, Claude, Kimi, and Qwen support context + history recovery for sessions they expose. DeepSeek Harness: context only · no old-message replay. AgentLink retains messages already saved locally; switching agents does not migrate a conversation between providers.</p><p>Claude requires <code>claude-agent-acp</code>. Kimi uses the current JavaScript CLI and <code>kimi login</code>, not the archived Python CLI. Qwen connects through <code>qwen --acp</code>. Follow the <a href="https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.md#coding-agents">compatibility guide</a> for DSH version requirements and setup details.</p><p>Accounts, model access, fees, reasoning controls, permissions, and image support depend on the agent and provider. New integrations may require both a newer app and Bridge.</p></div>
+          </details>
         </div>
       </section>
       <section class="section" id="features">
         <div class="shell">
-          <div class="section-heading split-heading reveal"><div><span class="kicker">Less desk time. Same context.</span><h2>Change screens.<br>Not conversations.</h2></div><p>One Android app for multiple agents, projects, and computers. Every chat keeps its own agent and workspace; switching chats does not transfer context between providers.</p></div>
-          <div class="link-benefits">
-            <article class="feature-card reveal"><span class="feature-label">01 / Follow the work</span><h3>More than a final answer.</h3><p>Stream replies, inspect tool activity, and review agent approval requests. Keep a task moving without keeping a terminal in view.</p></article>
-            <article class="feature-card reveal"><span class="feature-label">02 / Keep the thread</span><h3>Phone to keyboard.<br>No copy and paste.</h3><p>The optional AgentLink terminal shares your session, messages, task queue, and approvals with Android. Return to the same conversation.</p></article>
-            <article class="feature-card reveal"><span class="feature-label">03 / Stay in control</span><h3>Your projects.<br>Your decisions.</h3><p>Switch computers and chats, choose the options your agent exposes, and stop the current task. Credentials are configured on the computer, not entered into this website.</p></article>
+          <div class="section-heading split-heading reveal"><div><span class="kicker">02 / Take the conversation with you</span><h2>From a quick request<br>to the next decision.</h2></div><p>Follow work away from your desk, give your agent visual context, and pick up the same thread when you return.</p></div>
+          <div class="al-feature-grid">
+            <article class="feature-card reveal"><span class="feature-label">Follow &amp; approve</span><h3>See what is happening.</h3><p>Stream replies, inspect tool activity, handle approval requests, and stop the current task. Stay involved without keeping a terminal in view.</p></article>
+            <article class="feature-card reveal" data-image-feature><span class="feature-label">Show &amp; explain · 0.0.39+</span><h3>A screenshot says more.</h3><p>Attach one PNG/JPEG, preview it, and send it with optional text. New images are compressed to at most 1 MiB. Requires an image-capable agent/model and updated App and Bridge.</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.md#send-an-image">Image input &amp; cache limits ↗</a></article>
+            <article class="feature-card reveal"><span class="feature-label">Switch &amp; organize</span><h3>Each project, its own space.</h3><p>Manage multiple computers and chats from one app. Every chat keeps its own agent, project path, and context; your credentials stay configured on the computer.</p></article>
+            <article class="feature-card reveal"><span class="feature-label">Return &amp; continue</span><h3>Phone to keyboard.<br>No copy and paste.</h3><p>The optional AgentLink terminal shares your session, messages, task queue, and approvals with Android. Return to the same conversation, not a separate vendor CLI.</p></article>
           </div>
-        </div>
-      </section>
-      <section class="section al-agents-section" id="agents">
-        <div class="shell">
-          <div class="section-heading reveal"><span class="kicker">Five agents. One control surface.</span><h2>Bring the tools you already use.</h2><p>Install and configure only the agents you need. AgentLink connects to them through the computer-side Bridge; accounts, model access, and service charges remain with each provider.</p></div>
-          <div class="al-agent-grid">
-            <article class="al-agent-card" id="copilot" data-agent="copilot-cli"><span class="al-agent-kind">Native SDK</span><h3>GitHub Copilot CLI</h3><p>Your installed Copilot CLI and local sign-in.</p><dl><dt>Session recovery</dt><dd>Context + history</dd></dl><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#copilot-background-task-lifecycle">Copilot setup ↗</a></article>
-            <article class="al-agent-card" id="claude" data-agent="claude-code"><span class="al-agent-kind">ACP adapter</span><h3>Claude Code</h3><p>Local Claude authentication with the <code>claude-agent-acp</code> adapter.</p><dl><dt>Session recovery</dt><dd>Context + history</dd></dl><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#claude-code">Claude setup ↗</a></article>
-            <article class="al-agent-card" id="kimi" data-agent="kimi-cli"><span class="al-agent-kind">Native ACP</span><h3>Kimi Code</h3><p>Current JavaScript Kimi Code, with local <code>kimi login</code>. Not the archived Python CLI.</p><dl><dt>Session recovery</dt><dd>Context + history</dd></dl><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#kimi-code-and-qwen-code">Kimi setup ↗</a></article>
-            <article class="al-agent-card" id="qwen" data-agent="qwen-code"><span class="al-agent-kind">Native ACP</span><h3>Qwen Code</h3><p>Locally authenticated Qwen Code, connected through <code>qwen --acp</code>.</p><dl><dt>Session recovery</dt><dd>Context + history</dd></dl><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#kimi-code-and-qwen-code">Qwen setup ↗</a></article>
-            <article class="al-agent-card al-agent-preview" id="deepseek" data-agent="deepseek-harness"><span class="al-agent-kind">Developer preview</span><h3>DeepSeek Harness</h3><p>Pinned DSH preview with local provider configuration. Follow the guide's version requirements.</p><dl><dt>Session recovery</dt><dd>Context only · no old-message replay</dd></dl><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#deepseek-harness">DeepSeek setup ↗</a></article>
-          </div>
-          <p class="extensions-footnote">Models, reasoning controls, permissions, and recovery depend on the agent. Saved AgentLink messages are retained, but DeepSeek Harness cannot replay an external session's earlier messages. Consult the <a href="https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.md#coding-agents">compatibility guide</a> and your APK's release notes; new integrations may require both a newer app and Bridge.</p>
         </div>
       </section>
       <section class="section" id="setup">
         <div class="shell">
-          <div class="section-heading reveal"><span class="kicker">From download to your first message</span><h2>Two installs. One connection.</h2><p>An Android phone, a computer with Python 3.11+ and Git, and at least one installed, authenticated coding agent. Keep the computer awake, online, and running the Bridge.</p></div>
+          <div class="section-heading reveal"><span class="kicker">03 / Get connected</span><h2>Two installs. One connection.</h2><p>An Android phone, a computer with Python 3.11+ and Git, and at least one installed, authenticated coding agent. Keep the computer awake, online, and running the Bridge.</p></div>
           <ol class="al-setup-grid">
             <li><span class="al-step">01 / PHONE</span><h3>Install AgentLink.</h3><p>Choose the newest Android APK from AgentLink's Releases, including pre-releases. Use the same signing channel for in-place upgrades that preserve saved chats.</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/releases">Get the Android APK ↗</a></li>
             <li><span class="al-step">02 / COMPUTER</span><h3>Start the Bridge.</h3><p>Install your chosen agent and sign in locally first. Then start AgentLink's server. One Bridge discovers multiple agents; you do not need a server per agent.</p><a class="text-link" href="#server-commands">Windows quick start ↓</a></li>
@@ -103,7 +130,7 @@ python -m venv .venv
       </section>
       <section class="section al-trust-section" id="connection">
         <div class="shell">
-          <div class="section-heading reveal"><span class="kicker">Your computer. An explicit connection.</span><h2>Remote control,<br>with clear boundaries.</h2></div>
+          <div class="section-heading reveal"><span class="kicker">04 / Know the boundaries</span><h2>Your computer.<br>Your connection.</h2></div>
           <div class="link-benefits">
             <article class="feature-card"><span class="feature-label">Connection</span><h3>Private by default.</h3><p>Authenticated Dev Tunnels avoid inbound firewall ports and an extra phone VPN app. Confirm pairing; never enable anonymous tunnel access or share pairing tokens.</p></article>
             <article class="feature-card"><span class="feature-label">Data</span><h3>Local workspace.<br>Not an offline model.</h3><p>Your files and agent processes live on your computer. Model requests still follow the coding agent provider's data policy and may include project content.</p></article>
@@ -119,13 +146,8 @@ python -m venv .venv
             <details class="al-disclosure"><summary>What does “missing” mean for an agent?</summary><div class="al-disclosure-body"><p>The Bridge cannot find that agent's executable, or its required adapter, on its PATH. Install it on the computer, reopen the terminal, restart the Bridge, and refresh Machines. “Available” means an executable was found; it does not prove authentication or model access.</p><p>A missing installation is different from an absent picker entry. If Machines lists an agent but New session does not on the same computer, include your app/Bridge versions and a redacted screenshot in a <a href="https://github.com/gongpx20069/android-agent-link/issues">bug report</a>.</p></div></details>
             <details class="al-disclosure"><summary>Can I resume any existing conversation?</summary><div class="al-disclosure-body"><p>Only sessions offered by the connected agent. Recovery support varies: DeepSeek Harness restores context without replaying earlier external messages. Switching agents does not migrate a conversation to a different provider.</p></div></details>
             <details class="al-disclosure"><summary>Can I close the app or put my computer to sleep?</summary><div class="al-disclosure-body"><p>Keep the computer awake and the Bridge running. Closing a phone UI is not a cancellation request for remote work, but Android background updates are limited. Reopen AgentLink to reconnect and check authoritative task status.</p></div></details>
+            <details class="al-disclosure" id="mochi"><summary>Optional: can I use Mochi as a voice companion?</summary><div class="al-disclosure-body"><p>Yes. In Mochi Tools → AgentLink, open AgentLink and approve scoped access in its native screen. Enable the Provider, its Tools, and the AgentLink Skill. Mochi can discover authorized workspaces, create or continue shared chats, send tasks, and read results.</p><p>Credentials stay in AgentLink and are excluded from Mochi sharing. Results used by Mochi go to its model provider. Execution approvals remain human decisions; access is foreground-only, not enabled for scheduled Agents or Subagents. Background result delivery depends on Android scheduling. Keep both apps and the Bridge updated.</p><a class="text-link" href="../#extensions">Explore Mochi →</a></div></details>
           </div>
-        </div>
-      </section>
-      <section class="section" id="mochi">
-        <div class="shell mochi-handoff">
-          <div><span class="kicker">Optional / A voice companion</span><h2>Let Mochi connect<br>to your work, too.</h2><p>With scoped permission, Mochi can discover authorized workspaces, create or continue shared chats, send tasks, and read results. AgentLink works just as well without it.</p><a class="text-link" href="../#extensions">Explore Mochi →</a></div>
-          <div class="handoff-steps"><span class="extension-badge">Explicit permission · Foreground control</span><ol><li>Install AgentLink and connect your computer.</li><li>In Mochi Tools → AgentLink, open AgentLink and approve scoped access in its native screen.</li><li>Enable the Provider, its Tools, and the AgentLink Skill. Keep both apps and the Bridge updated.</li></ol><p>Credentials stay in AgentLink and are excluded from Mochi sharing. Results used by Mochi go to its model provider. Execution approvals remain human decisions; access is not enabled for scheduled Agents or Subagents. Background result delivery depends on Android scheduling.</p></div>
         </div>
       </section>
       <section class="al-final-cta"><div class="shell"><img src="../assets/agentlink.svg" width="56" height="56" alt=""><h2>Your next task.<br>Wherever you are.</h2><p>Keep your computer working. Keep the conversation with you.</p><div class="hero-actions"><a class="button button-primary" href="https://github.com/gongpx20069/android-agent-link/releases">Download AgentLink ↓</a><a class="button button-secondary" href="#setup">Start the Bridge →</a></div></div></section>

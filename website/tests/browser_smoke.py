@@ -106,6 +106,16 @@ def main() -> None:
                             )
                     if not is_home:
                         assert page.locator("[data-agent]").count() == 5
+                        assert page.locator("[data-image-feature]").count() == 1
+                        assert page.locator("[data-agent] img").evaluate_all("""images =>
+                            images.length === 5 && images.every(image =>
+                                image.complete && image.naturalWidth > 0 &&
+                                image.getAttribute("alt") === "" &&
+                                image.src.startsWith(location.origin + "/hi-mochi/assets/agents/"))
+                        """)
+                        assert page.locator("main > section[id]").evaluate_all(
+                            "sections => sections.map(section => section.id)"
+                        ) == ["agents", "features", "setup", "connection", "faq"]
                         summary = page.locator("#server-commands summary")
                         summary.focus()
                         page.keyboard.press("Enter")
@@ -115,7 +125,7 @@ def main() -> None:
                         assert not page.locator("#server-commands").evaluate("(item) => item.open")
                     page.locator("details").evaluate_all("(items) => items.forEach(item => item.open = true)")
 
-                    for width in (320, 390, 768, 1280):
+                    for width in (320, 390, 768, 1024, 1280, 1440):
                         page.set_viewport_size({"width": width, "height": 900})
                         layout_errors = page.evaluate("""() => {
                             const errors = [];
@@ -132,7 +142,7 @@ def main() -> None:
                                 "[data-speech-feature], [data-documents-feature], " +
                                 "[data-connections-feature], [data-tasks-feature], " +
                                 "[data-extension-card], .link-benefits article, .link-stage, " +
-                                ".al-agent-card, .al-setup-grid li"
+                                ".al-agent-card, .al-feature-grid article, .al-setup-grid li"
                             );
                             for (const card of cards) {
                                 const bounds = card.getBoundingClientRect();
@@ -178,11 +188,20 @@ def main() -> None:
                                 assert agent.locator("a").get_attribute("href").startswith(
                                     "https://github.com/gongpx20069/android-agent-link/blob/master/"
                                 )
+                                assert agent.locator("img").is_visible()
+                                assert agent.locator("img").evaluate("""image => {
+                                    const box = image.getBoundingClientRect();
+                                    return box.width === 56 && box.height === 56;
+                                }""")
                             if options.screenshots:
                                 prefix = language.strip("/").replace("/", "-")
-                                page.evaluate("scrollTo(0, 0)")
+                                page.evaluate("document.activeElement.blur(); scrollTo(0, 0)")
                                 page.screenshot(path=str(options.screenshots / f"{prefix}-{width}.png"))
-                                page.locator("#agents").screenshot(path=str(options.screenshots / f"{prefix}-agents-{width}.png"))
+                                for section in ("agents", "features"):
+                                    page.locator(f"#{section}").screenshot(
+                                        path=str(options.screenshots / f"{prefix}-{section}-{width}.png"),
+                                        style=".site-header, .skip-link { visibility: hidden !important; }",
+                                    )
                     if is_home:
                         page.locator("[data-extension-card='agentlink'] .button").click()
                         assert page.url.endswith(f"/hi-mochi/{language}agentlink/")
@@ -207,9 +226,12 @@ def main() -> None:
                 page.locator("#server-commands summary").click()
                 assert page.locator("#server-commands pre").is_visible()
                 assert page.locator("[data-agent]").count() == 5
+                assert page.locator("[data-agent] img").evaluate_all(
+                    "images => images.every(image => image.complete && image.naturalWidth > 0)"
+                )
                 context.close()
             browser.close()
-        print("Browser checks passed: 4 pages, 4 widths, extension downloads/fallbacks, and cross-page navigation.")
+        print("Browser checks passed: 4 pages, 6 widths, agent logos, extension downloads/fallbacks, and cross-page navigation.")
     finally:
         server.shutdown()
         server.server_close()

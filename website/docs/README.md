@@ -69,8 +69,12 @@ absence of a sandbox, and model-provider access to output used by the Agent.
 AgentLink's official website lives at `agentlink/` and `zh-CN/agentlink/`.
 Treat these as a standalone product destination, not a Mochi extension detail:
 lead with phone/terminal continuity, Android download and computer setup.
-Follow with five agent cards, progressive setup instructions, connection/data
-boundaries, FAQ, and optional Mochi integration. Keep both languages equivalent.
+Follow with five logo-led agent cards, four everyday feature cards (including
+single-image input), progressive setup instructions, connection/data boundaries,
+and FAQ. Keep optional Mochi integration inside the FAQ rather than a competing
+product pitch. Keep both languages equivalent. Agent compatibility/recovery
+details belong in a native disclosure under the cards, not in every card.
+The navigation order matches the reading order: agents, features, setup, FAQ.
 Its product/setup claims follow the
 [AgentLink README](https://github.com/gongpx20069/android-agent-link) and
 [user guide](https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.md).
@@ -89,6 +93,20 @@ guide links rather than independently maintained version pins. Claude uses
 `claude-agent-acp`, not `claude --acp`. Disclose DSH's context-only recovery and
 separate APK/Bridge upgrades. Do not equate executable discovery with working
 authentication or claim a fix for a reported picker discrepancy.
+
+Agent logos are local, unmodified LobeHub Icons SVGs under `assets/agents/`;
+that directory includes the pinned upstream revision, MIT license, and trademark
+notice. Use GitHub Copilot's mark, not Microsoft's Copilot mark. DeepSeek's mark
+identifies the provider, not an independently verified Harness logo. Do not
+imply endorsement. Logo images have empty alt text because the adjacent heading
+names the tool; keep explicit dimensions and a contrasting background (the Kimi
+color mark needs a dark background). No runtime third-party logo requests.
+Keep notices under assets so they ship in the Pages artifact.
+
+Image input requires App 0.0.39+ and the matching updated Bridge, plus an
+image-capable agent/model. The site describes one PNG/JPEG and the 1 MiB phone
+compression target, not universal vision support or unlimited image retention;
+link to the user guide for cache and compatibility details.
 
 ## Release links
 
@@ -130,13 +148,14 @@ python website\tests\browser_smoke.py
 
 Alternatively, use `--channel msedge` or `--channel chrome` with an installed
 browser instead of downloading Chromium. The check serves only `website/` at
-the project path, checks all four pages at 320/390/768/1280 pixels, exercises
+the project path, checks all four pages at 320/390/768/1024/1280/1440 pixels, exercises
 mobile/cross-page navigation and expanded setup disclosures, and mocks GitHub
 responses to verify matching base/extension updates, API-outage fallback,
 missing extension assets, and rejection of untrusted download URLs.
 AgentLink checks also cover keyboard-operated setup disclosures, no-JavaScript
-setup, all five agent cards, language switching, and desktop navigation bounds.
-Use `--screenshots <directory>` to save AgentLink hero and agent-section images
+setup, all five loaded local logos, reading order, image-input visibility,
+language switching, and desktop navigation bounds.
+Use `--screenshots <directory>` to save AgentLink hero, agent, and feature-section images
 at each tested width for visual review; keep generated images out of the site.
 
 ## Deployment
