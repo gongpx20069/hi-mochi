@@ -57,8 +57,9 @@ run in local JVM tests.
 | `TermuxRuntimeState` | Registry revocation generation and transient task views; no execution approval state |
 | `AgentTaskRuntime` | Bounded process-local run observations and exact foreground coroutine ownership |
 | `TaskCenterViewModel` | Read-only source aggregation, explicit source-specific actions and cancellable configuration reports |
-| `AgentBrowserSessionController` | visible per-turn WebView, snapshots, actions, and cleanup |
-| `AgentExecutionService` | background Agent Browser lifetime and Stop notification |
+| `AgentBrowserRuntime` | per-turn WebView, mode, snapshots, handoff and serialized cleanup/deletion |
+| `UserAssistanceCoordinator` | process-local ID-correlated, cancellable pending question/browser handoff |
+| `BrowserSettings` | visited host/time and last Agent-selected mode in Tool DataStore; no credentials or manual mode overrides |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
 | `AndroidJavaScriptExecutor` | bounded JavaScript in an isolated process |
 | `PlannerRepository` | calendar/todo transactions and queries |

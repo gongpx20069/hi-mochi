@@ -472,6 +472,9 @@ private fun MochiAppContent(
     val cameraSnapshot by
         viewModel.cameraSnapshot.collectAsStateWithLifecycle()
     val browserState by viewModel.browserState.collectAsStateWithLifecycle()
+    val assistanceRequest by viewModel.assistanceRequest.collectAsStateWithLifecycle()
+    var showBrowserManager by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(surface) { if (surface != MochiSurface.Tools) showBrowserManager = false }
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
     var focusMode by rememberSaveable { mutableStateOf(false) }
     var focusStandby by rememberSaveable { mutableStateOf(false) }
@@ -782,6 +785,7 @@ private fun MochiAppContent(
             onDisconnectAmap = viewModel::disconnectAmap,
             onSetAmapEnabled = viewModel::setAmapEnabled,
             onSetAgentBrowserEnabled = viewModel::setAgentBrowserEnabled,
+            onManageBrowser = { showBrowserManager = true },
             onAgentLinkAction = viewModel::onAgentLinkAction,
             onInstallMijia = viewModel::installMijiaExtension,
             onConfigureMijia = viewModel::configureMijiaExtension,
@@ -840,7 +844,7 @@ private fun MochiAppContent(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    if (browserState.active) {
+                    if (browserState.active && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
                             state = browserState,
                             webViewProvider = viewModel::browserWebView,
@@ -920,7 +924,7 @@ private fun MochiAppContent(
                     shape = RoundedCornerShape(28.dp),
                     tonalElevation = 6.dp,
                 ) {
-                    if (homePresentation && browserState.active) {
+                    if (homePresentation && browserState.active && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
                             state = browserState,
                             webViewProvider = viewModel::browserWebView,
@@ -1001,6 +1005,8 @@ private fun MochiAppContent(
             },
         )
     }
+    if (showBrowserManager) WebsiteManager(viewModel, onClose = { showBrowserManager = false })
+    BrowserExperience(viewModel)
     addTodoRequest?.let { request ->
         AddTodoDialog(
             scheduledDate = request.scheduledDate,
@@ -1017,13 +1023,10 @@ private fun MochiAppContent(
 private fun BrowserSessionCard(
     state: AgentBrowserUiState,
     webViewProvider: (android.content.Context) -> android.webkit.WebView?,
-    onRelease: () -> Unit,
+    onRelease: (android.webkit.WebView) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    DisposableEffect(state.sessionId) {
-        onDispose(onRelease)
-    }
     Box(
         modifier = modifier
             .background(Color(0xFF8FAEFF))
@@ -1037,14 +1040,17 @@ private fun BrowserSessionCard(
             color = Color.White,
             shape = RoundedCornerShape(25.dp),
         ) {
-            AndroidView(
-                factory = { context ->
-                    checkNotNull(webViewProvider(context)) {
-                        "Active browser session has no WebView"
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
+            androidx.compose.runtime.key(state.sessionId) {
+                AndroidView(
+                    factory = { context ->
+                        checkNotNull(webViewProvider(context)) {
+                            "Active browser session has no WebView"
+                        }
+                    },
+                    onRelease = onRelease,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
         Surface(
             modifier = Modifier
@@ -1458,6 +1464,7 @@ private fun SurfaceContent(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onManageBrowser: () -> Unit,
     onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
     onConfigureMijia: () -> Unit,
@@ -1569,6 +1576,7 @@ private fun SurfaceContent(
                 onDisconnectAmap = onDisconnectAmap,
                 onSetAmapEnabled = onSetAmapEnabled,
                 onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
+                onManageBrowser = onManageBrowser,
                 onAgentLinkAction = onAgentLinkAction,
                 onInstallMijia = onInstallMijia,
                 onConfigureMijia = onConfigureMijia,
@@ -3694,6 +3702,7 @@ private fun ToolsSurface(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onManageBrowser: () -> Unit,
     onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
     onConfigureMijia: () -> Unit,
@@ -3815,6 +3824,9 @@ private fun ToolsSurface(
                             onCheckedChange = onSetAgentBrowserEnabled,
                             enabled = !state.isLoading,
                         )
+                    }
+                    Button(onClick = onManageBrowser, enabled = !state.isLoading) {
+                        Text("Websites and logins")
                     }
                     TextButton(
                         onClick = {

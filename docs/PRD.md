@@ -114,10 +114,10 @@ support is an optional import/export adapter.
 - Mochi can search current public information through Bing.
 - Mochi can search WeChat official-account articles through Sogou Weixin.
 - Travel Planning combines Amap route and destination context with
-  foreground-only Agent Browser research on public no-login train and flight
+  foreground-only Agent Browser research on normal train and flight
   pages.
 - Ticket research uses visible website controls only, never undocumented
-  endpoints, account login, CAPTCHA bypass, passenger identity, booking, or
+  endpoints, CAPTCHA bypass, passenger identity, booking, or
   payment.
 - Both search engines, result pages, and selected sources are operated through
   the built-in Agent Browser rather than dedicated search or fetch Tools.
@@ -195,11 +195,24 @@ conversation history; authentication material is excluded.
   approval prompts or confirmation waits.
 - Home presents an active session as a trusted live Browser Card. Other
   surfaces remain unchanged and show only the existing Tool pipeline status.
-- Entering the background does not pause or cancel Browser execution. A
-  user-visible Agent notification exposes status and Stop while Browser Tools
-  continue executing.
+- Entering the background does not itself pause or cancel Browser execution.
+  Pending user assistance is exposed by a private notification when enabled;
+  Android process/background limits still apply.
 - The Tools surface groups the Agent Browser provider switch and all five
   individual Browser Tool switches in one card.
+- The Agent chooses auto/mobile/desktop mode according to the task, without
+  asking the user to configure it. Mode switches must not replay forms.
+- Existing website login is reused without repeated prompts. When real login,
+  verification or clarification is necessary, Main may suspend on
+  `request_user_assistance` with its own natural-language explanation.
+  The user completes/cancels in native UI; credentials are entered only on the
+  website. A fresh read verifies reported completion.
+- **Tools > Agent Browser > Websites and logins** manages shared local sessions,
+  per-site/all website data and separate resource cache in a Task Center-style
+  dialog over Tools. No manual mode selector is exposed.
+  Deletion requires confirmation and discloses parent-domain/subdomain impact.
+  Named isolated accounts, raw passwords and process-death task resumption are
+  outside this version.
 
 ### 3.7 Subagents
 

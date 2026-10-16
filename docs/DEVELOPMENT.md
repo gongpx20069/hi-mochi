@@ -78,6 +78,24 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Browser assistance regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*UserAssistanceTest" `
+  --tests "*BrowserSettingsTest" --tests "*BrowserModeTest" `
+  --tests "*AgentOrchestratorTest" --tests "*Skill*Test" --no-daemon
+```
+
+After an in-place app/test APK update, `feature.home.BrowserExperienceSmokeTest`
+checks the always-visible management entry, desktop viewport, explicit handoff,
+snapshot pause, continuation, Cookie reuse across turns and complete per-site
+deletion. It uses intercepted synthetic HTML under the reserved
+`mochi-browser-fixture.example` host, no real website/account request, and
+deletes only that fixture site's data. Actual website login/expiry, authentication
+compatibility and mode quality still require manual user-owned website testing.
+The handoff may speak its synthetic explanation through the configured TTS.
+Never clear all phone website data as a test or record real login credentials.
+
 Custom REST regressions:
 
 ```powershell

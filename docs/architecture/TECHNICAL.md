@@ -117,9 +117,15 @@ browser turn. While a child is active, the Browser Card identifies Researcher
 or Analyst; the label clears when child execution finishes or is cancelled.
 After the LLM produces its final response, the Orchestrator closes the browser
 before TTS. Structured cleanup also runs on cancellation, timeout, and failure.
-App backgrounding does not close or pause the session. A foreground Agent
-execution notification keeps the interaction discoverable and cancellable.
-Browser Tool actions execute without Mochi confirmation gates or user waits.
+App backgrounding does not itself close or pause the session. Main-only
+`request_user_assistance` suspends a Tool call on a cancellable ID-correlated
+answer for up to ten minutes. Browser handoff blocks snapshots/actions; a
+private notification exposes the pending request when enabled. Ordinary actions
+still have no confirmation gate. Process death does not resume pending calls.
+`browser_navigate.mode` lets the Agent select mobile/desktop; auto reuses the
+last selected mode. No manual mode preference overrides the Agent.
+Cookies are flushed, not deleted, on teardown; explicit complete deletion uses
+feature-gated AndroidX WebKit APIs serialized against all Browser turns.
 See `AGENT_BROWSER.md`.
 
 Wake and media triggers preserve the selected `MochiSurface`. A typed pipeline

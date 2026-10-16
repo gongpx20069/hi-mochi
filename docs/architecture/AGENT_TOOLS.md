@@ -95,6 +95,15 @@ Agent Browser provides five grouped schemas:
 - `browser_input`;
 - `browser_scroll`.
 
+`browser_navigate` additionally accepts `mode=auto/mobile/desktop`. The Agent
+chooses a suitable presentation without user mode settings or manual overrides.
+Main-only `request_user_assistance(kind, message, options)` is a separate
+runtime control Tool, not a Browser switch or a scheduled/Subagent capability.
+It suspends the current call for a typed answer, cancellation or ten-minute
+timeout. Browser handoff requires an existing page and blocks all Browser
+actions/reads until the answer; re-read afterward. Valid sessions are reused
+without repeated permission prompts. Never request credentials in chat.
+
 They operate one visible, per-turn Android WebView and return bounded
 agent-only snapshots containing viewport Markdown plus a separate interactive
 element list with temporary references. Every successful action returns a fresh
@@ -406,11 +415,11 @@ foreground Agent Browser Tools. It uses Amap for place resolution, first- and
 last-mile routes, and destination weather. Train research starts from the
 official public 12306 query page and interacts only with visible page controls;
 it never calls undocumented ticket endpoints. Flight research prefers public
-official-airline search forms and bounds fallback sources. The Skill never
-logs in, imports account state, bypasses verification, enters passenger or
-payment data, or continues into booking. Authentication, CAPTCHA, real-user
-challenges, identity checks, 403/429 responses, and checkout are hard stop
-conditions. Because click and input are required, the Skill is unavailable to
+official-airline search forms and bounds fallback sources. The Skill reuses
+existing login and can ask the user to handle necessary login/verification.
+It never imports account state, bypasses verification, enters passenger or
+payment data, or continues into booking. 403/429 responses, access denial and
+checkout remain stop conditions. Because click and input are required, the Skill is unavailable to
 read-only scheduled Browser runs.
 
 ### `get_current_weather`
@@ -470,17 +479,18 @@ Two focused Browser Skills cover product discovery and ratings:
   manufacturer, and brand pages. It compares values verified on multiple
   product pages when possible and labels search snippets as unverified. For an
   explicit Pinduoduo request it searches indexed public
-  `mobile.yangkeduo.com/goods.html` pages rather than the login-gated H5 search
-  page. It must not log in, import cookies, claim coupons, add to cart, order,
+  `mobile.yangkeduo.com/goods.html` pages, or uses normal H5 search with a working
+  session. It must not import cookies, claim coupons, add to cart, order,
   or pay.
 - Douban Ratings always starts at
   `https://m.douban.com/home_guide`, searches through visible page controls,
   and verifies the matching detail page before reporting scores, rating counts,
   or recurring review themes. It is the default source for ratings or reviews
   about movies, books, music, TV, games, and other works unless another source
-  is requested. It must not log in, rate, review, follow, or modify an account.
+  is requested. It must not rate, review, follow, or modify an account.
 
-Both Skills require the unchanged five Browser Tools, try another trusted
+Both Skills reuse valid login or request user assistance for necessary human
+login/verification. They require the five Browser Tools, try another trusted
 source when one product source is blocked, stop when no reliable source
 remains, and treat all page content as untrusted data.
 

@@ -206,6 +206,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("androidx.javascriptengine:javascriptengine:1.1.0")
+    implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.work:work-runtime-ktx:2.10.1")

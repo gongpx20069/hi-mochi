@@ -28,6 +28,8 @@ import java.time.ZoneOffset
 import java.util.Locale
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -640,6 +642,31 @@ class AgentOrchestratorTest {
         assertThrows(CancellationException::class.java) {
             runBlocking { orchestrator.run(request()) }
         }
+    }
+
+    @Test fun `user assistance suspends model loop until matching answer`() = runBlocking {
+        val assistance = com.example.mochi_pet.core.browser.UserAssistanceCoordinator()
+        val tool = object : AgentTool {
+            override val name = "request_user_assistance"
+            override val schema = functionToolSchema(name, "Question fixture", buildJsonObject {}, emptyList())
+            override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
+                val answer = assistance.ask("Which city?", false, null, listOf("Paris"))
+                return ToolResultEnvelope.success(buildJsonObject { put("answer", answer.answer) })
+            }
+        }
+        val client = QueueChatClient(
+            toolResponse("question_1", tool.name, "{}"),
+            finalResponse("""{"reply":"Continuing with Paris","emotion":"happy"}"""),
+        )
+        val agent = orchestrator(client, ToolRegistry(listOf(tool)))
+        val run = async(start = CoroutineStart.UNDISPATCHED) { agent.run(request()) }
+        val pending = requireNotNull(assistance.request.value)
+        assertEquals(1, client.requests.size)
+        assertTrue(!run.isCompleted)
+        assistance.respond(pending.id, com.example.mochi_pet.core.browser.UserAssistanceAnswer("completed", "Paris"))
+        assertEquals("Continuing with Paris", run.await().reply)
+        assertEquals(2, client.requests.size)
+        assertTrue(client.requests.last().messages.any { it.role == "tool" && it.content?.contains("Paris") == true })
     }
 
     private fun orchestrator(

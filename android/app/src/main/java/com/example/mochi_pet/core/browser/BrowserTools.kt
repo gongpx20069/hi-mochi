@@ -46,13 +46,18 @@ class BrowserNavigateTool(
         name = name,
         description =
             "Open a public HTTPS URL or move through browser history. " +
-                "Returns a fresh page snapshot.",
+                "Returns a fresh page snapshot. Reuse existing website login without asking again. " +
+                "Choose desktop when mobile hides needed features; use mobile for touch-friendly pages. " +
+                "Auto reuses the site's last mode. Choose the presentation yourself; do not ask the user to configure it. " +
+                "Do not switch modes or reload after filling or submitting a form. " +
+                "If human login or verification is required, ask the main Agent to request user assistance.",
         properties = buildJsonObject {
             put(
                 "operation",
                 enumProperty("goto", "back", "forward", "reload"),
             )
             put("url", stringProperty("Public HTTPS URL for goto"))
+            put("mode", enumProperty("auto", "mobile", "desktop"))
         },
         required = listOf("operation"),
     )
@@ -64,6 +69,7 @@ class BrowserNavigateTool(
         runtime.navigate(
             operation = arguments.requiredString("operation"),
             url = arguments.optionalString("url"),
+            mode = arguments.optionalString("mode") ?: "auto",
         )
     }
 }
@@ -174,6 +180,50 @@ fun readOnlyAgentBrowserTools(runtime: AgentBrowserRuntime): List<AgentTool> =
         BrowserScrollTool(runtime),
     )
 
+class RequestUserAssistanceTool(private val runtime: AgentBrowserRuntime) : AgentTool {
+    override val name = "request_user_assistance"
+    override val schema = functionToolSchema(
+        name,
+        "Ask the user for needed information or hand over the current browser for login/verification. " +
+            "Generate a short, natural message in the user's language explaining why help is needed and what happens next. " +
+            "This suspends the task until the user responds; it is not a final reply. " +
+            "Do not ask to use an already working login session. Never request passwords, tokens or verification codes in chat. " +
+            "Browser completion means only that the user finished; call browser_read to verify and continue. " +
+            "On cancellation or timeout do not repeat the request or retry writes; explain or use another approach. " +
+            "Do not use user assistance to bypass SSL, unsafe-site or URL-policy errors.",
+        buildJsonObject {
+            put("kind", enumProperty("question", "browser"))
+            put("message", stringProperty("Context-specific explanation, up to 1000 characters. Spoken and displayed to the user."))
+            put("options", buildJsonObject {
+                put("type", "array")
+                put("maxItems", 4)
+                put("items", stringProperty("Optional short answer choice; no secrets"))
+            })
+        },
+        listOf("kind", "message"),
+    )
+
+    override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
+        val kind = arguments.requiredString("kind")
+        require(kind == "question" || kind == "browser") { "Unknown assistance kind." }
+        val options = arguments["options"]?.let { element ->
+            require(element is JsonArray) { "options must be an array." }
+            element.map {
+                require(it is JsonPrimitive && it.isString) { "Choices must be text." }
+                it.content
+            }
+        }.orEmpty()
+        return browserResult {
+            val answer = runtime.requestAssistance(arguments.requiredString("message"), kind == "browser", options)
+            buildJsonObject {
+                put("outcome", answer.outcome)
+                put("answer", answer.answer)
+                put("notice", "User input is not proof that login or a remote action succeeded. Re-read the page before continuing.")
+            }
+        }
+    }
+}
+
 private suspend fun browserResult(
     operation: suspend () -> JsonObject,
 ): ToolResultEnvelope =
@@ -204,6 +254,9 @@ private suspend fun browserResult(
             ToolErrorCode.INVALID_ARGS,
             error.message ?: "Browser input is invalid",
         )
+    } catch (error: IllegalStateException) {
+        if (error is kotlinx.coroutines.CancellationException) throw error
+        ToolResultEnvelope.error(ToolErrorCode.CONFLICT, error.message ?: "Browser state changed")
     }
 
 private fun stringProperty(description: String): JsonObject =

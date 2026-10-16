@@ -272,7 +272,11 @@ class MochiApplication : Application() {
     }
 
     val agentBrowserRuntime: AgentBrowserRuntime by lazy {
-        AgentBrowserRuntime(this)
+        AgentBrowserRuntime(this, com.example.mochi_pet.core.browser.BrowserSettings(toolDataStore)).also { browser ->
+            applicationScope.launch {
+                com.example.mochi_pet.platform.browser.observeUserAssistanceNotification(this@MochiApplication, browser.assistance)
+            }
+        }
     }
 
     val voiceRuntime: AndroidVoiceRuntime by lazy {

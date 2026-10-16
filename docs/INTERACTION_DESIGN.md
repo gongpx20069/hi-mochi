@@ -436,12 +436,12 @@ debug SHA1 fingerprints are not required, and distinguishes the optional
 digital-signature Security Key from SHA1. Its six map and merchant capabilities
 remain individually selectable in an expandable Tool list. The two built-in
 Travel Planning and Merchant Discovery Skills provide route, destination
-weather, public no-login train or flight research, nearby-search, merchant
+weather, train or flight research, nearby-search, merchant
 detail, rating, average-cost, and missing-review guidance. Travel Planning is
 available only in foreground interactions with its Amap and all five Agent
-Browser Tools enabled. It stops on authentication, CAPTCHA, identity,
-passenger, booking, or payment flows rather than requesting manual takeover or
-bypassing the website.
+Browser Tools enabled. It reuses login and can request human login/verification,
+but never bypasses site controls or proceeds into passenger, booking or payment
+flows.
 Current Location appears as an independent built-in Tool switch. A clearly
 location-dependent Agent request keeps the current surface, continues after
 the Android permission result, and returns typed permission, timeout, or
@@ -450,6 +450,18 @@ Agent Browser uses the same provider-card pattern. Its provider-level enable
 switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
+**Websites and logins** stays outside its collapsed Tool list as a filled button
+matching Connect Feishu. It opens a Task Center-style full-screen dialog, with
+the same gradient backdrop, safe-area spacing, 680 dp content limit, rounded
+bordered panels and fixed title/Close row. Closing reveals the unchanged Tools
+page. It contains an introductory card, open-website form, saved-site cards/empty state, and a
+separate local-data section. It lists visited hosts and last visits (not verified
+login status), manual open/login/logout, and confirmed site/all-data deletion.
+There is no mode selector; Mochi chooses mobile/desktop as needed. Legacy manual
+preferences do not override that decision.
+Deletion includes the registrable domain's subdomains and shared login.
+Resource-cache clearing is separate and preserves login. Unsupported complete
+deletion requires a System WebView update, not partial cleanup.
 
 Tools places its Extensions section after all MCP and REST connection cards. The Mi Home
 card always occupies one stable position there, follows Mochi's selected
@@ -567,9 +579,16 @@ shown; the existing global pipeline indicator reports Tool progress. The
 browser closes after the final model response and before TTS, and also closes
 on cancellation, timeout, or failure.
 
-Moving Mochi to the background does not pause Browser Tools. A foreground Agent
-notification shows that browsing is active and provides Stop. Browser actions
-continue without approval prompts or waits.
+Moving Mochi to the background does not itself pause Browser Tools. Ordinary
+actions need no approval. Main can explicitly request user assistance: its
+generated explanation is displayed and spoken once while resumed. Questions
+have choices/typed answers; browser handoff opens the existing page in a secure
+full-screen dialog with origin and Continue/Cancel. The ordinary Home WebView
+is not mounted simultaneously and does not accept touch. While waiting, no
+Agent page reads/actions run; completion is verified with a fresh read.
+A private generic notification opens Mochi when notifications are enabled;
+no automatic Activity launch or process-death resumption is promised. The
+ten-minute wait ends explicitly on answer, cancellation or timeout.
 Selecting any card opens a rendered Markdown preview; market skills can switch
 between Preview and Edit after installation. The reader hides YAML frontmatter
 and renders headings, paragraphs, ordered/unordered lists, quotes, fenced code,

@@ -37,6 +37,9 @@ import com.example.mochi_pet.core.agentlink.briefing
 import com.example.mochi_pet.core.voice.WakeBriefingResult
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
+import com.example.mochi_pet.core.browser.BrowserSite
+import com.example.mochi_pet.core.browser.UserAssistanceRequest
+import com.example.mochi_pet.core.browser.UserAssistanceAnswer
 import com.example.mochi_pet.core.database.PlannerStore
 import com.example.mochi_pet.core.memory.AgentMemoryRepository
 import com.example.mochi_pet.core.persona.PersonaRepository
@@ -399,6 +402,14 @@ class MochiHomeViewModel(
         mutableCameraSnapshot.asStateFlow()
     val browserState: StateFlow<AgentBrowserUiState> =
         agentBrowserRuntime?.state ?: unavailableBrowserState.asStateFlow()
+    val assistanceRequest = agentBrowserRuntime?.assistance?.request
+        ?: MutableStateFlow<UserAssistanceRequest?>(null).asStateFlow()
+    val browserSites = agentBrowserRuntime?.settings?.sites ?: kotlinx.coroutines.flow.flowOf(emptyList<BrowserSite>())
+    private var spokenAssistanceId: String? = null
+    private val mutableAssistanceFeedback = MutableStateFlow<String?>(null)
+    val assistanceFeedback = mutableAssistanceFeedback.asStateFlow()
+    private val mutableBrowserManagementFeedback = MutableStateFlow<String?>(null)
+    val browserManagementFeedback = mutableBrowserManagementFeedback.asStateFlow()
     val locationPermissionRequest: StateFlow<Boolean> =
         locationPermissionGate?.request
             ?: unavailableLocationPermissionRequest.asStateFlow()
@@ -429,8 +440,74 @@ class MochiHomeViewModel(
     fun browserWebView(context: Context): WebView? =
         agentBrowserRuntime?.webViewForUi(context)
 
-    fun releaseBrowserWebView() {
-        agentBrowserRuntime?.releaseWebViewFromUi()
+    fun releaseBrowserWebView(view: android.webkit.WebView) {
+        agentBrowserRuntime?.releaseWebViewFromUi(view)
+    }
+
+    fun speakAssistance(id: String) {
+        val request = assistanceRequest.value?.takeIf { it.id == id } ?: return
+        if (spokenAssistanceId == id) return
+        spokenAssistanceId = id
+        mutableAssistanceFeedback.value = null
+        val voice = voiceRuntime ?: return
+        voice.speak(request.message) { result ->
+            if (assistanceRequest.value?.id == id && result != SpeechPlaybackResult.COMPLETED) {
+                mutableAssistanceFeedback.value = "Could not speak the request. Please read it below."
+            }
+        }
+    }
+
+    fun answerAssistance(id: String, answer: UserAssistanceAnswer) {
+        if (assistanceRequest.value?.id != id) return
+        voiceRuntime?.stopSpeaking()
+        agentBrowserRuntime?.assistance?.respond(id, answer)
+    }
+
+    fun stopAssistanceSpeech(id: String) {
+        if (assistanceRequest.value?.id == id) voiceRuntime?.stopSpeaking()
+    }
+
+    suspend fun canClearBrowserData() = agentBrowserRuntime?.canClearSiteData() == true
+
+    suspend fun clearBrowserData(site: String?, cacheOnly: Boolean) {
+        checkNotNull(agentBrowserRuntime) { "Browser unavailable." }.clearData(site, cacheOnly)
+    }
+
+    fun openManagedWebsite(host: String) {
+        mutableBrowserManagementFeedback.value = null
+        if (agentJob?.isActive == true) {
+            mutableBrowserManagementFeedback.value = "Stop the active task before opening a website manually."
+            return
+        }
+        val browser = agentBrowserRuntime
+        if (browser == null) {
+            mutableBrowserManagementFeedback.value = "Browser unavailable."
+            return
+        }
+        agentJob = viewModelScope.launch(ioDispatcher) {
+            try {
+                browser.beginTurn(wait = false)
+                try {
+                    browser.navigate("goto", "https://$host")
+                    browser.requestAssistance(
+                        localizeUiText("Manage this website's login in the browser, then choose Continue. Never enter passwords in chat."),
+                        browser = true, options = emptyList(),
+                    )
+                } finally {
+                    withContext(NonCancellable) { browser.closeTurn() }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: com.example.mochi_pet.platform.browser.AgentBrowserException) {
+                mutableBrowserManagementFeedback.value = error.message
+            } catch (error: IllegalArgumentException) {
+                mutableBrowserManagementFeedback.value = error.message
+            } catch (error: IllegalStateException) {
+                mutableBrowserManagementFeedback.value = error.message
+            } catch (error: java.io.IOException) {
+                mutableBrowserManagementFeedback.value = error.message ?: "Website data could not be updated."
+            }
+        }
     }
 
     fun navigate(intent: MochiNavigationIntent) {

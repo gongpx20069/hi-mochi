@@ -242,7 +242,7 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | **Notion Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新页面，并在已授权的私人知识库中查找或更新信息 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
 | **Feishu Knowledge（飞书知识）** | 禁用 | 搜索与浏览已授权云文档，编辑前读取内容，并回读验证创建或更新结果 | 工具 > 飞书 MCP；[自建应用与用户授权](https://open.feishu.cn/app) |
 | **腾讯文档 Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新文档，并在已授权的私人知识库中查找或更新信息 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
-| 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过智能体浏览器调研无需登录的公开火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用智能体浏览器 |
+| 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过智能体浏览器调研火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用智能体浏览器 |
 | 商家发现 | 启用 | 使用高德提供的评分、人均、营业时间、电话、标签和图片发现并比较商家 | [创建高德 Web 服务 Key](https://console.amap.com/) |
 
 需要另行安装应用的 Skills 集中列在后面的[可选扩展](#可选扩展)中，
@@ -255,19 +255,27 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | **计划** | `manage_mochi_calendar`<br>`manage_mochi_todo` | 读取和更新 Mochi 自己的日历事件与带日期待办，无需额外配置。 |
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
-| **智能体浏览器（Agent Browser）** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
+| **智能体浏览器（Agent Browser）** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 浏览公网 HTTPS 网站，复用本地登录状态，由 Agent 选择手机或桌面模式。 |
 | **原生体验** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | 打开可信 Mochi 界面，或在本地运行有界的纯 JavaScript 计算。 |
 | **高德地图** | 地点搜索 · 商家详情 · 路线<br>地理编码 · 逆地理编码 · 天气 | 使用可信 GCJ-02 坐标搜索地点和商家、比较可用评分与人均并规划路线，需要 Web 服务 Key。 |
 | **已连接 MCP** | **Notion** · **腾讯文档** · **飞书**<br>手动配置的 MCP Server | 检索私人知识、开展调研，并在已授权工作区中协作创建或更新文档。 |
 
 Tools 页面会将智能体浏览器、Mochi 内建能力和 Provider Tools 分组并默认
 收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
-每个 Tool 都有独立开关；Provider 支持的 Tools 还要求对应 Provider 开关已启用。
+Provider Tools 有独立开关，还要求对应 Provider 开关已启用。
+
+**Tools > 智能体浏览器 > 网站与登录管理**会打开与任务中心同风格的弹出界面，管理网站登录和需要确认
+的本地数据删除。网页使用手机还是桌面模式由 Mochi 自己决定，无需用户配置；
+也可仅清除资源缓存而保留登录。已有有效登录
+会自动复用。确需人工登录或验证时，主 Agent 通过 `request_user_assistance`
+暂停任务并播报自己生成的说明。请仅在网页内输入凭证，完成后点击“继续”，
+Mochi 会重新读取页面确认结果。普通问题支持选项和文字回答。
+完整数据删除需要兼容的新版 System WebView，会影响主域名及子域名共享登录。
+此版本使用一个共享会话存储，不提供隔离的多账号或密码库，也不支持进程退出后恢复等待任务。
 
 出行规划只使用公开 HTTPS 页面上的正常可见控件。火车票查询从 12306 官方
-公开查询页开始，机票优先查询航空公司官网。Mochi 不登录、不绕过验证、不填写
-乘客或支付信息，也不会进入预订流程；遇到登录、验证码、身份验证或结算页面时
-立即停止。
+公开查询页开始，机票优先查询航空公司官网。Mochi 会复用有效登录，必要时请用户
+处理登录或验证，但不绕过验证、不填写乘客或支付信息，也不会进入预订或结算流程。
 
 ### Skill Market
 

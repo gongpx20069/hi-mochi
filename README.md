@@ -272,7 +272,7 @@ once its provider is connected and its Tools are enabled.
 | **Notion Knowledge** | Disabled | Coworks with you to research, organize material, draft new pages, and find or update information in your authorized private knowledge base | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
 | **Tencent Docs Knowledge** | Disabled | Coworks with you to research, organize material, draft new documents, and find or update information in your authorized private knowledge base | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
 | **Feishu Knowledge** | Disabled | Searches and browses authorized cloud documents, reads before editing, and verifies requested creation/updates by readback | Tools > Feishu MCP; [self-built app and user authorization](https://open.feishu.cn/app) |
-| Travel Planning | Enabled | Uses Amap for grounded routes and weather, then Agent Browser to research public no-login train or flight options without booking | [Create an Amap Web Service Key](https://console.amap.com/); enable Agent Browser |
+| Travel Planning | Enabled | Uses Amap for grounded routes and weather, then Agent Browser to research train or flight options without booking | [Create an Amap Web Service Key](https://console.amap.com/); enable Agent Browser |
 | Merchant Discovery | Enabled | Finds and compares merchants using available Amap ratings, average cost, hours, phone, tags, and photos | [Create an Amap Web Service Key](https://console.amap.com/) |
 
 Skills requiring separately installed apps are listed under
@@ -285,7 +285,7 @@ Skills requiring separately installed apps are listed under
 | **Planner** | `manage_mochi_calendar`<br>`manage_mochi_todo` | Read and update Mochi-owned events and dated todos. No additional setup. |
 | **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
 | **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
-| **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Research public HTTPS pages in one visible, bounded Android WebView session. |
+| **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Browse public HTTPS websites with reusable local login and Agent-selected mobile/desktop mode. |
 | **Native UX** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | Open trusted Mochi surfaces or run bounded pure JavaScript calculations locally. |
 | **Amap Maps** | Place search · Merchant details · Routes<br>Geocoding · Reverse geocoding · Weather | Search places and merchants, compare available ratings and average cost, and plan routes with trusted GCJ-02 coordinates. Requires a Web Service Key. |
 | **Connected MCP** | **Notion** · **Tencent Docs** · **Feishu**<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
@@ -293,14 +293,26 @@ Skills requiring separately installed apps are listed under
 Agent Browser, Mochi built-ins, and provider Tool details are grouped and
 collapsed by default in Tools. Scheduled runs receive only the read-only
 Browser subset; foreground conversations may also click and enter page data.
-Every Tool has an independent switch, and provider-backed Tools also require
+Provider Tools have independent switches, and provider-backed Tools also require
 their provider switch to be enabled.
+
+**Tools > Agent Browser > Websites and logins** opens a Task Center-style panel for
+website login and confirmed local-data deletion. Mochi chooses the appropriate
+mobile/desktop view; no manual mode setting is needed. Resource
+cache can be cleared separately without logging out. Existing login is reused;
+when human login or verification is needed, Main's `request_user_assistance`
+pauses the task and speaks its explanation. Enter credentials only in the page,
+then choose Continue; Mochi checks the page before proceeding. Questions use
+choices or typed answers. Complete deletion requires a compatible updated
+System WebView and affects the parent domain's shared subdomain login.
+This version has one shared session store, not named isolated accounts or a
+password vault, and cannot resume a pending task after process death.
 
 Travel Planning uses the normal visible controls on public HTTPS pages. Train
 research starts from the official 12306 query page; flight research prefers
-official airline sites. Mochi never logs in, bypasses verification, enters
-passenger or payment data, or continues into booking. It stops when a site
-requires authentication, CAPTCHA, identity verification, or checkout.
+official airline sites. Mochi reuses working sessions or asks the user to handle
+login/verification; it never bypasses verification, enters passenger or payment
+data, or continues into booking or checkout.
 
 ### Skill Market
 

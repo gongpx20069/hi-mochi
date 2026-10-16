@@ -155,6 +155,13 @@ preview cancellation/version checks and wake restoration. Catalog and preview
 state are keyed by both provider and profile ID so two Azure accounts cannot
 reuse each other's catalogs or success badges. Save new/changed credentials
 before loading voices or previewing; preview never switches active profiles.
+
+User-assistance prompts reuse `VoiceRuntime.speak` with the Agent-generated
+message once per pending request while the Activity is resumed. Pausing the
+Activity or answering stops that prompt; synthesis failure leaves visible text
+and an error. It is not a final reply and must not close the pending Browser
+turn or start follow-up STT. Initial assistance answers use native choices/text;
+website credentials are entered only inside the handed-over WebView.
 Only installed offline
 voices are used for Android output; missing selected voices fail visibly. Local
 Android voice IDs are stored separately and excluded from cross-device shares.
