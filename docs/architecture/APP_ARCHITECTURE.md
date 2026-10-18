@@ -60,6 +60,7 @@ run in local JVM tests.
 | `AgentBrowserRuntime` | per-turn WebView, mode, snapshots, handoff and serialized cleanup/deletion |
 | `UserAssistanceCoordinator` | process-local ID-correlated, cancellable pending question/browser handoff |
 | `BrowserSettings` | visited host/time and last Agent-selected mode in Tool DataStore; no credentials or manual mode overrides |
+| `BrowserWebsite` | transient native UI grouping by registrable domain; exact-origin credentials and a data-presence flag, never Cookie values |
 | `BrowserCredentialVault` | revision-checked, encrypted native-only account catalog; never part of Tool results or Provider sharing |
 | `BrowserCredentialCapture` | source-validated top-level form submissions, transient save requests and turn-local password redaction |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
@@ -151,6 +152,9 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   stale revisions. Cookies and this catalog have independent deletion controls.
   Login kind separates password and SMS accounts; absent legacy kinds default
   to password. SMS records store only origin and phone, never a verification code.
+  Website grouping is derived, not a second persistent account store.
+  The runtime inspects local data presence; the Home ViewModel owns confirmed
+  per-site deletion across manual-browser sheet disposal and publishes its result.
 - A dedicated Tool DataStore owns built-in enablement, MCP configuration, and
   encrypted MCP/OAuth credentials.
 - The base Tool DataStore owns only extension package enablement, selected

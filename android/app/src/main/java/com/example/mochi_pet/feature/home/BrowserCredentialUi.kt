@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
@@ -33,6 +34,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -42,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mochi_pet.R
 import com.example.mochi_pet.core.browser.BrowserCredentialSummary
 import com.example.mochi_pet.core.browser.BrowserLoginKind
+import com.example.mochi_pet.core.browser.BrowserWebsite
 import com.example.mochi_pet.core.browser.browserOrigin
 import com.example.mochi_pet.platform.browser.BrowserCredentialSaveRequest
 import kotlin.math.roundToInt
@@ -75,137 +78,283 @@ internal fun WebsiteManager(viewModel: MochiHomeViewModel, onClose: () -> Unit) 
                 )
             },
         ) {
-            BrowserAccounts(viewModel, onOpen = { viewModel.openManagedWebsite(it.origin, it) }, modifier = Modifier.fillMaxSize())
+            BrowserWebsites(
+                viewModel, onOpen = { viewModel.openManagedWebsite(it.origin, it) },
+                onOpenSite = { viewModel.openManagedWebsite(it) }, modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
 
 @Composable
-internal fun BrowserAccounts(
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun BrowserWebsites(
     viewModel: MochiHomeViewModel,
     onOpen: (BrowserCredentialSummary) -> Unit,
+    onOpenSite: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val credentials by viewModel.savedBrowserCredentials.collectAsStateWithLifecycle(emptyList())
+    val sites by viewModel.browserSites.collectAsStateWithLifecycle(emptyList())
     val feedback by viewModel.browserManagementFeedback.collectAsStateWithLifecycle()
     val credentialFeedback by viewModel.browserCredentialFeedback.collectAsStateWithLifecycle()
     val browser by viewModel.browserState.collectAsStateWithLifecycle()
+    val dataVersion by viewModel.browserDataVersion.collectAsStateWithLifecycle()
+    val dataDeleting by viewModel.browserDataDeleting.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    var websites by remember { mutableStateOf(emptyList<BrowserWebsite>()) }
+    var selectedDomain by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<BrowserCredentialSummary?>(null) }
     var addingSms by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<BrowserCredentialSummary?>(null) }
+    var deletingSite by remember { mutableStateOf<BrowserWebsite?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var inventoryError by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(false) }
     var clearSessions by remember { mutableStateOf(false) }
     var canClear by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { canClear = viewModel.canClearBrowserData() }
-        Column(modifier) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Saved accounts", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Box {
-                    TextButton(enabled = !busy, onClick = { options = true }) { Text("...") }
-                    DropdownMenu(options, onDismissRequest = { options = false }) {
-                        DropdownMenuItem(text = { Text("Add SMS login account") }, onClick = { options = false; addingSms = true })
-                        DropdownMenuItem(text = { Text("Clear resource cache only") }, enabled = !browser.active, onClick = {
-                            options = false
-                            scope.launch {
-                                busy = true
-                                error = null
-                                try {
-                                    browserUiAction({ error = it }) {
-                                        viewModel.clearBrowserData(null, cacheOnly = true)
-                                        status = "Resource cache cleared. Login sessions were kept."
-                                    }
-                                } finally { busy = false }
-                            }
-                        })
-                        DropdownMenuItem(text = { Text("Clear all website data") }, enabled = canClear && !browser.active,
-                            onClick = { options = false; clearSessions = true })
-                    }
-                }
+    LaunchedEffect(sites, credentials, browser.loading, browser.active, dataVersion, dataDeleting) {
+        if (dataDeleting) return@LaunchedEffect
+        loading = true
+        inventoryError = null
+        try {
+            browserUiAction({ inventoryError = it }) {
+                websites = viewModel.managedBrowserWebsites(sites, credentials)
+                if (websites.none { it.domain == selectedDomain }) selectedDomain = null
             }
-            (error ?: credentialFeedback ?: feedback)?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp)) }
-            status?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
-            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (credentials.isEmpty()) {
-                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Text("Saved accounts will appear here.", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else LazyColumn(Modifier.weight(1f).testTag("browser-credentials-list")) {
-                items(credentials, key = { it.id }) { credential ->
-                    CredentialRow(
-                        credential,
-                        onOpen = { onOpen(credential) },
-                        onEdit = { editing = credential },
-                        onDelete = { error = null; deleting = credential },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        } finally { loading = false }
+    }
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Websites", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box {
+                TextButton(enabled = !busy && !dataDeleting, onClick = { options = true }) { Text("...") }
+                DropdownMenu(options, onDismissRequest = { options = false }) {
+                    DropdownMenuItem(text = { Text("Add SMS login account") }, onClick = { options = false; addingSms = true })
+                    DropdownMenuItem(text = { Text("Clear resource cache only") }, enabled = !browser.active, onClick = {
+                        options = false
+                        scope.launch {
+                            busy = true
+                            error = null
+                            try {
+                                browserUiAction({ error = it }) {
+                                    viewModel.clearBrowserData(null, cacheOnly = true)
+                                    status = "Resource cache cleared. Login sessions were kept."
+                                }
+                            } finally { busy = false }
+                        }
+                    })
+                    DropdownMenuItem(text = { Text("Clear all website data") }, enabled = canClear && !browser.active,
+                        onClick = { options = false; clearSessions = true })
                 }
             }
         }
-        editing?.let { credential ->
-            CredentialEditDialog(credential, viewModel, onClose = { editing = null })
+        (error ?: inventoryError ?: credentialFeedback)?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp))
         }
-        if (addingSms) CredentialEditDialog(
-            null, viewModel, onClose = { addingSms = false },
-            initialOrigin = browser.url.toHttpUrlOrNull()?.takeIf { it.isHttps }?.let { browserOrigin(it.toString()) }.orEmpty(),
-        )
-        deleting?.let { credential ->
-            AlertDialog(
-                properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
-                onDismissRequest = { if (!busy) deleting = null },
-                title = { Text("Delete saved account?") },
-                text = {
-                    Column {
-                        Text(if (credential.kind == BrowserLoginKind.SMS)
-                            "Only the saved website and phone number are deleted. Your current website login is kept."
-                        else "Only the saved username and password are deleted. Your current website login is kept.")
-                        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    }
-                },
-                dismissButton = { TextButton(enabled = !busy, onClick = { deleting = null }) { Text("Cancel") } },
-                confirmButton = { TextButton(enabled = !busy, onClick = {
-                    scope.launch {
-                        busy = true
-                        error = null
-                        try {
-                            browserUiAction({ error = it }) {
-                                viewModel.deleteBrowserCredential(credential)
-                                deleting = null
-                            }
-                        } finally { busy = false }
-                    }
-                }) { Text("Delete") } },
+        (status ?: feedback)?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
+        if (busy || loading || dataDeleting) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (websites.isEmpty()) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                if (!loading && inventoryError == null) Text("Websites with saved accounts or local data appear here.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else BrowserWebsiteList(websites, { selectedDomain = it.domain }, Modifier.weight(1f))
+    }
+    websites.firstOrNull { it.domain == selectedDomain }?.let { website ->
+        ModalBottomSheet(
+            onDismissRequest = { selectedDomain = null },
+            properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            BrowserWebsiteDetails(
+                website = website,
+                onClose = { selectedDomain = null },
+                onOpenSite = { selectedDomain = null; onOpenSite(website.openUrl) },
+                onOpen = { selectedDomain = null; onOpen(it) },
+                onEdit = { editing = it },
+                onDelete = { error = null; deleting = it },
+                onDeleteData = { deletingSite = website },
+                dataDeleteEnabled = canClear && (!browser.active || browser.manual) && !dataDeleting,
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.65f).padding(horizontal = 20.dp),
             )
+            if (!canClear) Text("Update Android System WebView to enable complete website-data deletion. Partial logout is not offered.",
+                Modifier.padding(20.dp), style = MaterialTheme.typography.bodySmall)
+            else if (browser.active && !browser.manual) Text("Stop the active browser task before clearing website data.",
+                Modifier.padding(20.dp), style = MaterialTheme.typography.bodySmall)
         }
-        if (clearSessions) AlertDialog(
-            onDismissRequest = { if (!busy) clearSessions = false },
-            title = { Text("Clear all website data") },
+    }
+    editing?.let { credential ->
+        CredentialEditDialog(credential, viewModel, onClose = { editing = null })
+    }
+    if (addingSms) CredentialEditDialog(
+        null, viewModel, onClose = { addingSms = false },
+        initialOrigin = browser.url.toHttpUrlOrNull()?.takeIf { it.isHttps }?.let { browserOrigin(it.toString()) }.orEmpty(),
+    )
+    deleting?.let { credential ->
+        AlertDialog(
+            properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
+            onDismissRequest = { if (!busy) deleting = null },
+            title = { Text("Delete saved account?") },
             text = {
                 Column {
-                    Text("This clears cookies and website storage, signing you out of websites. Saved accounts and passwords are kept.")
+                    Text(if (credential.kind == BrowserLoginKind.SMS)
+                        "Only the saved website and phone number are deleted. Your current website login is kept."
+                    else "Only the saved username and password are deleted. Your current website login is kept.")
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
             },
-            dismissButton = { TextButton(enabled = !busy, onClick = { clearSessions = false }) { Text("Cancel") } },
-            confirmButton = { TextButton(enabled = !busy, onClick = {
+            dismissButton = { TextButton(enabled = !busy, onClick = { deleting = null }) { Text("Cancel") } },
+            confirmButton = { TextButton(enabled = !busy, modifier = Modifier.testTag("browser-delete-account-confirm"), onClick = {
                 scope.launch {
                     busy = true
                     error = null
                     try {
                         browserUiAction({ error = it }) {
-                            viewModel.clearBrowserData(null, false)
-                            clearSessions = false
-                            status = "Website data cleared."
+                            viewModel.deleteBrowserCredential(credential)
+                            deleting = null
                         }
                     } finally { busy = false }
                 }
             }) { Text("Delete") } },
         )
+    }
+    deletingSite?.let { website ->
+        AlertDialog(
+            properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
+            onDismissRequest = { deletingSite = null },
+            title = { Text("Delete this website's data?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(website.domain)
+                    Text("This deletes cookies, cache and website storage for this domain and its subdomains. You may be signed out. Saved accounts are kept.")
+                    if (browser.manual) Text("The current browser page will close before deletion.")
+                }
+            },
+            dismissButton = { TextButton(onClick = { deletingSite = null }) { Text("Cancel") } },
+            confirmButton = { TextButton(
+                enabled = !dataDeleting,
+                modifier = Modifier.testTag("browser-delete-site-confirm"),
+                onClick = { deletingSite = null; viewModel.deleteManagedBrowserSite(website.domain) },
+            ) { Text("Delete") } },
+        )
+    }
+    if (clearSessions) AlertDialog(
+        onDismissRequest = { if (!busy) clearSessions = false },
+        title = { Text("Clear all website data") },
+        text = {
+            Column {
+                Text("This clears cookies and website storage, signing you out of websites. Saved accounts and passwords are kept.")
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = { clearSessions = false }) { Text("Cancel") } },
+        confirmButton = { TextButton(enabled = !busy, onClick = {
+            scope.launch {
+                busy = true
+                error = null
+                try {
+                    browserUiAction({ error = it }) {
+                        viewModel.clearBrowserData(null, false)
+                        clearSessions = false
+                        status = "Website data cleared."
+                    }
+                } finally { busy = false }
+            }
+        }) { Text("Delete") } },
+    )
+}
+
+@Composable
+internal fun BrowserWebsiteList(websites: List<BrowserWebsite>, onOpen: (BrowserWebsite) -> Unit, modifier: Modifier = Modifier) {
+    LazyColumn(modifier.testTag("browser-websites-list")) {
+        items(websites, key = { it.domain }) { website ->
+            Row(
+                Modifier.fillMaxWidth().testTag("browser-website-${website.domain}").clickable { onOpen(website) }.padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
+                    Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+                        Text(website.domain.take(1).uppercase(), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(website.domain, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (website.hasSiteData) BrowserDataBadge("Cookies", siteData = true)
+                        if (website.credentials.isNotEmpty()) BrowserDataBadge(
+                            "${localizeUiText("Credentials")} · ${website.credentials.size}", siteData = false,
+                        )
+                    }
+                }
+                Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        }
+    }
+}
+
+@Composable
+internal fun BrowserWebsiteDetails(
+    website: BrowserWebsite,
+    onClose: () -> Unit,
+    onOpenSite: () -> Unit,
+    onOpen: (BrowserCredentialSummary) -> Unit,
+    onEdit: (BrowserCredentialSummary) -> Unit,
+    onDelete: (BrowserCredentialSummary) -> Unit,
+    onDeleteData: () -> Unit,
+    dataDeleteEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.testTag("browser-website-details")) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(website.domain, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            TextButton(onClose) { Text("Close") }
+        }
+        Text("Stored locally. Login may expire.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onOpenSite, modifier = Modifier.testTag("browser-open-site")) { Text("Open website") }
+        LazyColumn(Modifier.weight(1f).testTag("browser-site-entries")) {
+            if (website.hasSiteData) item(key = "site-data") {
+                WebsiteDataRow(website.domain, onDeleteData, dataDeleteEnabled)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            }
+            items(website.credentials, key = { it.id }) { credential ->
+                CredentialRow(credential, { onOpen(credential) }, { onEdit(credential) }, { onDelete(credential) })
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowserDataBadge(label: String, siteData: Boolean) {
+    val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    val color = if (siteData) {
+        if (light) Color(0xFF235C8F) else Color(0xFF8DCBEE)
+    } else {
+        if (light) Color(0xFF66409F) else Color(0xFFD1BCFF)
+    }
+    Surface(shape = RoundedCornerShape(8.dp), color = color.copy(alpha = 0.12f)) {
+        Text(label, Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+internal fun WebsiteDataRow(domain: String, onDelete: () -> Unit, deleteEnabled: Boolean = true) {
+    HalfRevealRow(domain, "site-data", onOpen = null, onEdit = null, onDelete = onDelete, deleteEnabled = deleteEnabled) {
+        BrowserDataBadge("Cookies / site data", siteData = true)
+        Text("Shared website storage", style = MaterialTheme.typography.titleMedium)
+        Text("May keep you signed in. No saved password.", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
@@ -289,48 +438,65 @@ internal fun CredentialRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    HalfRevealRow(credential.id, "credential", onOpen, onEdit, onDelete) {
+        BrowserDataBadge(if (credential.kind == BrowserLoginKind.SMS) "SMS login" else "Password account", siteData = false)
+        Text(credential.username, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(credential.origin, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (credential.kind == BrowserLoginKind.PASSWORD) Text("Password: ********",
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+    }
+}
+
+@Composable
+private fun HalfRevealRow(
+    id: String,
+    tag: String,
+    onOpen: (() -> Unit)?,
+    onEdit: (() -> Unit)?,
+    onDelete: () -> Unit,
+    deleteEnabled: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     var width by remember { mutableIntStateOf(0) }
-    var offset by remember(credential.id) { mutableFloatStateOf(0f) }
+    var reveal by remember(id) { mutableFloatStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
-    val animated by animateFloatAsState(offset, if (dragging) snap() else tween(160), label = "credential-reveal")
+    val animated by animateFloatAsState(reveal, if (dragging) snap() else tween(160), label = "browser-row-reveal")
     Box(
         Modifier.fillMaxWidth().height(IntrinsicSize.Min).clipToBounds().onSizeChanged { width = it.width }
-            .testTag("credential-row-${credential.id}"),
+            .testTag("$tag-row-$id"),
     ) {
-        if (offset < 0f) Row(
+        if (reveal > 0f) Row(
             Modifier.align(Alignment.CenterEnd).fillMaxWidth(0.5f).fillMaxHeight(),
         ) {
-            TextButton(onEdit, Modifier.weight(1f).fillMaxHeight()) { Text("Edit") }
-            TextButton(onDelete, Modifier.weight(1f).fillMaxHeight()) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            onEdit?.let { TextButton(it, Modifier.weight(1f).fillMaxHeight().testTag("$tag-edit-$id")) { Text("Edit") } }
+            TextButton(onDelete, Modifier.weight(1f).fillMaxHeight().testTag("$tag-delete-$id"), enabled = deleteEnabled) {
+                Text("Delete", color = if (deleteEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         Surface(
-            color = if (offset == 0f) Color.Transparent else MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxWidth().offset { IntOffset(animated.roundToInt(), 0) }
-                .testTag("credential-content-${credential.id}")
+            color = if (reveal == 0f) Color.Transparent else MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth().offset { IntOffset((-width * animated).roundToInt(), 0) }
+                .testTag("$tag-content-$id")
                 .pointerInput(width) {
                     detectHorizontalDragGestures(
                         onDragStart = { dragging = true },
-                        onDragEnd = { dragging = false; offset = if (offset < -width / 4f) -width / 2f else 0f },
-                        onDragCancel = { dragging = false; offset = 0f },
+                        onDragEnd = { dragging = false; reveal = if (reveal > 0.25f) 0.5f else 0f },
+                        onDragCancel = { dragging = false; reveal = 0f },
                     ) { change, delta ->
                         change.consume()
-                        offset = (offset + delta).coerceIn(-width / 2f, 0f)
+                        if (width > 0) reveal = (reveal - delta / width).coerceIn(0f, 0.5f)
                     }
                 }
                 .semantics {
-                    customActions = listOf(
-                        CustomAccessibilityAction(localizeUiText("Edit")) { onEdit(); true },
-                        CustomAccessibilityAction(localizeUiText("Delete")) { onDelete(); true },
-                    )
+                    customActions = buildList {
+                        onEdit?.let { add(CustomAccessibilityAction(localizeUiText("Edit")) { it(); true }) }
+                        if (deleteEnabled) add(CustomAccessibilityAction(localizeUiText("Delete")) { onDelete(); true })
+                    }
                 }
-                .clickable { if (offset != 0f) offset = 0f else onOpen() },
+                .clickable(enabled = reveal > 0f || onOpen != null) { if (reveal > 0f) reveal = 0f else onOpen?.invoke() },
         ) {
-            Column(Modifier.padding(horizontal = 8.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(credential.origin.toHttpUrlOrNull()?.host ?: credential.origin, style = MaterialTheme.typography.titleMedium)
-                Text(credential.username, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(if (credential.kind == BrowserLoginKind.SMS) "SMS login" else "Password: ********",
-                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            }
+            Column(Modifier.padding(horizontal = 8.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp), content = content)
         }
     }
 }

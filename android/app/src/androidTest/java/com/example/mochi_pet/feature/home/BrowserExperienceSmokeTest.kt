@@ -10,8 +10,11 @@ import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -19,11 +22,15 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.mochi_pet.MainActivity
 import com.example.mochi_pet.MochiApplication
 import com.example.mochi_pet.core.browser.BrowserMode
 import com.example.mochi_pet.core.browser.BrowserLoginKind
+import com.example.mochi_pet.core.browser.BrowserLogin
 import java.io.ByteArrayInputStream
 import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
@@ -70,7 +77,7 @@ class BrowserExperienceSmokeTest {
         compose.onNodeWithTag("tools-list").assertIsDisplayed()
     }
 
-    @Test fun desktopHandoffResumesAndCookieSurvivesANewTurnThenSiteDeletion() = runBlocking {
+    @Test fun desktopHandoffResumesAndCookieSurvivesANewTurnThenSiteDeletion() = runBlocking<Unit> {
         compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         val app = compose.activity.application as MochiApplication
         val runtime = app.agentBrowserRuntime
@@ -167,7 +174,7 @@ class BrowserExperienceSmokeTest {
         })
     }
 
-    @Test fun searchingOpensFullScreenManualBrowserAndHomePreservesThePage() = runBlocking {
+    @Test fun searchingOpensFullScreenManualBrowserAndHomePreservesThePage() = runBlocking<Unit> {
         mark("manual test starting")
         compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         val runtime = (compose.activity.application as MochiApplication).agentBrowserRuntime
@@ -185,6 +192,7 @@ class BrowserExperienceSmokeTest {
         val view = displayedWebView(root)
         fixture(view)
         mark("manual fixture loaded")
+        script(view, "document.cookie='mochi_fixture_session=present; max-age=600; path=/; Secure'; 'ok'")
         script(view, "document.querySelector('[name=username]').value='retained-fixture'; 'ok'")
         tapFixtureButton(view, "fixture-next")
         mark("navigation tapped")
@@ -205,7 +213,7 @@ class BrowserExperienceSmokeTest {
         withTimeout(5_000) { while (script(view, "location.pathname") != "/second") delay(100) }
         mark("forward complete")
         compose.onNodeWithTag("browser-accounts").performClick()
-        compose.onNodeWithTag("browser-accounts-popup").assertIsDisplayed()
+        compose.onNodeWithTag("browser-websites-popup").assertIsDisplayed()
         mark("accounts popup visible")
         androidx.test.espresso.Espresso.pressBack()
         compose.onNodeWithTag("browser-home").performClick()
@@ -221,9 +229,100 @@ class BrowserExperienceSmokeTest {
         mark("original page reattached")
         assertEquals(session, runtime.state.value.sessionId)
         assertEquals("retained-fixture", script(view, "document.querySelector('[name=username]').value"))
-        compose.onNodeWithTag("browser-home").performClick()
-        compose.onNodeWithTag("browser-management-close").performClick()
+        compose.onNodeWithTag("browser-accounts").performClick()
+        val popupWebsite = hasTestTag("browser-website-mochi-browser-fixture.example") and
+            hasAnyAncestor(hasTestTag("browser-websites-popup"))
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(popupWebsite).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(popupWebsite).performClick()
+        compose.onNodeWithTag("browser-website-details").assertIsDisplayed()
+        compose.onNodeWithTag("site-data-row-mochi-browser-fixture.example").performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("site-data-delete-mochi-browser-fixture.example").performClick()
+        compose.onNodeWithText(localizeUiText("The current browser page will close before deletion.")).assertIsDisplayed()
+        compose.onNodeWithTag("browser-delete-site-confirm").performClick()
         compose.waitUntil(5_000) { !runtime.state.value.manual }
+        compose.onNodeWithTag("browser-management").assertIsDisplayed()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText(localizeUiText("Website data cleared. Saved accounts were kept.")).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertFalse(withContext(Dispatchers.Main) {
+            CookieManager.getInstance().getCookie(BASE).orEmpty().contains("mochi_fixture_session")
+        })
+        compose.onNodeWithTag("browser-management-close").performClick()
+    }
+
+    @Test fun websiteGroupsKeepCredentialsSeparateFromDomainScopedDataDeletion() = runBlocking<Unit> {
+        compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        val app = compose.activity.application as MochiApplication
+        val runtime = app.agentBrowserRuntime
+        val settings = checkNotNull(runtime.settings)
+        val vault = app.browserCredentialVault
+        val domain = "mochi-browser-fixture.example"
+        val child = "https://login.$domain/"
+        val otherDomain = "other-mochi-browser-fixture.example"
+        val other = "https://$otherDomain/"
+        val username = "grouped-fixture-user"
+        val phone = "+12025550124"
+        try {
+            for (url in listOf(BASE, child, other)) {
+                withContext(Dispatchers.Main) {
+                    withTimeout(5_000) {
+                        suspendCancellableCoroutine<Unit> { continuation ->
+                            CookieManager.getInstance().setCookie(url, "mochi_group_fixture=present; max-age=600; path=/; Secure") {
+                                if (continuation.isActive) {
+                                    if (it) continuation.resume(Unit)
+                                    else continuation.resumeWith(Result.failure(AssertionError("Fixture Cookie was rejected")))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for (host in listOf(domain, "login.$domain", otherDomain)) settings.visited(host, BrowserMode.MOBILE)
+            vault.save(BrowserLogin(BASE, username, "synthetic-group-password"))
+            vault.save(BrowserLogin(child, phone, kind = BrowserLoginKind.SMS))
+            val entries = vault.summaries.first()
+            val password = entries.single { it.origin == BASE && it.username == username }
+            val sms = entries.single { it.origin == child && it.username == phone }
+            compose.onAllNodesWithText(localizeUiText("Tools")).onFirst().performClick()
+            compose.onNodeWithTag("tools-list").performScrollToNode(hasText(localizeUiText("Websites and logins")))
+            compose.onNodeWithText(localizeUiText("Websites and logins")).performClick()
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("browser-website-$domain").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("browser-website-$domain").performClick()
+            compose.onNodeWithTag("browser-website-details").assertIsDisplayed()
+            val row = compose.onNodeWithTag("credential-row-${password.id}").performScrollTo()
+            val width = row.fetchSemanticsNode().boundsInRoot.width
+            row.performTouchInput { swipeLeft() }
+            compose.waitForIdle()
+            assertEquals(width / 2f, compose.onNodeWithTag("credential-content-${password.id}").fetchSemanticsNode().boundsInRoot.width, 1f)
+            compose.onNodeWithTag("credential-edit-${password.id}").assertIsDisplayed()
+            compose.onNodeWithTag("credential-delete-${password.id}").performClick()
+            compose.onNodeWithTag("browser-delete-account-confirm").performClick()
+            withTimeout(5_000) { vault.summaries.first { records -> records.none { it.id == password.id } } }
+            assertTrue(withContext(Dispatchers.Main) { CookieManager.getInstance().getCookie(BASE).orEmpty().contains("mochi_group_fixture") })
+            val dataRow = compose.onNodeWithTag("site-data-row-$domain").performScrollTo()
+            val dataWidth = dataRow.fetchSemanticsNode().boundsInRoot.width
+            dataRow.performTouchInput { swipeLeft() }
+            compose.waitForIdle()
+            assertEquals(dataWidth / 2f, compose.onNodeWithTag("site-data-content-$domain").fetchSemanticsNode().boundsInRoot.width, 1f)
+            compose.onNodeWithTag("site-data-delete-$domain").performClick()
+            compose.onNodeWithTag("browser-delete-site-confirm").performClick()
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("site-data-row-$domain").fetchSemanticsNodes().isEmpty() }
+            assertEquals(phone, vault.load(sms).username)
+            withContext(Dispatchers.Main) {
+                assertFalse(CookieManager.getInstance().getCookie(BASE).orEmpty().contains("mochi_group_fixture"))
+                assertFalse(CookieManager.getInstance().getCookie(child).orEmpty().contains("mochi_group_fixture"))
+                assertTrue(CookieManager.getInstance().getCookie(other).orEmpty().contains("mochi_group_fixture"))
+            }
+            compose.onNodeWithTag("credential-row-${sms.id}").performScrollTo().assertIsDisplayed()
+        } finally {
+            vault.summaries.first().filter {
+                (it.origin == BASE && it.username == username) || (it.origin == child && it.username == phone)
+            }.forEach { vault.delete(it) }
+            runtime.clearData(domain)
+            runtime.clearData(otherDomain)
+        }
     }
 
     private fun displayedWebView(root: android.view.View = compose.activity.window.decorView, expected: WebView? = null): WebView {

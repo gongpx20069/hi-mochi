@@ -31,6 +31,7 @@ import androidx.webkit.WebViewFeature
 import androidx.webkit.UserAgentMetadata
 import com.example.mochi_pet.core.browser.BrowserMode
 import com.example.mochi_pet.core.browser.BrowserSettings
+import com.example.mochi_pet.core.browser.browserWebsiteDomain
 import com.example.mochi_pet.core.browser.UserAssistanceCoordinator
 import com.example.mochi_pet.core.browser.UserAssistanceAnswer
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
@@ -728,6 +729,26 @@ class AgentBrowserRuntime(
 
     suspend fun canClearSiteData(): Boolean = withContext(Dispatchers.Main.immediate) {
         WebViewFeature.isFeatureSupported(WebViewFeature.DELETE_BROWSING_DATA)
+    }
+
+    suspend fun websiteDataDomains(hosts: Set<String>): Set<String> = withContext(Dispatchers.Main.immediate) {
+        val domains = hosts.map(::browserWebsiteDomain).toSet()
+        val cookies = CookieManager.getInstance()
+        val cookieDomains = (hosts + domains).filter { !cookies.getCookie("https://$it/").isNullOrEmpty() }
+            .map(::browserWebsiteDomain).toSet()
+        val storageDomains = withTimeoutOrNull(5_000) {
+            suspendCancellableCoroutine<Set<String>> { continuation ->
+                WebStorage.getInstance().getOrigins { origins ->
+                    if (continuation.isActive) continuation.resume(
+                        origins.keys.filterIsInstance<String>().mapNotNull { it.toHttpUrlOrNull() }
+                            .filter { it.isHttps }
+                            .map { browserWebsiteDomain(it.host) }
+                            .filter { it in domains }.toSet(),
+                    )
+                }
+            }
+        } ?: throw AgentBrowserException("Website data could not be inspected. Try again.")
+        cookieDomains + storageDomains
     }
 
     suspend fun clearData(site: String? = null, cacheOnly: Boolean = false) {

@@ -38,6 +38,8 @@ import com.example.mochi_pet.core.voice.WakeBriefingResult
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.browser.BrowserSite
+import com.example.mochi_pet.core.browser.BrowserWebsite
+import com.example.mochi_pet.core.browser.groupBrowserWebsites
 import com.example.mochi_pet.core.browser.UserAssistanceRequest
 import com.example.mochi_pet.core.browser.UserAssistanceAnswer
 import com.example.mochi_pet.core.browser.BrowserCredentialVault
@@ -49,6 +51,7 @@ import com.example.mochi_pet.core.browser.BrowserVaultException
 import com.example.mochi_pet.core.browser.browserDestination
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.cancelAndJoin
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import com.example.mochi_pet.core.database.PlannerStore
 import com.example.mochi_pet.core.memory.AgentMemoryRepository
@@ -415,12 +418,24 @@ class MochiHomeViewModel(
         agentBrowserRuntime?.state ?: unavailableBrowserState.asStateFlow()
     val assistanceRequest = agentBrowserRuntime?.assistance?.request
         ?: MutableStateFlow<UserAssistanceRequest?>(null).asStateFlow()
-    val browserSites = agentBrowserRuntime?.settings?.sites ?: kotlinx.coroutines.flow.flowOf(emptyList<BrowserSite>())
     private var spokenAssistanceId: String? = null
     private val mutableAssistanceFeedback = MutableStateFlow<String?>(null)
     val assistanceFeedback = mutableAssistanceFeedback.asStateFlow()
     private val mutableBrowserManagementFeedback = MutableStateFlow<String?>(null)
     val browserManagementFeedback = mutableBrowserManagementFeedback.asStateFlow()
+    val browserSites = agentBrowserRuntime?.settings?.sites?.catch { error ->
+        when (error) {
+            is java.io.IOException, is kotlinx.serialization.SerializationException -> {
+                mutableBrowserManagementFeedback.value = "Website history could not be loaded. Existing data was not changed."
+                emit(emptyList())
+            }
+            else -> throw error
+        }
+    } ?: kotlinx.coroutines.flow.flowOf(emptyList<BrowserSite>())
+    private val mutableBrowserDataVersion = MutableStateFlow(0L)
+    val browserDataVersion = mutableBrowserDataVersion.asStateFlow()
+    private val mutableBrowserDataDeleting = MutableStateFlow(false)
+    val browserDataDeleting = mutableBrowserDataDeleting.asStateFlow()
     private val mutableBrowserCredentialFeedback = MutableStateFlow<String?>(null)
     val browserCredentialFeedback = mutableBrowserCredentialFeedback.asStateFlow()
     val savedBrowserCredentials = browserCredentialVault?.summaries?.onEach {
@@ -503,6 +518,34 @@ class MochiHomeViewModel(
 
     suspend fun clearBrowserData(site: String?, cacheOnly: Boolean) {
         checkNotNull(agentBrowserRuntime) { "Browser unavailable." }.clearData(site, cacheOnly)
+        mutableBrowserDataVersion.value++
+    }
+
+    suspend fun managedBrowserWebsites(sites: List<BrowserSite>, credentials: List<BrowserCredentialSummary>): List<BrowserWebsite> {
+        val hosts = sites.map { it.host }.toSet() + credentials.mapNotNull { it.origin.toHttpUrlOrNull()?.host }
+        val domains = checkNotNull(agentBrowserRuntime) { "Browser unavailable." }.websiteDataDomains(hosts)
+        return groupBrowserWebsites(sites, credentials, domains)
+    }
+
+    fun deleteManagedBrowserSite(domain: String) {
+        if (mutableBrowserDataDeleting.value) {
+            mutableBrowserManagementFeedback.value = "Website data deletion is still running. Wait before trying again."
+            return
+        }
+        mutableBrowserDataDeleting.value = true
+        mutableBrowserManagementFeedback.value = null
+        viewModelScope.launch {
+            try {
+                browserUiAction({ mutableBrowserManagementFeedback.value = it }) {
+                    check(agentJob?.isActive != true) { "Stop the active browser task before clearing website data." }
+                    manualBrowserJob?.cancelAndJoin()
+                    clearBrowserData(domain, cacheOnly = false)
+                    mutableBrowserManagementFeedback.value = "Website data cleared. Saved accounts were kept."
+                }
+            } finally {
+                mutableBrowserDataDeleting.value = false
+            }
+        }
     }
 
     fun openManagedWebsite(input: String, credential: BrowserCredentialSummary? = null) {
@@ -526,7 +569,7 @@ class MochiHomeViewModel(
                     } else {
                         browser.openManual(browserDestination(input))
                         if (credential != null) mutableBrowserManagementFeedback.value =
-                            "Open the login form, then choose this account from Accounts."
+                            "Open the login form, then choose this account from Sites."
                         mutableManualBrowserVisible.value = true
                     }
                 }
@@ -551,7 +594,7 @@ class MochiHomeViewModel(
                     mutableSelectedBrowserCredential.value = credential
                     browser.openManual(destination)
                     if (credential != null) mutableBrowserManagementFeedback.value =
-                        "Open the login form, then choose this account from Accounts."
+                        "Open the login form, then choose this account from Sites."
                     mutableManualBrowserVisible.value = true
                     kotlinx.coroutines.awaitCancellation()
                 } finally {

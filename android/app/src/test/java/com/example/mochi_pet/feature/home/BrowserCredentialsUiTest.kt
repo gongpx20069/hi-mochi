@@ -2,15 +2,21 @@ package com.example.mochi_pet.feature.home
 
 import android.app.Application
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.example.mochi_pet.core.browser.BrowserCredentialSummary
+import com.example.mochi_pet.core.browser.BrowserLoginKind
+import com.example.mochi_pet.core.browser.BrowserWebsite
 import com.example.mochi_pet.ui.theme.MochiTheme
 import org.junit.Assert.*
 import org.junit.After
@@ -41,11 +47,8 @@ class BrowserCredentialsUiTest {
                             modifier = Modifier.fillMaxWidth().testTag("browser-search"), singleLine = true)
                     },
                 ) {
-                    Text("Saved accounts")
-                    CredentialRow(BrowserCredentialSummary("fixture", "v1", "https://example.com/", "demo@mochi.example"),
-                        {}, {}, {})
-                    CredentialRow(BrowserCredentialSummary("sms-fixture", "v1", "https://sms.example/", "+12025550123",
-                        com.example.mochi_pet.core.browser.BrowserLoginKind.SMS), {}, {}, {})
+                    Text("Websites")
+                    BrowserWebsiteList(listOf(fixtureWebsite()), {}, Modifier.weight(1f))
                 }
             }
         }
@@ -59,7 +62,8 @@ class BrowserCredentialsUiTest {
         assertTrue(logo.bottom < search.top)
         assertTrue(accounts.top > search.bottom)
         assertTrue(close.center.x > bounds.center.x && close.bottom < logo.top)
-        compose.onNodeWithText(localizeUiText("SMS login")).assertIsDisplayed()
+        compose.onNodeWithText("example.com").assertIsDisplayed()
+        compose.onNodeWithText(localizeUiText("Cookies")).assertIsDisplayed()
         captureFixture("browser-management", "browser-accounts-fixture.png")
         compose.onNodeWithTag("browser-management-close").performClick()
         assertTrue(closed)
@@ -77,12 +81,12 @@ class BrowserCredentialsUiTest {
             }
         }
         val layouts = mutableListOf<TextLayoutResult>()
-        compose.onNodeWithText(localizeUiText("Accounts")).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        compose.onNodeWithText(localizeUiText("Sites")).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         captureFixture("browser-navigation", "browser-navigation-fixture.png")
         val label = layouts.single()
-        assertEquals("Accounts", label.layoutInput.text.text)
+        assertEquals("Sites", label.layoutInput.text.text)
         assertEquals(1, label.lineCount)
-        assertEquals("Accounts".length, label.getLineEnd(0, visibleEnd = true))
+        assertEquals("Sites".length, label.getLineEnd(0, visibleEnd = true))
         assertTrue("Account label must fit without clipping", label.getLineLeft(0) >= 0f &&
             label.getLineRight(0) <= label.size.width && label.getLineBottom(0) <= label.size.height)
         compose.onNodeWithTag("browser-forward").assertIsNotEnabled()
@@ -113,6 +117,47 @@ class BrowserCredentialsUiTest {
         assertTrue(edited)
         assertTrue(deleted)
     }
+
+    @Test fun `cookie swipe keeps half the row with only an explicit delete action`() {
+        var deleted = false
+        compose.setContent { MochiTheme { WebsiteDataRow("example.com", { deleted = true }) } }
+        val row = compose.onNodeWithTag("site-data-row-example.com")
+        val width = row.fetchSemanticsNode().boundsInRoot.width
+        row.performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        val content = compose.onNodeWithTag("site-data-content-example.com")
+        assertEquals(width / 2f, content.fetchSemanticsNode().boundsInRoot.width, 1f)
+        content.performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertEquals(width / 2f, content.fetchSemanticsNode().boundsInRoot.width, 1f)
+        compose.onNodeWithText(localizeUiText("Edit")).assertDoesNotExist()
+        assertFalse(deleted)
+        compose.onNodeWithText(localizeUiText("Delete")).performClick()
+        assertTrue(deleted)
+    }
+
+    @Test fun `website detail list distinguishes website data and both account kinds`() {
+        compose.setContent {
+            MochiTheme {
+                Surface {
+                    BrowserWebsiteDetails(fixtureWebsite(), {}, {}, {}, {}, {}, {}, true,
+                        Modifier.fillMaxSize().padding(horizontal = 20.dp))
+                }
+            }
+        }
+        compose.onNodeWithText(localizeUiText("Cookies / site data")).assertIsDisplayed()
+        compose.onNodeWithText(localizeUiText("Password account")).assertIsDisplayed()
+        compose.onNodeWithText(localizeUiText("SMS login")).performScrollTo().assertIsDisplayed()
+        captureFixture("browser-website-details", "browser-website-details-fixture.png")
+    }
+
+    private fun fixtureWebsite() = BrowserWebsite(
+        "example.com", "https://www.example.com/",
+        listOf(
+            BrowserCredentialSummary("fixture", "v1", "https://www.example.com/", "demo@mochi.example"),
+            BrowserCredentialSummary("sms-fixture", "v1", "https://login.example.com/", "+12025550123", BrowserLoginKind.SMS),
+        ), true,
+    )
 
     private fun captureFixture(tag: String, name: String) {
         val node = compose.onNodeWithTag(tag).fetchSemanticsNode()

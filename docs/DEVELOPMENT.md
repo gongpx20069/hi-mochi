@@ -96,11 +96,19 @@ deletion. Its form-less SMS fixture uses a real touch to verify phone-only savin
 masked-code exclusion, and filling without changing the code or auto-submitting.
 No real SMS is sent. JVM coverage verifies legacy password-catalog reads, SMS
 records rejecting codes, encrypted storage, stale revisions, exact-origin
-capture and half-width swipe actions. A separate device case submits the
+capture, public/private suffix grouping, and half-width credential/data swipe
+actions. Grouping tests initialize OkHttp's Android assets under Robolectric,
+so the actual bundled public-suffix list is exercised rather than a fake resolver.
+A separate device case submits the
 non-sensitive query `mochi browser fixture` to public Bing and checks full-screen
 manual browsing, back/forward, the shared credentials popup and Home/resume
-preserving the same session and entered form text. The layout test renders
-`app/build/reports/browser-accounts-fixture.png` using synthetic account metadata.
+preserving the same session and entered form text, then confirms scoped data
+deletion closes the manual page without losing its result. A fourth case opens
+the nested website list, deletes a credential without removing its Cookie, and
+deletes parent/subdomain data without removing the remaining account or an
+unrelated fixture site's Cookie. The layout test renders
+`app/build/reports/browser-accounts-fixture.png` and
+`app/build/reports/browser-website-details-fixture.png` using synthetic metadata.
 Login fixtures use synthetic HTML under the reserved
 `mochi-browser-fixture.example` host, no real website/account request, and
 deletes only that fixture site's data. Actual website login/expiry, authentication
@@ -123,8 +131,11 @@ adb -s <serial> shell am start -a android.intent.action.MAIN `
 
 Use this only for a confirmed blocked launch, not while a test body is running.
 Each subsequent scenario can need the same assistance. Do not change background
-permissions or weaken assertions to get a pass. Require `OK (3 tests)` from this
+permissions or weaken assertions to get a pass. Require `OK (4 tests)` from this
 suite; an instrumentation crash can still return shell exit code zero.
+Expression-bodied JUnit methods must return `Unit`; use `runBlocking<Unit>`
+when the last UI assertion/action returns a semantics interaction rather than
+`Unit`, otherwise JUnit rejects the class before any fixture runs.
 If the user approves temporary stay-awake, record and restore the original
 `stay_on_while_plugged_in` value in `finally`. Check the actual charging type:
 some phones report computer power as AC, so USB-only stay-awake does not apply.

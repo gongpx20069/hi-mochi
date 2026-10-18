@@ -160,14 +160,15 @@ private fun ManualBrowser(viewModel: MochiHomeViewModel) {
                     properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
                     sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                 ) {
-                    BrowserAccounts(
+                    BrowserWebsites(
                         viewModel,
                         onOpen = { credential ->
                             showAccounts = false
                             viewModel.openManagedWebsite(credential.origin, credential)
                         },
+                        onOpenSite = { url -> showAccounts = false; viewModel.openManagedWebsite(url) },
                         modifier = Modifier.fillMaxWidth().fillMaxHeight(0.65f).padding(horizontal = 20.dp)
-                            .testTag("browser-accounts-popup"),
+                            .testTag("browser-websites-popup"),
                     )
                 }
             }
@@ -216,7 +217,7 @@ internal fun BrowserNavigationBar(
                     shape = RoundedCornerShape(20.dp)) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         BrowserNavigationIcon(BrowserGlyph.ACCOUNTS)
-                        Text("Accounts", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false)
+                        Text("Sites", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false)
                     }
                 }
             }

@@ -297,18 +297,23 @@ Provider Tools have independent switches, and provider-backed Tools also require
 their provider switch to be enabled.
 
 **Tools > Agent Browser > Websites and logins** opens a Bing search/address field
-and saved-account list. Search enters a full-screen browser; swipe an account
-halfway left to reveal Edit/Delete. The browser's four bottom controls are Back,
-Forward, Home and Accounts. Home keeps the current page for resuming;
-Accounts opens the same account list in a popup. Supported login-form submissions offer to save
+and website list. Known websites with detected local data or saved accounts appear
+automatically. Open a website item for its blue Cookie/site-data entry and purple
+password/SMS accounts; labels distinguish them without relying on color.
+Swipe credentials halfway left for Edit/Delete, or site data for Delete only;
+swiping never removes a row. The browser's four bottom controls are Back,
+Forward, Home and Sites. Home keeps the current page for resuming;
+Sites opens the same website lists in a popup. Supported login-form submissions offer to save
 the website, username and password locally with Keystore encryption and native
 confirmation. Passwords never go to the model. Selecting an account allows
 explicit same-origin filling without automatic submission. SMS logins save only
 the website and phone number, never verification codes; expired logins still need
-a new code. **Accounts > ... > Add SMS login account** can record an already
+a new code. **Sites > ... > Add SMS login account** can record an already
 completed or unsupported login without signing out. Deleting an account
 preserves the current website login; separate website-data clearing keeps saved
-passwords. Mochi chooses the appropriate
+passwords. Per-site deletion includes subdomains, warns about sign-out and closes
+the current manual page first. Stored website data is not proof of valid login.
+Mochi chooses the appropriate
 mobile/desktop view; no manual mode setting is needed. Resource
 cache can be cleared separately without logging out. Existing login is reused;
 when human login or verification is needed, Main's `request_user_assistance`

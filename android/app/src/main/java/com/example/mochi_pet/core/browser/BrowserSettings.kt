@@ -21,6 +21,35 @@ data class BrowserSite(
     val lastMode: BrowserMode = BrowserMode.MOBILE,
 )
 
+data class BrowserWebsite(
+    val domain: String,
+    val openUrl: String,
+    val credentials: List<BrowserCredentialSummary>,
+    val hasSiteData: Boolean,
+)
+
+internal fun browserWebsiteDomain(host: String): String =
+    "https://$host".toHttpUrl().let { it.topPrivateDomain() ?: it.host }
+
+internal fun groupBrowserWebsites(
+    sites: List<BrowserSite>,
+    credentials: List<BrowserCredentialSummary>,
+    dataDomains: Set<String>,
+): List<BrowserWebsite> {
+    val visits = sites.sortedByDescending { it.lastVisited }.groupBy { browserWebsiteDomain(it.host) }
+    val accounts = credentials.groupBy { browserWebsiteDomain(it.origin.toHttpUrl().host) }
+    return (visits.keys + accounts.keys).mapNotNull { domain ->
+        val saved = accounts[domain].orEmpty()
+        val hasData = domain in dataDomains
+        if (saved.isEmpty() && !hasData) null else BrowserWebsite(
+            domain = domain,
+            openUrl = visits[domain]?.firstOrNull()?.let { "https://${it.host}/" } ?: saved.first().origin,
+            credentials = saved,
+            hasSiteData = hasData,
+        )
+    }
+}
+
 class BrowserSettings(private val store: DataStore<Preferences>) {
     private val key = stringPreferencesKey("browser.sites.v1")
     private val json = Json { ignoreUnknownKeys = true }

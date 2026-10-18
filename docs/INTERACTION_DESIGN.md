@@ -456,24 +456,29 @@ search/address field centered in the page, Mochi's launcher logo above it, and
 an always-visible Close action at the top right. The logo and concise
 "Search the web. Save accounts safely." caption share a softly tinted brand area.
 A separate rounded translucent
-frosted-look panel below search contains saved accounts and the compact data
+frosted-look panel below search contains website groups and the compact data
 overflow menu. There are no introductory or session-status cards.
-Rows show website, username and a fixed
-password mask. Left swipe stops halfway and reveals Edit/Delete; swiping alone
-never deletes, and both actions also have accessibility alternatives.
+Each website row shows its registrable domain and badges for local data and
+saved credentials. Clicking it opens a second secure bottom-sheet list.
+Its Cookie/site-data row uses a blue text badge and exposes only Delete;
+password/SMS credentials use purple text badges and expose Edit/Delete.
+Credential rows show the account identifier and exact origin; passwords use a
+fixed mask. All left swipes stop halfway, even after repeated swipes or width
+changes; swiping never removes a row. Explicit actions also have accessibility
+alternatives. Color is supplementary, never the only type indicator.
 Search opens a full-screen manual browser with only four bottom controls:
-Back, Forward, Home, and Accounts (Chinese: 凭证), in an inset rounded navigation
+Back, Forward, Home, and Sites (Chinese: 网站), in an inset rounded navigation
 bar. History uses arrow icons with accessible labels and disabled states;
-Home and Accounts use icons with short single-line labels. Accounts is the
+Home and Sites use icons with short single-line labels. Sites is the
 emphasized action; its English label must not wrap on a 320 dp screen.
 Home reveals the search/account homepage without destroying or reloading
 the current page; Return to page restores that same WebView. System Back follows
 history, then returns Home. The homepage's Close action ends manual browsing.
-Accounts opens the same account-list component in a secure bottom sheet,
+Sites opens the same website-list component in a secure bottom sheet,
 including its swipe/edit/delete interactions, without a separate management page.
 Choosing a saved account for the current exact origin explicitly fills its login
 form and never submits; choosing another origin opens that website. To fill after
-reaching its login form, choose the account from Accounts again.
+reaching its login form, choose the account from Sites again.
 A supported top-level login submission/button opens a secure Save/Not now dialog,
 showing the native website origin and editable account identifier. Password
 accounts show a fixed password mask; SMS accounts show a phone field and a short
@@ -490,6 +495,11 @@ both preserve saved passwords. Closing reveals the unchanged Tools page.
 There is no mode selector; Mochi chooses mobile/desktop as needed. Legacy manual
 preferences do not override that decision.
 Website-data deletion includes shared login, unlike saved-account deletion.
+Its confirmation identifies the domain, includes its subdomains, and explains
+that saved credentials remain. During manual browsing it also warns that the
+current page will close; the ViewModel owns the confirmed operation so closing
+that browser popup does not cancel the deletion. The homepage shows its result.
+An active Agent browser blocks this action rather than being cancelled.
 Resource-cache clearing is separate and preserves login. Unsupported complete
 deletion requires a System WebView update, not partial cleanup.
 

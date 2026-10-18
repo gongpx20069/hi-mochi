@@ -134,6 +134,9 @@ Provider sharing. Explicit filling checks exact origin and same-origin form
 action, never auto-submits, and keeps secrets out of model Tool results.
 SMS accounts save/fill only a phone number, not a password or verification code;
 they do not auto-request codes or make sessions permanent.
+Native management groups known websites with detected local data or saved accounts
+by registrable domain. This is a UI grouping, not a shared credential origin or
+proof of login. Cookie/site-data deletion and credential deletion remain separate.
 See `AGENT_BROWSER.md`.
 
 Wake and media triggers preserve the selected `MochiSurface`. A typed pipeline

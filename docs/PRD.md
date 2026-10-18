@@ -209,15 +209,23 @@ conversation history; authentication material is excluded.
   by the website or native account editor, never chat/model context.
   A fresh read verifies reported completion.
 - **Tools > Agent Browser > Websites and logins** manages shared local sessions,
-  with a Bing search/address field and saved-account list. Search opens a
-  full-screen manual browser. Left swipe reveals Edit/Delete while retaining
-  half the row; swiping never deletes. No manual mode selector is exposed.
+  with a Bing search/address field and a website-grouped list. Known websites
+  with detectable local data or saved credentials appear automatically. Opening
+  a website item shows its Cookie/site-data entry and saved accounts in a new
+  list. Text labels and blue/purple badges distinguish site data from credentials,
+  without claiming that stored data proves login. Credential rows reveal
+  Edit/Delete; site-data rows reveal only Delete. Every swipe stops at half the
+  row and never deletes automatically. Search opens a full-screen manual browser
+  with Home and Sites access to the same lists. No manual mode selector is exposed.
 - A submitted supported top-level HTTPS login form offers native confirmation
   to save website, username and password locally with Keystore encryption.
   Passwords never enter model context. Saving does not imply login succeeded.
   Users can edit/delete saved accounts and explicitly fill a same-origin form,
   without automatic submission. Deleting a saved account preserves cookies;
   separate cache/site-data controls do not delete the password catalog.
+  Confirmed per-website deletion clears the registrable domain and subdomains,
+  and explicitly closes any current manual page first. Active Agent browsing
+  must stop before deletion; unrelated websites and saved credentials are kept.
   Named isolated browser profiles and process-death task resumption remain
   outside this version.
 - SMS login accounts save only website and phone number, explicitly labelled

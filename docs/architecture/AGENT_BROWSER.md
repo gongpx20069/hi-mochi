@@ -229,13 +229,17 @@ Tool contract table.
 
 Website management is a secure full-screen dialog with a Bing search/address
 field centered beneath the Mochi logo, a top-right Close button, and a separate
-translucent saved-account panel, not dashboard cards. Its entry remains a filled
-button matching Connect Feishu. Left swipe reveals Edit/Delete and stops at
-half the row; it never deletes automatically. Search or opening an account moves
+translucent website-list panel, not dashboard cards. Its entry remains a filled
+button matching Connect Feishu. Opening a website row shows a secure second
+list containing one shared Cookie/site-data entry, when detected, plus its
+password/SMS accounts. Blue data and purple credential badges include text labels.
+Credential swipes reveal Edit/Delete; data swipes reveal only Delete. A shared
+fraction-based reveal clamps every row at half width, including after resizing
+or repeated gestures; swiping never deletes. Search or opening an account moves
 to a full-screen manual browser sharing Mochi's cookie store, with four bottom
-controls: Back, Forward, Home and Accounts. Home hides but retains the same
-WebView, history and form state; Return to page reattaches it. Accounts opens
-the homepage's shared account-list component in a secure bottom sheet.
+controls: Back, Forward, Home and Sites. Home hides but retains the same
+WebView, history and form state; Return to page reattaches it. Sites opens
+the homepage's shared website-list component in a secure bottom sheet.
 Selecting an account matching the current exact origin explicitly fills its
 login form without submission; other origins navigate to that account's site.
 The homepage Close action ends the manual session. Manual browsing retains
@@ -244,7 +248,19 @@ wake listening pauses and no Agent snapshots/actions run. Closing restores Tools
 Further manual navigation keeps that WebView's selected mode, avoiding a UA
 change on an already interacted-with form.
 
-The list contains up to 100 encrypted accounts, not inferred logged-in websites.
+Website groups combine up to 100 known visited hosts and up to 100 encrypted
+accounts. Native inspection checks HTTPS root-URL Cookie presence for those
+hosts and their registrable domains, plus matching WebStorage origin metadata.
+Only domains/data-presence flags leave the runtime; Cookie values, names and
+storage contents never enter the UI catalog or model context. Inspection is
+bounded to five seconds and failures are shown explicitly. It is not exhaustive
+Cookie enumeration: unrecorded hosts, path-only cookies and cache-only sites may
+not be discoverable. No network request or login inference is used.
+Domains with detected data or saved accounts appear automatically; ordinary visits
+without either are omitted. OkHttp's bundled public-suffix list groups registrable
+domains, including private suffix boundaries. Accounts retain their exact origins
+and revisions: grouping neither merges identities nor broadens filling authority.
+
 Native confirmation saves exact HTTPS origin, username and password for password
 accounts, or only origin and phone for SMS accounts, in a separate no-backup
 Keystore-encrypted catalog. Account identity includes login kind, so an SMS login
@@ -271,8 +287,13 @@ visited hosts/timestamps and last Agent-selected mode in Tool DataStore
 Resource-cache deletion preserves login storage. Complete per-site/global
 deletion uses feature-gated AndroidX `WebStorageCompat` APIs, removing cookies,
 cache and JS-readable storage. Per-site deletion affects the registrable parent
-domain and subdomains. The management menu exposes all-site clearing rather
-than a per-host session list and discloses its sign-out impact.
+domain and subdomains. The nested site-data row offers confirmed per-site deletion, disclosing the
+parent/subdomain scope and possible sign-out while preserving saved credentials.
+During manual browsing confirmation also warns that the current page closes;
+the ViewModel cancels and joins its manual job before calling serialized deletion.
+The operation outlives its dismissed browser sheet and reports feedback on the
+homepage. Agent-owned turns are not cancelled and still block deletion.
+The overflow menu retains confirmed all-site clearing.
 Unsupported WebViews require an update, never a partial fake logout. Deletion
 is serialized against Browser turns and awaits completion; a delayed callback
 reports failure and blocks new Browser use until deletion actually finishes.
