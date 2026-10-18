@@ -83,18 +83,51 @@ Browser assistance regressions:
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest --tests "*UserAssistanceTest" `
   --tests "*BrowserSettingsTest" --tests "*BrowserModeTest" `
+  --tests "*BrowserCredentialsTest" --tests "*BrowserCredentialCaptureTest" `
+  --tests "*BrowserCredentialsUiTest" `
   --tests "*AgentOrchestratorTest" --tests "*Skill*Test" --no-daemon
 ```
 
 After an in-place app/test APK update, `feature.home.BrowserExperienceSmokeTest`
 checks the always-visible management entry, desktop viewport, explicit handoff,
-snapshot pause, continuation, Cookie reuse across turns and complete per-site
-deletion. It uses intercepted synthetic HTML under the reserved
+snapshot pause, continuation, credential-save confirmation, password redaction,
+account deletion without logout, Cookie reuse across turns and complete per-site
+deletion. Its form-less SMS fixture uses a real touch to verify phone-only saving,
+masked-code exclusion, and filling without changing the code or auto-submitting.
+No real SMS is sent. JVM coverage verifies legacy password-catalog reads, SMS
+records rejecting codes, encrypted storage, stale revisions, exact-origin
+capture and half-width swipe actions. A separate device case submits the
+non-sensitive query `mochi browser fixture` to public Bing and checks full-screen
+manual browsing, back/forward, the shared credentials popup and Home/resume
+preserving the same session and entered form text. The layout test renders
+`app/build/reports/browser-accounts-fixture.png` using synthetic account metadata.
+Login fixtures use synthetic HTML under the reserved
 `mochi-browser-fixture.example` host, no real website/account request, and
 deletes only that fixture site's data. Actual website login/expiry, authentication
 compatibility and mode quality still require manual user-owned website testing.
 The handoff may speak its synthetic explanation through the configured TTS.
 Never clear all phone website data as a test or record real login credentials.
+
+On MIUI, a runner can report a test as started while
+`Instrumentation.startActivitySync` is still waiting: system logs may show
+`Abort background activity starts` before any test-body or Activity lifecycle
+events. Keep the phone unlocked and inspect that evidence before retrying.
+For an already-waiting `MainActivity` scenario, explicitly launch its matching
+intent from a second terminal; a component-only launch does not match:
+
+```powershell
+adb -s <serial> shell am start -a android.intent.action.MAIN `
+  -c android.intent.category.LAUNCHER -f 0x10008000 `
+  -n com.example.mochi_pet/.MainActivity
+```
+
+Use this only for a confirmed blocked launch, not while a test body is running.
+Each subsequent scenario can need the same assistance. Do not change background
+permissions or weaken assertions to get a pass. Require `OK (3 tests)` from this
+suite; an instrumentation crash can still return shell exit code zero.
+If the user approves temporary stay-awake, record and restore the original
+`stay_on_while_plugged_in` value in `finally`. Check the actual charging type:
+some phones report computer power as AC, so USB-only stay-awake does not apply.
 
 Custom REST regressions:
 

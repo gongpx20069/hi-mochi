@@ -47,6 +47,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.NonCancellable
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -82,6 +83,9 @@ data class AgentBrowserUiState(
     val error: String? = null,
     val mode: BrowserMode = BrowserMode.MOBILE,
     val userControl: Boolean = false,
+    val manual: Boolean = false,
+    val canGoForward: Boolean = false,
+    val credentialSaveAvailable: Boolean = false,
 )
 
 open class AgentBrowserException(message: String) : Exception(message)
@@ -100,6 +104,7 @@ class AgentBrowserRuntime(
     private var defaultMetadata: UserAgentMetadata? = null
     private val mutableState = MutableStateFlow(AgentBrowserUiState())
     val state: StateFlow<AgentBrowserUiState> = mutableState.asStateFlow()
+    val credentialCapture = BrowserCredentialCapture { mutableState.value.userControl }
 
     private val turnMutex = Mutex()
     private var turnActive = false
@@ -157,6 +162,7 @@ class AgentBrowserRuntime(
     private suspend fun resetTurnResources() {
         redirectScope.cancel()
         withContext(Dispatchers.Main.immediate) {
+            credentialCapture.reset()
             val current = webView
             webView = null
             allowedRedirectUrl = null
@@ -187,6 +193,56 @@ class AgentBrowserRuntime(
         (view.parent as? ViewGroup)?.removeView(view)
         (view.context as? MutableContextWrapper)?.baseContext = applicationContext
     }
+
+    suspend fun openManual(url: String) {
+        val validated = withContext(Dispatchers.IO) { PublicWebUrlPolicy.validate(url).toString() }
+        val reusingManualPage = mutableState.value.manual
+        val current = if (reusingManualPage) {
+            withContext(Dispatchers.Main.immediate) { checkNotNull(webView) }
+        } else ensureWebView()
+        val mode = if (reusingManualPage) activeMode
+            else settings?.mode(validated.toHttpUrlOrNull()!!.host, BrowserMode.AUTO) ?: BrowserMode.MOBILE
+        withContext(Dispatchers.Main.immediate) {
+            applyMode(current, mode)
+            modeLocked = true
+            mutableState.value = mutableState.value.copy(manual = true, userControl = true)
+            current.loadUrl(validated)
+        }
+    }
+
+    suspend fun manualBack(): Boolean = withContext(Dispatchers.Main.immediate) {
+        check(mutableState.value.manual) { "No manual browser is open." }
+        val current = checkNotNull(webView)
+        if (current.canGoBack()) { current.goBack(); true } else false
+    }
+
+    suspend fun manualForward() = withContext(Dispatchers.Main.immediate) {
+        check(mutableState.value.manual) { "No manual browser is open." }
+        val current = checkNotNull(webView)
+        if (current.canGoForward()) current.goForward()
+    }
+
+    suspend fun fillUserCredential(login: com.example.mochi_pet.core.browser.BrowserLogin) =
+        withContext(Dispatchers.Main.immediate) {
+            check(mutableState.value.userControl) { "Saved accounts can only be filled while you control the browser." }
+            val current = checkNotNull(webView)
+            require(com.example.mochi_pet.core.browser.browserOrigin(current.url.orEmpty()) == login.origin) {
+                "The saved account belongs to a different website. Nothing was filled."
+            }
+            if (login.password.isNotEmpty()) credentialCapture.protect(login.password)
+            withTimeoutOrNull(5_000) {
+                suspendCancellableCoroutine<Unit> { continuation ->
+                    current.evaluateJavascript(credentialFillScript(login)) { result ->
+                        if (continuation.isActive) {
+                            if (result == "\"filled\"") continuation.resume(Unit)
+                            else continuation.resumeWith(Result.failure(AgentBrowserException(
+                                "No matching secure login form was found. Open the login page and try again.",
+                            )))
+                        }
+                    }
+                }
+            } ?: throw AgentBrowserException("Account filling timed out. Check the page before trying again.")
+        }
 
     suspend fun read(): JsonObject {
         val current = ensureWebView()
@@ -461,6 +517,7 @@ class AgentBrowserRuntime(
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     internal suspend fun ensureWebView(): WebView {
         check(assistance.request.value == null) { "Browser is paused for user assistance." }
+        check(!mutableState.value.manual) { "Browser is under manual control." }
         if (!turnActive) {
             throw AgentBrowserException("The browser turn is not active")
         }
@@ -486,6 +543,7 @@ class AgentBrowserRuntime(
                 webChromeClient = BrowserWebChromeClient()
             }
             webView = created
+            val credentialSaveAvailable = credentialCapture.attach(created)
             if (WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
                 defaultMetadata = WebSettingsCompat.getUserAgentMetadata(created.settings)
             }
@@ -493,6 +551,7 @@ class AgentBrowserRuntime(
                 active = true,
                 sessionId = UUID.randomUUID().toString(),
                 actor = actorLabel,
+                credentialSaveAvailable = credentialSaveAvailable,
             )
             created
         }
@@ -560,8 +619,15 @@ class AgentBrowserRuntime(
                 error = null,
             )
         }
-        return result
+        return redactSnapshot(result).jsonObject
     }
+
+    private fun redactSnapshot(value: kotlinx.serialization.json.JsonElement): kotlinx.serialization.json.JsonElement =
+        when (value) {
+            is JsonObject -> JsonObject(value.mapValues { redactSnapshot(it.value) })
+            is JsonArray -> JsonArray(value.map(::redactSnapshot))
+            is JsonPrimitive -> if (value.isString) JsonPrimitive(credentialCapture.redact(value.content)) else value
+        }
 
     private suspend fun evaluate(
         current: WebView,
@@ -648,6 +714,7 @@ class AgentBrowserRuntime(
         } finally {
             withContext(NonCancellable + Dispatchers.Main.immediate) {
                 mutableState.value = mutableState.value.copy(userControl = false)
+                credentialCapture.clear()
                 refAttributeName = newRefAttributeName()
                 CookieManager.getInstance().flush()
             }
@@ -723,6 +790,19 @@ class AgentBrowserRuntime(
             view: WebView,
             url: String,
         ) {
+            if (mutableState.value.manual) {
+                url.toHttpUrlOrNull()?.host?.let { host ->
+                    redirectScope.launch {
+                        try {
+                            settings?.visited(host, activeMode)
+                        } catch (_: java.io.IOException) {
+                            withContext(Dispatchers.Main.immediate) {
+                                mutableState.value = mutableState.value.copy(error = "Could not save the website visit.")
+                            }
+                        }
+                    }
+                }
+            }
             if (activeMode == BrowserMode.DESKTOP) {
                 view.evaluateJavascript(
                     """(() => {
@@ -743,6 +823,13 @@ class AgentBrowserRuntime(
                 title = view.title.orEmpty(),
                 loading = false,
                 canGoBack = view.canGoBack(),
+                canGoForward = view.canGoForward(),
+            )
+        }
+
+        override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+            if (webView === view) mutableState.value = mutableState.value.copy(
+                canGoBack = view.canGoBack(), canGoForward = view.canGoForward(),
             )
         }
 

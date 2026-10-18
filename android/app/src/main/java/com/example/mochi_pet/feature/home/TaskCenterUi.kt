@@ -434,7 +434,7 @@ private fun taskAccent(task: DashboardTask): Color = when {
 }
 
 @Composable
-internal fun DashboardPanel(
+private fun DashboardPanel(
     accent: Color = MaterialTheme.colorScheme.outline,
     content: @Composable ColumnScope.() -> Unit,
 ) {

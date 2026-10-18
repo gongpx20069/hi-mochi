@@ -156,8 +156,9 @@ The ordinary Browser Card does not accept touch input. During explicit browser
 assistance the same WebView moves into a secure full-screen dialog showing
 origin, Agent-generated explanation, and native Continue/Cancel buttons.
 No snapshots or Agent actions are allowed while assistance is pending.
-User navigation invalidates references. The user enters credentials only in
-the website, never in chat; Mochi does not maintain a raw-password vault.
+User navigation invalidates references. Credentials are entered in the website
+or native account editor, never chat. Supported form submissions can offer native-only,
+explicitly confirmed local password saving as described below.
 Question assistance uses choices or typed text (not voice-answer routing).
 The request explanation is spoken once while the Activity is resumed; pausing
 or answering stops that speech. Speech failure leaves the visible request.
@@ -186,10 +187,27 @@ Platform boundaries still apply. Unsupported Android permissions, blocked URL
 schemes, Safe Browsing failures, SSL failures, private-network targets, and
 external-app launches return typed errors rather than opening an approval flow.
 
-No webpage receives an Android JavaScript bridge. Semantic extraction is a
-bounded one-way evaluation owned by Mochi and returns only nearby Markdown,
-roles, states, bounds, safe form metadata, and native-generated element
-references.
+No webpage receives a general Android JavaScript interface. Semantic extraction
+is a bounded one-way evaluation returning only nearby Markdown, roles, states,
+bounds, safe form metadata and native-generated references. The only native
+message channel accepts bounded credential submissions while the user controls
+the browser. Native checks require the main frame, HTTPS and exact source/current
+origin (including port); the page cannot supply the stored origin or save without
+native confirmation. AndroidX document-start script and message-listener support
+are required; unsupported WebViews show an update notice.
+
+The fixed observer handles trusted top-level form submissions, recognizable
+login-button clicks and Enter in password/code fields, not each keystroke.
+Visible phone and verification-code fields identify SMS login. Its native
+payload contains only kind and phone number; code/password fields in an SMS
+message are rejected. Code fields are excluded from password capture/filling,
+including masked `one-time-code` inputs. SMS filling touches only a single
+recognized phone field, never requests a code or submits.
+Nonstandard AJAX widgets, cross-origin frames, passkeys and external-app
+authentication are not universally supported. The save offer does
+not prove successful login. Captured/filled passwords remain native-only and
+are redacted if echoed into subsequent Agent snapshots during the same turn.
+More than 32 distinct protected passwords blocks snapshots until a new turn.
 
 ## 6. Tools UI
 
@@ -209,22 +227,52 @@ When enabled, individual Tool switches still determine which schemas are
 registered. The five switches remain adjacent and in the same order as the
 Tool contract table.
 
-Website management opens a full-screen dialog matching Task Center: gradient
-backdrop, safe-area insets, 680 dp maximum content width, persistent title/Close
-row, and the same rounded bordered `DashboardPanel` cards. Closing restores the
-underlying Tools page. Its entry is a filled provider-action button matching
-Connect Feishu. The dialog groups an explanation, open-website form, saved-site
-cards/empty state, and separate local-data controls. It has no mode selector.
-It lists up to 100 visited hosts and last-visited timestamps. The runtime keeps
-the last Agent-selected mode in the existing Tool DataStore under
-`browser.sites.v1`. It stores no URL queries, credentials or inferred login flags.
-Users can open a host to log in/out manually while no Browser turn owns the
-runtime. This uses the same session store as Mochi.
+Website management is a secure full-screen dialog with a Bing search/address
+field centered beneath the Mochi logo, a top-right Close button, and a separate
+translucent saved-account panel, not dashboard cards. Its entry remains a filled
+button matching Connect Feishu. Left swipe reveals Edit/Delete and stops at
+half the row; it never deletes automatically. Search or opening an account moves
+to a full-screen manual browser sharing Mochi's cookie store, with four bottom
+controls: Back, Forward, Home and Accounts. Home hides but retains the same
+WebView, history and form state; Return to page reattaches it. Accounts opens
+the homepage's shared account-list component in a secure bottom sheet.
+Selecting an account matching the current exact origin explicitly fills its
+login form without submission; other origins navigate to that account's site.
+The homepage Close action ends the manual session. Manual browsing retains
+exclusive Browser ownership even while Home or the account sheet is visible;
+wake listening pauses and no Agent snapshots/actions run. Closing restores Tools.
+Further manual navigation keeps that WebView's selected mode, avoiding a UA
+change on an already interacted-with form.
+
+The list contains up to 100 encrypted accounts, not inferred logged-in websites.
+Native confirmation saves exact HTTPS origin, username and password for password
+accounts, or only origin and phone for SMS accounts, in a separate no-backup
+Keystore-encrypted catalog. Account identity includes login kind, so an SMS login
+never overwrites a password account with the same username. Legacy records with
+no kind remain password accounts. SMS records require an empty password.
+No model Tool, conversation, Provider export or notification receives its
+secrets. Editing a password account's website requires password re-entry; blank
+replacement preserves its password only on the same origin. SMS editing has no
+password/code field. Stale edits/deletes fail visibly. Explicit fill requires
+the exact main-frame origin and same-origin form action when a form is present.
+Password filling requires a form; SMS widgets may be form-less. Neither submits.
+Deleting an account preserves cookies; clearing website data preserves accounts.
+Multiple stored accounts do not imply isolated browser profiles.
+
+The account menu also offers Add SMS login account for a completed login that
+cannot be captured retroactively or an unsupported widget. The user supplies
+the website and phone number; Mochi never infers a phone from cookies or claims
+that saving guarantees a valid session. Expired SMS logins need a fresh code.
+The overflow menu provides separate resource-cache and confirmed all-website-data
+clearing. There is no mode selector. The runtime privately retains up to 100
+visited hosts/timestamps and last Agent-selected mode in Tool DataStore
+`browser.sites.v1`, without queries, credentials or inferred login flags.
 
 Resource-cache deletion preserves login storage. Complete per-site/global
 deletion uses feature-gated AndroidX `WebStorageCompat` APIs, removing cookies,
 cache and JS-readable storage. Per-site deletion affects the registrable parent
-domain and subdomains; a native confirmation discloses the shared-login impact.
+domain and subdomains. The management menu exposes all-site clearing rather
+than a per-host session list and discloses its sign-out impact.
 Unsupported WebViews require an update, never a partial fake logout. Deletion
 is serialized against Browser turns and awaits completion; a delayed callback
 reports failure and blocks new Browser use until deletion actually finishes.

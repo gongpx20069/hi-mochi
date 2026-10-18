@@ -296,17 +296,29 @@ Browser subset; foreground conversations may also click and enter page data.
 Provider Tools have independent switches, and provider-backed Tools also require
 their provider switch to be enabled.
 
-**Tools > Agent Browser > Websites and logins** opens a Task Center-style panel for
-website login and confirmed local-data deletion. Mochi chooses the appropriate
+**Tools > Agent Browser > Websites and logins** opens a Bing search/address field
+and saved-account list. Search enters a full-screen browser; swipe an account
+halfway left to reveal Edit/Delete. The browser's four bottom controls are Back,
+Forward, Home and Accounts. Home keeps the current page for resuming;
+Accounts opens the same account list in a popup. Supported login-form submissions offer to save
+the website, username and password locally with Keystore encryption and native
+confirmation. Passwords never go to the model. Selecting an account allows
+explicit same-origin filling without automatic submission. SMS logins save only
+the website and phone number, never verification codes; expired logins still need
+a new code. **Accounts > ... > Add SMS login account** can record an already
+completed or unsupported login without signing out. Deleting an account
+preserves the current website login; separate website-data clearing keeps saved
+passwords. Mochi chooses the appropriate
 mobile/desktop view; no manual mode setting is needed. Resource
 cache can be cleared separately without logging out. Existing login is reused;
 when human login or verification is needed, Main's `request_user_assistance`
-pauses the task and speaks its explanation. Enter credentials only in the page,
+pauses the task and speaks its explanation. Enter login credentials in the page, not chat,
 then choose Continue; Mochi checks the page before proceeding. Questions use
 choices or typed answers. Complete deletion requires a compatible updated
 System WebView and affects the parent domain's shared subdomain login.
-This version has one shared session store, not named isolated accounts or a
-password vault, and cannot resume a pending task after process death.
+This version has one shared session store, not isolated account profiles, and
+cannot resume a pending task after process death. Capture supports top-level forms
+and recognizable login buttons, not every AJAX, iframe or external authentication flow.
 
 Travel Planning uses the normal visible controls on public HTTPS pages. Train
 research starts from the official 12306 query page; flight research prefers

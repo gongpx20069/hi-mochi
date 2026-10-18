@@ -451,15 +451,45 @@ switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
 **Websites and logins** stays outside its collapsed Tool list as a filled button
-matching Connect Feishu. It opens a Task Center-style full-screen dialog, with
-the same gradient backdrop, safe-area spacing, 680 dp content limit, rounded
-bordered panels and fixed title/Close row. Closing reveals the unchanged Tools
-page. It contains an introductory card, open-website form, saved-site cards/empty state, and a
-separate local-data section. It lists visited hosts and last visits (not verified
-login status), manual open/login/logout, and confirmed site/all-data deletion.
+matching Connect Feishu. It opens a secure full-screen dialog with only a Bing
+search/address field centered in the page, Mochi's launcher logo above it, and
+an always-visible Close action at the top right. The logo and concise
+"Search the web. Save accounts safely." caption share a softly tinted brand area.
+A separate rounded translucent
+frosted-look panel below search contains saved accounts and the compact data
+overflow menu. There are no introductory or session-status cards.
+Rows show website, username and a fixed
+password mask. Left swipe stops halfway and reveals Edit/Delete; swiping alone
+never deletes, and both actions also have accessibility alternatives.
+Search opens a full-screen manual browser with only four bottom controls:
+Back, Forward, Home, and Accounts (Chinese: 凭证), in an inset rounded navigation
+bar. History uses arrow icons with accessible labels and disabled states;
+Home and Accounts use icons with short single-line labels. Accounts is the
+emphasized action; its English label must not wrap on a 320 dp screen.
+Home reveals the search/account homepage without destroying or reloading
+the current page; Return to page restores that same WebView. System Back follows
+history, then returns Home. The homepage's Close action ends manual browsing.
+Accounts opens the same account-list component in a secure bottom sheet,
+including its swipe/edit/delete interactions, without a separate management page.
+Choosing a saved account for the current exact origin explicitly fills its login
+form and never submits; choosing another origin opens that website. To fill after
+reaching its login form, choose the account from Accounts again.
+A supported top-level login submission/button opens a secure Save/Not now dialog,
+showing the native website origin and editable account identifier. Password
+accounts show a fixed password mask; SMS accounts show a phone field and a short
+notice that codes are never saved and expired logins need a new code.
+This is a save offer, not evidence that authentication succeeded.
+SMS rows are labelled SMS login. The account menu's Add SMS login account action
+supports completed or unsupported login flows without asking the user to log out;
+only website and phone are entered. Selecting an SMS account fills only its phone.
+Editing supports username, website and replacement password for password accounts;
+changing their website requires password re-entry. SMS editing offers only website
+and phone. Confirmed account deletion preserves current login.
+The overflow menu has separate cache and confirmed all-website-data deletion;
+both preserve saved passwords. Closing reveals the unchanged Tools page.
 There is no mode selector; Mochi chooses mobile/desktop as needed. Legacy manual
 preferences do not override that decision.
-Deletion includes the registrable domain's subdomains and shared login.
+Website-data deletion includes shared login, unlike saved-account deletion.
 Resource-cache clearing is separate and preserves login. Unsupported complete
 deletion requires a System WebView update, not partial cleanup.
 

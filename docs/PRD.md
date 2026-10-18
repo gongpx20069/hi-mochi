@@ -205,14 +205,28 @@ conversation history; authentication material is excluded.
 - Existing website login is reused without repeated prompts. When real login,
   verification or clarification is necessary, Main may suspend on
   `request_user_assistance` with its own natural-language explanation.
-  The user completes/cancels in native UI; credentials are entered only on the
-  website. A fresh read verifies reported completion.
+  The user completes/cancels in native UI. Website passwords are handled only
+  by the website or native account editor, never chat/model context.
+  A fresh read verifies reported completion.
 - **Tools > Agent Browser > Websites and logins** manages shared local sessions,
-  per-site/all website data and separate resource cache in a Task Center-style
-  dialog over Tools. No manual mode selector is exposed.
-  Deletion requires confirmation and discloses parent-domain/subdomain impact.
-  Named isolated accounts, raw passwords and process-death task resumption are
+  with a Bing search/address field and saved-account list. Search opens a
+  full-screen manual browser. Left swipe reveals Edit/Delete while retaining
+  half the row; swiping never deletes. No manual mode selector is exposed.
+- A submitted supported top-level HTTPS login form offers native confirmation
+  to save website, username and password locally with Keystore encryption.
+  Passwords never enter model context. Saving does not imply login succeeded.
+  Users can edit/delete saved accounts and explicitly fill a same-origin form,
+  without automatic submission. Deleting a saved account preserves cookies;
+  separate cache/site-data controls do not delete the password catalog.
+  Named isolated browser profiles and process-death task resumption remain
   outside this version.
+- SMS login accounts save only website and phone number, explicitly labelled
+  as SMS login. One-time verification codes are never stored as passwords.
+  Recognized top-level login submissions/buttons offer native confirmation;
+  users can also add SMS accounts manually for an already completed or
+  unsupported login flow. Filling inserts only the phone number, never sends a
+  code or submits. Valid cookies are reused; expired sessions still need a new
+  verification code.
 
 ### 3.7 Subagents
 

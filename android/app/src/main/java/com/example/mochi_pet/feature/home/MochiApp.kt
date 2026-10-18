@@ -844,7 +844,7 @@ private fun MochiAppContent(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    if (browserState.active && assistanceRequest?.browser != true) {
+                    if (browserState.active && !browserState.manual && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
                             state = browserState,
                             webViewProvider = viewModel::browserWebView,
@@ -924,7 +924,7 @@ private fun MochiAppContent(
                     shape = RoundedCornerShape(28.dp),
                     tonalElevation = 6.dp,
                 ) {
-                    if (homePresentation && browserState.active && assistanceRequest?.browser != true) {
+                    if (homePresentation && browserState.active && !browserState.manual && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
                             state = browserState,
                             webViewProvider = viewModel::browserWebView,

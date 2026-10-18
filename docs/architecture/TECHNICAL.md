@@ -126,6 +126,14 @@ still have no confirmation gate. Process death does not resume pending calls.
 last selected mode. No manual mode preference overrides the Agent.
 Cookies are flushed, not deleted, on teardown; explicit complete deletion uses
 feature-gated AndroidX WebKit APIs serialized against all Browser turns.
+Manual browsing takes the same exclusive runtime ownership and blocks Agent
+actions. A feature-gated, source-validated native WebMessage listener offers
+local account saving after supported top-level HTTPS login submissions/clicks.
+The native-only, no-backup Keystore vault is separate from website sessions and
+Provider sharing. Explicit filling checks exact origin and same-origin form
+action, never auto-submits, and keeps secrets out of model Tool results.
+SMS accounts save/fill only a phone number, not a password or verification code;
+they do not auto-request codes or make sessions permanent.
 See `AGENT_BROWSER.md`.
 
 Wake and media triggers preserve the selected `MochiSurface`. A typed pipeline

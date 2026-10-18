@@ -279,6 +279,15 @@ class MochiApplication : Application() {
         }
     }
 
+    val browserCredentialVault by lazy {
+        com.example.mochi_pet.core.browser.BrowserCredentialVault(
+            PreferenceDataStoreFactory.create(scope = applicationScope) {
+                File(noBackupFilesDir, "browser_credentials.preferences_pb")
+            },
+            AndroidKeystoreApiKeyCipher("mochi_browser_credentials_v1"),
+        )
+    }
+
     val voiceRuntime: AndroidVoiceRuntime by lazy {
         AndroidVoiceRuntime(
             context = this,
