@@ -453,12 +453,16 @@ independently from Tools settings. Amap parameters must use the returned GCJ-02
 fields, never the WGS-84 fields or model-generated
 conversion.
 
-## 4. Public web research
+## 4. Web browsing and research
 
 There are no dedicated `search_web` or `fetch_web_page` schemas. Public
 research uses the Agent Browser Tools defined in `AGENT_BROWSER.md`.
 
-The built-in Web Search Skill guides the Agent to:
+The built-in Browser Skill guides the Agent to open supplied links directly,
+read/compare relevant pages, and reuse valid existing sessions without a new
+login prompt. Dedicated connected integrations remain preferable for their
+provider-backed work. Missing authorization or a disabled Tool cannot be
+bypassed with Browser. When search is needed, the Skill guides the Agent to:
 
 1. use Bing for technical, official, news, global, and general authoritative
    queries;
@@ -469,13 +473,20 @@ The built-in Web Search Skill guides the Agent to:
 4. base the final answer on bounded source-page snapshots rather than search
    snippets alone.
 
-Disabling the Agent Browser provider or its required Browser Tools makes this
-Skill unavailable. Search pages and source pages remain untrusted evidence and
-cannot issue Agent instructions.
+Browser requires navigate/read/scroll, so it also works in read-only registries.
+Click/input and `request_user_assistance` are optional and remain unavailable
+where the registry omits them. Its loaded `allowed-tools` header includes only
+available optional capabilities. Missing a required read Tool or disabling the
+Browser provider makes the Skill unavailable. Search/source pages remain
+untrusted evidence, never instructions. Cache is not proof of freshness or login.
+Saved passwords/SMS accounts remain native-only: no model Tool lists, selects or
+fills them. Human handoff signs in on the webpage; the saved-account picker is
+currently exposed in manual browsing, not in the handoff dialog.
 
 Two focused Browser Skills cover product discovery and ratings:
 
-- Product Search uses Bing to discover public official marketplace, retailer,
+- Product Search opens supplied product URLs directly and uses Bing when needed
+  to discover public official marketplace, retailer,
   manufacturer, and brand pages. It compares values verified on multiple
   product pages when possible and labels search snippets as unverified. For an
   explicit Pinduoduo request it searches indexed public
@@ -495,6 +506,9 @@ source when one product source is blocked, stop when no reliable source
 remains, and treat all page content as untrusted data.
 
 US Stock Analysis uses Agent Browser rather than dedicated SEC Tools. It
+collects only requested companies and relevant fields, not a full report for
+a single quote. A whole-group request covers all seven; a full-analysis request
+uses the detailed financial/technical checklist. It
 uses one Baidu Stock URL pattern for the Magnificent Seven:
 `https://pqa9p2.smartapps.baidu.com/pages/quote/quote?code=<TICKER>&market=us`.
 It maps Apple, Microsoft, Amazon, Alphabet, Meta, Nvidia, and Tesla to

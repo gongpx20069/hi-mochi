@@ -66,9 +66,15 @@ native search providers. The Agent uses `browser_navigate`, `browser_input`,
 `browser_click`, `browser_read`, and `browser_scroll` to search results and
 selected source pages.
 
-The legacy `search_web` and `fetch_web_page` Tools are removed. The built-in Web
-Search Skill contains search-engine selection guidance but receives no special
-network or parsing capability outside the enabled Browser Tools.
+The legacy `search_web` and `fetch_web_page` Tools are removed. The built-in
+Browser Skill covers direct website access, reading, comparison, session reuse
+and search-engine selection, without special network or parsing capabilities.
+It replaces Web Search while preserving its saved enabled/disabled preference.
+Navigate/read/scroll are its prerequisites; click/input/assistance are optional,
+registry-scoped capabilities. Its instructions distinguish automatic WebView
+cache/session reuse from native-only saved credentials. It cannot read, select
+or fill vault accounts, nor infer current login or freshness from stored data.
+Product, ratings, stock and travel Skills retain their specialized restrictions.
 
 ### 2.2 Semantic snapshot v2
 

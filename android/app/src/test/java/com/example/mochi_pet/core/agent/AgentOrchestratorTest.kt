@@ -71,9 +71,9 @@ class AgentOrchestratorTest {
                 ),
                 availableSkills = listOf(
                     AgentSkillMetadata(
-                        name = "web-search",
+                        name = "browser",
                         description = "Research current public information.",
-                        location = "builtin://web-search/SKILL.md",
+                        location = "builtin://browser/SKILL.md",
                     ),
                 ),
             ),
@@ -98,7 +98,7 @@ class AgentOrchestratorTest {
                 .contains("[Asia/Shanghai]"),
         )
         assertTrue(prompt.contains("Timezone: Asia/Shanghai"))
-        assertTrue(prompt.contains("<name>web-search</name>"))
+        assertTrue(prompt.contains("<name>browser</name>"))
         assertTrue(prompt.contains("Call load_skill"))
         assertTrue(prompt.contains("visual presentation never replaces"))
         assertTrue(

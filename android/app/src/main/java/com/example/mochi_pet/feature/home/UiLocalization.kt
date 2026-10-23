@@ -1108,7 +1108,9 @@ private val ZH_UI_TEXT = mapOf(
         "获得 Android 权限后读取设备当前位置。",
     "Current Weather" to "当前天气",
     "Read current local weather with device permission." to "在获得设备权限后读取当前本地天气。",
-    "Web Search" to "网页搜索",
+    "Browser" to "网页浏览",
+    "Open websites, search the web or WeChat, read and compare external pages, and reuse existing website sessions." to
+        "打开网站、搜索网页或微信内容、阅读与比较外部页面，并复用已有网站会话。",
     "Search current public web information." to "搜索当前公开网页信息。",
     "Web Page Reader" to "网页阅读器",
     "Read bounded text from public HTTPS pages." to "读取公开 HTTPS 页面中的有限文本。",

@@ -265,7 +265,7 @@ once its provider is connected and its Tools are enabled.
 | Mochi Planner | Enabled | Manages Mochi calendar events and dated todos | None |
 | Voice Navigation | Enabled | Opens the relevant native Mochi surface from conversation intent | None |
 | Scheduled Automations | Enabled | Runs one-time or recurring Agent prompts and writes results to Conversation | Notification permission; exact-alarm access is optional |
-| Web Search | Enabled | Researches public web and WeChat official-account content through Agent Browser | None |
+| Browser | Enabled | Opens links, reads/compares web pages, searches Bing or WeChat sources, and reuses website sessions | None; requires Agent Browser read Tools |
 | Product Search | Enabled | Finds and compares public product pages without ordering or payment | None |
 | Douban Ratings | Enabled | Reads public Douban ratings, counts, and review themes | None |
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |

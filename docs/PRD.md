@@ -278,6 +278,17 @@ conversation history; authentication material is excluded.
   dependency later becomes unavailable, the saved Skill preference remains but
   the Skill is suspended from Agent discovery until readiness is restored.
 - Bundled scripts and dependencies are never executed automatically.
+- Browser replaces Web Search as the general web Skill: supplied links open
+  directly, search retains Bing/Sogou Weixin source guidance, and valid website
+  sessions are reused. Cache is not proof of freshness; saved credentials stay
+  native-only and cannot be selected or filled by the model.
+- Browser requires navigate/read/scroll; click, input and human assistance are
+  optional and usable only in registries that expose them. The old Web Search
+  enablement is preserved without showing a duplicate Skill.
+- Specialized Skills retain separate provider and action boundaries. Product
+  Search opens supplied product links before searching; stock analysis collects
+  only requested companies/fields. Planner records and their reminders, future
+  Agent schedules, and UI-only navigation must not create duplicate actions.
 
 ### 3.9 Language
 

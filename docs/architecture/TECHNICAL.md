@@ -432,6 +432,15 @@ package-install instructions. Connected, enabled Termux Tools may run user
 scripts or install packages inside Termux; this does not grant other Skills
 or runtimes an execution bypass.
 
+The Browser Skill has the stable discovery name `browser` and storage ID
+`builtin:browser`. Existing `builtin:web-search` enablement is read through
+the built-in alias mechanism; a new-ID override takes precedence. The legacy
+record is not a second installed Skill, and no database schema changes.
+Its minimum prerequisite is navigate/read/scroll. `load_skill` includes optional
+click/input/assistance in its `allowed-tools` header only when available in the
+calling registry; loading cannot grant a foreground capability to a background
+or child run. Other built-in and installed Skill prerequisites are unchanged.
+
 The unauthenticated Explore default parses the public skills.sh Trending (24h)
 leaderboard and falls back to install-ranked public search if the page shape
 changes. Public search exposes install counts but not favorites; Mochi labels
@@ -447,12 +456,19 @@ that Tool evidence only when the Tool is called. Current weather uses the same
 provider with Open-Meteo, caches results for ten minutes, and reduces latitude
 and longitude to two decimal places before sending them to Open-Meteo.
 
-Native public-web research uses the Agent Browser through the built-in Web
-Search Skill. Bing is preferred for technical, official, news, global, and
+Native web browsing and research use the Agent Browser through the built-in
+Browser Skill. Supplied links open directly; search is used to discover or
+verify sources. Bing is preferred for technical, official, news, global, and
 authoritative sources. Sogou Weixin is preferred for explicit WeChat requests
 and Chinese lifestyle or experience queries. The Agent operates the search
-page and selected sources with the five Browser Tools; there are no dedicated
+page and selected sources with the available Browser Tools; there are no dedicated
 `search_web` or `fetch_web_page` schemas.
+Existing valid website sessions are reused without another login prompt.
+Cache is not evidence of freshness. Saved credentials remain native-only;
+manual browsing exposes the Sites picker, while Agent handoff currently does
+not. The Skill must not invent vault access, automatic filling, or handoff UI.
+Connected dedicated integrations remain preferable for their provider-backed
+tasks; Browser is not a bypass for missing permissions or disabled Tools.
 
 Browser navigation enforces the public HTTPS policy, rejects local/private
 address ranges and credential-bearing URLs, and bounds semantic snapshots and

@@ -235,7 +235,7 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | Mochi Planner | 启用 | 管理 Mochi 日历事件和带日期的待办 | 无 |
 | Voice Navigation | 启用 | 根据对话意图打开相关 Mochi 原生页面 | 无 |
 | Scheduled Automations | 启用 | 执行一次性或周期 Agent 任务，并把结果写入 Conversation | 通知权限；精确闹钟权限可选 |
-| Web Search | 启用 | 通过智能体浏览器搜索公开网页和微信公众号内容 | 无 |
+| Browser（网页浏览） | 启用 | 直接打开链接、阅读比较网页、搜索 Bing 或微信来源，并复用网站会话 | 无；需启用智能体浏览器的只读工具 |
 | Product Search | 启用 | 搜索并比较公开商品页面，不下单、不支付 | 无 |
 | Douban Ratings | 启用 | 获取公开豆瓣评分、评分人数和评论主题 | 无 |
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |

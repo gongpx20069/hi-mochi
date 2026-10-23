@@ -93,6 +93,13 @@ Browser assistance regressions:
   --tests "*AgentOrchestratorTest" --tests "*Skill*Test" --no-daemon
 ```
 
+Skill catalog changes additionally run `:app:testDebugUnitTest --tests
+"*MochiDatabaseTest" --tests "*AgentOrchestratorTest"`. These cover legacy Web
+Search enablement moving to Browser without duplicate entries, new-ID override
+precedence, read-only discovery/loading, and optional tool headers restricted to
+the calling registry. These deterministic checks validate the contract, not
+live-provider model choices or real-site authentication.
+
 After an in-place app/test APK update, `feature.home.BrowserExperienceSmokeTest`
 checks the always-visible management entry, desktop viewport, explicit handoff,
 snapshot pause, continuation, credential-save confirmation, password redaction,
