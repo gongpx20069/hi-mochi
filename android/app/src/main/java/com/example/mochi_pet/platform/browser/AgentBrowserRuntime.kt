@@ -225,6 +225,14 @@ class AgentBrowserRuntime(
         if (current.canGoForward()) current.goForward()
     }
 
+    suspend fun assistanceBack(id: String): Boolean = withContext(Dispatchers.Main.immediate) {
+        check(assistance.request.value?.let { it.id == id && it.browser } == true && mutableState.value.userControl) {
+            "This assistance request expired."
+        }
+        val current = checkNotNull(webView)
+        if (current.canGoBack()) { current.goBack(); true } else false
+    }
+
     suspend fun fillUserCredential(login: com.example.mochi_pet.core.browser.BrowserLogin) =
         withContext(Dispatchers.Main.immediate) {
             check(mutableState.value.userControl) { "Saved accounts can only be filled while you control the browser." }

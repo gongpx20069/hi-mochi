@@ -111,6 +111,11 @@ records rejecting codes, encrypted storage, stale revisions, exact-origin
 capture, public/private suffix grouping, and half-width credential/data swipe
 actions. Grouping tests initialize OkHttp's Android assets under Robolectric,
 so the actual bundled public-suffix list is exercised rather than a fake resolver.
+Handoff layout cases in `BrowserCredentialsUiTest` cover compact page allocation,
+large text, explicit return, details/menu actions and question-sheet answers.
+The device handoff case checks website history without returning control, keyboard
+insets hiding/restoring the request strip, filling through the exact-origin picker,
+and rejection of stale handoff navigation; it never uses a real saved account.
 A separate device case submits the
 non-sensitive query `mochi browser fixture` to public Bing and checks full-screen
 manual browsing, back/forward, the shared credentials popup and Home/resume

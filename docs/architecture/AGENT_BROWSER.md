@@ -161,13 +161,21 @@ Tool progress. If the app enters the background, execution continues without a
 Browser Card and is represented by the Agent notification.
 
 The ordinary Browser Card does not accept touch input. During explicit browser
-assistance the same WebView moves into a secure full-screen dialog showing
-origin, Agent-generated explanation, and native Continue/Cancel buttons.
+assistance the same WebView moves into a secure full-screen browser handoff
+with a compact origin header, paused/request strip, and rounded Accounts /
+Return to Mochi bar. Full request/privacy details use a secure bottom sheet.
+The strip hides for the keyboard, without replacing/reloading the WebView.
+Accounts lists only the current exact origin; filling revalidates the request
+ID, vault revision and actual page origin, never navigates or submits.
+Back navigates history while this handoff ID is pending; without history it
+opens the menu. Stop Agent cancels the whole running interaction.
 No snapshots or Agent actions are allowed while assistance is pending.
 User navigation invalidates references. Credentials are entered in the website
 or native account editor, never chat. Supported form submissions can offer native-only,
 explicitly confirmed local password saving as described below.
-Question assistance uses choices or typed text (not voice-answer routing).
+Question assistance uses a secure bottom sheet with immediate choices or typed
+text (not voice-answer routing). Choices hide the optional text field until
+requested. Dismiss cancels; closing browser detail/account sheets does not answer.
 The request explanation is spoken once while the Activity is resumed; pausing
 or answering stops that speech. Speech failure leaves the visible request.
 

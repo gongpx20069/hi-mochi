@@ -632,6 +632,19 @@ class MochiHomeViewModel(
 
     suspend fun manualBrowserForward() { agentBrowserRuntime?.manualForward() }
 
+    suspend fun assistanceBrowserBack(id: String): Boolean =
+        checkNotNull(agentBrowserRuntime) { "Browser unavailable." }.assistanceBack(id)
+
+    suspend fun fillAssistanceCredential(id: String, summary: BrowserCredentialSummary) {
+        fun checkRequest() {
+            check(assistanceRequest.value?.let { it.id == id && it.browser } == true) { "This assistance request expired." }
+        }
+        checkRequest()
+        val login = checkNotNull(browserCredentialVault).load(summary)
+        checkRequest()
+        checkNotNull(agentBrowserRuntime).fillUserCredential(login)
+    }
+
     suspend fun fillSelectedBrowserCredential() {
         val summary = checkNotNull(selectedBrowserCredential.value) { "Choose a saved account first." }
         val login = checkNotNull(browserCredentialVault).load(summary)

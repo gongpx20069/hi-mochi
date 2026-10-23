@@ -626,8 +626,18 @@ on cancellation, timeout, or failure.
 Moving Mochi to the background does not itself pause Browser Tools. Ordinary
 actions need no approval. Main can explicitly request user assistance: its
 generated explanation is displayed and spoken once while resumed. Questions
-have choices/typed answers; browser handoff opens the existing page in a secure
-full-screen dialog with origin and Continue/Cancel. The ordinary Home WebView
+use a secure bottom sheet with immediate choices; a text field appears only for
+free-text questions or after choosing to write another answer. Dismiss cancels
+the question, never submits an answer.
+Browser handoff presents the existing page as a secure full-screen browser,
+not a help alert: compact origin header, paused-state label and two-line request,
+with the full explanation/privacy information in a details sheet. The rounded
+bottom bar has Accounts and **Return to Mochi**; only exact-origin saved accounts
+are offered for native filling without navigation or submission. The request
+banner hides while the keyboard is open; controls respect system/IME insets.
+Back navigates website history; at its beginning it opens the menu, which has
+**Stop Agent**. Closing details/accounts never resumes the Agent.
+The ordinary Home WebView
 is not mounted simultaneously and does not accept touch. While waiting, no
 Agent page reads/actions run; completion is verified with a fresh read.
 A private generic notification opens Mochi when notifications are enabled;

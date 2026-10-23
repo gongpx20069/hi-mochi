@@ -18,9 +18,11 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -30,6 +32,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mochi_pet.core.browser.UserAssistanceAnswer
+import com.example.mochi_pet.core.browser.UserAssistanceRequest
+import com.example.mochi_pet.core.browser.BrowserLoginKind
+import com.example.mochi_pet.core.browser.browserOrigin
 import com.example.mochi_pet.platform.browser.AgentBrowserException
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -61,59 +66,201 @@ internal fun BrowserExperience(viewModel: MochiHomeViewModel) {
     if (state.manual && manualVisible) {
         ManualBrowser(viewModel)
     } else if (pending != null) {
-        var answer by remember(pending.id) { mutableStateOf("") }
-        val cancel = { viewModel.answerAssistance(pending.id, UserAssistanceAnswer("cancelled")) }
-        Dialog(
-            onDismissRequest = cancel,
-            properties = DialogProperties(
-                usePlatformDefaultWidth = !pending.browser, securePolicy = SecureFlagPolicy.SecureOn,
-                dismissOnClickOutside = false,
-            ),
+        key(pending.id) {
+            if (pending.browser) BrowserHandoff(viewModel, pending, feedback)
+            else AssistanceQuestionSheet(pending.message, pending.options, feedback,
+                onCancel = { viewModel.answerAssistance(pending.id, UserAssistanceAnswer("cancelled")) },
+                onAnswer = { viewModel.answerAssistance(pending.id, UserAssistanceAnswer("completed", it)) })
+        }
+    }
+    saveRequest?.let { CredentialSaveDialog(viewModel, it) }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun BrowserHandoff(viewModel: MochiHomeViewModel, pending: UserAssistanceRequest, speechError: String?) {
+    val state by viewModel.browserState.collectAsStateWithLifecycle()
+    val credentials by viewModel.savedBrowserCredentials.collectAsStateWithLifecycle(emptyList())
+    val scope = rememberCoroutineScope()
+    var accounts by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    var filling by remember { mutableStateOf(false) }
+    var feedback by remember(state.url) { mutableStateOf<String?>(null) }
+    val origin = state.url.toHttpUrlOrNull()?.takeIf { it.isHttps }?.let { browserOrigin(it.toString()) }
+    fun back() {
+        if (filling) return
+        scope.launch {
+            browserUiAction({ feedback = it }) {
+                if (!viewModel.assistanceBrowserBack(pending.id)) menu = true
+            }
+        }
+    }
+    Dialog(onDismissRequest = ::back, properties = DialogProperties(
+        usePlatformDefaultWidth = false, securePolicy = SecureFlagPolicy.SecureOn, dismissOnClickOutside = false,
+        decorFitsSystemWindows = false,
+    )) {
+        BackHandler(onBack = ::back)
+        BrowserHandoffLayout(
+            origin = origin ?: pending.origin.orEmpty(), message = pending.message, loading = state.loading,
+            feedback = feedback ?: state.error ?: speechError, menu = menu, onMenu = { menu = it },
+            onBack = ::back, onStop = viewModel::cancelConversation, onAccounts = { accounts = true },
+            enabled = !filling,
+            onReturn = { viewModel.answerAssistance(pending.id, UserAssistanceAnswer("completed")) },
         ) {
-            Surface(shape = MaterialTheme.shapes.large) {
-                Column(
-                    Modifier.then(if (pending.browser) Modifier.fillMaxSize() else Modifier).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text("Mochi needs your help", style = MaterialTheme.typography.titleLarge)
-                    Column(Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())) {
-                        Text(pending.message)
-                        if (pending.browser) {
-                            Text(state.url.toHttpUrlOrNull()?.let { "${it.scheme}://${it.host}" } ?: pending.origin.orEmpty())
-                            Text("The Agent is paused. Passwords stay on this device; saving requires your confirmation.")
-                        }
-                        feedback?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    }
-                    if (pending.browser) {
-                        AndroidView(
-                            factory = { context -> checkNotNull(viewModel.browserWebView(context)) },
-                            onRelease = viewModel::releaseBrowserWebView,
-                            modifier = Modifier.fillMaxWidth().weight(1f),
-                        )
-                    } else {
-                        Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
-                            pending.options.forEach { option ->
-                                TextButton({ viewModel.answerAssistance(pending.id, UserAssistanceAnswer("completed", option)) }) { Text(option) }
+            key(state.sessionId) {
+                AndroidView(
+                    factory = { context -> checkNotNull(viewModel.browserWebView(context)) },
+                    onRelease = viewModel::releaseBrowserWebView,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        if (accounts) ModalBottomSheet(
+            onDismissRequest = { accounts = false },
+            properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState()).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Saved accounts", style = MaterialTheme.typography.titleLarge)
+                Text(origin.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                Text("Fill only this page. Nothing is submitted automatically.", style = MaterialTheme.typography.bodyMedium)
+                val matching = credentials.filter { it.origin == origin }
+                if (matching.isEmpty()) Text("No saved accounts for this page.")
+                matching.forEach { credential ->
+                    OutlinedButton(
+                        enabled = !filling, modifier = Modifier.fillMaxWidth().testTag("handoff-account-${credential.id}"),
+                        onClick = {
+                            filling = true
+                            scope.launch {
+                                try {
+                                    browserUiAction({ feedback = it }) {
+                                        viewModel.fillAssistanceCredential(pending.id, credential)
+                                        feedback = if (credential.kind == BrowserLoginKind.SMS)
+                                            "Phone number filled. Request a new code and sign in yourself."
+                                        else "Account filled. Review the form and sign in yourself."
+                                    }
+                                } finally { filling = false; accounts = false }
                             }
-                            OutlinedTextField(
-                                value = answer, onValueChange = { if (it.length <= 2_000) answer = it },
-                                label = { Text("Your answer (no passwords or verification codes)") }, modifier = Modifier.fillMaxWidth(),
-                            )
+                        },
+                    ) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(credential.username)
+                            Text(if (credential.kind == BrowserLoginKind.SMS) "SMS login" else "Password account",
+                                style = MaterialTheme.typography.labelSmall)
                         }
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        TextButton(cancel) { Text("Cancel") }
-                        Button(
-                            onClick = { viewModel.answerAssistance(pending.id, UserAssistanceAnswer("completed", answer)) },
-                            enabled = pending.browser || answer.isNotBlank(),
-                        ) { Text("Continue") }
                     }
                 }
             }
         }
     }
-    saveRequest?.let { CredentialSaveDialog(viewModel, it) }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+internal fun BrowserHandoffLayout(
+    origin: String, message: String, loading: Boolean, feedback: String?,
+    menu: Boolean, onMenu: (Boolean) -> Unit, onBack: () -> Unit, onStop: () -> Unit,
+    onAccounts: () -> Unit, enabled: Boolean, onReturn: () -> Unit, page: @Composable () -> Unit,
+) {
+    var details by remember { mutableStateOf(false) }
+    Surface(Modifier.fillMaxSize().testTag("browser-handoff")) {
+        Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onBack, enabled = enabled, modifier = Modifier.testTag("handoff-back")
+                    .semantics { contentDescription = localizeUiText("Back") }) {
+                    BrowserNavigationIcon(BrowserGlyph.BACK)
+                }
+                Text(origin.removePrefix("https://"), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box {
+                    IconButton({ onMenu(true) }, modifier = Modifier.testTag("handoff-menu")
+                        .semantics { contentDescription = localizeUiText("More options") }) { Text("...") }
+                    DropdownMenu(menu, onDismissRequest = { onMenu(false) }) {
+                        DropdownMenuItem(text = { Text("Stop Agent") }, onClick = { onMenu(false); onStop() })
+                    }
+                }
+            }
+            if (!WindowInsets.isImeVisible) Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Your turn · Mochi is paused", style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary)
+                        Text(message, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                    IconButton({ details = true }, modifier = Modifier.testTag("handoff-details")
+                        .semantics { contentDescription = localizeUiText("Request details") }) { Text("ⓘ") }
+                }
+            }
+            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            Box(Modifier.fillMaxWidth().weight(1f).testTag("handoff-page")) { page() }
+            feedback?.let {
+                Text(it, Modifier.fillMaxWidth().heightIn(max = 72.dp).verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall)
+            }
+            Surface(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth(),
+                shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))) {
+                FlowRow(Modifier.padding(6.dp),
+                    maxItemsInEachRow = if (LocalDensity.current.fontScale > 1.3f) 1 else 2,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onAccounts, enabled = enabled, modifier = Modifier.weight(1f).testTag("handoff-accounts")) { Text("Accounts") }
+                    Button(onReturn, enabled = enabled, modifier = Modifier.weight(1.5f).testTag("handoff-return")) { Text("Return to Mochi") }
+                }
+            }
+        }
+    }
+    if (details) ModalBottomSheet(
+        onDismissRequest = { details = false },
+        properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Request details", style = MaterialTheme.typography.titleLarge)
+            Text(origin)
+            Text(message)
+            Text("The Agent is paused. Passwords stay on this device; saving requires your confirmation.")
+            Text("Return control when you are ready. Mochi will check the page before continuing.")
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun AssistanceQuestionSheet(
+    message: String, options: List<String>, feedback: String?, onCancel: () -> Unit, onAnswer: (String) -> Unit,
+) {
+    var answer by remember { mutableStateOf("") }
+    var writing by remember { mutableStateOf(options.isEmpty()) }
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        properties = ModalBottomSheetProperties(securePolicy = SecureFlagPolicy.SecureOn),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).imePadding().padding(horizontal = 20.dp)
+            .testTag("assistance-question")) {
+            Text("A quick question", style = MaterialTheme.typography.titleMedium)
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(message)
+                options.forEach { option ->
+                    OutlinedButton({ onAnswer(option) }, modifier = Modifier.fillMaxWidth()) { Text(option) }
+                }
+                if (writing) OutlinedTextField(
+                    value = answer, onValueChange = { if (it.length <= 2_000) answer = it },
+                    label = { Text("Your answer (no passwords or verification codes)") },
+                    modifier = Modifier.fillMaxWidth().testTag("assistance-answer"),
+                ) else TextButton({ writing = true }) { Text("Write another answer") }
+                feedback?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+            Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onCancel) { Text("Cancel") }
+                if (writing) Button({ onAnswer(answer) }, enabled = answer.isNotBlank(),
+                    modifier = Modifier.testTag("assistance-send")) { Text("Send") }
+            }
+        }
+    }
 }
 
 @Composable

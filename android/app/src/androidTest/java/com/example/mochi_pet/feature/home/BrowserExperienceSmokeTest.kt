@@ -99,7 +99,26 @@ class BrowserExperienceSmokeTest {
                 runtime.requestAssistance("Browser fixture: complete the simulated login, then continue.", true, emptyList())
             }
             withTimeout(5_000) { runtime.assistance.request.filterNotNull().first() }
-            compose.onNodeWithText(localizeUiText("Mochi needs your help")).assertIsDisplayed()
+            compose.onNodeWithTag("browser-handoff").assertIsDisplayed()
+            compose.onNodeWithTag("handoff-return").assertIsDisplayed()
+            compose.onNodeWithTag("handoff-details").performClick()
+            compose.onNodeWithText(localizeUiText("Request details")).assertIsDisplayed()
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(
+                android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK,
+            )
+            tapFixtureButton(view, "fixture-next")
+            withTimeout(5_000) { while (!script(view, "location.pathname").endsWith("/second")) delay(50) }
+            compose.onNodeWithTag("handoff-back").performClick()
+            withTimeout(5_000) { while (script(view, "location.pathname") != "/") delay(50) }
+            assertFalse("Website navigation must not return control", waiting.isCompleted)
+            tapFixtureButton(view, "fixture-username")
+            assertEquals("fixture-username", script(view, "document.activeElement.id"))
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("handoff-details").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithTag("handoff-return").assertIsDisplayed()
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(
+                android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK,
+            )
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("handoff-details").fetchSemanticsNodes().isNotEmpty() }
             try {
                 runtime.ensureWebView()
                 fail("Snapshots must be paused")
@@ -115,7 +134,11 @@ class BrowserExperienceSmokeTest {
             }
             assertEquals("synthetic-browser-password", app.browserCredentialVault.load(saved).password)
             script(view, "document.querySelector('[name=username]').value=''; document.querySelector('[type=password]').value=''; 'ok'")
-            runtime.fillUserCredential(app.browserCredentialVault.load(saved))
+            compose.onNodeWithTag("handoff-accounts").performClick()
+            compose.onNodeWithTag("handoff-account-${saved.id}").performClick()
+            withTimeout(5_000) {
+                while (script(view, "document.querySelector('[name=username]').value") != "mochi-fixture-test") delay(50)
+            }
             assertEquals("mochi-fixture-test", script(view, "document.querySelector('[name=username]').value"))
             assertEquals("synthetic-browser-password", script(view, "document.querySelector('[type=password]').value"))
             assertEquals("1", script(view, "window.fixtureSubmits"))
@@ -139,9 +162,13 @@ class BrowserExperienceSmokeTest {
             assertEquals("975310", script(view, "document.getElementById('sms-code').value"))
             assertEquals("1", script(view, "window.smsSubmits"))
             app.browserCredentialVault.delete(sms)
-            compose.onNodeWithText(localizeUiText("Continue")).performClick()
+            compose.onNodeWithTag("handoff-return").performClick()
             assertEquals("completed", withTimeout(5_000) { waiting.await() }.outcome)
             assertFalse(runtime.state.value.userControl)
+            try {
+                runtime.assistanceBack("expired-fixture")
+                fail("A stale handoff must not navigate")
+            } catch (_: IllegalStateException) { }
             val snapshot = runtime.read()
             assertNotNull(snapshot["snapshot_id"])
             assertFalse(snapshot.toString().contains("synthetic-browser-password"))
@@ -396,6 +423,6 @@ class BrowserExperienceSmokeTest {
         const val BASE = "https://mochi-browser-fixture.example/"
         const val SMS_PHONE = "+12025550123"
         const val SMS_HTML = """<h1>Browser fixture</h1><section><input id="sms-phone" type="tel" autocomplete="tel" value="+12025550123"><input id="sms-code" type="password" autocomplete="one-time-code" value="975310"><button id="sms-login" type="button" onclick="window.smsSubmits=(window.smsSubmits||0)+1">登录</button></section><div id="echo">synthetic-browser-password</div>"""
-        const val HTML = """<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><h1>Browser fixture</h1><form onsubmit="event.preventDefault(); window.fixtureSubmits=(window.fixtureSubmits||0)+1; document.getElementById('echo').textContent=this.elements.password.value"><input name="username" autocomplete="username"><input name="password" type="password"><button type="submit">Sign in fixture</button></form><div id="echo"></div><button id="fixture-next" onclick="history.pushState({}, '', '/second')">Next fixture page</button></body></html>"""
+        const val HTML = """<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><h1>Browser fixture</h1><form onsubmit="event.preventDefault(); window.fixtureSubmits=(window.fixtureSubmits||0)+1; document.getElementById('echo').textContent=this.elements.password.value"><input id="fixture-username" name="username" autocomplete="username"><input name="password" type="password"><button type="submit">Sign in fixture</button></form><div id="echo"></div><button id="fixture-next" onclick="history.pushState({}, '', '/second')">Next fixture page</button></body></html>"""
     }
 }
