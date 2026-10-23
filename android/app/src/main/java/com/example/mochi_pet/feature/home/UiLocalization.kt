@@ -177,6 +177,10 @@ internal fun localizeUiText(
 }
 
 private val ZH_UI_TEXT = mapOf(
+    "API protocol" to "API 协议",
+    "Mochi uses /responses for this connection." to "此连接使用 /responses 接口。",
+    "Responses supports reasoning with tools. Choose only a protocol supported by this endpoint and model; Mochi never switches automatically." to
+        "Responses 支持推理与工具调用。请选择此接口和模型支持的协议；Mochi 不会自动切换。",
     "Search Bing or enter a website" to "搜索 Bing 或输入网址",
     "Go" to "搜索",
     "Websites with saved accounts or local data appear here." to "有保存账号或本地数据的网站会显示在这里。",

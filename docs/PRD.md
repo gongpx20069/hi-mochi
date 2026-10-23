@@ -132,7 +132,12 @@ support is an optional import/export adapter.
 
 - A new installation without a configured provider opens Settings directly.
 - Azure OpenAI is a first-class option with resource endpoint, deployment
-  name, API version, and API key fields.
+  name and API key fields; dated API version applies to Chat Completions only.
+- Each AI connection independently selects Responses or Chat Completions under
+  advanced settings. New OpenAI/Azure connections prefer Responses; other presets
+  prefer Chat Completions. Existing connections keep their protocol and key.
+  Responses preserves same-task reasoning/tool continuity without extra server-side
+  response storage. Protocol failures never trigger silent fallback or tool replay.
 - Named LLM connections are saved independently, including multiple accounts
   for one provider. Official editable endpoint presets cover OpenAI, DeepSeek,
   Kimi, GLM, MiniMax (China), and Agnes-AI; Azure and custom endpoints remain.

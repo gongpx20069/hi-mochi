@@ -26,6 +26,9 @@ enum class ProviderType {
     CUSTOM,
 }
 
+@Serializable
+enum class ApiProtocol { CHAT_COMPLETIONS, RESPONSES }
+
 const val DEFAULT_MULTIMODAL_INPUT_ENABLED = true
 
 class OpenAiProviderConfig(
@@ -37,6 +40,7 @@ class OpenAiProviderConfig(
     val timeoutSeconds: Long = 60,
     val maxResponseBytes: Long = 2L * 1024L * 1024L,
     val imageInputEnabled: Boolean = DEFAULT_MULTIMODAL_INPUT_ENABLED,
+    val apiProtocol: ApiProtocol = ApiProtocol.CHAT_COMPLETIONS,
 ) {
     fun forForegroundRequest(): OpenAiProviderConfig =
         OpenAiProviderConfig(
@@ -48,13 +52,14 @@ class OpenAiProviderConfig(
             timeoutSeconds = minOf(timeoutSeconds, 20L),
             maxResponseBytes = maxResponseBytes,
             imageInputEnabled = imageInputEnabled,
+            apiProtocol = apiProtocol,
         )
 
     init {
         require(endpoint.isNotBlank()) { "Provider endpoint must not be empty" }
         require(apiKey.isNotBlank()) { "Provider API key must not be empty" }
         require(model.isNotBlank()) { "Provider model must not be empty" }
-        if (providerType == ProviderType.AZURE_OPENAI) {
+        if (providerType == ProviderType.AZURE_OPENAI && apiProtocol == ApiProtocol.CHAT_COMPLETIONS) {
             require(apiVersion.isNotBlank()) {
                 "Azure OpenAI API version must not be empty"
             }
@@ -93,6 +98,8 @@ data class OpenAiChatMessage(
     val toolCallId: String? = null,
     val name: String? = null,
     val reasoningContent: String? = null,
+    // Same-run opaque continuation only; the chat serializer deliberately excludes it.
+    val responsesOutput: JsonArray? = null,
 )
 
 object OpenAiChatMessageSerializer : KSerializer<OpenAiChatMessage> {

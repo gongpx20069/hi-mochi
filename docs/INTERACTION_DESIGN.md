@@ -296,9 +296,13 @@ Add opens a screenshot-protected editor; OpenAI is prefilled, and presets also
 include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Azure, and custom. Each
 links to its official guide. Endpoint remains editable; model is supplied by
 the user because account access varies. Standard APIs are not Coding Plans.
-Azure calls its model field the deployment name and exposes API version.
+Azure calls its model field the deployment name and exposes API version only for
+Chat Completions. Advanced settings has an API protocol selector: new OpenAI/Azure
+connections default to Responses, others to Chat Completions. Existing connections
+retain their protocol; changing it reuses the same key and does not change
+provider, endpoint or model. Unsupported protocols fail rather than auto-switching.
 Keys are masked and never loaded into the editor. Blank preserves only that
-profile's encrypted key; changing provider protocol or endpoint host requires
+profile's encrypted key; changing provider authentication type or endpoint host requires
 replacement. Each profile independently stores timeout and image-input policy.
 First save activates; subsequent additions do not switch. Use cancels running
 local Agents, children and current scheduled runs before the new configuration
@@ -374,7 +378,7 @@ Mi Home sessions, and Android permissions require setup on the receiving
 device and never appear in the checklist.
 Speech shares include the synthesis opt-in and selected voice. Older v2 speech
 shares without these fields import with system speech output. New shares use
-v4 and require an updated receiver; existing authenticated v2/v3 links remain
+v5, include AI API protocol, and require an updated receiver; existing authenticated v2/v3/v4 links remain
 importable as additional saved connections.
 
 Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.

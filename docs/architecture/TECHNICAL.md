@@ -34,14 +34,16 @@ patch number but cannot roll back or overwrite a released version. At startup,
 Mochi checks only the latest stable release and opens its GitHub page after
 explicit user confirmation; Android remains responsible for APK installation.
 
-Provider sharing generates v4 bundles and imports authenticated v2/v3/v4 links.
+Provider sharing generates v5 bundles and imports authenticated v2/v3/v4/v5 links.
 Each share selects multiple saved LLM and speech connections plus
 optional Amap, Tencent Docs, and manual MCP connections. Only the active ready
 LLM and speech profiles default selected; other profiles and Tool credentials
 default unselected every time. MCP shares contain endpoint,
 credential, and enabled remote Tool names rather than cached schemas. Mochi
 encrypts the bundle with a fresh AES-256-GCM key and places ciphertext and key
-in a `mochi://provider/import#v4` link, with version-specific authenticated data.
+in a `mochi://provider/import#v5` link, with version-specific authenticated data.
+V5 includes each AI connection's API protocol; older bundles default to Chat
+Completions. Older apps reject v5 instead of silently dropping Responses selection.
 The envelope and payload versions must match. No password or backend is required, but
 possession of the complete link grants the selected API access and quota.
 Import requires confirmation, rediscovers shared MCP schemas, writes secrets
@@ -311,7 +313,8 @@ changing the UI.
 The native implementation now includes:
 
 - serializable OpenAI-compatible chat messages, tool calls, and responses;
-- OkHttp `/chat/completions` client with cancellation and bounded responses;
+- one OkHttp transport with Chat Completions and stateless Responses adapters,
+  cancellation and bounded responses;
 - `AgentOrchestrator` with 20 Tool rounds for the Main Agent;
 - one bounded, Tool-disabled repair round when a provider final response does
   not satisfy the Mochi JSON contract;
@@ -346,6 +349,25 @@ continuations, not persisted as conversation text or shown as a reply.
   `/openai/deployments/{deployment}/chat/completions?api-version={version}`;
   its request body omits `model`.
 - Custom providers use the OpenAI-compatible bearer flow.
+
+Authentication/provider type and `ApiProtocol` are separate. The saved protocol
+defaults to `CHAT_COMPLETIONS` when absent, including legacy profiles and imports.
+The new-connection editor recommends `RESPONSES` for OpenAI/Azure and Chat
+Completions for other presets. Switching protocol alone preserves the encrypted
+key and follows normal active-run cancellation; no model-name heuristics,
+automatic fallback, disabled reasoning, or application retries are introduced.
+
+Responses uses the same resource/key and puts the deployment/model in the body.
+Azure uses `/openai/v1/responses` without a dated API-version query; other
+providers append `/responses` to their API base. The adapter maps text/images,
+function schemas (`strict:false` unless explicitly specified), calls and
+`function_call_output` into the existing Agent loop. It requests `store:false`
+and encrypted reasoning items. All supported output items, including original
+phase and opaque reasoning, are replayed only in that run; the chat serializer,
+persisted history, diagnostics and Provider shares exclude them. Continuation
+is bounded to 4,000,000 characters and fails explicitly rather than trimming
+opaque items. Failed, incomplete, refused, empty or unsupported output is an
+error; intermediate commentary alone is not a final reply.
 
 Provider errors are bounded and redact the configured key. Endpoints must be
 absolute HTTP(S) URLs without embedded credentials.

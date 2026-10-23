@@ -79,13 +79,13 @@ Settings remains available from the top-right action.
 | Provider | Configuration | Credentials |
 | --- | --- | --- |
 | OpenAI | Prefilled `https://api.openai.com/v1`; enter model | [OpenAI API key](https://platform.openai.com/api-keys) |
-| Azure OpenAI | Azure resource endpoint, **deployment name** as the model, and API version | [Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| Azure OpenAI | Azure resource endpoint and **deployment name** as the model; API version for Chat Completions only | [Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
 | DeepSeek | Prefilled `https://api.deepseek.com`; enter model | [Official API guide](https://api-docs.deepseek.com/) |
 | Kimi | Prefilled `https://api.moonshot.cn/v1`; enter model | [Official API guide](https://platform.kimi.com/docs/get-api-key) |
 | GLM | Prefilled `https://open.bigmodel.cn/api/paas/v4`; enter model | [Official API guide](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
 | MiniMax (China) | Prefilled `https://api.minimax.cn/v1`; enter model and verify account region | [Official API guide](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
 | Agnes-AI | Prefilled `https://apihub.agnes-ai.com/v1`; enter model | [Official API guide](https://wiki.agnes-ai.com/en/docs/quickstart) |
-| Custom OpenAI-compatible | User-defined HTTPS endpoint and model using the OpenAI chat/tool-call protocol | API key issued by that provider |
+| Custom OpenAI-compatible | User-defined HTTPS endpoint and model supporting tool calls through the selected API protocol | API key issued by that provider |
 
 **Settings > AI connections** saves multiple named accounts and models, with
 editable official endpoint presets for OpenAI, DeepSeek, Kimi, GLM, MiniMax
@@ -95,11 +95,17 @@ Adding another connection preserves the current choice. **Use** switches and
 cancels running local Agent tasks; future schedules remain enabled. Existing
 single-provider settings migrate without re-entering the key.
 
+Each connection's **Advanced connection settings > API protocol** selects Responses
+or Chat Completions. New OpenAI/Azure connections default to Responses; other
+presets and existing connections retain Chat Completions unless changed.
+Switching only the protocol reuses the saved key. Choose a protocol supported by
+the endpoint and model; Mochi never switches automatically after an error.
+
 Settings starts with **Share/import**, followed by AI connections, Speech/wake,
 Conversation/persona, and Display/language. Sharing can include multiple checked
 LLM and speech connections. Import adds them instead of overwriting saved accounts
-and selects each shared active connection. New v4 links require an updated receiver;
-existing v2/v3 links remain importable. Anyone holding a full link can use the
+and selects each shared active connection. New v5 links include API protocol and
+require an updated receiver; existing v2/v3/v4 links remain importable. Anyone holding a full link can use the
 included API credentials.
 
 ### Supported Speech Providers

@@ -655,6 +655,9 @@ class AgentOrchestrator(
             require(message.toolCalls.isNullOrEmpty()) {
                 "Agent history must not contain pending tool calls"
             }
+            require(message.responsesOutput == null) {
+                "Agent history must not contain another run's Responses continuation"
+            }
         }
     }
 

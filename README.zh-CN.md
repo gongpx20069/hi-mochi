@@ -76,13 +76,13 @@ LLM Provider 是必需配置。未配置时，首次启动会打开设置；之�
 | Provider | 配置 | 凭据 |
 | --- | --- | --- |
 | OpenAI | 自动填写 `https://api.openai.com/v1`，再填写模型 | [OpenAI API Key](https://platform.openai.com/api-keys) |
-| Azure OpenAI | Azure 资源 Endpoint、以 **Deployment 名称**填写模型、API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| Azure OpenAI | Azure 资源 Endpoint、以 **Deployment 名称**填写模型；仅 Chat Completions 需要 API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
 | DeepSeek | 自动填写 `https://api.deepseek.com`，再填写模型 | [官方 API 指南](https://api-docs.deepseek.com/) |
 | Kimi | 自动填写 `https://api.moonshot.cn/v1`，再填写模型 | [官方 API 指南](https://platform.kimi.com/docs/get-api-key) |
 | GLM | 自动填写 `https://open.bigmodel.cn/api/paas/v4`，再填写模型 | [官方 API 指南](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
 | MiniMax（国内） | 自动填写 `https://api.minimax.cn/v1`，填写模型并确认账号区域 | [官方 API 指南](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
 | Agnes-AI | 自动填写 `https://apihub.agnes-ai.com/v1`，再填写模型 | [官方 API 指南](https://wiki.agnes-ai.com/en/docs/quickstart) |
-| 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需兼容 OpenAI Chat/Tool Call 协议 | 对应服务商签发的 API Key |
+| 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需通过所选 API 协议支持工具调用 | 对应服务商签发的 API Key |
 
 **设置 > AI 连接**支持保存多个命名账号和模型。OpenAI、DeepSeek、Kimi、GLM、
 MiniMax（国内）和 Agnes-AI 会自动填入可编辑的官方地址；根据内置官方指南填写
@@ -90,9 +90,14 @@ MiniMax（国内）和 Agnes-AI 会自动填入可编辑的官方地址；根据
 专用地址。新增连接不会切换当前选择；点击**使用**才切换，并取消正在运行的本地
 Agent 任务，未来的定时计划仍保留。旧版单连接配置及密钥自动迁移，无需重填。
 
+每个连接可在**高级连接设置 > API 协议**中选择 Responses 或 Chat Completions。
+新建 OpenAI/Azure 连接默认使用 Responses，其他预设及旧连接保留 Chat Completions，
+除非手动修改。仅切换协议可复用已保存的密钥；请选择接口和模型支持的协议，
+Mochi 不会在报错后自动切换。
+
 设置依次分为**分享与导入 → AI 连接 → 语音与唤醒 → 对话与人格 → 显示与语言**。
 分享时可勾选多个 LLM 和语音连接；导入会新增而非覆盖已有账号，并分别切换到分享
-中的选中连接。新 v4 链接需要新版接收端，旧 v2/v3 链接仍可导入。持有完整链接的人可以使用
+中的选中连接。新 v5 链接包含 API 协议，需要新版接收端，旧 v2/v3/v4 链接仍可导入。持有完整链接的人可以使用
 其中的 API 凭据，请仅发给可信的人。
 
 ### 支持的 Speech Provider

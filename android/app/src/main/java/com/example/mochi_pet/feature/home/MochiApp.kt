@@ -6616,7 +6616,7 @@ internal fun ProviderSettingsSurface(
                         },
                         label = { Text("Mochi Provider link") },
                         placeholder = {
-                            Text("mochi://provider/import#v4...")
+                            Text("mochi://provider/import#v5...")
                         },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
@@ -6630,7 +6630,7 @@ internal fun ProviderSettingsSurface(
                         showReceiveProviders = false
                         receivedProviderLink = ""
                     },
-                    enabled = listOf("v2", "v3", "v4").any { receivedProviderLink.startsWith("mochi://provider/import#$it.") },
+                    enabled = listOf("v2", "v3", "v4", "v5").any { receivedProviderLink.startsWith("mochi://provider/import#$it.") },
                 ) {
                     Text("Continue")
                 }

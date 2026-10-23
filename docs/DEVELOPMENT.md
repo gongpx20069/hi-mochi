@@ -185,6 +185,27 @@ catalogs are unchanged. Update with `adb install -r`;
 never uninstall or clear data. Real account/model Tool compatibility still needs
 authorized provider-specific testing and is not implied by endpoint presets.
 
+Responses regressions additionally run `:app:testDebugUnitTest --tests
+"*ResponsesAdapterTest" --tests "*OkHttpOpenAiChatClientTest" --tests
+"*AgentOrchestratorTest" --tests "*ProviderSharingTest" --tests
+"*ProviderShareManagerTest" --tests "*ProviderSettingsRepositoryTest" --tests
+"*ProviderProfilesUiTest"`. They cover stateless tool continuation, images, exact
+URLs/auth, optional schemas, failure/cancellation without fallback, legacy Chat
+defaults, same-key protocol changes, v5 shares and the advanced selector.
+
+After an in-place app/test APK update, the opt-in
+`core.agent.llm.AzureResponsesDiagnosticTest` uses the active saved connection
+only when its host and deployment match explicit instrumentation arguments:
+`-e mochiResponsesDiagnostic true -e mochiAzureResourceHost <host>
+-e mochiAzureDeployment <deployment>`. It sends a fixed synthetic Agent prompt,
+executes only a local no-side-effect fixture tool, and checks the final reply
+through the production Agent loop with the normal 20-second foreground deadline.
+It consumes model quota, but sends no user history/persona, real Tool definitions,
+or business data. Logs contain only request durations and counts.
+Only with explicit permission, `-e mochiEnableResponses true` switches that
+connection's protocol after success, preserving its key and all other settings.
+Without the diagnostic opt-in, the test is skipped.
+
 Speech profile regressions additionally cover `SpeechSettingsRepositoryTest`,
 `SpeechSynthesisSettingsTest`, `CloudSpeechRuntimeTest`, and `WakeBriefingTest`:
 legacy active/inactive migration, isolated same-provider accounts, non-overwriting

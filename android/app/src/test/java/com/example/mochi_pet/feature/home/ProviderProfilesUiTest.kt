@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import com.example.mochi_pet.core.settings.ProviderPreset
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
 import com.example.mochi_pet.core.settings.ProviderProfileInput
 import com.example.mochi_pet.core.settings.ProviderProfileSummary
 import com.example.mochi_pet.core.settings.ProviderProfilesSummary
@@ -59,6 +60,8 @@ class ProviderProfilesUiTest {
             }
         }
         compose.onNodeWithText("API endpoint").performScrollTo().assertTextContains("https://api.openai.com/v1")
+        compose.onNodeWithText("Advanced connection settings").performScrollTo().performClick()
+        compose.onNodeWithTag("provider-api-protocol").performScrollTo().assertTextContains("Responses")
         compose.onNode(hasText("OpenAI") and !hasSetTextAction()).performScrollTo().performClick()
         compose.onNodeWithText("Kimi").performScrollTo().performClick()
         compose.onNodeWithText("API endpoint").performScrollTo().assertTextContains("https://api.moonshot.cn/v1")
@@ -66,7 +69,23 @@ class ProviderProfilesUiTest {
         compose.onNodeWithText("API key").performScrollTo().performTextInput("synthetic-key")
         compose.onNodeWithText("Save connection").performClick()
         assertEquals(ProviderPreset.KIMI, saved!!.preset)
+        assertEquals(ApiProtocol.CHAT_COMPLETIONS, saved!!.settings.apiProtocol)
         assertEquals("https://api.moonshot.cn/v1", saved!!.settings.endpoint)
+    }
+
+    @Test fun `saved connection keeps chat until protocol is explicitly changed without replacing its key`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var saved: ProviderProfileInput? = null
+        compose.setContent {
+            MaterialTheme { ProviderConnectionDialog(first, ProviderSettingsUiState(isLoading = false), {}, { saved = it }) }
+        }
+        compose.onNodeWithText("Advanced connection settings").performScrollTo().performClick()
+        compose.onNodeWithTag("provider-api-protocol").performScrollTo().assertTextContains("Chat Completions").performClick()
+        compose.onNodeWithText("Responses").performClick()
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals(ApiProtocol.RESPONSES, saved!!.settings.apiProtocol)
+        assertEquals("", saved!!.settings.apiKeyReplacement)
+        assertEquals(first.settings.model, saved!!.settings.model)
     }
 
     @Test fun `share import is first and all Settings parts remain reachable at large font`() {

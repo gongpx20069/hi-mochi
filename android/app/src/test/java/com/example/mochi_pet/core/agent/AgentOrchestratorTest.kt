@@ -41,6 +41,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentOrchestratorTest {
+    @Test fun `Responses continuation survives tool execution and final reply repair within one run`() = runBlocking {
+        val continuation = buildJsonArray { add(buildJsonObject { put("type", "reasoning"); put("encrypted_content", "fixture") }) }
+        fun continued(response: OpenAiChatResponse) = response.copy(choices = response.choices.map {
+            it.copy(message = it.message.copy(responsesOutput = continuation))
+        })
+        val client = QueueChatClient(
+            continued(toolResponse("call_fixture", "echo", """{"value":"fixture"}""")),
+            continued(finalResponse("not valid JSON")),
+            finalResponse("""{"reply":"Done","emotion":"neutral"}"""),
+        )
+        assertEquals("Done", orchestrator(client, ToolRegistry(listOf(EchoTool()))).run(request()).reply)
+        assertEquals(continuation, client.requests[1].messages.first { it.role == "assistant" }.responsesOutput)
+        assertEquals(2, client.requests[2].messages.count { it.responsesOutput == continuation })
+        assertTrue(client.requests[2].tools.isEmpty())
+    }
+
     private val provider = OpenAiProviderConfig(
         endpoint = "https://example.com/v1",
         apiKey = "test-key",

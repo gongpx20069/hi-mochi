@@ -1,6 +1,7 @@
 package com.example.mochi_pet.core.settings
 
 import com.example.mochi_pet.core.agent.llm.ProviderType
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
 import com.example.mochi_pet.core.tools.SharedManualMcpServer
 import com.example.mochi_pet.core.tools.SharedTencentDocsProvider
 import com.example.mochi_pet.core.tools.SharedToolProviders
@@ -13,6 +14,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProviderSharingTest {
+    @Test fun `legacy v4 AI payload without protocol stays Chat Completions`() {
+        val old = Json.decodeFromString<SharedProviderBundle>(
+            """{"version":4,"llm":{"providerType":"AZURE_OPENAI","endpoint":"https://fixture.openai.azure.com","model":"fixture","apiVersion":"2024-10-21","timeoutSeconds":60,"maxResponseBytes":1024,"apiKey":"synthetic-key"}}""",
+        )
+        assertEquals(ApiProtocol.CHAT_COMPLETIONS, old.llm!!.apiProtocol)
+        assertEquals(old, ProviderShareCodec.decode(ProviderShareCodec.encode(old)))
+    }
+
     @Test
     fun `speech shares without synthesis fields keep system output`() {
         val speech = Json.decodeFromString<SharedSpeechProvider>(
@@ -53,7 +62,7 @@ class ProviderSharingTest {
     fun `round trip keeps provider secrets out of visible link`() {
         val link = ProviderShareCodec.encode(bundle)
 
-        assertTrue(link.startsWith("mochi://provider/import#v4."))
+        assertTrue(link.startsWith("mochi://provider/import#v5."))
         assertEquals(bundle, ProviderShareCodec.decode(link))
         assertTrue("llm-secret" !in link)
         assertTrue("speech-secret" !in link)
@@ -101,7 +110,7 @@ class ProviderSharingTest {
         assertThrows(IllegalArgumentException::class.java) {
             ProviderShareCodec.decode(
                 link.replace(
-                    "mochi://provider/import#v4.",
+                    "mochi://provider/import#v5.",
                     "mochi://provider/import#v1.",
                 ),
             )

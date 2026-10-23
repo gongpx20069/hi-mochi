@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import com.example.mochi_pet.core.agent.llm.ProviderType
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
 import com.example.mochi_pet.core.mcp.McpStreamableHttpClient
 import com.example.mochi_pet.core.tools.DataStoreToolCatalogRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,7 +69,9 @@ class ProviderShareManagerTest {
     @Test fun `shares only selected profiles and imports them without overwriting existing connections`() = runBlocking {
         val source = repo()
         val one = source.saveProfile(input("One", "one-key")).active!!
-        val two = source.saveProfile(input("Two", "two-key")).profiles.last()
+        val two = source.saveProfile(input("Two", "two-key").let {
+            it.copy(settings = it.settings.copy(apiProtocol = ApiProtocol.RESPONSES))
+        }).profiles.last()
         source.saveProfile(input("Unselected", "excluded-key"))
         source.activateProfile(two.id)
         val link = manager(source).createShareLink(ProviderShareSelection(
@@ -86,6 +89,8 @@ class ProviderShareManagerTest {
         assertEquals(3, imported.profiles.size)
         assertEquals("Two", imported.active!!.name)
         assertEquals("two-key", target.loadRuntimeConfig().apiKey)
+        assertEquals(ApiProtocol.RESPONSES, target.loadRuntimeConfig().apiProtocol)
+        assertEquals(ApiProtocol.CHAT_COMPLETIONS, target.loadProfileRuntimeConfig(existing.id).apiProtocol)
         assertFalse(target.loadRuntimeConfig().imageInputEnabled)
         assertEquals("existing-key", target.loadProfileRuntimeConfig(existing.id).apiKey)
     }

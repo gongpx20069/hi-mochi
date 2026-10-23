@@ -1,5 +1,7 @@
 package com.example.mochi_pet.feature.home
 
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -167,6 +169,8 @@ internal fun ProviderConnectionDialog(
     var version by remember(profile) { mutableStateOf(original.apiVersion) }
     var timeout by remember(profile) { mutableStateOf(original.timeoutSeconds.toString()) }
     var images by remember(profile) { mutableStateOf(original.imageInputEnabled) }
+    var apiProtocol by remember(profile) { mutableStateOf(profile?.settings?.apiProtocol ?: preset.defaultApiProtocol) }
+    var chooseApiProtocol by remember { mutableStateOf(false) }
     var key by remember(profile) { mutableStateOf("") }
     var choosePreset by remember { mutableStateOf(false) }
     var advanced by remember { mutableStateOf(false) }
@@ -190,6 +194,7 @@ internal fun ProviderConnectionDialog(
                                 if (option != preset) {
                                     if (name == preset.title) name = option.title
                                     preset = option
+                                    apiProtocol = option.defaultApiProtocol
                                     endpoint = option.endpoint
                                     model = ""
                                     key = ""
@@ -205,6 +210,8 @@ internal fun ProviderConnectionDialog(
                     label = { Text(if (preset == ProviderPreset.AZURE) "Azure resource endpoint" else "API endpoint") },
                     supportingText = { Text(if (preset == ProviderPreset.AZURE) {
                         "Azure Portal → Azure OpenAI → Keys and Endpoint"
+                    } else if (apiProtocol == ApiProtocol.RESPONSES) {
+                        "Mochi uses /responses for this connection."
                     } else "Mochi appends /chat/completions when needed.") },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -220,7 +227,7 @@ internal fun ProviderConnectionDialog(
                     supportingText = { Text("Enter a model available to your account that supports tool calling.") },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (preset == ProviderPreset.AZURE) OutlinedTextField(
+                if (preset == ProviderPreset.AZURE && apiProtocol == ApiProtocol.CHAT_COMPLETIONS) OutlinedTextField(
                     version, { version = it }, enabled = !state.isSaving,
                     label = { Text("Azure API version") }, modifier = Modifier.fillMaxWidth(),
                 )
@@ -234,6 +241,23 @@ internal fun ProviderConnectionDialog(
                 Text("Changing provider or endpoint host requires a new API key.")
                 TextButton(onClick = { advanced = !advanced }) { Text("Advanced connection settings") }
                 if (advanced) {
+                    Column {
+                        Text("API protocol")
+                        OutlinedButton(
+                            onClick = { chooseApiProtocol = true },
+                            enabled = !state.isSaving,
+                            modifier = Modifier.testTag("provider-api-protocol"),
+                        ) { Text(if (apiProtocol == ApiProtocol.RESPONSES) "Responses" else "Chat Completions") }
+                        DropdownMenu(expanded = chooseApiProtocol, onDismissRequest = { chooseApiProtocol = false }) {
+                            ApiProtocol.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(if (option == ApiProtocol.RESPONSES) "Responses" else "Chat Completions") },
+                                    onClick = { apiProtocol = option; chooseApiProtocol = false },
+                                )
+                            }
+                        }
+                    }
+                    Text("Responses supports reasoning with tools. Choose only a protocol supported by this endpoint and model; Mochi never switches automatically.")
                     OutlinedTextField(timeout, { timeout = it.filter(Char::isDigit) },
                         label = { Text("Timeout seconds") }, enabled = !state.isSaving,
                         supportingText = { Text("Per AI request. Chat and voice use at most 20 seconds; scheduled agents use this value.") })
@@ -258,6 +282,7 @@ internal fun ProviderConnectionDialog(
                             apiVersion = version, timeoutSeconds = timeout.toIntOrNull() ?: 0,
                             maxResponseBytes = original.maxResponseBytes, imageInputEnabled = images,
                             apiKeyReplacement = key,
+                            apiProtocol = apiProtocol,
                         ),
                     ))
                 },
