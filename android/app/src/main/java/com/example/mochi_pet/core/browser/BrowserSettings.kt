@@ -18,6 +18,7 @@ enum class BrowserMode { AUTO, MOBILE, DESKTOP }
 data class BrowserSite(
     val host: String,
     val lastVisited: Long = 0,
+    // Older catalogs omit lastMode for mobile; preserve their decoded meaning.
     val lastMode: BrowserMode = BrowserMode.MOBILE,
 )
 
@@ -87,5 +88,5 @@ class BrowserSettings(private val store: DataStore<Preferences>) {
 
 internal fun resolveBrowserMode(site: BrowserSite?, requested: BrowserMode): BrowserMode = when {
     requested != BrowserMode.AUTO -> requested
-    else -> site?.lastMode?.takeIf { it != BrowserMode.AUTO } ?: BrowserMode.MOBILE
+    else -> site?.lastMode?.takeIf { it != BrowserMode.AUTO } ?: BrowserMode.DESKTOP
 }

@@ -40,7 +40,9 @@ The MVP does not expose tabs, screenshots, file upload, arbitrary waits,
 schema extraction, JavaScript evaluation, CSS/XPath selectors, or coordinate
 input.
 
-`auto` uses the exact host's remembered mode, otherwise mobile. Mochi chooses
+`auto` uses the exact host's remembered mode, otherwise desktop, for both Agent
+and manual browsing. Explicit mobile/desktop choices still win; legacy catalog
+entries with an omitted `lastMode` keep their former mobile meaning. Mochi chooses
 the presentation without asking users to configure it; legacy manual mode
 preferences are ignored and dropped on the next catalog write. Desktop
 mode derives its UA from the installed Chromium version, requests a wide

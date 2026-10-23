@@ -46,14 +46,29 @@ class BrowserSettingsTest {
         assertEquals(listOf("alice.github.io", "bob.github.io", "notalice.github.io"), groups.map { it.domain })
     }
 
-    @Test fun `agent selection wins and auto remembers last mode`() = runBlocking {
+    @Test fun `auto defaults to desktop while agent selection and remembered modes win`() = runBlocking {
         val store = MemoryStore()
         val settings = BrowserSettings(store)
-        assertEquals(BrowserMode.MOBILE, settings.mode("example.com", BrowserMode.AUTO))
-        settings.visited("example.com", BrowserMode.DESKTOP)
         assertEquals(BrowserMode.DESKTOP, settings.mode("example.com", BrowserMode.AUTO))
+        settings.visited("example.com", BrowserMode.DESKTOP)
+        assertEquals(BrowserMode.DESKTOP, BrowserSettings(store).mode("example.com", BrowserMode.AUTO))
         assertEquals(BrowserMode.MOBILE, settings.mode("example.com", BrowserMode.MOBILE))
-        assertEquals(BrowserMode.MOBILE, BrowserSettings(store).mode("example.com", BrowserMode.MOBILE))
+        settings.visited("example.com", BrowserMode.MOBILE)
+        assertEquals(BrowserMode.MOBILE, BrowserSettings(store).mode("example.com", BrowserMode.AUTO))
+        assertEquals(BrowserMode.DESKTOP, settings.mode("other.example", BrowserMode.AUTO))
+        assertEquals(BrowserMode.DESKTOP, resolveBrowserMode(BrowserSite("auto.example", lastMode = BrowserMode.AUTO), BrowserMode.AUTO))
+    }
+
+    @Test fun `legacy omitted mobile mode is preserved when another site is saved as desktop`() = runBlocking {
+        val store = MemoryStore()
+        val key = stringPreferencesKey("browser.sites.v1")
+        store.data.value = preferencesOf(key to """[{"host":"example.com"}]""")
+        val settings = BrowserSettings(store)
+        assertEquals(BrowserMode.MOBILE, settings.mode("example.com", BrowserMode.AUTO))
+        settings.visited("new.example", settings.mode("new.example", BrowserMode.AUTO))
+        val restored = BrowserSettings(store)
+        assertEquals(BrowserMode.MOBILE, restored.mode("example.com", BrowserMode.AUTO))
+        assertEquals(BrowserMode.DESKTOP, restored.mode("new.example", BrowserMode.AUTO))
     }
 
     @Test fun `old manual mode preferences cannot override the agent`() = runBlocking {

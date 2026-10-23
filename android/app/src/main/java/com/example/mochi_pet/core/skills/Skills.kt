@@ -780,7 +780,8 @@ private val BUILT_IN_SKILLS = listOf(
 
             ## Browse
 
-            1. `browser_navigate` opens the page. Choose auto/mobile/desktop yourself;
+            1. `browser_navigate` opens the page. Auto reuses the site's mode,
+               otherwise defaults to desktop. Choose mobile when needed yourself;
                change mode before interaction, never to replay a submitted form.
             2. Read returned snapshots; use `browser_read` after page changes or
                handoff, and `browser_scroll` for relevant sections. Available

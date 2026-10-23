@@ -47,8 +47,8 @@ class BrowserNavigateTool(
         description =
             "Open a public HTTPS URL or move through browser history. " +
                 "Returns a fresh page snapshot. Reuse existing website login without asking again. " +
-                "Choose desktop when mobile hides needed features; use mobile for touch-friendly pages. " +
-                "Auto reuses the site's last mode. Choose the presentation yourself; do not ask the user to configure it. " +
+                "Auto reuses the site's last mode, otherwise defaults to desktop. " +
+                "Choose mobile when the site needs it; do not ask the user to configure presentation. " +
                 "Do not switch modes or reload after filling or submitting a form. " +
                 "If human login or verification is required, ask the main Agent to request user assistance.",
         properties = buildJsonObject {

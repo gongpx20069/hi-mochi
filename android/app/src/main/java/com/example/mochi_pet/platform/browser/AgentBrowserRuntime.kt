@@ -30,6 +30,7 @@ import androidx.webkit.WebStorageCompat
 import androidx.webkit.WebViewFeature
 import androidx.webkit.UserAgentMetadata
 import com.example.mochi_pet.core.browser.BrowserMode
+import com.example.mochi_pet.core.browser.resolveBrowserMode
 import com.example.mochi_pet.core.browser.BrowserSettings
 import com.example.mochi_pet.core.browser.browserWebsiteDomain
 import com.example.mochi_pet.core.browser.UserAssistanceCoordinator
@@ -202,7 +203,8 @@ class AgentBrowserRuntime(
             withContext(Dispatchers.Main.immediate) { checkNotNull(webView) }
         } else ensureWebView()
         val mode = if (reusingManualPage) activeMode
-            else settings?.mode(validated.toHttpUrlOrNull()!!.host, BrowserMode.AUTO) ?: BrowserMode.MOBILE
+            else settings?.mode(validated.toHttpUrlOrNull()!!.host, BrowserMode.AUTO)
+                ?: resolveBrowserMode(null, BrowserMode.AUTO)
         withContext(Dispatchers.Main.immediate) {
             applyMode(current, mode)
             modeLocked = true
@@ -286,7 +288,7 @@ class AgentBrowserRuntime(
                     }
                     val host = validated.toHttpUrlOrNull()!!.host
                     val effective = settings?.mode(host, requestedMode)
-                        ?: requestedMode.takeIf { it != BrowserMode.AUTO } ?: BrowserMode.MOBILE
+                        ?: resolveBrowserMode(null, requestedMode)
                     withContext(Dispatchers.Main.immediate) {
                         applyMode(current, effective)
                         refAttributeName = newRefAttributeName()
