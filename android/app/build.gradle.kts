@@ -21,7 +21,6 @@ plugins {
     id("com.android.application")
     id("androidx.room")
     id("com.google.devtools.ksp")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -210,10 +209,10 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
-    // OkHttp 5.5 requires compileSdk 37, beyond the current AGP maximum.
+    // OkHttp 5.5 requires compileSdk 37; this project still targets API 36.
     //noinspection NewerVersionAvailable
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
     implementation(files(sherpaOnnxAar))
 
     ksp("androidx.room:room-compiler:2.8.4")

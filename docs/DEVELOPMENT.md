@@ -30,6 +30,11 @@ android/
 - An Android 8.0 or newer device or emulator
 
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
+The build uses AGP 9.1.0 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
+and serialization 1.12.0 across the host and extensions. The root buildscript
+pins KGP because AGP's default compiler is older; do not reapply
+`org.jetbrains.kotlin.android` in modules. Serialization 1.12.0 uses Kotlin 2.4
+metadata and cannot compile with the former Kotlin 2.2.20 toolchain.
 Keep machine-specific SDK paths in `android/local.properties`; do not commit
 that file. The first build downloads the pinned sherpa-onnx Android AAR from
 its upstream GitHub release and verifies its SHA-256 before use.
