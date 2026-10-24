@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Resources
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
@@ -24,12 +25,21 @@ class AndroidWakeRuntime(
         WAKE_PREFERENCES_NAME,
         Context.MODE_PRIVATE,
     )
-    private val mutableState = MutableStateFlow(WakeRuntimeState(keyword = readWakeKeyword(applicationContext)))
+    private val mutableState = MutableStateFlow(
+        WakeRuntimeState(
+            keyword = readWakeKeyword(applicationContext),
+            keywordOverride = readWakeKeywordOverride(applicationContext),
+        ),
+    )
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(
             context: Context?,
             intent: Intent?,
         ) {
+            if (intent?.action == Intent.ACTION_LOCALE_CHANGED) {
+                refreshKeyword()
+                return
+            }
             if (intent?.action != WakeCaptureService.ACTION_STATE_CHANGED) {
                 return
             }
@@ -78,7 +88,9 @@ class AndroidWakeRuntime(
         ContextCompat.registerReceiver(
             applicationContext,
             receiver,
-            IntentFilter(WakeCaptureService.ACTION_STATE_CHANGED),
+            IntentFilter(WakeCaptureService.ACTION_STATE_CHANGED).apply {
+                addAction(Intent.ACTION_LOCALE_CHANGED)
+            },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         sendAction(WakeCaptureService.ACTION_QUERY_STATE)
@@ -102,16 +114,25 @@ class AndroidWakeRuntime(
         )
     }
 
-    override fun selectKeyword(keyword: WakeKeyword) {
-        if (keyword == mutableState.value.keyword) return
-        preferences.edit { putString(KEY_WAKE_KEYWORD, keyword.name) }
+    override fun selectKeyword(keyword: WakeKeyword?) {
+        if (keyword == mutableState.value.keywordOverride) return
+        preferences.edit {
+            if (keyword == null) remove(KEY_WAKE_KEYWORD) else putString(KEY_WAKE_KEYWORD, keyword.name)
+        }
+        refreshKeyword()
+    }
+
+    private fun refreshKeyword() {
+        val keyword = readWakeKeyword(applicationContext)
+        val changed = keyword != mutableState.value.keyword
         mutableState.value = mutableState.value.copy(
             keyword = keyword,
-            status = if (mutableState.value.status == WakeCaptureStatus.LISTENING) {
+            keywordOverride = readWakeKeywordOverride(applicationContext),
+            status = if (changed && mutableState.value.status == WakeCaptureStatus.LISTENING) {
                 WakeCaptureStatus.STARTING
             } else mutableState.value.status,
         )
-        if (mutableState.value.enabled) sendAction(WakeCaptureService.ACTION_SET_KEYWORD)
+        if (changed && mutableState.value.enabled) sendAction(WakeCaptureService.ACTION_SET_KEYWORD)
     }
 
     override fun pause(onPaused: () -> Unit) {
@@ -176,7 +197,13 @@ class AndroidWakeRuntime(
 private const val WAKE_PREFERENCES_NAME = "mochi_wake_preferences"
 private const val KEY_WAKE_KEYWORD = "keyword"
 
-internal fun readWakeKeyword(context: Context): WakeKeyword = WakeKeyword.valueOf(
+private fun readWakeKeywordOverride(context: Context): WakeKeyword? =
     context.getSharedPreferences(WAKE_PREFERENCES_NAME, Context.MODE_PRIVATE)
-        .getString(KEY_WAKE_KEYWORD, WakeKeyword.ENGLISH.name) ?: WakeKeyword.ENGLISH.name,
-)
+        .getString(KEY_WAKE_KEYWORD, null)?.let(WakeKeyword::valueOf)
+
+internal fun readWakeKeyword(context: Context): WakeKeyword =
+    readWakeKeywordOverride(context) ?: if (Resources.getSystem().configuration.locales[0].language == "zh") {
+        WakeKeyword.CHINESE
+    } else {
+        WakeKeyword.ENGLISH
+    }

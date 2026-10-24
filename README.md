@@ -30,8 +30,9 @@ Local-first data, BYOK intelligence, native actions.**
 
 ---
 
-Say **“Hi Mochi”** to remember something, research public information, plan
-daily life, or open the right native screen. Native Android voice, memory,
+Say your selected phrase, **“Hi Mochi”** or **“老莫老莫”**, to remember something,
+research public information, plan daily life, or open the right native screen.
+Native Android voice, memory,
 planning, Tools, and Skills turn a spare phone into a dedicated companion,
 desk display, and planner.
 
@@ -58,7 +59,9 @@ and choose the APK that matches the device:
    Optionally add a [speech connection](#supported-speech-providers) and tap **Use**.
 3. Start a conversation by text or microphone; grant microphone permission
    for voice input and enable the wake word when ready. In **Settings > Speech
-   and wake**, choose **“Hi Mochi”** (default) or **“老莫老莫”**.
+   and wake**, **Follow system** is the default: Chinese device languages use
+   **“老莫老莫”**; other languages use **“Hi Mochi”**. You can manually select
+   either phrase or return to Follow system; existing saved choices are retained.
    Configure additional Tools and Skills only as you need them.
 
 The ABI-specific APKs contain the same Mochi features as the universal APK;

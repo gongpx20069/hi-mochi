@@ -68,9 +68,12 @@ ordinary commands run in the background without switching away from Mochi.
    explicitly enabled synthesis service of the selected speech Provider.
 
 The wake word is enabled by default after Android permissions are granted.
-Users can explicitly disable it in Settings > Speech and wake, or select English
-`Hi Mochi` (default) or Chinese `老莫老莫`. Only the selected phrase triggers;
-its choice is independent of interface language and survives app restarts.
+Settings > Speech and wake defaults to **Follow system**: Chinese device languages
+use `老莫老莫`; English and other device languages use `Hi Mochi`. Users can
+disable capture, pin either phrase, or return to Follow system. Existing saved
+manual choices are retained; unset preferences follow the device language.
+Only the resolved phrase triggers. The choice is independent of Mochi's interface
+language and survives app restarts, including while capture is disabled.
 Cloud STT is an optional reliability recommendation, never a prerequisite.
 Cloud synthesis is also optional and default-off. iFlytek and Azure Speech
 reuse their recognition credentials through **Also use this provider for

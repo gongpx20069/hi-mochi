@@ -70,11 +70,14 @@ an earlier Tool may already have executed before a later model request failed.
 The native foreground wake service is enabled by default once the
 required Android permissions are granted. Settings can disable it, and that
 explicit choice is retained across later launches.
-Settings > Speech > Wake word offers a single selection: English `Hi Mochi`
-(default) or Chinese `老莫老莫`. The selected phrase appears beside its runtime
-status and in the persistent notification. Selection is independent of UI
-language and persists while disabled. A keyword update alone does not enable
-or resume capture; ending an active voice interaction uses the existing safe
+Settings > Speech > Wake word offers **Follow system** (default), English
+`Hi Mochi`, and Chinese `老莫老莫`. Follow system resolves Chinese device
+languages to `老莫老莫` and other device languages to `Hi Mochi`, updating when
+the system language changes. The resolved phrase appears beside its runtime
+status and in the persistent notification. Existing saved manual choices are
+retained. Selection is independent of Mochi's UI language and persists while
+disabled. A keyword update alone does not enable or resume capture; manually
+changing the selection ends an active voice interaction through the existing safe
 microphone release and wake-restoration path.
 When Mochi is visible, wake and media triggers start listening without changing
 the current surface.

@@ -170,13 +170,20 @@ class ProviderProfilesUiTest {
     @Test fun `wake phrase selection is visible in speech settings without enabling disabled capture`() {
         Locale.setDefault(Locale.ENGLISH)
         val wake = mutableStateOf(WakeRuntimeState())
-        render(wake = wake, selectKeyword = { wake.value = wake.value.copy(keyword = it) })
+        render(fontScale = 1.5f, wake = wake, selectKeyword = {
+            wake.value = wake.value.copy(keyword = it ?: WakeKeyword.ENGLISH, keywordOverride = it)
+        })
+        compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Follow system"))
+        compose.onNodeWithText("Follow system").performScrollTo().assertIsSelected()
         compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Chinese · 老莫老莫"))
         compose.onNodeWithText("Chinese · 老莫老莫").performScrollTo().performClick().assertIsSelected()
         compose.onNodeWithText("Say 老莫老莫 hands-free").performScrollTo().assertIsDisplayed()
         assertEquals(WakeCaptureStatus.DISABLED, wake.value.status)
         compose.onNodeWithText("English · Hi Mochi").performScrollTo().performClick().assertIsSelected()
         assertEquals(WakeKeyword.ENGLISH, wake.value.keyword)
+        compose.onNodeWithText("Follow system").performScrollTo().performClick().assertIsSelected()
+        assertEquals(null, wake.value.keywordOverride)
+        assertEquals(WakeCaptureStatus.DISABLED, wake.value.status)
     }
 
     private fun render(
@@ -184,7 +191,7 @@ class ProviderProfilesUiTest {
         share: (ProviderShareSelection) -> Unit = {},
         speechProfiles: SpeechProfilesSummary = SpeechProfilesSummary(),
         wake: State<WakeRuntimeState> = mutableStateOf(WakeRuntimeState()),
-        selectKeyword: (WakeKeyword) -> Unit = {},
+        selectKeyword: (WakeKeyword?) -> Unit = {},
     ) {
         compose.setContent {
             MaterialTheme {

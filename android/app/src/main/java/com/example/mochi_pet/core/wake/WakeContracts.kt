@@ -20,6 +20,7 @@ data class WakeRuntimeState(
     val lastTriggerSource: String? = null,
     val errorMessage: String? = null,
     val keyword: WakeKeyword = WakeKeyword.ENGLISH,
+    val keywordOverride: WakeKeyword? = null,
 ) {
     val enabled: Boolean
         get() = status != WakeCaptureStatus.DISABLED
@@ -79,7 +80,7 @@ interface WakeRuntime {
 
     fun disable()
 
-    fun selectKeyword(keyword: WakeKeyword)
+    fun selectKeyword(keyword: WakeKeyword?)
 
     fun pause(onPaused: () -> Unit = {})
 

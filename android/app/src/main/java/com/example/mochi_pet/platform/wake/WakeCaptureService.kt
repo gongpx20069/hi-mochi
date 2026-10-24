@@ -49,7 +49,8 @@ class WakeCaptureService : Service() {
         ) {
             if (
                 intent?.action !=
-                AppLanguage.ACTION_APP_LANGUAGE_CHANGED
+                AppLanguage.ACTION_APP_LANGUAGE_CHANGED &&
+                intent?.action != Intent.ACTION_LOCALE_CHANGED
             ) {
                 return
             }
@@ -84,7 +85,9 @@ class WakeCaptureService : Service() {
         ContextCompat.registerReceiver(
             this,
             languageChangedReceiver,
-            IntentFilter(AppLanguage.ACTION_APP_LANGUAGE_CHANGED),
+            IntentFilter(AppLanguage.ACTION_APP_LANGUAGE_CHANGED).apply {
+                addAction(Intent.ACTION_LOCALE_CHANGED)
+            },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         engine = SherpaWakeEngine(

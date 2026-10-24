@@ -1437,7 +1437,7 @@ private fun SurfaceContent(
     onStopVoice: () -> Unit,
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
-    onSelectWakeKeyword: (WakeKeyword) -> Unit,
+    onSelectWakeKeyword: (WakeKeyword?) -> Unit,
     onProviderProfileAction: (ProviderProfileAction) -> Unit,
     onSpeechAction: (SpeechProfileAction) -> Unit,
     onLoadSpeechVoices: (SpeechProvider, String?) -> Unit,
@@ -6088,7 +6088,7 @@ internal fun ProviderSettingsSurface(
     onLoadSpeechVoices: (SpeechProvider, String?) -> Unit = { _, _ -> },
     onPreviewSpeechVoice: (SpeechProvider, String, String?) -> Unit = { _, _, _ -> },
     onStopVoicePreview: () -> Unit = {},
-    onSelectWakeKeyword: (WakeKeyword) -> Unit = {},
+    onSelectWakeKeyword: (WakeKeyword?) -> Unit = {},
 ) {
     var recentTurns by remember(agentSettingsState.settings) {
         mutableStateOf(
@@ -6490,17 +6490,21 @@ internal fun ProviderSettingsSurface(
                             Text(if (wakeState.enabled) "Disable" else "Enable")
                         }
                     }
-                    WakeKeyword.entries.forEach { keyword ->
+                    (listOf<WakeKeyword?>(null) + WakeKeyword.entries).forEach { keyword ->
                         Row(
                             modifier = Modifier.fillMaxWidth().selectable(
-                                selected = wakeState.keyword == keyword,
+                                selected = wakeState.keywordOverride == keyword,
                                 role = Role.RadioButton,
                                 onClick = { onSelectWakeKeyword(keyword) },
                             ).padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RadioButton(selected = wakeState.keyword == keyword, onClick = null)
-                            Text(if (keyword == WakeKeyword.ENGLISH) "English · Hi Mochi" else "Chinese · 老莫老莫")
+                            RadioButton(selected = wakeState.keywordOverride == keyword, onClick = null)
+                            Text(when (keyword) {
+                                null -> "Follow system"
+                                WakeKeyword.ENGLISH -> "English · Hi Mochi"
+                                WakeKeyword.CHINESE -> "Chinese · 老莫老莫"
+                            })
                         }
                     }
                     wakeState.errorMessage?.let {

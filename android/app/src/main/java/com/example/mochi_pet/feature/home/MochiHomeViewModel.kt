@@ -1216,8 +1216,8 @@ class MochiHomeViewModel(
         mutableWakeFeedback.value = null
     }
 
-    fun selectWakeKeyword(keyword: WakeKeyword) {
-        if (wakeRuntime?.state?.value?.keyword == keyword) return
+    fun selectWakeKeyword(keyword: WakeKeyword?) {
+        if (wakeRuntime?.state?.value?.keywordOverride == keyword) return
         stopChangedSpeechConnection()
         wakeRuntime?.selectKeyword(keyword)
         mutableWakeFeedback.value = null

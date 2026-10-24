@@ -17,12 +17,18 @@ Foreground service
 The native app now implements this pipeline with the pinned sherpa-onnx AAR,
 quantized KWS model files, Silero VAD, `WakeCaptureService`, and typed wake state.
 The build downloads the AAR from the upstream release and verifies its pinned
-SHA-256 before use. Settings > Speech > Wake word selects either English
-`Hi Mochi` (the existing-install default) or Chinese `老莫老莫`, independently
-of interface language. Only the selected phrase is active. Selection persists
-while disabled. The keyword update itself does not enable or resume capture.
-Changing it ends any active voice interaction through the existing microphone
-release and wake-restoration path, without cancelling text-only/background Agents.
+SHA-256 before use. Settings > Speech > Wake word defaults to **Follow system**:
+Chinese device locales use `老莫老莫`; English and other locales use `Hi Mochi`.
+Users may pin either phrase or return to Follow system, independently of the
+Mochi interface language. The existing wake preference stores only an explicit
+override; absence means Follow system. Previously saved overrides are preserved.
+`WakeRuntimeState.keyword` is the resolved phrase and `keywordOverride` is the
+nullable manual choice. The runtime observes system locale changes; service
+notifications refresh even without a visible Activity. Only the resolved phrase
+is active. Selection persists while disabled. The keyword update itself does not
+enable or resume capture. Manual changes end any active voice interaction through
+the existing microphone release and wake-restoration path, without cancelling
+text-only/background Agents.
 The service notification and settings status show the selected phrase.
 
 ## 2. Dependency

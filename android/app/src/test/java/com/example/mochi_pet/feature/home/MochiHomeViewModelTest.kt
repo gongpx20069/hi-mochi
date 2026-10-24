@@ -46,6 +46,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
+import com.example.mochi_pet.core.wake.WakeKeyword
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
 import java.time.Clock
@@ -63,6 +64,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test fun `choosing the current system phrase pins it and permits returning to system`() {
+        val wake = WakeRuntimeFake()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), wakeRuntime = wake, ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.selectWakeKeyword(WakeKeyword.ENGLISH)
+        assertEquals(WakeKeyword.ENGLISH, wake.state.value.keywordOverride)
+        viewModel.selectWakeKeyword(null)
+        assertEquals(null, wake.state.value.keywordOverride)
+    }
+
     @Test fun `speech switching cancels voice interaction but leaves text Agent running`() = kotlinx.coroutines.runBlocking {
         for (voiceInput in listOf(false, true)) {
             val speech = com.example.mochi_pet.core.settings.DataStoreSpeechSettingsRepository(
@@ -1164,8 +1176,8 @@ private class WakeRuntimeFake : WakeRuntime {
 
     override fun disable() = Unit
 
-    override fun selectKeyword(keyword: com.example.mochi_pet.core.wake.WakeKeyword) {
-        state.value = state.value.copy(keyword = keyword)
+    override fun selectKeyword(keyword: WakeKeyword?) {
+        state.value = state.value.copy(keyword = keyword ?: WakeKeyword.ENGLISH, keywordOverride = keyword)
     }
 
     override fun pause(onPaused: () -> Unit) {
