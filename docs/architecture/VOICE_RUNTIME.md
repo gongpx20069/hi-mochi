@@ -15,9 +15,15 @@ Foreground service
 ```
 
 The native app now implements this pipeline with the pinned sherpa-onnx AAR,
-int8 KWS model files, Silero VAD, `WakeCaptureService`, and typed wake state.
+quantized KWS model files, Silero VAD, `WakeCaptureService`, and typed wake state.
 The build downloads the AAR from the upstream release and verifies its pinned
-SHA-256 before use. The configured local keyword is `HI MOCHI`.
+SHA-256 before use. Settings > Speech > Wake word selects either English
+`Hi Mochi` (the existing-install default) or Chinese `老莫老莫`, independently
+of interface language. Only the selected phrase is active. Selection persists
+while disabled. The keyword update itself does not enable or resume capture.
+Changing it ends any active voice interaction through the existing microphone
+release and wake-restoration path, without cancelling text-only/background Agents.
+The service notification and settings status show the selected phrase.
 
 ## 2. Dependency
 
@@ -30,6 +36,30 @@ android/app/libs/sherpa-onnx-1.13.2.aar
 The generated file is ignored by Git. Do not introduce a second ONNX runtime.
 Dependency upgrades require updating the release asset ID and SHA-256, release
 notes, ABI/package inspection, and real-device regression.
+
+The single bundled KWS model is
+`sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20`, chunk 16 / left context 64:
+INT8 encoder/joiner, the upstream FP32 decoder, and phonetic tokens. The four
+files total 5,448,042 bytes; Silero VAD is unchanged. No second language model,
+English pronunciation dictionary, alternative chunk size or upstream test
+recordings ship in the application. Both ordinary wake capture and briefing
+interruption accept only the selected phrase from the shared bilingual keyword
+graph; upstream custom streams append to, rather than replace, its defaults.
+Switching resets capture without reloading the model weights. CPU threads: 1;
+active paths: 4; keyword score: 1.5; threshold: 0.25; trailing blanks: 1.
+New weights install under `wake-model-v2`; only the known obsolete model files
+are removed from `wake-model-v1` after the replacement files are copied.
+
+The official release archive SHA-256 is
+`68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6`.
+Model licensing is Apache-2.0, clarified by the upstream contributor in
+[the licence discussion](https://github.com/k2-fsa/sherpa-onnx/issues/3802#issuecomment-6052663364)
+and the linked ModelScope repository. Attribution and licence accompany the
+assets. Fixed Mandarin tokens are `l ǎo m ò l ǎo m ò`; English uses `HH AY1`
+from the upstream lexicon and `M OW1 CH IY0` for the requested pronunciation
+of Mochi. All phones must exist in the bundled vocabulary.
+The token file is pinned to LF by `.gitattributes`; checkout-time CRLF
+conversion would invalidate its verified byte length.
 
 ## 3. Responsibilities
 
@@ -56,7 +86,7 @@ outside the audio thread.
 - Background thread; never block the main thread.
 - Bounded chunk cadence and two-second duplicate suppression.
 - Stop wake capture before STT obtains the microphone.
-- Without new task results, after a confirmed `HI MOCHI` keyword detection, speak a fixed one-syllable
+- Without new task results, after a confirmed selected-keyword detection, speak a fixed one-syllable
   acknowledgement ("嗯？" in Chinese, "Yes?" in English) before STT starts. This
   acknowledgement is transient audio only and never enters conversation
   history or model context. Direct microphone and media-button triggers skip it.

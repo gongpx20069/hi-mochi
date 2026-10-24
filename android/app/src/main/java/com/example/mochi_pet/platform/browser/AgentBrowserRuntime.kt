@@ -349,6 +349,30 @@ class AgentBrowserRuntime(
                   const el = ${refQuery(ref)};
                   if (!el) return JSON.stringify({ok:false});
                   el.scrollIntoView({block:'center', inline:'nearest'});
+                  const rect = el.getBoundingClientRect();
+                  let hit = document.elementFromPoint(
+                    Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2)),
+                    Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2))
+                  );
+                  while (hit?.shadowRoot) {
+                    const child = hit.shadowRoot.elementFromPoint(
+                      rect.left + rect.width / 2, rect.top + rect.height / 2);
+                    if (!child || child === hit) break;
+                    hit = child;
+                  }
+                  let covered = hit;
+                  while (covered && covered !== el) {
+                    covered = covered.assignedSlot || covered.parentElement || covered.getRootNode()?.host;
+                  }
+                  let unavailable = el.matches(':disabled');
+                  for (let node = el; node; node = node.assignedSlot || node.parentElement || node.getRootNode()?.host) {
+                    const style = getComputedStyle(node);
+                    unavailable ||= node.hidden || node.inert || node.getAttribute('aria-disabled') === 'true' ||
+                      style.display === 'none' || style.visibility !== 'visible' || style.opacity === '0';
+                  }
+                  if (!rect.width || !rect.height || !covered || unavailable) {
+                    return JSON.stringify({ok:false, error:'not_actionable'});
+                  }
                   if (el instanceof HTMLAnchorElement && el.target === '_blank') {
                     window.location.assign(el.href);
                   } else {
@@ -359,6 +383,9 @@ class AgentBrowserRuntime(
                 """.trimIndent(),
             )
             if (!result.booleanValue("ok")) {
+                if (result["error"]?.jsonPrimitive?.contentOrNull == "not_actionable") {
+                    throw AgentBrowserException("The page control is hidden, disabled, or covered. Read the page again before acting.")
+                }
                 throw StaleBrowserReferenceException()
             }
             delay(ACTION_SETTLE_MILLIS)
@@ -395,11 +422,22 @@ class AgentBrowserRuntime(
                     (() => {
                       const el = ${refQuery(targetRef)};
                       if (!el) return JSON.stringify({ok:false});
+                      if (el.matches(':disabled') || el.readOnly ||
+                          (el instanceof HTMLInputElement && ['file','checkbox','radio','button','submit','reset','image','hidden'].includes(el.type)) ||
+                          !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)) {
+                        return JSON.stringify({ok:false, error:'not_editable'});
+                      }
                       el.focus();
-                      if (${clear.toString()}) el.value = '';
-                      el.value = el.value + ${inputText.jsString()};
-                      el.dispatchEvent(new Event('input', {bubbles:true}));
-                      el.dispatchEvent(new Event('change', {bubbles:true}));
+                      const previous = el.isContentEditable ? el.textContent : el.value;
+                      const value = (${clear.toString()} ? '' : previous) + ${inputText.jsString()};
+                      if (el.isContentEditable) el.textContent = value;
+                      else {
+                        const prototype = el instanceof HTMLTextAreaElement
+                          ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+                        Object.getOwnPropertyDescriptor(prototype, 'value').set.call(el, value);
+                      }
+                      el.dispatchEvent(new Event('input', {bubbles:true, composed:true}));
+                      el.dispatchEvent(new Event('change', {bubbles:true, composed:true}));
                       return JSON.stringify({ok:true});
                     })()
                     """.trimIndent()
@@ -417,9 +455,16 @@ class AgentBrowserRuntime(
                     (() => {
                       const el = ${refQuery(targetRef)};
                       if (!el) return JSON.stringify({ok:false});
-                      el.value = ${selectedValue.jsString()};
-                      el.dispatchEvent(new Event('input', {bubbles:true}));
-                      el.dispatchEvent(new Event('change', {bubbles:true}));
+                      if (!(el instanceof HTMLSelectElement) || el.matches(':disabled')) {
+                        return JSON.stringify({ok:false, error:'not_editable'});
+                      }
+                      const option = Array.from(el.options).find(o => !o.disabled && !o.closest('optgroup[disabled]') &&
+                        (o.value === ${selectedValue.jsString()} ||
+                          o.label.replace(/\s+/g, ' ').trim() === ${selectedValue.jsString()}));
+                      if (!option) return JSON.stringify({ok:false, error:'option_unavailable'});
+                      el.value = option.value;
+                      el.dispatchEvent(new Event('input', {bubbles:true, composed:true}));
+                      el.dispatchEvent(new Event('change', {bubbles:true, composed:true}));
                       return JSON.stringify({ok:true});
                     })()
                     """.trimIndent()
@@ -454,7 +499,12 @@ class AgentBrowserRuntime(
                     "Unsupported input operation",
                 )
             }
-            if (!evaluate(current, script).booleanValue("ok")) {
+            val result = evaluate(current, script)
+            if (!result.booleanValue("ok")) {
+                when (result["error"]?.jsonPrimitive?.contentOrNull) {
+                    "not_editable" -> throw AgentBrowserException("This control does not support that input operation or is disabled/read-only.")
+                    "option_unavailable" -> throw AgentBrowserException("The requested option is unavailable or disabled. Read the page again.")
+                }
                 throw StaleBrowserReferenceException()
             }
             delay(ACTION_SETTLE_MILLIS)
@@ -504,6 +554,7 @@ class AgentBrowserRuntime(
                     """
                     (() => {
                       const target = $target;
+                      if (!target) return JSON.stringify({ok:false});
                       const distance = window.innerHeight * $multiplier * $sign;
                       if (target === window) window.scrollBy({top:distance});
                       else target.scrollBy({top:distance});
@@ -682,7 +733,8 @@ class AgentBrowserRuntime(
     }
 
     private fun refQuery(ref: String): String =
-        "document.querySelector('[${refAttributeName}=\"$ref\"]')"
+        "(() => { const el = window[${refAttributeName.jsString()}]?.byRef.get(${ref.jsString()}); " +
+            "return el?.isConnected && el.ownerDocument === document ? el : null; })()"
 
     private fun applyMode(view: WebView, mode: BrowserMode) {
         if (mode == activeMode) return
@@ -1012,7 +1064,7 @@ class AgentBrowserRuntime(
         const val NAVIGATION_SETTLE_MILLIS = 1_200L
         const val ACTION_SETTLE_MILLIS = 500L
         const val BROWSER_LOG_TAG = "MochiBrowser"
-        const val SNAPSHOT_FORMAT = "mochi-semantic-v2"
+        const val SNAPSHOT_FORMAT = "mochi-semantic-v3"
         const val MAX_INTERACTIVE_ELEMENTS = 100
 
         fun newRefAttributeName(): String =
@@ -1025,24 +1077,72 @@ class AgentBrowserRuntime(
             (() => {
               const refAttribute = ${refAttribute.jsString()};
               let nextRef = $firstRef;
+              const registry = window[refAttribute] || {byRef:new Map(), byNode:new WeakMap()};
+              if (!window[refAttribute]) Object.defineProperty(window, refAttribute, {value:registry});
+              for (const [ref, node] of registry.byRef) {
+                if (!node.isConnected) {
+                  registry.byRef.delete(ref);
+                  registry.byNode.delete(node);
+                }
+              }
               const viewportHeight = Math.max(window.innerHeight, 1);
               const nearbyTop = -viewportHeight * 0.5;
               const nearbyBottom = viewportHeight * 2;
+              const parent = el => el.assignedSlot || el.parentElement || el.getRootNode()?.host;
+              const styles = new Map();
+              const styleOf = el => {
+                if (!styles.has(el)) styles.set(el, getComputedStyle(el));
+                return styles.get(el);
+              };
+              const excluded = el => {
+                for (let node = el; node; node = parent(node)) {
+                  if (node.matches('script,style,noscript,template,input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return true;
+                }
+                return false;
+              };
               const rendered = el => {
-                const style = getComputedStyle(el);
                 const rect = el.getBoundingClientRect();
-                return style.display !== 'none' &&
-                  style.visibility !== 'hidden' &&
-                  style.opacity !== '0' &&
-                  rect.width > 0 && rect.height > 0;
+                if (!rect.width || !rect.height) return false;
+                for (let node = el; node; node = parent(node)) {
+                  const style = styleOf(node);
+                  if (style.display === 'none' || style.visibility === 'hidden' ||
+                      style.visibility === 'collapse' || style.opacity === '0' || node.hidden) return false;
+                }
+                return true;
               };
               const nearViewport = el => {
                 const rect = el.getBoundingClientRect();
-                return rect.bottom >= nearbyTop && rect.top <= nearbyBottom;
+                return rect.bottom >= nearbyTop && rect.top <= nearbyBottom &&
+                  rect.right >= 0 && rect.left <= innerWidth;
               };
               const cleanText = value => (value || '')
                 .replace(/\s+/g, ' ')
                 .trim();
+              let textTruncated = false;
+              const visibleText = (el, preserveWhitespace = false, limit = 1000) => {
+                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+                const parts = [];
+                let node, visited = 0, size = 0;
+                while ((node = walker.nextNode()) && visited++ < 400 && size < limit) {
+                  if (!node.parentElement || excluded(node.parentElement) || !rendered(node.parentElement)) continue;
+                  const text = preserveWhitespace ? node.nodeValue : cleanText(node.nodeValue);
+                  if (text) { parts.push(text); size += text.length; }
+                }
+                const text = preserveWhitespace ? parts.join('') : cleanText(parts.join(' '));
+                if (node || text.length > limit) textTruncated = true;
+                return text.slice(0, limit);
+              };
+              const allElements = [];
+              const stack = [document.documentElement];
+              while (stack.length && allElements.length < 12000) {
+                const el = stack.pop();
+                if (!el || el.matches('script,style,noscript,template')) continue;
+                allElements.push(el);
+                const children = Array.from(el.children);
+                if (el.shadowRoot) children.push(...el.shadowRoot.children);
+                for (let i = children.length - 1; i >= 0; --i) stack.push(children[i]);
+              }
+              const scanTruncated = stack.length > 0;
               const safeLink = value => {
                 try {
                   const url = new URL(value, location.href);
@@ -1056,30 +1156,28 @@ class AgentBrowserRuntime(
                 const labelledBy = el.getAttribute('aria-labelledby');
                 const labelledText = labelledBy
                   ? labelledBy.split(/\s+/)
-                      .map(id => document.getElementById(id)?.innerText || '')
+                      .map(id => {
+                        const label = el.getRootNode().getElementById?.(id);
+                        return label ? visibleText(label) : '';
+                      })
                       .join(' ')
                   : '';
                 const label = el.id
-                  ? document.querySelector(
+                  ? el.getRootNode().querySelector(
                       `label[for="${'$'}{CSS.escape(el.id)}"]`
-                    )?.innerText || ''
-                  : '';
+                    ) : null;
+                const labelText = label ? visibleText(label) : '';
                 const safeValue =
                   el instanceof HTMLInputElement &&
                   el.type !== 'password' &&
                   ['button', 'submit', 'reset'].includes(el.type)
                     ? el.value
                     : '';
-                return cleanText(
-                  el.getAttribute('aria-label') ||
-                  labelledText ||
-                  label ||
-                  el.innerText ||
-                  safeValue ||
-                  el.getAttribute('placeholder') ||
-                  el.getAttribute('title') ||
-                  ''
-                ).slice(0, 240);
+                const description = cleanText(el.getAttribute('aria-label') || labelledText || labelText ||
+                  el.getAttribute('title') || el.getAttribute('placeholder') || el.getAttribute('alt'));
+                const text = visibleText(el) || safeValue;
+                return (description && text && !text.includes(description)
+                  ? description + ': ' + text : text || description).slice(0, 240);
               };
               const elementRole = el => {
                 const explicit = el.getAttribute('role');
@@ -1089,6 +1187,7 @@ class AgentBrowserRuntime(
                 if (tag === 'button') return 'button';
                 if (tag === 'textarea') return 'textbox';
                 if (tag === 'select') return 'combobox';
+                if (el.isContentEditable) return 'textbox';
                 if (tag === 'input') {
                   if (el.type === 'checkbox') return 'checkbox';
                   if (el.type === 'radio') return 'radio';
@@ -1097,37 +1196,62 @@ class AgentBrowserRuntime(
                   }
                   return 'textbox';
                 }
-                return tag;
+                if (scrollable(el)) return 'region';
+                return el.hasAttribute('onclick') || typeof el.onclick === 'function' || pointerControl(el)
+                  ? 'button' : tag;
               };
               const interactiveSelector = [
                 'a[href]', 'button', 'input', 'textarea', 'select',
-                '[contenteditable="true"]', '[tabindex]',
+                '[contenteditable="true"]', '[contenteditable=""]', '[contenteditable="plaintext-only"]', '[tabindex]',
                 '[role="button"]', '[role="link"]', '[role="checkbox"]',
                 '[role="radio"]', '[role="textbox"]', '[role="combobox"]',
                 '[role="menuitem"]', '[role="option"]', '[role="slider"]',
                 '[role="switch"]', '[role="tab"]'
               ].join(',');
-              const interactiveCandidates = Array.from(
-                document.querySelectorAll(interactiveSelector)
-              ).filter(el => rendered(el) && nearViewport(el));
-              const usedRefs = new Set();
+              const scrollable = el => el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 2 &&
+                /auto|scroll/.test(styleOf(el).overflowY);
+              const labelled = el => el.hasAttribute('title') || el.hasAttribute('aria-label') ||
+                el.hasAttribute('aria-labelledby');
+              const pointerControl = el => styleOf(el).cursor === 'pointer' &&
+                (!parent(el) || styleOf(parent(el)).cursor !== 'pointer' || labelled(el));
+              const visibleElements = allElements.filter(el => rendered(el) && nearViewport(el));
+              const contentPriority = el => {
+                const rect = el.getBoundingClientRect();
+                return (rect.bottom >= 0 && rect.top <= viewportHeight ? 0 : 4) +
+                  (el.closest('nav,header,footer,aside,[role="navigation"],[role="complementary"]') ? 2 : 0);
+              };
+              const priority = el => contentPriority(el) + (el.matches('a') && !labelled(el) ? 1 : 0);
+              const interactiveCandidates = visibleElements.filter(el =>
+                !el.matches('html,body') && (el.matches(interactiveSelector) ||
+                  el.hasAttribute('onclick') || typeof el.onclick === 'function' ||
+                  pointerControl(el) || scrollable(el))
+              ).sort((a, b) => priority(a) - priority(b));
+              const controls = new Set(interactiveCandidates);
+              let optionBudget = 2000;
+              const selectOptions = el => {
+                const options = [];
+                let truncated = false;
+                for (const option of el.options) {
+                  if (option.disabled || option.closest('optgroup[disabled]')) continue;
+                  const label = cleanText(option.label);
+                  if (options.length >= 20 || label.length > optionBudget) { truncated = true; break; }
+                  options.push(label);
+                  optionBudget -= label.length;
+                }
+                return {options, options_truncated: truncated};
+              };
               const interactiveElements = interactiveCandidates
                 .slice(0, $MAX_INTERACTIVE_ELEMENTS)
                 .map(el => {
-                  let ref = el.getAttribute(refAttribute);
-                  const refNumber = /^e([0-9]{1,8})$/.exec(ref || '');
-                  if (
-                    !refNumber ||
-                    Number(refNumber[1]) >= nextRef ||
-                    usedRefs.has(ref)
-                  ) {
+                  let ref = registry.byNode.get(el);
+                  if (!ref) {
                     ref = `e${'$'}{nextRef++}`;
-                    el.setAttribute(refAttribute, ref);
+                    registry.byNode.set(el, ref);
+                    registry.byRef.set(ref, el);
                   }
-                  usedRefs.add(ref);
                   const rect = el.getBoundingClientRect();
                   const states = [];
-                  if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+                  if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') {
                     states.push('disabled');
                   }
                   if (el.checked || el.getAttribute('aria-checked') === 'true') {
@@ -1146,7 +1270,8 @@ class AgentBrowserRuntime(
                     tag: el.tagName.toLowerCase(),
                     role: elementRole(el),
                     type: el.getAttribute('type') || '',
-                    name: elementName(el),
+                    name: elementName(el) || (scrollable(el) ? 'Scrollable region' : ''),
+                    ...(el instanceof HTMLSelectElement ? selectOptions(el) : {}),
                     href: el.href ? safeLink(el.href).slice(0, 1000) : '',
                     states,
                     visibility:
@@ -1167,45 +1292,75 @@ class AgentBrowserRuntime(
                 'p', 'li', 'pre', 'blockquote', 'tr',
                 'dt', 'dd', 'label', 'figcaption'
               ].join(',');
-              const blockCandidates = Array.from(
-                document.querySelectorAll(blockSelector)
-              ).filter(el => rendered(el) && nearViewport(el));
+              const groups = new Map();
+              const groupFor = el => {
+                let fallback = el;
+                let foundBlock = false;
+                for (let node = el; node && !node.matches('body,html'); node = parent(node)) {
+                  if (controls.has(node) || labelled(node) || node.matches(blockSelector)) return node;
+                  if (!foundBlock && /block|flex|grid/.test(styleOf(node).display)) {
+                    fallback = node;
+                    foundBlock = true;
+                  }
+                }
+                return fallback;
+              };
+              for (const el of visibleElements) {
+                if (excluded(el)) continue;
+                if (el.matches(blockSelector) && !groups.has(el)) groups.set(el, []);
+                const ownText = Array.from(el.childNodes).filter(n => n.nodeType === Node.TEXT_NODE)
+                  .map(n => n.nodeValue).join(' ');
+                if (!cleanText(ownText) && !labelled(el) && !(el.matches('img') && el.alt)) continue;
+                const group = groupFor(el);
+                if (!groups.has(group)) groups.set(group, []);
+                if (cleanText(ownText)) groups.get(group).push(ownText);
+                if (el.matches('img') && el.alt) groups.get(group).push(el.alt);
+              }
+              const blockCandidates = Array.from(groups.keys()).sort((a, b) => contentPriority(a) - contentPriority(b));
               const blocks = blockCandidates.slice(0, 220).map(el => {
                 const tag = el.tagName.toLowerCase();
+                const raw = el.matches(blockSelector)
+                  ? visibleText(el, tag === 'pre', 3000) : groups.get(el).join(' ');
+                const description = cleanText(el.getAttribute('aria-label') || el.getAttribute('title'));
+                const content = cleanText(raw);
+                const combined = description && content && !content.includes(description)
+                  ? description + ': ' + content : content || description;
+                if (combined.length > 3000) textTruncated = true;
+                const text = combined.slice(0, 3000);
                 if (/^h[1-6]$/.test(tag)) {
                   return {
                     kind: 'heading',
                     level: Number(tag.substring(1)),
-                    text: cleanText(el.innerText)
+                    text
                   };
                 }
                 if (tag === 'li') {
-                  return {kind: 'list_item', text: cleanText(el.innerText)};
+                  return {kind: 'list_item', text};
                 }
                 if (tag === 'pre') {
                   return {
                     kind: 'code',
-                    text: (el.innerText || '').trim().slice(0, 3000)
+                    text: raw.trim().slice(0, 3000)
                   };
                 }
                 if (tag === 'blockquote') {
-                  return {kind: 'quote', text: cleanText(el.innerText)};
+                  return {kind: 'quote', text};
                 }
                 if (tag === 'tr') {
                   return {
                     kind: 'table_row',
                     cells: Array.from(el.querySelectorAll(':scope > th, :scope > td'))
-                      .map(cell => cleanText(cell.innerText).slice(0, 300))
+                      .map(cell => visibleText(cell).slice(0, 300))
                       .slice(0, 12)
                   };
                 }
-                return {kind: 'paragraph', text: cleanText(el.innerText)};
+                return {kind: 'paragraph', text};
               }).filter(block => block.text || block.cells?.length);
-              const headingOutline = Array.from(
-                document.querySelectorAll('h1, h2, h3, h4, h5, h6')
-              ).filter(rendered).slice(0, 24).map(el => ({
+              const headingOutline = allElements.filter(el =>
+                el.matches('h1,h2,h3,h4,h5,h6') && rendered(el)
+              ).slice(0, 24).map(el => ({
                 level: Number(el.tagName.substring(1)),
-                text: cleanText(el.innerText).slice(0, 180)
+                text: visibleText(el).slice(0, 180)
               }));
               const documentHeight = Math.max(
                 document.documentElement.scrollHeight,
@@ -1235,10 +1390,16 @@ class AgentBrowserRuntime(
                 },
                 heading_outline: headingOutline,
                 blocks,
-                blocks_truncated: blockCandidates.length > blocks.length,
+                blocks_truncated: blockCandidates.length > 220 || textTruncated || scanTruncated,
                 interactive_elements: interactiveElements,
                 elements_truncated:
-                  interactiveCandidates.length > interactiveElements.length,
+                  interactiveCandidates.length > interactiveElements.length || scanTruncated,
+                limitations: {
+                  dom_scan_truncated: scanTruncated,
+                  iframe_count: allElements.filter(el => el.matches('iframe')).length,
+                  frames: 'Frame contents and closed shadow roots are not read.',
+                  input_values: 'Editable values are omitted.'
+                },
                 next_ref: nextRef
               });
             })()

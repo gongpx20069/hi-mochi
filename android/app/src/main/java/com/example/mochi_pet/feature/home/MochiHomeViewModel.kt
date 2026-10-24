@@ -122,6 +122,7 @@ import com.example.mochi_pet.core.voice.SpeechPurpose
 import com.example.mochi_pet.core.voice.SpeechVoice
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
+import com.example.mochi_pet.core.wake.WakeKeyword
 import java.security.GeneralSecurityException
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
@@ -1212,6 +1213,13 @@ class MochiHomeViewModel(
 
     fun disableWakeWord() {
         wakeRuntime?.disable()
+        mutableWakeFeedback.value = null
+    }
+
+    fun selectWakeKeyword(keyword: WakeKeyword) {
+        if (wakeRuntime?.state?.value?.keyword == keyword) return
+        stopChangedSpeechConnection()
+        wakeRuntime?.selectKeyword(keyword)
         mutableWakeFeedback.value = null
     }
 

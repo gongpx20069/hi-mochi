@@ -10,10 +10,16 @@ enum class WakeCaptureStatus {
     ERROR,
 }
 
+enum class WakeKeyword(val phrase: String) {
+    ENGLISH("Hi Mochi"),
+    CHINESE("老莫老莫"),
+}
+
 data class WakeRuntimeState(
     val status: WakeCaptureStatus = WakeCaptureStatus.DISABLED,
     val lastTriggerSource: String? = null,
     val errorMessage: String? = null,
+    val keyword: WakeKeyword = WakeKeyword.ENGLISH,
 ) {
     val enabled: Boolean
         get() = status != WakeCaptureStatus.DISABLED
@@ -58,7 +64,9 @@ fun reduceWakeRuntimeState(
             status = WakeCaptureStatus.ERROR,
             errorMessage = event.message,
         )
-        WakeRuntimeEvent.Disabled -> WakeRuntimeState()
+        WakeRuntimeEvent.Disabled -> state.copy(
+            status = WakeCaptureStatus.DISABLED, lastTriggerSource = null, errorMessage = null,
+        )
     }
 
 interface WakeRuntime {
@@ -70,6 +78,8 @@ interface WakeRuntime {
     fun enable()
 
     fun disable()
+
+    fun selectKeyword(keyword: WakeKeyword)
 
     fun pause(onPaused: () -> Unit = {})
 

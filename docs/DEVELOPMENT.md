@@ -100,6 +100,23 @@ precedence, read-only discovery/loading, and optional tool headers restricted to
 the calling registry. These deterministic checks validate the contract, not
 live-provider model choices or real-site authentication.
 
+`AgentBrowserSemanticSnapshotTest` uses local synthetic HTML to cover unmarked
+DIV/SPAN statistics, action prioritization beyond 100 links, shadow controls,
+editable-value redaction, native input/select events, reference replacement and
+covered/hidden click rejection. No real video likes/favorites are mutated.
+`WakeKeywordDeviceTest` feeds 16 kHz mono PCM16 fixtures through the production
+native detector. For each selected language, it requires its wake phrase to be
+accepted and the other phrase plus two ordinary commands to be rejected.
+Fixtures under `app/src/androidTest/assets/wake` are offline Windows SAPI output:
+Zira says "Hi Mochi" and "Please show the latest video"; Huihui says "老莫老莫"
+and "请看看最新的视频有多少收藏". They contain no user recordings and do not
+ship in the application. Generate with `SAPI.SpVoice` and `SAPI.SpFileStream`,
+`Format.Type=18` (16 kHz, 16-bit mono), rate 0. Zira mispronounces the brand by
+default, so its wake fixture uses SAPI
+`<pron sym="m ow 1 ch iy">Mochi</pron>` for "MOH-chee". Synthetic acceptance is not
+evidence of human, distance, noise or echo accuracy; those still need device
+acoustic evaluation.
+
 After an in-place app/test APK update, `feature.home.BrowserExperienceSmokeTest`
 checks the always-visible management entry, desktop viewport, explicit handoff,
 snapshot pause, continuation, credential-save confirmation, password redaction,

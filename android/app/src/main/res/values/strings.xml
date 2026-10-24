@@ -6,7 +6,7 @@
     <string name="assistance_notification_text">Open Mochi to answer or manage the website login</string>
     <string name="wake_notification_channel">Mochi wake word</string>
     <string name="wake_notification_title">Mochi is listening</string>
-    <string name="wake_notification_text">Say Hi Mochi or use a headset button</string>
+    <string name="wake_notification_text">Say %1$s or use a headset button</string>
     <string name="wake_notification_talk">Talk</string>
     <string name="wake_notification_stop">Stop</string>
     <string name="wake_detected_channel">Mochi wake detections</string>

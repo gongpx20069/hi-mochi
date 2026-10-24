@@ -1,1 +1,2 @@
 android/**/*.sh text eol=lf
+android/app/src/main/assets/wake/tokens.txt text eol=lf

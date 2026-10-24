@@ -1,0 +1,25 @@
+sherpa-onnx bilingual keyword spotting model
+
+Model: sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20
+Upstream: k2-fsa/sherpa-onnx; model contributor pkufool
+License: Apache License, Version 2.0 (see sherpa-onnx-LICENSE.txt)
+Model license clarification:
+https://github.com/k2-fsa/sherpa-onnx/issues/3802#issuecomment-6052663364
+
+Source archive:
+https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2
+Archive SHA-256:
+68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6
+
+The bundled files are unmodified upstream chunk-16 / left-64 INT8 encoder
+and joiner, FP32 decoder, and tokens.txt. Other model variants, dictionaries
+and upstream recordings are not bundled.
+
+encoder-epoch-13-avg-2-chunk-16-left-64.int8.onnx:
+408bbd740838c42d5bf6d1c5b80b3c88b616c7860b92d980328b5b068c76ae48
+decoder-epoch-13-avg-2-chunk-16-left-64.onnx:
+63a22dd60f40fff082ac3e09afa507f6787da36df76ded2fbe145fa233e22c21
+joiner-epoch-13-avg-2-chunk-16-left-64.int8.onnx:
+190d4067b4cc20b72a42a1916e69d92052000fb7051a427ebb1bc72a69207dc1
+tokens.txt:
+2d3f32311f9b692b964da3c90e830258d3e78e013cb0c992dbfb15cd5a1a71b0

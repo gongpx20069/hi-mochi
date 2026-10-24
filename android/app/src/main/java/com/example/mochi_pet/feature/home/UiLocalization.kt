@@ -115,8 +115,8 @@ internal fun localizeUiText(
     return when {
         text.matches(Regex("REST HTTP \\d{3}\\. Check authorization, limits, and the endpoint; redirects are not followed\\.")) ->
             "REST HTTP ${text.substringAfter("REST HTTP ").substringBefore('.')}。请检查鉴权、额度和接口地址；不会跟随重定向。"
-        text.startsWith("Hi Mochi is ") ->
-            "Hi Mochi 当前状态：${localizeUiText(text.removePrefix("Hi Mochi is "), language)}"
+        text.startsWith("Hi Mochi is ") || text.startsWith("老莫老莫 is ") ->
+            "${text.substringBefore(" is ")} 当前状态：${localizeUiText(text.substringAfter(" is "), language)}"
         text.startsWith("Mochi is ") ->
             "Mochi 正在${localizeUiText(text.removePrefix("Mochi is "), language)}"
         text.startsWith("Back to ") ->
@@ -1030,6 +1030,9 @@ private val ZH_UI_TEXT = mapOf(
         "每次 AI 请求的超时。聊天和语音最多等待 20 秒；定时任务使用此设置值。",
     "Wake word" to "唤醒词",
     "Say Hi Mochi hands-free" to "免手持说“Hi Mochi”",
+    "Say 老莫老莫 hands-free" to "免手持说“老莫老莫”",
+    "English · Hi Mochi" to "英语 · Hi Mochi",
+    "Chinese · 老莫老莫" to "中文 · 老莫老莫",
     "Disable" to "禁用",
     "Enable" to "启用",
     "Saving..." to "正在保存……",

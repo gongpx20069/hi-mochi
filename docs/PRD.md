@@ -54,8 +54,8 @@ ordinary commands run in the background without switching away from Mochi.
 
 ### 3.2 Voice interaction
 
-1. Wake with `Hi Mochi`, microphone, media button, or text.
-   A confirmed `Hi Mochi` wake normally receives a one-syllable acknowledgement.
+1. Wake with the selected phrase (`Hi Mochi` or `老莫老莫`), microphone, media button, or text.
+   A confirmed wake phrase normally receives a one-syllable acknowledgement.
    New AgentLink outcomes may replace it with one short local task briefing.
    User input takes priority; unsupported simultaneous input skips the briefing
    and starts listening. This feedback is not conversation data.
@@ -68,7 +68,9 @@ ordinary commands run in the background without switching away from Mochi.
    explicitly enabled synthesis service of the selected speech Provider.
 
 The wake word is enabled by default after Android permissions are granted.
-Users can explicitly disable it in Settings.
+Users can explicitly disable it in Settings > Speech and wake, or select English
+`Hi Mochi` (default) or Chinese `老莫老莫`. Only the selected phrase triggers;
+its choice is independent of interface language and survives app restarts.
 Cloud STT is an optional reliability recommendation, never a prerequisite.
 Cloud synthesis is also optional and default-off. iFlytek and Azure Speech
 reuse their recognition credentials through **Also use this provider for
@@ -370,7 +372,7 @@ conversation history; authentication material is excluded.
   Bounded encrypted results survive process restart, appear in the conversation
   and task center, and distinguish remote execution from verified fulfillment.
   No default unsolicited speech or new system completion notification is added.
-  Viewed and announced are independent. A deliberate second `Hi Mochi` during
+  Viewed and announced are independent. Repeating the selected wake phrase during
   a briefing dismisses that batch's speech and unread markers, keeps its history,
   and never cancels remote execution. Failed/ordinary-interrupted audio stays pending.
 

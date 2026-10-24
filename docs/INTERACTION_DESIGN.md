@@ -67,14 +67,20 @@ configuration, and response errors. Raw provider error text is not displayed.
 These messages do not claim that device actions were skipped or rolled back:
 an earlier Tool may already have executed before a later model request failed.
 
-The native `HI MOCHI` foreground wake service is enabled by default once the
+The native foreground wake service is enabled by default once the
 required Android permissions are granted. Settings can disable it, and that
 explicit choice is retained across later launches.
+Settings > Speech > Wake word offers a single selection: English `Hi Mochi`
+(default) or Chinese `老莫老莫`. The selected phrase appears beside its runtime
+status and in the persistent notification. Selection is independent of UI
+language and persists while disabled. A keyword update alone does not enable
+or resume capture; ending an active voice interaction uses the existing safe
+microphone release and wake-restoration path.
 When Mochi is visible, wake and media triggers start listening without changing
 the current surface.
 When it is backgrounded or locked, wake detection posts a lock-screen-visible
 notification; tapping it starts the same permission-checked voice path.
-After a confirmed “Hi Mochi” wake, Mochi speaks a one-syllable acknowledgement
+After a confirmed selected wake phrase, Mochi speaks a one-syllable acknowledgement
 ("嗯？" in Chinese, "Yes?" in English) before listening. The acknowledgement
 is transient feedback, not a conversation message, and is excluded from
 history and model context. Microphone-button and media-button starts do not add

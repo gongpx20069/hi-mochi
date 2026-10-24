@@ -57,7 +57,8 @@ and choose the APK that matches the device:
    preset or custom endpoint, and enter your model and API key.
    Optionally add a [speech connection](#supported-speech-providers) and tap **Use**.
 3. Start a conversation by text or microphone; grant microphone permission
-   for voice input and enable the **“Hi Mochi”** wake word when ready.
+   for voice input and enable the wake word when ready. In **Settings > Speech
+   and wake**, choose **“Hi Mochi”** (default) or **“老莫老莫”**.
    Configure additional Tools and Skills only as you need them.
 
 The ABI-specific APKs contain the same Mochi features as the universal APK;
@@ -218,7 +219,7 @@ microphone test and voice preview.
 
 ### Always ready for your voice
 
-- Wake Mochi anytime with the on-device **“Hi Mochi”** wake word.
+- Wake Mochi with your selected on-device phrase: **“Hi Mochi”** or **“老莫老莫”**.
 - Continue speaking naturally through automatic follow-up listening.
 - Use Android speech recognition by default, or optionally connect built-in
   iFlytek/Azure Speech-to-Text settings for greater reliability.
@@ -230,7 +231,7 @@ microphone test and voice preview.
 
 | Voice first | Remember what matters | Get real work done |
 | --- | --- | --- |
-| Always-ready “Hi Mochi” wake word and continuous voice conversation | Local conversation history and ICU-tokenized lexical memory recall | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
+| Selectable English/Chinese wake phrase and continuous voice conversation | Local conversation history and ICU-tokenized lexical memory recall | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
 | Android speech by default, with optional iFlytek/Azure recognition and synthesis; text input remains available | Editable `SOUL`, `USER`, and `AGENTS` persona files | Trusted cards, native navigation, and serial Researcher/Analyst Subagents surface useful results |
 
 | Cowork with **Notion** and **Tencent Docs** | Expand through the Skill Market |
@@ -423,9 +424,9 @@ Subagent/Scheduled Agent access is provided. Linked chats are not cached-live
 task monitors by themselves. Newly submitted Mochi tasks are followed separately
 with durable, encrypted result cards in the conversation and task center.
 Update both AgentLink and its Bridge for this feature. Background collection is
-best effort, not instant push. At the next “Hi Mochi”, a short local briefing may
+best effort, not instant push. On your next wake, a short local briefing may
 replace “Yes?”. Input wins: unsupported simultaneous speech skips the brief.
-Saying “Hi Mochi” again dismisses the current brief and unread markers without
+Repeating the selected wake phrase dismisses the current brief and unread markers without
 deleting history or cancelling the remote task.
 
 ### Run local commands with Termux

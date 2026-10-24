@@ -3,8 +3,11 @@ package com.example.mochi_pet.feature.home
 import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -31,6 +34,8 @@ import com.example.mochi_pet.core.settings.SpeechProfilesSummary
 import com.example.mochi_pet.core.settings.SpeechSettingsSummary
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.wake.WakeRuntimeState
+import com.example.mochi_pet.core.wake.WakeKeyword
+import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import java.util.Locale
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -135,10 +140,24 @@ class ProviderProfilesUiTest {
         assertEquals(setOf("voice-one", "voice-two"), selection!!.speechProfileIds)
     }
 
+    @Test fun `wake phrase selection is visible in speech settings without enabling disabled capture`() {
+        Locale.setDefault(Locale.ENGLISH)
+        val wake = mutableStateOf(WakeRuntimeState())
+        render(wake = wake, selectKeyword = { wake.value = wake.value.copy(keyword = it) })
+        compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Chinese · 老莫老莫"))
+        compose.onNodeWithText("Chinese · 老莫老莫").performScrollTo().performClick().assertIsSelected()
+        compose.onNodeWithText("Say 老莫老莫 hands-free").performScrollTo().assertIsDisplayed()
+        assertEquals(WakeCaptureStatus.DISABLED, wake.value.status)
+        compose.onNodeWithText("English · Hi Mochi").performScrollTo().performClick().assertIsSelected()
+        assertEquals(WakeKeyword.ENGLISH, wake.value.keyword)
+    }
+
     private fun render(
         fontScale: Float = 1f,
         share: (ProviderShareSelection) -> Unit = {},
         speechProfiles: SpeechProfilesSummary = SpeechProfilesSummary(),
+        wake: State<WakeRuntimeState> = mutableStateOf(WakeRuntimeState()),
+        selectKeyword: (WakeKeyword) -> Unit = {},
     ) {
         compose.setContent {
             MaterialTheme {
@@ -150,7 +169,7 @@ class ProviderProfilesUiTest {
                             profiles = speechProfiles, isLoading = false),
                         providerShareState = ProviderShareUiState(), toolsState = ToolsUiState(),
                         agentSettingsState = AgentSettingsUiState(), personaState = PersonaUiState(),
-                        wakeState = WakeRuntimeState(), wakeFeedback = null,
+                        wakeState = wake.value, wakeFeedback = null, onSelectWakeKeyword = selectKeyword,
                         onEnableWake = {}, onDisableWake = {}, onProviderAction = {}, onSpeechAction = {},
                         onCreateProviderShareLink = share, onReceiveProviderShareLink = {},
                         onSetRecentConversationTurns = {}, onSetFocusStandby = { _, _ -> },

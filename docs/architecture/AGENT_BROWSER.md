@@ -21,7 +21,7 @@ The initial Tool set is intentionally small:
 | `browser_input` | Type text, select an option, or send a supported key |
 | `browser_scroll` | Scroll the page or a referenced scrollable element |
 
-Every successful mutation returns a fresh `mochi-semantic-v2` snapshot.
+Every successful mutation returns a fresh `mochi-semantic-v3` snapshot.
 `browser_read` is needed for the initial observation, recovery after user
 interaction, and pages that change without a preceding Agent action.
 
@@ -78,11 +78,11 @@ cache/session reuse from native-only saved credentials. It cannot read, select
 or fill vault accounts, nor infer current login or freshness from stored data.
 Product, ratings, stock and travel Skills retain their specialized restrictions.
 
-### 2.2 Semantic snapshot v2
+### 2.2 Semantic snapshot v3
 
 Each successful Browser Tool result includes:
 
-- `snapshot_id` and `format=mochi-semantic-v2`;
+- `snapshot_id` and `format=mochi-semantic-v3`;
 - final URL, title, loading state, heading outline, and viewport position;
 - bounded Markdown from the current viewport, half a viewport above, and one
   viewport below;
@@ -91,10 +91,23 @@ Each successful Browser Tool result includes:
 - a notice that page content is untrusted data rather than instructions.
 
 Markdown preserves headings, paragraphs, lists, code, quotes, labels, and
-bounded table rows. Password values and unrestricted page source are never
+bounded table rows. Visible DIV/SPAN text is no longer discarded for lacking a
+semantic tag. Labels and numeric text remain associated (for example,
+`点赞（Q）: 364`), and visible main content is prioritized over navigation.
+Native/ARIA controls, explicit click handlers, pointer-style custom controls
+and scrollable regions receive references; options expose at most 20 labels per
+select with a shared 2,000-character budget and explicit truncation indicators.
+Open shadow roots are traversed. At most 12,000 DOM elements, 220 text blocks,
+100 controls and 8,000 Markdown characters are returned, with truncation flags.
+Frame contents and closed shadow roots remain unsupported and are reported.
+All editable values, hidden/script content and unrestricted page source are never
 included. `browser_click`, `browser_input`, and element scrolling continue to
 target the separate opaque references. Snapshot page/link URLs omit user info,
 query strings and fragments; opaque element references retain their targets.
+References are held in a document-local identity map, not cloned DOM attributes.
+Clicks recheck visibility, disabled/inert state and center-point occlusion.
+Typing uses native value setters and composed input/change events; custom
+contenteditable controls and selection by option label are supported.
 
 ## 3. Per-turn lifecycle
 

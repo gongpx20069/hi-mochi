@@ -112,6 +112,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
@@ -174,8 +175,11 @@ import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceInputTrigger
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
+import com.example.mochi_pet.core.wake.WakeKeyword
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import com.example.mochi_pet.core.web.WebContentException
 import com.example.mochi_pet.platform.browser.AgentBrowserUiState
@@ -749,6 +753,7 @@ private fun MochiAppContent(
             onStopVoice = viewModel::stopVoiceInput,
             onEnableWake = onEnableWake,
             onDisableWake = viewModel::disableWakeWord,
+            onSelectWakeKeyword = viewModel::selectWakeKeyword,
             onProviderProfileAction = viewModel::handleProviderProfileAction,
             onSpeechAction = viewModel::handleSpeechProfileAction,
             onLoadSpeechVoices = viewModel::loadSpeechVoices,
@@ -1127,7 +1132,7 @@ private fun MochiTopBar(
             )
             Text(
                 text = if (wakeState.enabled) {
-                    "Hi Mochi is ${wakeState.status.name.lowercase()}"
+                    "${wakeState.keyword.phrase} is ${wakeState.status.name.lowercase()}"
                 } else {
                     surface.displayName()
                 },
@@ -1432,6 +1437,7 @@ private fun SurfaceContent(
     onStopVoice: () -> Unit,
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
+    onSelectWakeKeyword: (WakeKeyword) -> Unit,
     onProviderProfileAction: (ProviderProfileAction) -> Unit,
     onSpeechAction: (SpeechProfileAction) -> Unit,
     onLoadSpeechVoices: (SpeechProvider, String?) -> Unit,
@@ -1534,6 +1540,7 @@ private fun SurfaceContent(
                 wakeFeedback = wakeFeedback,
                 onEnableWake = onEnableWake,
                 onDisableWake = onDisableWake,
+                onSelectWakeKeyword = onSelectWakeKeyword,
                 onProviderAction = onProviderProfileAction,
                 onSpeechAction = onSpeechAction,
                 onLoadSpeechVoices = onLoadSpeechVoices,
@@ -6039,6 +6046,7 @@ internal fun ProviderSettingsSurface(
     onLoadSpeechVoices: (SpeechProvider, String?) -> Unit = { _, _ -> },
     onPreviewSpeechVoice: (SpeechProvider, String, String?) -> Unit = { _, _, _ -> },
     onStopVoicePreview: () -> Unit = {},
+    onSelectWakeKeyword: (WakeKeyword) -> Unit = {},
 ) {
     var recentTurns by remember(agentSettingsState.settings) {
         mutableStateOf(
@@ -6422,9 +6430,9 @@ internal fun ProviderSettingsSurface(
                             )
                             Text(
                                 text = if (wakeState.enabled) {
-                                    "Hi Mochi is ${wakeState.status.name.lowercase()}"
+                                    "${wakeState.keyword.phrase} is ${wakeState.status.name.lowercase()}"
                                 } else {
-                                    "Say Hi Mochi hands-free"
+                                    "Say ${wakeState.keyword.phrase} hands-free"
                                 },
                                 color =
                                     MaterialTheme.colorScheme.onSurfaceVariant,
@@ -6438,6 +6446,19 @@ internal fun ProviderSettingsSurface(
                             },
                         ) {
                             Text(if (wakeState.enabled) "Disable" else "Enable")
+                        }
+                    }
+                    WakeKeyword.entries.forEach { keyword ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().selectable(
+                                selected = wakeState.keyword == keyword,
+                                role = Role.RadioButton,
+                                onClick = { onSelectWakeKeyword(keyword) },
+                            ).padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = wakeState.keyword == keyword, onClick = null)
+                            Text(if (keyword == WakeKeyword.ENGLISH) "English · Hi Mochi" else "Chinese · 老莫老莫")
                         }
                     }
                     wakeState.errorMessage?.let {
