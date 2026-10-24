@@ -30,6 +30,7 @@ android/
 - An Android 8.0 or newer device or emulator
 
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
+The wrapper pins Gradle 9.8.2 with its official distribution SHA-256.
 The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
 and serialization 1.12.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply

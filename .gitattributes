@@ -1,2 +1,4 @@
 android/**/*.sh text eol=lf
+android/gradlew text eol=lf
+android/gradlew.bat text eol=crlf
 android/app/src/main/assets/wake/tokens.txt text eol=lf
