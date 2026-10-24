@@ -439,6 +439,14 @@ private val ZH_UI_TEXT = mapOf(
     "Share and import" to "分享与导入",
     "Choose what to share, or add trusted connections." to "选择要分享的配置，或导入可信的连接。",
     "AI connections" to "AI 连接",
+    "Local network access" to "局域网访问",
+    "Only needed for AI or MCP servers on your local network. Public cloud connections do not need this permission." to
+        "仅连接局域网内的 AI 或 MCP 服务时需要此权限，公共云服务不需要。",
+    "Local network access is allowed." to "已允许局域网访问。",
+    "Local network access is off. Allow it before connecting to a local server." to
+        "尚未允许局域网访问，请在连接本地服务前授权。",
+    "Allow local network access" to "允许局域网访问",
+    "Open app permissions" to "打开应用权限",
     "Save multiple providers and choose the connection Mochi uses." to "保存多个服务与账号，选择 Mochi 当前使用的连接。",
     "Speech and wake" to "语音与唤醒",
     "Configure recognition, reply voices, and hands-free wake." to "设置语音识别、回复声音和免手动唤醒。",

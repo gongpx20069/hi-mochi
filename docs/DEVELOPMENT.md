@@ -25,16 +25,27 @@ android/
 
 ## Prerequisites
 
-- JDK 17
-- Android SDK with API 36
+- JDK 21 or newer (required by Android 17 Robolectric tests)
+- Android SDK with API 37
 - An Android 8.0 or newer device or emulator
 
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
-The build uses AGP 9.1.0 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
+The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
 and serialization 1.12.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply
 `org.jetbrains.kotlin.android` in modules. Serialization 1.12.0 uses Kotlin 2.4
 metadata and cannot compile with the former Kotlin 2.2.20 toolchain.
+The host and both extensions compile against and target Android 17 (API 37);
+the shared libraries also compile against API 37. Android 8.0 (API 26) remains
+the minimum supported version. Keep Lint warnings fatal, including target-SDK
+checks; do not suppress `OldTargetApi` to pass CI.
+CI and release builds use JDK 21; Kotlin and Java application bytecode still
+target Java 17. The build rejects older Gradle JVMs before running tasks.
+The app's unit-test JVM exports `java.base/jdk.internal.access` for Robolectric's
+API 37 shared-memory emulation; this does not change the APK runtime.
+Host UI tests pin Espresso 3.8.0-alpha01 and Test Core 1.8.0-alpha01: Espresso
+3.7.0 reflects on the removed `InputManager.getInstance()` API on Android 17.
+These are test-only dependencies, not production application libraries.
 Keep machine-specific SDK paths in `android/local.properties`; do not commit
 that file. The first build downloads the pinned sherpa-onnx Android AAR from
 its upstream GitHub release and verifies its SHA-256 before use.

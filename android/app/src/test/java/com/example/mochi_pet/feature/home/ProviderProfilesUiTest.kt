@@ -1,5 +1,6 @@
 package com.example.mochi_pet.feature.home
 
+import android.Manifest
 import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -43,6 +44,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -121,6 +124,30 @@ class ProviderProfilesUiTest {
         compose.onNodeWithText("分享与导入").assertIsDisplayed()
         compose.onNodeWithTag("settings-parts").performScrollToNode(hasTestTag("settings-part-AI connections"))
         compose.onNodeWithText("AI 连接").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(sdk = [37])
+    fun `Android 17 offers explicit local network permission and recovery at large font`() {
+        Locale.setDefault(Locale.ENGLISH)
+        shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        render(fontScale = 1.5f)
+        compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Allow local network access"))
+        compose.onNodeWithText("Allow local network access").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Local network access is off. Allow it before connecting to a local server.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Open app permissions").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    @Config(sdk = [37])
+    fun `Android 17 settings reflect an existing local network grant`() {
+        Locale.setDefault(Locale.ENGLISH)
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        render()
+        compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Local network access is allowed."))
+        compose.onNodeWithText("Local network access is allowed.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Allow local network access").assertDoesNotExist()
     }
 
     @Test fun `speech shares select the active account by default and permit a second account`() {

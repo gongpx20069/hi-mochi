@@ -13,11 +13,11 @@ val patch = requireNotNull(Regex("""1\.0\.([1-9]\d*)""").matchEntire(mochiVersio
 
 android {
     namespace = "com.example.mochi_termux"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "com.example.mochi_pet.extension.termux"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 10_000 + patch
         versionName = mochiVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

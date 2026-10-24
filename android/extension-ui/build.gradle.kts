@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.mochi_ui"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig { minSdk = 26 }
     buildFeatures { compose = true }
     compileOptions {

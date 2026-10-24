@@ -21,12 +21,12 @@ plugins {
 
 android {
     namespace = "com.example.mochi_mijia"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.mochi_pet.extension.mijia"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 10_000 + mochiVersionPatch
         versionName = mochiVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -94,7 +94,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("com.google.zxing:core:3.5.4")
-    // OkHttp 5.5 requires compileSdk 37; this project still targets API 36.
     //noinspection NewerVersionAvailable
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
     //noinspection NewerVersionAvailable

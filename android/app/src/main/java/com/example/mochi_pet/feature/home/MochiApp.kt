@@ -6023,6 +6023,48 @@ private fun ConversationError(
 }
 
 @Composable
+@androidx.annotation.RequiresApi(37)
+private fun LocalNetworkPermissionSettings() {
+    val context = LocalContext.current
+    val permission = Manifest.permission.ACCESS_LOCAL_NETWORK
+    var granted by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        granted = it
+    }
+    LifecycleResumeEffect(context) {
+        granted = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        onPauseOrDispose { }
+    }
+    PlannerCard {
+        Text("Local network access", fontWeight = FontWeight.Bold)
+        Text(
+            "Only needed for AI or MCP servers on your local network. Public cloud connections do not need this permission.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            if (granted) "Local network access is allowed."
+            else "Local network access is off. Allow it before connecting to a local server.",
+            color = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+        )
+        if (!granted) {
+            OutlinedButton(onClick = { launcher.launch(permission) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Allow local network access")
+            }
+        }
+        TextButton(onClick = {
+            context.startActivity(Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                "package:${context.packageName}".toUri(),
+            ))
+        }, modifier = Modifier.fillMaxWidth()) {
+            Text("Open app permissions")
+        }
+    }
+}
+
+@Composable
 internal fun ProviderSettingsSurface(
     state: ProviderSettingsUiState,
     speechState: SpeechSettingsUiState,
@@ -6477,6 +6519,9 @@ internal fun ProviderSettingsSurface(
             providerShareSection()
             item { SettingsPartHeading("AI connections", "Save multiple providers and choose the connection Mochi uses.") }
             item { ProviderConnectionsSection(state, onProviderAction) }
+            if (Build.VERSION.SDK_INT >= 37) {
+                item { LocalNetworkPermissionSettings() }
+            }
             item { SettingsPartHeading("Speech and wake", "Configure recognition, reply voices, and hands-free wake.") }
             speechSection()
             wakeSection()

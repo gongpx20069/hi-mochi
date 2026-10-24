@@ -152,6 +152,9 @@ support is an optional import/export adapter.
   never silently selects a replacement.
 - Legacy single-provider configuration and encrypted keys migrate in place.
 - Settings is always discoverable from the primary app shell.
+- On Android 17 and newer, Settings offers an explicit local-network permission
+  action for local AI/MCP servers. Public cloud connections do not require it;
+  the grant remains device-local and is never requested automatically at startup.
 - API keys are never displayed again after saving.
 - Settings groups are ordered: Share/import, AI connections, Speech/wake,
   Conversation/persona, Display/language.

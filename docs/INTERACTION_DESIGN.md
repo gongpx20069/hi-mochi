@@ -318,6 +318,13 @@ Remote AgentLink tasks and submitted Termux processes are not stopped by this
 local cancellation. Deleting the active profile requires confirmation and leaves
 no active connection; there is no implicit fallback to another account.
 
+On Android 17 and newer, **AI connections** also contains a local-network
+permission card for local AI/MCP endpoints. It shows the current Android grant,
+an explicit **Allow local network access** action when denied, and **Open app
+permissions** for recovery or revocation. Returning from system settings refreshes
+the state. It does not prompt automatically or imply that public cloud services
+need this permission. Browser and REST public-URL restrictions remain unchanged.
+
 **Speech/wake** shows saved connection cards with Use/Edit/Delete and a separate
 Add speech connection button. Android is a built-in, nondeletable default card;
 iFlytek and Azure support multiple named accounts. Add/Edit opens a masked,

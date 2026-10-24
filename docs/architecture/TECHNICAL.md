@@ -20,6 +20,13 @@ This document defines the native Android implementation.
 | STT | Android SpeechRecognizer by default; optional iFlytek/Azure Speech |
 | TTS | Android TextToSpeech by default; opt-in iFlytek/Azure Speech using existing speech credentials |
 
+The host declares Android 17's `ACCESS_LOCAL_NETWORK` runtime permission for
+user-configured local AI/MCP endpoints. Settings requests it only after an
+explicit action and refreshes the OS grant when resumed. Denial remains visible
+with a link to app permissions; public Internet access is unaffected. The
+cloud-only Mi Home extension and the Termux IPC bridge do not request this
+permission. Existing Browser/REST public-address policies are not relaxed.
+
 ## Releases and Provider sharing
 
 Native releases use monotonic `1.0.x` versions and derive Android
