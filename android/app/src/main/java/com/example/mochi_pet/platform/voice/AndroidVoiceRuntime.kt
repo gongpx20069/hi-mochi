@@ -1081,7 +1081,7 @@ internal fun briefingTranscript(transcript: String, spoken: String, wakeDetected
     fun normalized(value: String) = value.filter(Char::isLetterOrDigit).lowercase()
     if (spoken.isNotBlank() && normalized(transcript) == normalized(spoken)) return ""
     return if (wakeDetected) transcript.trim().replaceFirst(
-        Regex("^(?:hi|hey|嗨|嘿)\\s*(?:mochi|moki|莫奇|摩奇|麻薯)[\\s，,。.!！?？:：]*", RegexOption.IGNORE_CASE), "",
+        Regex("^(?:(?:hi|hey|嗨|嘿)\\s*(?:mochi|moki|莫奇|摩奇|麻薯)|老\\s*莫\\s*老\\s*莫)[\\s，,。.!！?？:：]*", RegexOption.IGNORE_CASE), "",
     ) else transcript
 }
 

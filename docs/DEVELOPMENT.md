@@ -25,11 +25,28 @@ android/
 
 ## Prerequisites
 
-- JDK 17
-- Android SDK with API 36
+- JDK 21 or newer (required by Android 17 Robolectric tests)
+- Android SDK with API 37
 - An Android 8.0 or newer device or emulator
 
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
+The wrapper pins Gradle 9.8.2 with its official distribution SHA-256.
+The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
+and serialization 1.12.0 across the host and extensions. The root buildscript
+pins KGP because AGP's default compiler is older; do not reapply
+`org.jetbrains.kotlin.android` in modules. Serialization 1.12.0 uses Kotlin 2.4
+metadata and cannot compile with the former Kotlin 2.2.20 toolchain.
+The host and both extensions compile against and target Android 17 (API 37);
+the shared libraries also compile against API 37. Android 8.0 (API 26) remains
+the minimum supported version. Keep Lint warnings fatal, including target-SDK
+checks; do not suppress `OldTargetApi` to pass CI.
+CI and release builds use JDK 21; Kotlin and Java application bytecode still
+target Java 17. The build rejects older Gradle JVMs before running tasks.
+The app's unit-test JVM exports `java.base/jdk.internal.access` for Robolectric's
+API 37 shared-memory emulation; this does not change the APK runtime.
+Host UI tests pin Espresso 3.8.0-alpha01 and Test Core 1.8.0-alpha01: Espresso
+3.7.0 reflects on the removed `InputManager.getInstance()` API on Android 17.
+These are test-only dependencies, not production application libraries.
 Keep machine-specific SDK paths in `android/local.properties`; do not commit
 that file. The first build downloads the pinned sherpa-onnx Android AAR from
 its upstream GitHub release and verifies its SHA-256 before use.
@@ -78,6 +95,97 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Browser assistance regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*UserAssistanceTest" `
+  --tests "*BrowserSettingsTest" --tests "*BrowserModeTest" `
+  --tests "*BrowserCredentialsTest" --tests "*BrowserCredentialCaptureTest" `
+  --tests "*BrowserCredentialsUiTest" `
+  --tests "*AgentOrchestratorTest" --tests "*Skill*Test" --no-daemon
+```
+
+Skill catalog changes additionally run `:app:testDebugUnitTest --tests
+"*MochiDatabaseTest" --tests "*AgentOrchestratorTest"`. These cover legacy Web
+Search enablement moving to Browser without duplicate entries, new-ID override
+precedence, read-only discovery/loading, and optional tool headers restricted to
+the calling registry. These deterministic checks validate the contract, not
+live-provider model choices or real-site authentication.
+
+`AgentBrowserSemanticSnapshotTest` uses local synthetic HTML to cover unmarked
+DIV/SPAN statistics, action prioritization beyond 100 links, shadow controls,
+editable-value redaction, native input/select events, reference replacement and
+covered/hidden click rejection. No real video likes/favorites are mutated.
+`WakeKeywordDeviceTest` feeds 16 kHz mono PCM16 fixtures through the production
+native detector. For each selected language, it requires its wake phrase to be
+accepted and the other phrase plus two ordinary commands to be rejected.
+Fixtures under `app/src/androidTest/assets/wake` are offline Windows SAPI output:
+Zira says "Hi Mochi" and "Please show the latest video"; Huihui says "老莫老莫"
+and "请看看最新的视频有多少收藏". They contain no user recordings and do not
+ship in the application. Generate with `SAPI.SpVoice` and `SAPI.SpFileStream`,
+`Format.Type=18` (16 kHz, 16-bit mono), rate 0. Zira mispronounces the brand by
+default, so its wake fixture uses SAPI
+`<pron sym="m ow 1 ch iy">Mochi</pron>` for "MOH-chee". Synthetic acceptance is not
+evidence of human, distance, noise or echo accuracy; those still need device
+acoustic evaluation.
+
+After an in-place app/test APK update, `feature.home.BrowserExperienceSmokeTest`
+checks the always-visible management entry, desktop viewport, explicit handoff,
+snapshot pause, continuation, credential-save confirmation, password redaction,
+account deletion without logout, Cookie reuse across turns and complete per-site
+deletion. Its form-less SMS fixture uses a real touch to verify phone-only saving,
+masked-code exclusion, and filling without changing the code or auto-submitting.
+No real SMS is sent. JVM coverage verifies legacy password-catalog reads, SMS
+records rejecting codes, encrypted storage, stale revisions, exact-origin
+capture, public/private suffix grouping, and half-width credential/data swipe
+actions. Grouping tests initialize OkHttp's Android assets under Robolectric,
+so the actual bundled public-suffix list is exercised rather than a fake resolver.
+Handoff layout cases in `BrowserCredentialsUiTest` cover compact page allocation,
+large text, explicit return, details/menu actions and question-sheet answers.
+The device handoff case checks website history without returning control, keyboard
+insets hiding/restoring the request strip, filling through the exact-origin picker,
+and rejection of stale handoff navigation; it never uses a real saved account.
+A separate device case submits the
+non-sensitive query `mochi browser fixture` to public Bing and checks full-screen
+manual browsing, back/forward, the shared credentials popup and Home/resume
+preserving the same session and entered form text, then confirms scoped data
+deletion closes the manual page without losing its result. A fourth case opens
+the nested website list, deletes a credential without removing its Cookie, and
+deletes parent/subdomain data without removing the remaining account or an
+unrelated fixture site's Cookie. The layout test renders
+`app/build/reports/browser-accounts-fixture.png` and
+`app/build/reports/browser-website-details-fixture.png` using synthetic metadata.
+Login fixtures use synthetic HTML under the reserved
+`mochi-browser-fixture.example` host, no real website/account request, and
+deletes only that fixture site's data. Actual website login/expiry, authentication
+compatibility and mode quality still require manual user-owned website testing.
+The handoff may speak its synthetic explanation through the configured TTS.
+Never clear all phone website data as a test or record real login credentials.
+
+On MIUI, a runner can report a test as started while
+`Instrumentation.startActivitySync` is still waiting: system logs may show
+`Abort background activity starts` before any test-body or Activity lifecycle
+events. Keep the phone unlocked and inspect that evidence before retrying.
+For an already-waiting `MainActivity` scenario, explicitly launch its matching
+intent from a second terminal; a component-only launch does not match:
+
+```powershell
+adb -s <serial> shell am start -a android.intent.action.MAIN `
+  -c android.intent.category.LAUNCHER -f 0x10008000 `
+  -n com.example.mochi_pet/.MainActivity
+```
+
+Use this only for a confirmed blocked launch, not while a test body is running.
+Each subsequent scenario can need the same assistance. Do not change background
+permissions or weaken assertions to get a pass. Require `OK (4 tests)` from this
+suite; an instrumentation crash can still return shell exit code zero.
+Expression-bodied JUnit methods must return `Unit`; use `runBlocking<Unit>`
+when the last UI assertion/action returns a semantics interaction rather than
+`Unit`, otherwise JUnit rejects the class before any fixture runs.
+If the user approves temporary stay-awake, record and restore the original
+`stay_on_while_plugged_in` value in `finally`. Check the actual charging type:
+some phones report computer power as AC, so USB-only stay-awake does not apply.
+
 Custom REST regressions:
 
 ```powershell
@@ -110,6 +218,27 @@ active AI/speech credential decryption without printing it, and verifies both
 catalogs are unchanged. Update with `adb install -r`;
 never uninstall or clear data. Real account/model Tool compatibility still needs
 authorized provider-specific testing and is not implied by endpoint presets.
+
+Responses regressions additionally run `:app:testDebugUnitTest --tests
+"*ResponsesAdapterTest" --tests "*OkHttpOpenAiChatClientTest" --tests
+"*AgentOrchestratorTest" --tests "*ProviderSharingTest" --tests
+"*ProviderShareManagerTest" --tests "*ProviderSettingsRepositoryTest" --tests
+"*ProviderProfilesUiTest"`. They cover stateless tool continuation, images, exact
+URLs/auth, optional schemas, failure/cancellation without fallback, legacy Chat
+defaults, same-key protocol changes, v5 shares and the advanced selector.
+
+After an in-place app/test APK update, the opt-in
+`core.agent.llm.AzureResponsesDiagnosticTest` uses the active saved connection
+only when its host and deployment match explicit instrumentation arguments:
+`-e mochiResponsesDiagnostic true -e mochiAzureResourceHost <host>
+-e mochiAzureDeployment <deployment>`. It sends a fixed synthetic Agent prompt,
+executes only a local no-side-effect fixture tool, and checks the final reply
+through the production Agent loop with the normal 20-second foreground deadline.
+It consumes model quota, but sends no user history/persona, real Tool definitions,
+or business data. Logs contain only request durations and counts.
+Only with explicit permission, `-e mochiEnableResponses true` switches that
+connection's protocol after success, preserving its key and all other settings.
+Without the diagnostic opt-in, the test is skipped.
 
 Speech profile regressions additionally cover `SpeechSettingsRepositoryTest`,
 `SpeechSynthesisSettingsTest`, `CloudSpeechRuntimeTest`, and `WakeBriefingTest`:

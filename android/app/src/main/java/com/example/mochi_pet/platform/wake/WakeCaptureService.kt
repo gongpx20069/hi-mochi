@@ -37,6 +37,7 @@ class WakeCaptureService : Service() {
     private var engine: SherpaWakeEngine? = null
     private var mediaSession: MediaSession? = null
     private var enabled = false
+    private var capturePaused = false
     private var lastTriggerAtMillis = 0L
     private var currentStatus = WakeCaptureStatus.DISABLED
     private var currentTriggerSource: String? = null
@@ -89,7 +90,11 @@ class WakeCaptureService : Service() {
         engine = SherpaWakeEngine(
             context = applicationContext,
             onWakeDetected = { keyword ->
-                mainHandler.post { handleVoiceTrigger("wake:$keyword") }
+                mainHandler.post {
+                    if (readWakeKeyword(applicationContext).matches(keyword)) {
+                        handleVoiceTrigger("wake:$keyword")
+                    }
+                }
             },
             onFailure = { message ->
                 mainHandler.post {
@@ -116,6 +121,23 @@ class WakeCaptureService : Service() {
                 )
                 if (!enabled) {
                     stopSelf()
+                }
+            }
+            ACTION_SET_KEYWORD -> {
+                val restart = enabled && !capturePaused
+                val version = commandVersion.incrementAndGet()
+                worker.execute {
+                    engine?.stop()
+                    mainHandler.post {
+                        if (version == commandVersion.get()) {
+                            if (restart) startCapture() else {
+                                publishState(if (enabled) WakeCaptureStatus.PAUSED else WakeCaptureStatus.DISABLED)
+                                if (enabled) {
+                                    getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification())
+                                }
+                            }
+                        }
+                    }
                 }
             }
             ACTION_MEDIA_TRIGGER -> {
@@ -152,6 +174,7 @@ class WakeCaptureService : Service() {
     private fun startCapture() {
         mainHandler.removeCallbacks(resumeAfterDetection)
         enabled = true
+        capturePaused = false
         if (!ensureForegroundSafely()) {
             return
         }
@@ -196,15 +219,19 @@ class WakeCaptureService : Service() {
             triggerSource?.let(::notifyVoiceTrigger)
             return
         }
-        commandVersion.incrementAndGet()
+        capturePaused = true
+        val version = commandVersion.incrementAndGet()
         worker.execute {
             engine?.stop()
+            if (version != commandVersion.get()) return@execute
             publishState(
                 WakeCaptureStatus.PAUSED,
                 triggerSource = triggerSource,
             )
             triggerSource?.let { source ->
-                mainHandler.post { notifyVoiceTrigger(source) }
+                mainHandler.post {
+                    if (version == commandVersion.get()) notifyVoiceTrigger(source)
+                }
             }
         }
     }
@@ -218,6 +245,7 @@ class WakeCaptureService : Service() {
     private fun stopWakeService() {
         mainHandler.removeCallbacks(resumeAfterDetection)
         enabled = false
+        capturePaused = false
         commandVersion.incrementAndGet()
         worker.execute { engine?.stop() }
         publishState(WakeCaptureStatus.DISABLED)
@@ -353,6 +381,7 @@ class WakeCaptureService : Service() {
             .setContentText(
                 localizedContext.getString(
                     R.string.wake_notification_text,
+                    readWakeKeyword(applicationContext).phrase,
                 ),
             )
             .setContentIntent(openApp)
@@ -494,7 +523,8 @@ class WakeCaptureService : Service() {
                 .setPackage(packageName)
                 .putExtra(EXTRA_STATUS, status.name)
                 .putExtra(EXTRA_TRIGGER_SOURCE, triggerSource)
-                .putExtra(EXTRA_ERROR, error),
+                .putExtra(EXTRA_ERROR, error)
+                .putExtra(EXTRA_KEYWORD, readWakeKeyword(applicationContext).name),
         )
         currentStatus = status
         currentTriggerSource = triggerSource ?: currentTriggerSource
@@ -518,6 +548,8 @@ class WakeCaptureService : Service() {
             "com.example.mochi_pet.action.MEDIA_VOICE_TRIGGER"
         const val ACTION_QUERY_STATE =
             "com.example.mochi_pet.action.QUERY_WAKE_STATE"
+        const val ACTION_SET_KEYWORD =
+            "com.example.mochi_pet.action.SET_WAKE_KEYWORD"
         const val ACTION_STATE_CHANGED =
             "com.example.mochi_pet.action.WAKE_STATE_CHANGED"
         const val ACTION_VOICE_TRIGGERED =
@@ -525,6 +557,7 @@ class WakeCaptureService : Service() {
         const val ACTION_OPEN_VOICE =
             "com.example.mochi_pet.action.OPEN_VOICE"
         const val EXTRA_STATUS = "wake_status"
+        const val EXTRA_KEYWORD = "wake_keyword"
         const val EXTRA_TRIGGER_SOURCE = "wake_trigger_source"
         const val EXTRA_ERROR = "wake_error"
 

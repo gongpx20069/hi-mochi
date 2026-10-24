@@ -1,10 +1,14 @@
 package com.example.mochi_pet.feature.home
 
+import android.Manifest
 import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -20,6 +24,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import com.example.mochi_pet.core.settings.ProviderPreset
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
 import com.example.mochi_pet.core.settings.ProviderProfileInput
 import com.example.mochi_pet.core.settings.ProviderProfileSummary
 import com.example.mochi_pet.core.settings.ProviderProfilesSummary
@@ -30,6 +35,8 @@ import com.example.mochi_pet.core.settings.SpeechProfilesSummary
 import com.example.mochi_pet.core.settings.SpeechSettingsSummary
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.wake.WakeRuntimeState
+import com.example.mochi_pet.core.wake.WakeKeyword
+import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import java.util.Locale
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -37,6 +44,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -59,6 +68,8 @@ class ProviderProfilesUiTest {
             }
         }
         compose.onNodeWithText("API endpoint").performScrollTo().assertTextContains("https://api.openai.com/v1")
+        compose.onNodeWithText("Advanced connection settings").performScrollTo().performClick()
+        compose.onNodeWithTag("provider-api-protocol").performScrollTo().assertTextContains("Responses")
         compose.onNode(hasText("OpenAI") and !hasSetTextAction()).performScrollTo().performClick()
         compose.onNodeWithText("Kimi").performScrollTo().performClick()
         compose.onNodeWithText("API endpoint").performScrollTo().assertTextContains("https://api.moonshot.cn/v1")
@@ -66,7 +77,23 @@ class ProviderProfilesUiTest {
         compose.onNodeWithText("API key").performScrollTo().performTextInput("synthetic-key")
         compose.onNodeWithText("Save connection").performClick()
         assertEquals(ProviderPreset.KIMI, saved!!.preset)
+        assertEquals(ApiProtocol.CHAT_COMPLETIONS, saved!!.settings.apiProtocol)
         assertEquals("https://api.moonshot.cn/v1", saved!!.settings.endpoint)
+    }
+
+    @Test fun `saved connection keeps chat until protocol is explicitly changed without replacing its key`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var saved: ProviderProfileInput? = null
+        compose.setContent {
+            MaterialTheme { ProviderConnectionDialog(first, ProviderSettingsUiState(isLoading = false), {}, { saved = it }) }
+        }
+        compose.onNodeWithText("Advanced connection settings").performScrollTo().performClick()
+        compose.onNodeWithTag("provider-api-protocol").performScrollTo().assertTextContains("Chat Completions").performClick()
+        compose.onNodeWithText("Responses").performClick()
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals(ApiProtocol.RESPONSES, saved!!.settings.apiProtocol)
+        assertEquals("", saved!!.settings.apiKeyReplacement)
+        assertEquals(first.settings.model, saved!!.settings.model)
     }
 
     @Test fun `share import is first and all Settings parts remain reachable at large font`() {
@@ -99,6 +126,30 @@ class ProviderProfilesUiTest {
         compose.onNodeWithText("AI 连接").assertIsDisplayed()
     }
 
+    @Test
+    @Config(sdk = [37])
+    fun `Android 17 offers explicit local network permission and recovery at large font`() {
+        Locale.setDefault(Locale.ENGLISH)
+        shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        render(fontScale = 1.5f)
+        compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Allow local network access"))
+        compose.onNodeWithText("Allow local network access").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Local network access is off. Allow it before connecting to a local server.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Open app permissions").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    @Config(sdk = [37])
+    fun `Android 17 settings reflect an existing local network grant`() {
+        Locale.setDefault(Locale.ENGLISH)
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        render()
+        compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Local network access is allowed."))
+        compose.onNodeWithText("Local network access is allowed.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Allow local network access").assertDoesNotExist()
+    }
+
     @Test fun `speech shares select the active account by default and permit a second account`() {
         Locale.setDefault(Locale.ENGLISH)
         var selection: ProviderShareSelection? = null
@@ -116,10 +167,24 @@ class ProviderProfilesUiTest {
         assertEquals(setOf("voice-one", "voice-two"), selection!!.speechProfileIds)
     }
 
+    @Test fun `wake phrase selection is visible in speech settings without enabling disabled capture`() {
+        Locale.setDefault(Locale.ENGLISH)
+        val wake = mutableStateOf(WakeRuntimeState())
+        render(wake = wake, selectKeyword = { wake.value = wake.value.copy(keyword = it) })
+        compose.onNodeWithTag("settings-parts").performScrollToNode(hasText("Chinese · 老莫老莫"))
+        compose.onNodeWithText("Chinese · 老莫老莫").performScrollTo().performClick().assertIsSelected()
+        compose.onNodeWithText("Say 老莫老莫 hands-free").performScrollTo().assertIsDisplayed()
+        assertEquals(WakeCaptureStatus.DISABLED, wake.value.status)
+        compose.onNodeWithText("English · Hi Mochi").performScrollTo().performClick().assertIsSelected()
+        assertEquals(WakeKeyword.ENGLISH, wake.value.keyword)
+    }
+
     private fun render(
         fontScale: Float = 1f,
         share: (ProviderShareSelection) -> Unit = {},
         speechProfiles: SpeechProfilesSummary = SpeechProfilesSummary(),
+        wake: State<WakeRuntimeState> = mutableStateOf(WakeRuntimeState()),
+        selectKeyword: (WakeKeyword) -> Unit = {},
     ) {
         compose.setContent {
             MaterialTheme {
@@ -131,7 +196,7 @@ class ProviderProfilesUiTest {
                             profiles = speechProfiles, isLoading = false),
                         providerShareState = ProviderShareUiState(), toolsState = ToolsUiState(),
                         agentSettingsState = AgentSettingsUiState(), personaState = PersonaUiState(),
-                        wakeState = WakeRuntimeState(), wakeFeedback = null,
+                        wakeState = wake.value, wakeFeedback = null, onSelectWakeKeyword = selectKeyword,
                         onEnableWake = {}, onDisableWake = {}, onProviderAction = {}, onSpeechAction = {},
                         onCreateProviderShareLink = share, onReceiveProviderShareLink = {},
                         onSetRecentConversationTurns = {}, onSetFocusStandby = { _, _ -> },

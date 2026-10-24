@@ -25,6 +25,7 @@ import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
+import com.example.mochi_pet.core.wake.WakeKeyword
 
 class SherpaWakeEngine(
     private val context: Context,
@@ -228,6 +229,7 @@ class SherpaWakeEngine(
     }
 
     private fun emitWake(keyword: String) {
+        if (!readWakeKeyword(context).matches(keyword)) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (
             lastTriggerAtMillis > 0 &&
@@ -254,6 +256,7 @@ class SherpaWakeEngine(
 
 /** Consumes the STT recorder's samples; never opens a second microphone. */
 internal class BriefingKeywordDetector(context: Context) : AutoCloseable {
+    private val applicationContext = context.applicationContext
     private val spotter = createKeywordSpotter(WakeModelInstaller(context).install())
     private var stream = spotter.createStream("")
 
@@ -266,9 +269,10 @@ internal class BriefingKeywordDetector(context: Context) : AutoCloseable {
         stream.acceptWaveform(FloatArray(count) { samples[it] / 32768f }, 16_000)
         while (spotter.isReady(stream)) {
             spotter.decode(stream)
-            if (!spotter.getResult(stream).keyword.isNullOrBlank()) {
+            val keyword = spotter.getResult(stream).keyword
+            if (keyword.isNotBlank()) {
                 spotter.reset(stream)
-                return true
+                if (readWakeKeyword(applicationContext).matches(keyword)) return true
             }
         }
         return false
@@ -288,11 +292,19 @@ private fun createKeywordSpotter(models: WakeModelFiles): KeywordSpotter = Keywo
             OnlineTransducerModelConfig(models.encoder.path, models.decoder.path, models.joiner.path),
             OnlineParaformerModelConfig(), OnlineZipformer2CtcModelConfig(),
             OnlineNeMoCtcModelConfig(), OnlineToneCtcModelConfig(),
-            models.tokens.path, 1, false, "cpu", "", "cjkchar", "",
+            models.tokens.path, 1, false, "cpu", "", "phone+ppinyin", "",
         ),
-        32, models.keywords.path, 2.0f, 0.005f, 0,
+        4, models.keywords.path, 1.5f, 0.25f, 1,
     ),
 )
+
+internal fun WakeKeyword.tokens(): String = when (this) {
+    WakeKeyword.ENGLISH -> "HH AY1 M OW1 CH IY0 @Hi_Mochi"
+    WakeKeyword.CHINESE -> "l ǎo m ò l ǎo m ò @老莫老莫"
+}
+
+// Native custom streams append to the default keyword graph rather than replacing it.
+internal fun WakeKeyword.matches(result: String): Boolean = result == phrase.replace(' ', '_')
 
 private data class WakeModelFiles(
     val encoder: File,
@@ -317,11 +329,25 @@ private class WakeModelInstaller(
         val tokens = copyAsset(directory, TOKENS, TOKENS_BYTES)
         val vad = copyAsset(directory, VAD, VAD_BYTES)
         val keywords = File(directory, "keywords.txt")
+        val keywordText = WakeKeyword.entries.joinToString("\n", postfix = "\n") { it.tokens() }
         if (
             !keywords.isFile ||
-            keywords.readText() != "$WAKE_KEYWORD_TOKENS\n"
+            keywords.readText() != keywordText
         ) {
-            keywords.writeText("$WAKE_KEYWORD_TOKENS\n")
+            keywords.writeText(keywordText)
+        }
+        val legacy = File(context.filesDir, "wake-model-v1")
+        listOf(
+            "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx",
+            "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx",
+            "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx",
+            TOKENS, VAD, "keywords.txt",
+        ).forEach { name ->
+            val old = File(legacy, name)
+            if (old.exists() && !old.delete()) throw IOException("Failed to remove obsolete wake model")
+        }
+        if (legacy.isDirectory && legacy.list()?.isEmpty() == true && !legacy.delete()) {
+            throw IOException("Failed to remove obsolete wake model directory")
         }
         WakeModelFiles(
             encoder = encoder,
@@ -347,6 +373,10 @@ private class WakeModelInstaller(
         context.assets.open("wake/$name").use { input ->
             temporary.outputStream().use(input::copyTo)
         }
+        if (temporary.length() != expectedBytes) {
+            temporary.delete()
+            throw IOException("Wake model asset size mismatch: $name")
+        }
         if (!temporary.renameTo(target)) {
             temporary.delete()
             throw IOException("Failed to install wake model: $name")
@@ -355,20 +385,19 @@ private class WakeModelInstaller(
     }
 
     private companion object {
-        const val MODEL_DIRECTORY = "wake-model-v1"
+        const val MODEL_DIRECTORY = "wake-model-v2"
         const val ENCODER =
-            "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"
+            "encoder-epoch-13-avg-2-chunk-16-left-64.int8.onnx"
         const val DECODER =
-            "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"
+            "decoder-epoch-13-avg-2-chunk-16-left-64.onnx"
         const val JOINER =
-            "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx"
+            "joiner-epoch-13-avg-2-chunk-16-left-64.int8.onnx"
         const val TOKENS = "tokens.txt"
         const val VAD = "silero_vad.onnx"
-        const val WAKE_KEYWORD_TOKENS = "\u2581HI \u2581MO CH I"
-        const val ENCODER_BYTES = 4_807_159L
-        const val DECODER_BYTES = 277_985L
-        const val JOINER_BYTES = 163_380L
-        const val TOKENS_BYTES = 5_006L
+        const val ENCODER_BYTES = 4_599_656L
+        const val DECODER_BYTES = 759_829L
+        const val JOINER_BYTES = 86_629L
+        const val TOKENS_BYTES = 1_928L
         const val VAD_BYTES = 643_854L
     }
 }

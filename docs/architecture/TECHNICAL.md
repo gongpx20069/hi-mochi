@@ -20,6 +20,13 @@ This document defines the native Android implementation.
 | STT | Android SpeechRecognizer by default; optional iFlytek/Azure Speech |
 | TTS | Android TextToSpeech by default; opt-in iFlytek/Azure Speech using existing speech credentials |
 
+The host declares Android 17's `ACCESS_LOCAL_NETWORK` runtime permission for
+user-configured local AI/MCP endpoints. Settings requests it only after an
+explicit action and refreshes the OS grant when resumed. Denial remains visible
+with a link to app permissions; public Internet access is unaffected. The
+cloud-only Mi Home extension and the Termux IPC bridge do not request this
+permission. Existing Browser/REST public-address policies are not relaxed.
+
 ## Releases and Provider sharing
 
 Native releases use monotonic `1.0.x` versions and derive Android
@@ -34,14 +41,16 @@ patch number but cannot roll back or overwrite a released version. At startup,
 Mochi checks only the latest stable release and opens its GitHub page after
 explicit user confirmation; Android remains responsible for APK installation.
 
-Provider sharing generates v4 bundles and imports authenticated v2/v3/v4 links.
+Provider sharing generates v5 bundles and imports authenticated v2/v3/v4/v5 links.
 Each share selects multiple saved LLM and speech connections plus
 optional Amap, Tencent Docs, and manual MCP connections. Only the active ready
 LLM and speech profiles default selected; other profiles and Tool credentials
 default unselected every time. MCP shares contain endpoint,
 credential, and enabled remote Tool names rather than cached schemas. Mochi
 encrypts the bundle with a fresh AES-256-GCM key and places ciphertext and key
-in a `mochi://provider/import#v4` link, with version-specific authenticated data.
+in a `mochi://provider/import#v5` link, with version-specific authenticated data.
+V5 includes each AI connection's API protocol; older bundles default to Chat
+Completions. Older apps reject v5 instead of silently dropping Responses selection.
 The envelope and payload versions must match. No password or backend is required, but
 possession of the complete link grants the selected API access and quota.
 Import requires confirmation, rediscovers shared MCP schemas, writes secrets
@@ -117,9 +126,26 @@ browser turn. While a child is active, the Browser Card identifies Researcher
 or Analyst; the label clears when child execution finishes or is cancelled.
 After the LLM produces its final response, the Orchestrator closes the browser
 before TTS. Structured cleanup also runs on cancellation, timeout, and failure.
-App backgrounding does not close or pause the session. A foreground Agent
-execution notification keeps the interaction discoverable and cancellable.
-Browser Tool actions execute without Mochi confirmation gates or user waits.
+App backgrounding does not itself close or pause the session. Main-only
+`request_user_assistance` suspends a Tool call on a cancellable ID-correlated
+answer for up to ten minutes. Browser handoff blocks snapshots/actions; a
+private notification exposes the pending request when enabled. Ordinary actions
+still have no confirmation gate. Process death does not resume pending calls.
+`browser_navigate.mode` lets the Agent select mobile/desktop; auto reuses the
+last selected mode. No manual mode preference overrides the Agent.
+Cookies are flushed, not deleted, on teardown; explicit complete deletion uses
+feature-gated AndroidX WebKit APIs serialized against all Browser turns.
+Manual browsing takes the same exclusive runtime ownership and blocks Agent
+actions. A feature-gated, source-validated native WebMessage listener offers
+local account saving after supported top-level HTTPS login submissions/clicks.
+The native-only, no-backup Keystore vault is separate from website sessions and
+Provider sharing. Explicit filling checks exact origin and same-origin form
+action, never auto-submits, and keeps secrets out of model Tool results.
+SMS accounts save/fill only a phone number, not a password or verification code;
+they do not auto-request codes or make sessions permanent.
+Native management groups known websites with detected local data or saved accounts
+by registrable domain. This is a UI grouping, not a shared credential origin or
+proof of login. Cookie/site-data deletion and credential deletion remain separate.
 See `AGENT_BROWSER.md`.
 
 Wake and media triggers preserve the selected `MochiSurface`. A typed pipeline
@@ -294,7 +320,8 @@ changing the UI.
 The native implementation now includes:
 
 - serializable OpenAI-compatible chat messages, tool calls, and responses;
-- OkHttp `/chat/completions` client with cancellation and bounded responses;
+- one OkHttp transport with Chat Completions and stateless Responses adapters,
+  cancellation and bounded responses;
 - `AgentOrchestrator` with 20 Tool rounds for the Main Agent;
 - one bounded, Tool-disabled repair round when a provider final response does
   not satisfy the Mochi JSON contract;
@@ -329,6 +356,25 @@ continuations, not persisted as conversation text or shown as a reply.
   `/openai/deployments/{deployment}/chat/completions?api-version={version}`;
   its request body omits `model`.
 - Custom providers use the OpenAI-compatible bearer flow.
+
+Authentication/provider type and `ApiProtocol` are separate. The saved protocol
+defaults to `CHAT_COMPLETIONS` when absent, including legacy profiles and imports.
+The new-connection editor recommends `RESPONSES` for OpenAI/Azure and Chat
+Completions for other presets. Switching protocol alone preserves the encrypted
+key and follows normal active-run cancellation; no model-name heuristics,
+automatic fallback, disabled reasoning, or application retries are introduced.
+
+Responses uses the same resource/key and puts the deployment/model in the body.
+Azure uses `/openai/v1/responses` without a dated API-version query; other
+providers append `/responses` to their API base. The adapter maps text/images,
+function schemas (`strict:false` unless explicitly specified), calls and
+`function_call_output` into the existing Agent loop. It requests `store:false`
+and encrypted reasoning items. All supported output items, including original
+phase and opaque reasoning, are replayed only in that run; the chat serializer,
+persisted history, diagnostics and Provider shares exclude them. Continuation
+is bounded to 4,000,000 characters and fails explicitly rather than trimming
+opaque items. Failed, incomplete, refused, empty or unsupported output is an
+error; intermediate commentary alone is not a final reply.
 
 Provider errors are bounded and redact the configured key. Endpoints must be
 absolute HTTP(S) URLs without embedded credentials.
@@ -415,6 +461,15 @@ package-install instructions. Connected, enabled Termux Tools may run user
 scripts or install packages inside Termux; this does not grant other Skills
 or runtimes an execution bypass.
 
+The Browser Skill has the stable discovery name `browser` and storage ID
+`builtin:browser`. Existing `builtin:web-search` enablement is read through
+the built-in alias mechanism; a new-ID override takes precedence. The legacy
+record is not a second installed Skill, and no database schema changes.
+Its minimum prerequisite is navigate/read/scroll. `load_skill` includes optional
+click/input/assistance in its `allowed-tools` header only when available in the
+calling registry; loading cannot grant a foreground capability to a background
+or child run. Other built-in and installed Skill prerequisites are unchanged.
+
 The unauthenticated Explore default parses the public skills.sh Trending (24h)
 leaderboard and falls back to install-ranked public search if the page shape
 changes. Public search exposes install counts but not favorites; Mochi labels
@@ -430,12 +485,19 @@ that Tool evidence only when the Tool is called. Current weather uses the same
 provider with Open-Meteo, caches results for ten minutes, and reduces latitude
 and longitude to two decimal places before sending them to Open-Meteo.
 
-Native public-web research uses the Agent Browser through the built-in Web
-Search Skill. Bing is preferred for technical, official, news, global, and
+Native web browsing and research use the Agent Browser through the built-in
+Browser Skill. Supplied links open directly; search is used to discover or
+verify sources. Bing is preferred for technical, official, news, global, and
 authoritative sources. Sogou Weixin is preferred for explicit WeChat requests
 and Chinese lifestyle or experience queries. The Agent operates the search
-page and selected sources with the five Browser Tools; there are no dedicated
+page and selected sources with the available Browser Tools; there are no dedicated
 `search_web` or `fetch_web_page` schemas.
+Existing valid website sessions are reused without another login prompt.
+Cache is not evidence of freshness. Saved credentials remain native-only;
+manual browsing exposes the Sites picker, while Agent handoff currently does
+not. The Skill must not invent vault access, automatic filling, or handoff UI.
+Connected dedicated integrations remain preferable for their provider-backed
+tasks; Browser is not a bypass for missing permissions or disabled Tools.
 
 Browser navigation enforces the public HTTPS policy, rejects local/private
 address ranges and credential-bearing URLs, and bounds semantic snapshots and

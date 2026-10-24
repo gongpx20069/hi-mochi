@@ -36,11 +36,17 @@ class WakeRuntimeStateTest {
                 status = WakeCaptureStatus.ERROR,
                 lastTriggerSource = "media_button",
                 errorMessage = "failed",
+                keyword = WakeKeyword.CHINESE,
             ),
             WakeRuntimeEvent.Disabled,
         )
 
         assertFalse(disabled.enabled)
+        assertEquals(WakeKeyword.CHINESE, disabled.keyword)
+        assertEquals(
+            WakeKeyword.CHINESE,
+            reduceWakeRuntimeState(disabled, WakeRuntimeEvent.Starting).keyword,
+        )
         assertNull(disabled.lastTriggerSource)
         assertNull(disabled.errorMessage)
     }

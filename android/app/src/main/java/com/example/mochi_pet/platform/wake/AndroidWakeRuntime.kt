@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
+import com.example.mochi_pet.core.wake.WakeKeyword
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeEvent
 import com.example.mochi_pet.core.wake.WakeRuntimeState
@@ -20,10 +21,10 @@ class AndroidWakeRuntime(
 ) : WakeRuntime, AutoCloseable {
     private val applicationContext = context.applicationContext
     private val preferences = applicationContext.getSharedPreferences(
-        PREFERENCES_NAME,
+        WAKE_PREFERENCES_NAME,
         Context.MODE_PRIVATE,
     )
-    private val mutableState = MutableStateFlow(WakeRuntimeState())
+    private val mutableState = MutableStateFlow(WakeRuntimeState(keyword = readWakeKeyword(applicationContext)))
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(
             context: Context?,
@@ -32,6 +33,7 @@ class AndroidWakeRuntime(
             if (intent?.action != WakeCaptureService.ACTION_STATE_CHANGED) {
                 return
             }
+            if (intent.getStringExtra(WakeCaptureService.EXTRA_KEYWORD) != mutableState.value.keyword.name) return
             val status = intent.getStringExtra(
                 WakeCaptureService.EXTRA_STATUS,
             )?.let(WakeCaptureStatus::valueOf)
@@ -100,6 +102,18 @@ class AndroidWakeRuntime(
         )
     }
 
+    override fun selectKeyword(keyword: WakeKeyword) {
+        if (keyword == mutableState.value.keyword) return
+        preferences.edit { putString(KEY_WAKE_KEYWORD, keyword.name) }
+        mutableState.value = mutableState.value.copy(
+            keyword = keyword,
+            status = if (mutableState.value.status == WakeCaptureStatus.LISTENING) {
+                WakeCaptureStatus.STARTING
+            } else mutableState.value.status,
+        )
+        if (mutableState.value.enabled) sendAction(WakeCaptureService.ACTION_SET_KEYWORD)
+    }
+
     override fun pause(onPaused: () -> Unit) {
         if (!mutableState.value.enabled) {
             onPaused()
@@ -155,7 +169,14 @@ class AndroidWakeRuntime(
     }
 
     private companion object {
-        const val PREFERENCES_NAME = "mochi_wake_preferences"
         const val KEY_ENABLED = "enabled"
     }
 }
+
+private const val WAKE_PREFERENCES_NAME = "mochi_wake_preferences"
+private const val KEY_WAKE_KEYWORD = "keyword"
+
+internal fun readWakeKeyword(context: Context): WakeKeyword = WakeKeyword.valueOf(
+    context.getSharedPreferences(WAKE_PREFERENCES_NAME, Context.MODE_PRIVATE)
+        .getString(KEY_WAKE_KEYWORD, WakeKeyword.ENGLISH.name) ?: WakeKeyword.ENGLISH.name,
+)

@@ -102,6 +102,9 @@ suspend fun MochiApplication.createAgentRunner(
             toolCatalogRepository.loadEnabledExtensionTools(extensionScope)
     ).toMutableList()
     if (extensionScope == ExtensionToolScope.FOREGROUND_MAIN) {
+        tools += com.example.mochi_pet.core.browser.RequestUserAssistanceTool(agentBrowserRuntime)
+    }
+    if (extensionScope == ExtensionToolScope.FOREGROUND_MAIN) {
         tools += toolCatalogRepository.loadEnabledRestTools()
     }
     if (includeAgentLink) {

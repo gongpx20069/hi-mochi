@@ -56,7 +56,8 @@
    填写模型名称和 API Key。按需添加[语音连接](#支持的-speech-provider)，
    并点击**使用**。
 3. 通过文字或麦克风开始交流；语音输入需授予麦克风权限，准备好后可启用
-   **“Hi Mochi”** 唤醒词。其他 Tools 和 Skills 按需配置即可。
+   唤醒词。在**设置 > 语音与唤醒**中选择 **“Hi Mochi”**（默认）或
+   **“老莫老莫”**；一次只启用所选词。其他 Tools 和 Skills 按需配置即可。
 
 各 ABI 专用 APK 与通用版功能完全相同，只是不包含其他 CPU 架构的本地语音库，
 因此体积会小很多。开发者可通过
@@ -76,13 +77,13 @@ LLM Provider 是必需配置。未配置时，首次启动会打开设置；之�
 | Provider | 配置 | 凭据 |
 | --- | --- | --- |
 | OpenAI | 自动填写 `https://api.openai.com/v1`，再填写模型 | [OpenAI API Key](https://platform.openai.com/api-keys) |
-| Azure OpenAI | Azure 资源 Endpoint、以 **Deployment 名称**填写模型、API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| Azure OpenAI | Azure 资源 Endpoint、以 **Deployment 名称**填写模型；仅 Chat Completions 需要 API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
 | DeepSeek | 自动填写 `https://api.deepseek.com`，再填写模型 | [官方 API 指南](https://api-docs.deepseek.com/) |
 | Kimi | 自动填写 `https://api.moonshot.cn/v1`，再填写模型 | [官方 API 指南](https://platform.kimi.com/docs/get-api-key) |
 | GLM | 自动填写 `https://open.bigmodel.cn/api/paas/v4`，再填写模型 | [官方 API 指南](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
 | MiniMax（国内） | 自动填写 `https://api.minimax.cn/v1`，填写模型并确认账号区域 | [官方 API 指南](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
 | Agnes-AI | 自动填写 `https://apihub.agnes-ai.com/v1`，再填写模型 | [官方 API 指南](https://wiki.agnes-ai.com/en/docs/quickstart) |
-| 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需兼容 OpenAI Chat/Tool Call 协议 | 对应服务商签发的 API Key |
+| 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需通过所选 API 协议支持工具调用 | 对应服务商签发的 API Key |
 
 **设置 > AI 连接**支持保存多个命名账号和模型。OpenAI、DeepSeek、Kimi、GLM、
 MiniMax（国内）和 Agnes-AI 会自动填入可编辑的官方地址；根据内置官方指南填写
@@ -90,9 +91,14 @@ MiniMax（国内）和 Agnes-AI 会自动填入可编辑的官方地址；根据
 专用地址。新增连接不会切换当前选择；点击**使用**才切换，并取消正在运行的本地
 Agent 任务，未来的定时计划仍保留。旧版单连接配置及密钥自动迁移，无需重填。
 
+每个连接可在**高级连接设置 > API 协议**中选择 Responses 或 Chat Completions。
+新建 OpenAI/Azure 连接默认使用 Responses，其他预设及旧连接保留 Chat Completions，
+除非手动修改。仅切换协议可复用已保存的密钥；请选择接口和模型支持的协议，
+Mochi 不会在报错后自动切换。
+
 设置依次分为**分享与导入 → AI 连接 → 语音与唤醒 → 对话与人格 → 显示与语言**。
 分享时可勾选多个 LLM 和语音连接；导入会新增而非覆盖已有账号，并分别切换到分享
-中的选中连接。新 v4 链接需要新版接收端，旧 v2/v3 链接仍可导入。持有完整链接的人可以使用
+中的选中连接。新 v5 链接包含 API 协议，需要新版接收端，旧 v2/v3/v4 链接仍可导入。持有完整链接的人可以使用
 其中的 API 凭据，请仅发给可信的人。
 
 ### 支持的 Speech Provider
@@ -189,7 +195,7 @@ Android 系统权限不会被分享。
 
 ### 全天候，随时语音唤醒
 
-- 通过设备本地的 **“Hi Mochi”** 唤醒词随时唤醒 Mochi。
+- 使用设备本地所选的 **“Hi Mochi”** 或 **“老莫老莫”** 唤醒 Mochi。
 - 回答结束后自动继续聆听，让多轮语音对话更加自然。
 - 默认使用 Android 语音识别，也可按需配置内置的讯飞或 Azure STT。
 - 使用 Android 语音合成播报回答，也可按需启用讯飞/Azure 合成。
@@ -199,7 +205,7 @@ Android 系统权限不会被分享。
 
 | 语音优先 | 记住重要信息 | 真正处理工作 |
 | --- | --- | --- |
-| 全天候 “Hi Mochi” 语音唤醒和连续语音对话 | 在本地保存对话历史，并通过 ICU 分词的词法检索召回相关长期记忆 | 内置计划、定时任务、定位、天气、网页、地图、文档和本地计算 Tools |
+| 可切换中英文唤醒词，支持连续语音对话 | 在本地保存对话历史，并通过 ICU 分词的词法检索召回相关长期记忆 | 内置计划、定时任务、定位、天气、网页、地图、文档和本地计算 Tools |
 | 默认使用 Android 语音，也可选配讯飞/Azure 识别与合成，并支持文字输入 | 可直接编辑 `SOUL`、`USER` 和 `AGENTS` Persona 文件 | 通过可信卡片、原生导航以及串行 Researcher/Analyst Subagent 呈现有用结果 |
 
 | 与 **Notion** 和 **腾讯文档** Cowork | 通过 Skill Market 持续扩展 |
@@ -235,14 +241,14 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | Mochi Planner | 启用 | 管理 Mochi 日历事件和带日期的待办 | 无 |
 | Voice Navigation | 启用 | 根据对话意图打开相关 Mochi 原生页面 | 无 |
 | Scheduled Automations | 启用 | 执行一次性或周期 Agent 任务，并把结果写入 Conversation | 通知权限；精确闹钟权限可选 |
-| Web Search | 启用 | 通过智能体浏览器搜索公开网页和微信公众号内容 | 无 |
+| Browser（网页浏览） | 启用 | 直接打开链接、阅读比较网页、搜索 Bing 或微信来源，并复用网站会话 | 无；需启用智能体浏览器的只读工具 |
 | Product Search | 启用 | 搜索并比较公开商品页面，不下单、不支付 | 无 |
 | Douban Ratings | 启用 | 获取公开豆瓣评分、评分人数和评论主题 | 无 |
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
 | **Notion Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新页面，并在已授权的私人知识库中查找或更新信息 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
 | **Feishu Knowledge（飞书知识）** | 禁用 | 搜索与浏览已授权云文档，编辑前读取内容，并回读验证创建或更新结果 | 工具 > 飞书 MCP；[自建应用与用户授权](https://open.feishu.cn/app) |
 | **腾讯文档 Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新文档，并在已授权的私人知识库中查找或更新信息 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
-| 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过智能体浏览器调研无需登录的公开火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用智能体浏览器 |
+| 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过智能体浏览器调研火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用智能体浏览器 |
 | 商家发现 | 启用 | 使用高德提供的评分、人均、营业时间、电话、标签和图片发现并比较商家 | [创建高德 Web 服务 Key](https://console.amap.com/) |
 
 需要另行安装应用的 Skills 集中列在后面的[可选扩展](#可选扩展)中，
@@ -255,19 +261,40 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | **计划** | `manage_mochi_calendar`<br>`manage_mochi_todo` | 读取和更新 Mochi 自己的日历事件与带日期待办，无需额外配置。 |
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
-| **智能体浏览器（Agent Browser）** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 在一个用户可见、内容有界的 Android WebView 会话中研究公开 HTTPS 页面。 |
+| **智能体浏览器（Agent Browser）** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 浏览公网 HTTPS 网站，复用本地登录状态，由 Agent 选择手机或桌面模式。 |
 | **原生体验** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | 打开可信 Mochi 界面，或在本地运行有界的纯 JavaScript 计算。 |
 | **高德地图** | 地点搜索 · 商家详情 · 路线<br>地理编码 · 逆地理编码 · 天气 | 使用可信 GCJ-02 坐标搜索地点和商家、比较可用评分与人均并规划路线，需要 Web 服务 Key。 |
 | **已连接 MCP** | **Notion** · **腾讯文档** · **飞书**<br>手动配置的 MCP Server | 检索私人知识、开展调研，并在已授权工作区中协作创建或更新文档。 |
 
 Tools 页面会将智能体浏览器、Mochi 内建能力和 Provider Tools 分组并默认
 收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
-每个 Tool 都有独立开关；Provider 支持的 Tools 还要求对应 Provider 开关已启用。
+Provider Tools 有独立开关，还要求对应 Provider 开关已启用。
+
+**Tools > 智能体浏览器 > 网站与登录管理**会打开 Bing 搜索/地址框和按网站归组的列表。
+已知网站中检测到本地数据或保存账号的，会自动出现在列表。点击网站弹出第二层列表，
+蓝色标签表示 Cookie／网站数据，紫色标签表示密码或短信账号，同时用文字区分。
+凭证左滑显示编辑和删除，网站数据左滑只显示删除；都最多停在半行，不会滑掉或自动删除。
+浏览器底部提供后退、前进、Home 和网站按钮；Home 返回首页并保留网页，
+网站按钮弹出与首页相同的两层列表。
+提交受支持的登录表单后，会询问是否将网站、用户名和密码保存在本机，
+使用 Keystore 加密，密码不发送给模型。选择账号后可明确点击填入同源登录表单，不会自动提交。
+短信登录只保存网站和手机号，不保存验证码，登录过期仍需新验证码。
+已完成登录或网站未弹出保存提示时，可在**网站列表 > … > 添加短信登录账号**中补录，无需退出网站登录。
+删除已保存账号不影响当前网站登录；单独清除网站数据也不会删除已保存密码。
+按网站删除包含主域名和子域名，会提示可能退出登录，并在确认后先关闭当前手动浏览页面。
+存在网站数据不代表登录一定有效。
+网页使用手机还是桌面模式由 Mochi 自己决定，无需用户配置；
+也可仅清除资源缓存而保留登录。已有有效登录
+会自动复用。确需人工登录或验证时，主 Agent 通过 `request_user_assistance`
+暂停任务并播报自己生成的说明。登录凭证请在网页内输入，不要发送到聊天，完成后点击“继续”，
+Mochi 会重新读取页面确认结果。普通问题支持选项和文字回答。
+完整数据删除需要兼容的新版 System WebView，会影响主域名及子域名共享登录。
+此版本使用一个共享会话存储，不提供隔离的多账号浏览器环境，也不支持进程退出后恢复等待任务。
+密码捕获支持普通顶层表单，不能保证覆盖所有 AJAX 登录、iframe 或外部认证流程。
 
 出行规划只使用公开 HTTPS 页面上的正常可见控件。火车票查询从 12306 官方
-公开查询页开始，机票优先查询航空公司官网。Mochi 不登录、不绕过验证、不填写
-乘客或支付信息，也不会进入预订流程；遇到登录、验证码、身份验证或结算页面时
-立即停止。
+公开查询页开始，机票优先查询航空公司官网。Mochi 会复用有效登录，必要时请用户
+处理登录或验证，但不绕过验证、不填写乘客或支付信息，也不会进入预订或结算流程。
 
 ### Skill Market
 
@@ -341,9 +368,9 @@ Tools 中的关联聊天按钮打开可信的原生 AgentLink 页面，也可刷
 不允许使用网络/浏览器绕过权限，也不默认向 Subagent 或定时 Agent 开放。
 关联记录本身并非实时监控。新提交的 Mochi 任务会单独跟踪，在对话与任务中心
 保留加密的结果卡片；需要同时更新 AgentLink 应用和电脑端 Bridge。
-后台补收受系统调度限制，不是即时推送。下次说“Hi Mochi”时，可以用一句简短
+后台补收受系统调度限制，不是即时推送。下次使用所选唤醒词时，可以用一句简短
 的本地任务简报替代“嗯？”。用户说话优先，不支持可靠同时收音时跳过简报。
-再次说“Hi Mochi”会停止这批简报并取消未读提示，但保留历史、不取消远端任务。
+再次说出所选唤醒词会停止这批简报并取消未读提示，但保留历史、不取消远端任务。
 
 ### 使用 Termux 执行本机命令
 

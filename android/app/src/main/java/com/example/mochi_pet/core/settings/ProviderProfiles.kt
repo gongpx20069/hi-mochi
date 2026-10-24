@@ -1,6 +1,7 @@
 package com.example.mochi_pet.core.settings
 
 import com.example.mochi_pet.core.agent.llm.ProviderType
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.joinAll
@@ -21,6 +22,10 @@ enum class ProviderPreset(
     MINIMAX("MiniMax", ProviderType.CUSTOM, "https://api.minimax.cn/v1", "https://platform.minimax.cn/docs/api-reference/text-openai-api"),
     AGNES("Agnes-AI", ProviderType.CUSTOM, "https://apihub.agnes-ai.com/v1", "https://wiki.agnes-ai.com/en/docs/quickstart"),
     CUSTOM("Custom compatible API", ProviderType.CUSTOM, "", ""),
+    ;
+
+    val defaultApiProtocol: ApiProtocol
+        get() = if (this == OPENAI || this == AZURE) ApiProtocol.RESPONSES else ApiProtocol.CHAT_COMPLETIONS
 }
 
 data class ProviderProfileSummary(

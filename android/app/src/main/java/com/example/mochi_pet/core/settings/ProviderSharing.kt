@@ -2,6 +2,7 @@ package com.example.mochi_pet.core.settings
 
 import com.example.mochi_pet.core.agent.llm.OpenAiProviderConfig
 import com.example.mochi_pet.core.agent.llm.ProviderType
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
 import com.example.mochi_pet.core.tools.SharedToolProviders
 import com.example.mochi_pet.core.tools.ToolCatalogRepository
 import com.example.mochi_pet.core.tools.ToolShareSelection
@@ -22,7 +23,7 @@ class ProviderShareException(message: String) : IllegalArgumentException(message
 
 @Serializable
 internal data class SharedProviderBundle(
-    val version: Int = 4,
+    val version: Int = 5,
     val llm: SharedLlmProvider? = null,
     val llmProfiles: List<SharedLlmProfile> = emptyList(),
     val activeLlmIndex: Int = 0,
@@ -57,6 +58,7 @@ internal data class SharedLlmProvider(
     val maxResponseBytes: Long,
     val apiKey: String,
     val imageInputEnabled: Boolean = true,
+    val apiProtocol: ApiProtocol = ApiProtocol.CHAT_COMPLETIONS,
 )
 
 @Serializable
@@ -134,7 +136,7 @@ class ProviderShareManager(
 
     suspend fun importShareLink(link: String) {
         val bundle = ProviderShareCodec.decode(link)
-        require(bundle.version in 2..4) {
+        require(bundle.version in 2..5) {
             "This Provider share version is not supported"
         }
         require(
@@ -179,6 +181,7 @@ class ProviderShareManager(
                 maxResponseBytes = llm.maxResponseBytes,
                 apiKeyReplacement = llm.apiKey,
                 imageInputEnabled = llm.imageInputEnabled,
+                apiProtocol = llm.apiProtocol,
             ).also { it.validate() })
         }
         require(bundle.speech == null || bundle.speechProfiles.isEmpty()) { "Provider share contains conflicting speech connections." }
@@ -236,6 +239,7 @@ class ProviderShareManager(
             maxResponseBytes = maxResponseBytes,
             apiKey = apiKey,
             imageInputEnabled = imageInputEnabled,
+            apiProtocol = apiProtocol,
         )
 
     private fun SpeechRuntimeConfig.toShared(): SharedSpeechProvider =
@@ -269,7 +273,7 @@ internal object ProviderShareCodec {
     private val random = SecureRandom()
 
     fun encode(bundle: SharedProviderBundle): String {
-        require(bundle.version in 2..4) { "This Provider share version is not supported" }
+        require(bundle.version in 2..5) { "This Provider share version is not supported" }
         val key = ByteArray(KEY_BYTES).also(random::nextBytes)
         val iv = ByteArray(IV_BYTES).also(random::nextBytes)
         val plaintext = json.encodeToString(bundle)
@@ -300,7 +304,7 @@ internal object ProviderShareCodec {
     }
 
     fun decode(link: String): SharedProviderBundle {
-        val version = listOf(2, 3, 4).firstOrNull { link.startsWith(linkPrefix(it)) }
+        val version = listOf(2, 3, 4, 5).firstOrNull { link.startsWith(linkPrefix(it)) }
         require(version != null) {
             "This is not a Mochi Provider share link"
         }

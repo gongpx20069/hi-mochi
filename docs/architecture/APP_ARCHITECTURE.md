@@ -57,8 +57,12 @@ run in local JVM tests.
 | `TermuxRuntimeState` | Registry revocation generation and transient task views; no execution approval state |
 | `AgentTaskRuntime` | Bounded process-local run observations and exact foreground coroutine ownership |
 | `TaskCenterViewModel` | Read-only source aggregation, explicit source-specific actions and cancellable configuration reports |
-| `AgentBrowserSessionController` | visible per-turn WebView, snapshots, actions, and cleanup |
-| `AgentExecutionService` | background Agent Browser lifetime and Stop notification |
+| `AgentBrowserRuntime` | per-turn WebView, mode, snapshots, handoff and serialized cleanup/deletion |
+| `UserAssistanceCoordinator` | process-local ID-correlated, cancellable pending question/browser handoff |
+| `BrowserSettings` | visited host/time and last Agent-selected mode in Tool DataStore; no credentials or manual mode overrides |
+| `BrowserWebsite` | transient native UI grouping by registrable domain; exact-origin credentials and a data-presence flag, never Cookie values |
+| `BrowserCredentialVault` | revision-checked, encrypted native-only account catalog; never part of Tool results or Provider sharing |
+| `BrowserCredentialCapture` | source-validated top-level form submissions, transient save requests and turn-local password redaction |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
 | `AndroidJavaScriptExecutor` | bounded JavaScript in an isolated process |
 | `PlannerRepository` | calendar/todo transactions and queries |
@@ -141,6 +145,16 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   so a lost acceptance reply never causes an automatic resend. Revocation clears
   retained results; late receipts cannot recreate a removed tracking record.
 - Android Keystore protects BYOK credentials.
+- Browser accounts use a separate `browser_credentials.preferences_pb` DataStore
+  under `noBackupFilesDir`, encrypted as one catalog with the dedicated
+  `mochi_browser_credentials_v1` Keystore key. At most 100 accounts are stored,
+  with no silent eviction. Native summaries omit passwords; edits/deletes reject
+  stale revisions. Cookies and this catalog have independent deletion controls.
+  Login kind separates password and SMS accounts; absent legacy kinds default
+  to password. SMS records store only origin and phone, never a verification code.
+  Website grouping is derived, not a second persistent account store.
+  The runtime inspects local data presence; the Home ViewModel owns confirmed
+  per-site deletion across manual-browser sheet disposal and publishes its result.
 - A dedicated Tool DataStore owns built-in enablement, MCP configuration, and
   encrypted MCP/OAuth credentials.
 - The base Tool DataStore owns only extension package enablement, selected

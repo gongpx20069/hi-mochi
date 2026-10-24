@@ -14,6 +14,7 @@ import com.example.mochi_pet.core.agent.llm.DEFAULT_AZURE_API_VERSION
 import com.example.mochi_pet.core.agent.llm.DEFAULT_MULTIMODAL_INPUT_ENABLED
 import com.example.mochi_pet.core.agent.llm.OpenAiProviderConfig
 import com.example.mochi_pet.core.agent.llm.ProviderType
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
 import java.nio.charset.StandardCharsets
 import java.security.GeneralSecurityException
 import java.security.KeyStore
@@ -38,6 +39,7 @@ data class ProviderSettingsSummary(
     val maxResponseBytes: Long = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
     val imageInputEnabled: Boolean = DEFAULT_MULTIMODAL_INPUT_ENABLED,
     val hasApiKey: Boolean = false,
+    val apiProtocol: ApiProtocol = ApiProtocol.CHAT_COMPLETIONS,
 ) {
     val isReady: Boolean
         get() = endpoint.isNotBlank() && model.isNotBlank() && hasApiKey
@@ -52,6 +54,7 @@ data class ProviderSettingsInput(
     val maxResponseBytes: Long = DEFAULT_PROVIDER_MAX_RESPONSE_BYTES,
     val imageInputEnabled: Boolean = DEFAULT_MULTIMODAL_INPUT_ENABLED,
     val apiKeyReplacement: String? = null,
+    val apiProtocol: ApiProtocol = ApiProtocol.CHAT_COMPLETIONS,
 )
 
 internal fun ProviderSettingsInput.validate() {
@@ -65,7 +68,7 @@ internal fun ProviderSettingsInput.validate() {
     require(url != null && url.username.isEmpty() && url.password.isEmpty() && url.fragment == null) {
         "Use an absolute HTTP(S) endpoint without embedded credentials or fragments."
     }
-    if (providerType == ProviderType.AZURE_OPENAI) {
+    if (providerType == ProviderType.AZURE_OPENAI && apiProtocol == ApiProtocol.CHAT_COMPLETIONS) {
         require(apiVersion.trim().isNotEmpty()) {
             "Azure OpenAI API version must not be empty"
         }
@@ -304,6 +307,7 @@ class DataStoreProviderSettingsRepository(
             endpoint = settings.endpoint.trim(), model = settings.model.trim(),
             apiVersion = settings.apiVersion.trim(), timeoutSeconds = settings.timeoutSeconds,
             maxResponseBytes = settings.maxResponseBytes, imageInputEnabled = settings.imageInputEnabled,
+            apiProtocol = settings.apiProtocol,
             key = replacement?.let(apiKeyCipher::encrypt) ?: old?.key,
         )
     }
@@ -336,6 +340,7 @@ class DataStoreProviderSettingsRepository(
             apiKey = apiKeyCipher.decrypt(key), model = summary.model,
             apiVersion = summary.apiVersion, timeoutSeconds = summary.timeoutSeconds.toLong(),
             maxResponseBytes = summary.maxResponseBytes, imageInputEnabled = summary.imageInputEnabled,
+            apiProtocol = summary.apiProtocol,
         )
     }
 
@@ -447,10 +452,11 @@ class DataStoreProviderSettingsRepository(
         val maxResponseBytes: Long,
         val imageInputEnabled: Boolean,
         val key: EncryptedSecret?,
+        val apiProtocol: ApiProtocol = ApiProtocol.CHAT_COMPLETIONS,
     ) {
         fun summary() = ProviderProfileSummary(id, name, preset, ProviderSettingsSummary(
             providerType, endpoint, model, apiVersion, timeoutSeconds, maxResponseBytes,
-            imageInputEnabled, key != null,
+            imageInputEnabled, key != null, apiProtocol,
         ))
     }
 }

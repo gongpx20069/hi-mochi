@@ -37,6 +37,22 @@ import com.example.mochi_pet.core.agentlink.briefing
 import com.example.mochi_pet.core.voice.WakeBriefingResult
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.browser.agentBrowserTools
+import com.example.mochi_pet.core.browser.BrowserSite
+import com.example.mochi_pet.core.browser.BrowserWebsite
+import com.example.mochi_pet.core.browser.groupBrowserWebsites
+import com.example.mochi_pet.core.browser.UserAssistanceRequest
+import com.example.mochi_pet.core.browser.UserAssistanceAnswer
+import com.example.mochi_pet.core.browser.BrowserCredentialVault
+import com.example.mochi_pet.core.browser.BrowserCredentialSummary
+import com.example.mochi_pet.core.browser.BrowserLogin
+import com.example.mochi_pet.core.browser.BrowserLoginKind
+import com.example.mochi_pet.core.browser.browserOrigin
+import com.example.mochi_pet.core.browser.BrowserVaultException
+import com.example.mochi_pet.core.browser.browserDestination
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.cancelAndJoin
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import com.example.mochi_pet.core.database.PlannerStore
 import com.example.mochi_pet.core.memory.AgentMemoryRepository
 import com.example.mochi_pet.core.persona.PersonaRepository
@@ -106,6 +122,7 @@ import com.example.mochi_pet.core.voice.SpeechPurpose
 import com.example.mochi_pet.core.voice.SpeechVoice
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
+import com.example.mochi_pet.core.wake.WakeKeyword
 import java.security.GeneralSecurityException
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
@@ -319,6 +336,7 @@ class MochiHomeViewModel(
     private val termuxRuntime: com.example.mochi_pet.core.extensions.TermuxRuntimeState =
         com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
     private val agentBrowserRuntime: AgentBrowserRuntime? = null,
+    private val browserCredentialVault: BrowserCredentialVault? = null,
     private val weatherRepository: WeatherRepository? = null,
     private val locationPermissionGate: LocationPermissionGate? = null,
     private val clock: Clock = Clock.systemDefaultZone(),
@@ -399,6 +417,47 @@ class MochiHomeViewModel(
         mutableCameraSnapshot.asStateFlow()
     val browserState: StateFlow<AgentBrowserUiState> =
         agentBrowserRuntime?.state ?: unavailableBrowserState.asStateFlow()
+    val assistanceRequest = agentBrowserRuntime?.assistance?.request
+        ?: MutableStateFlow<UserAssistanceRequest?>(null).asStateFlow()
+    private var spokenAssistanceId: String? = null
+    private val mutableAssistanceFeedback = MutableStateFlow<String?>(null)
+    val assistanceFeedback = mutableAssistanceFeedback.asStateFlow()
+    private val mutableBrowserManagementFeedback = MutableStateFlow<String?>(null)
+    val browserManagementFeedback = mutableBrowserManagementFeedback.asStateFlow()
+    val browserSites = agentBrowserRuntime?.settings?.sites?.catch { error ->
+        when (error) {
+            is java.io.IOException, is kotlinx.serialization.SerializationException -> {
+                mutableBrowserManagementFeedback.value = "Website history could not be loaded. Existing data was not changed."
+                emit(emptyList())
+            }
+            else -> throw error
+        }
+    } ?: kotlinx.coroutines.flow.flowOf(emptyList<BrowserSite>())
+    private val mutableBrowserDataVersion = MutableStateFlow(0L)
+    val browserDataVersion = mutableBrowserDataVersion.asStateFlow()
+    private val mutableBrowserDataDeleting = MutableStateFlow(false)
+    val browserDataDeleting = mutableBrowserDataDeleting.asStateFlow()
+    private val mutableBrowserCredentialFeedback = MutableStateFlow<String?>(null)
+    val browserCredentialFeedback = mutableBrowserCredentialFeedback.asStateFlow()
+    val savedBrowserCredentials = browserCredentialVault?.summaries?.onEach {
+        mutableBrowserCredentialFeedback.value = null
+    }?.catch { error ->
+        when (error) {
+            is BrowserVaultException, is java.io.IOException -> {
+                mutableBrowserCredentialFeedback.value = "Saved website credentials could not be loaded. Existing data was not changed."
+                emit(emptyList())
+            }
+            else -> throw error
+        }
+    } ?: kotlinx.coroutines.flow.flowOf(emptyList<BrowserCredentialSummary>())
+    val credentialSaveRequest = agentBrowserRuntime?.credentialCapture?.pending
+        ?: MutableStateFlow<com.example.mochi_pet.platform.browser.BrowserCredentialSaveRequest?>(null).asStateFlow()
+    private var manualBrowserJob: Job? = null
+    private var manualNavigationJob: Job? = null
+    private val mutableManualBrowserVisible = MutableStateFlow(false)
+    val manualBrowserVisible = mutableManualBrowserVisible.asStateFlow()
+    private val mutableSelectedBrowserCredential = MutableStateFlow<BrowserCredentialSummary?>(null)
+    val selectedBrowserCredential = mutableSelectedBrowserCredential.asStateFlow()
     val locationPermissionRequest: StateFlow<Boolean> =
         locationPermissionGate?.request
             ?: unavailableLocationPermissionRequest.asStateFlow()
@@ -429,8 +488,189 @@ class MochiHomeViewModel(
     fun browserWebView(context: Context): WebView? =
         agentBrowserRuntime?.webViewForUi(context)
 
-    fun releaseBrowserWebView() {
-        agentBrowserRuntime?.releaseWebViewFromUi()
+    fun releaseBrowserWebView(view: android.webkit.WebView) {
+        agentBrowserRuntime?.releaseWebViewFromUi(view)
+    }
+
+    fun speakAssistance(id: String) {
+        val request = assistanceRequest.value?.takeIf { it.id == id } ?: return
+        if (spokenAssistanceId == id) return
+        spokenAssistanceId = id
+        mutableAssistanceFeedback.value = null
+        val voice = voiceRuntime ?: return
+        voice.speak(request.message) { result ->
+            if (assistanceRequest.value?.id == id && result != SpeechPlaybackResult.COMPLETED) {
+                mutableAssistanceFeedback.value = "Could not speak the request. Please read it below."
+            }
+        }
+    }
+
+    fun answerAssistance(id: String, answer: UserAssistanceAnswer) {
+        if (assistanceRequest.value?.id != id) return
+        voiceRuntime?.stopSpeaking()
+        agentBrowserRuntime?.assistance?.respond(id, answer)
+    }
+
+    fun stopAssistanceSpeech(id: String) {
+        if (assistanceRequest.value?.id == id) voiceRuntime?.stopSpeaking()
+    }
+
+    suspend fun canClearBrowserData() = agentBrowserRuntime?.canClearSiteData() == true
+
+    suspend fun clearBrowserData(site: String?, cacheOnly: Boolean) {
+        checkNotNull(agentBrowserRuntime) { "Browser unavailable." }.clearData(site, cacheOnly)
+        mutableBrowserDataVersion.value++
+    }
+
+    suspend fun managedBrowserWebsites(sites: List<BrowserSite>, credentials: List<BrowserCredentialSummary>): List<BrowserWebsite> {
+        val hosts = sites.map { it.host }.toSet() + credentials.mapNotNull { it.origin.toHttpUrlOrNull()?.host }
+        val domains = checkNotNull(agentBrowserRuntime) { "Browser unavailable." }.websiteDataDomains(hosts)
+        return groupBrowserWebsites(sites, credentials, domains)
+    }
+
+    fun deleteManagedBrowserSite(domain: String) {
+        if (mutableBrowserDataDeleting.value) {
+            mutableBrowserManagementFeedback.value = "Website data deletion is still running. Wait before trying again."
+            return
+        }
+        mutableBrowserDataDeleting.value = true
+        mutableBrowserManagementFeedback.value = null
+        viewModelScope.launch {
+            try {
+                browserUiAction({ mutableBrowserManagementFeedback.value = it }) {
+                    check(agentJob?.isActive != true) { "Stop the active browser task before clearing website data." }
+                    manualBrowserJob?.cancelAndJoin()
+                    clearBrowserData(domain, cacheOnly = false)
+                    mutableBrowserManagementFeedback.value = "Website data cleared. Saved accounts were kept."
+                }
+            } finally {
+                mutableBrowserDataDeleting.value = false
+            }
+        }
+    }
+
+    fun openManagedWebsite(input: String, credential: BrowserCredentialSummary? = null) {
+        mutableBrowserManagementFeedback.value = null
+        val currentManualJob = manualBrowserJob?.takeIf { it.isActive }
+        val browser = agentBrowserRuntime
+        if (currentManualJob != null && browser?.state?.value?.manual == true) {
+            manualNavigationJob?.cancel()
+            manualNavigationJob = viewModelScope.launch(ioDispatcher + currentManualJob) {
+                browserUiAction({ mutableBrowserManagementFeedback.value = it }) {
+                    mutableSelectedBrowserCredential.value = credential
+                    val currentOrigin = browser.state.value.url.toHttpUrlOrNull()?.let {
+                        com.example.mochi_pet.core.browser.browserOrigin(it.toString())
+                    }
+                    if (credential != null && currentOrigin == credential.origin) {
+                        mutableManualBrowserVisible.value = true
+                        fillSelectedBrowserCredential()
+                        mutableBrowserManagementFeedback.value = if (credential.kind == BrowserLoginKind.SMS)
+                            "Phone number filled. Request a new code and sign in yourself."
+                        else "Account filled. Review the form and sign in yourself."
+                    } else {
+                        browser.openManual(browserDestination(input))
+                        if (credential != null) mutableBrowserManagementFeedback.value =
+                            "Open the login form, then choose this account from Sites."
+                        mutableManualBrowserVisible.value = true
+                    }
+                }
+            }
+            return
+        }
+        if (agentJob?.isActive == true || currentManualJob != null) {
+            mutableBrowserManagementFeedback.value = "Stop the active task before opening a website manually."
+            return
+        }
+        if (browser == null) {
+            mutableBrowserManagementFeedback.value = "Browser unavailable."
+            return
+        }
+        voiceRuntime?.stopSpeaking()
+        wakeRuntime?.pause()
+        manualBrowserJob = viewModelScope.launch(ioDispatcher) {
+            try {
+                val destination = browserDestination(input)
+                browser.beginTurn(wait = false)
+                try {
+                    mutableSelectedBrowserCredential.value = credential
+                    browser.openManual(destination)
+                    if (credential != null) mutableBrowserManagementFeedback.value =
+                        "Open the login form, then choose this account from Sites."
+                    mutableManualBrowserVisible.value = true
+                    kotlinx.coroutines.awaitCancellation()
+                } finally {
+                    withContext(NonCancellable) { browser.closeTurn() }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: com.example.mochi_pet.platform.browser.AgentBrowserException) {
+                mutableBrowserManagementFeedback.value = error.message
+            } catch (error: IllegalArgumentException) {
+                mutableBrowserManagementFeedback.value = error.message
+            } catch (error: IllegalStateException) {
+                mutableBrowserManagementFeedback.value = error.message
+            } catch (error: java.io.IOException) {
+                mutableBrowserManagementFeedback.value = error.message ?: "Website data could not be updated."
+            } finally {
+                mutableSelectedBrowserCredential.value = null
+                mutableManualBrowserVisible.value = false
+                wakeRuntime?.resume()
+            }
+        }
+    }
+
+    fun closeManualBrowser() { manualNavigationJob?.cancel(); manualBrowserJob?.cancel() }
+
+    fun showBrowserHome() { manualNavigationJob?.cancel(); mutableManualBrowserVisible.value = false }
+
+    fun resumeManualBrowser() {
+        if (browserState.value.manual) mutableManualBrowserVisible.value = true
+    }
+
+    suspend fun manualBrowserBack() {
+        if (agentBrowserRuntime?.manualBack() != true) showBrowserHome()
+    }
+
+    suspend fun manualBrowserForward() { agentBrowserRuntime?.manualForward() }
+
+    suspend fun assistanceBrowserBack(id: String): Boolean =
+        checkNotNull(agentBrowserRuntime) { "Browser unavailable." }.assistanceBack(id)
+
+    suspend fun fillAssistanceCredential(id: String, summary: BrowserCredentialSummary) {
+        fun checkRequest() {
+            check(assistanceRequest.value?.let { it.id == id && it.browser } == true) { "This assistance request expired." }
+        }
+        checkRequest()
+        val login = checkNotNull(browserCredentialVault).load(summary)
+        checkRequest()
+        checkNotNull(agentBrowserRuntime).fillUserCredential(login)
+    }
+
+    suspend fun fillSelectedBrowserCredential() {
+        val summary = checkNotNull(selectedBrowserCredential.value) { "Choose a saved account first." }
+        val login = checkNotNull(browserCredentialVault).load(summary)
+        checkNotNull(agentBrowserRuntime).fillUserCredential(login)
+    }
+
+    fun dismissCredentialSave(id: String) { agentBrowserRuntime?.credentialCapture?.dismiss(id) }
+
+    suspend fun saveCapturedCredential(id: String, username: String) {
+        val request = credentialSaveRequest.value?.takeIf { it.id == id }
+            ?: throw IllegalStateException("This save request expired.")
+        checkNotNull(browserCredentialVault).save(BrowserLogin(request.login.origin, username.trim(), request.login.password, request.login.kind))
+        dismissCredentialSave(id)
+    }
+
+    suspend fun saveSmsBrowserAccount(origin: String, phone: String) {
+        checkNotNull(browserCredentialVault).save(BrowserLogin(browserOrigin(origin), phone.trim(), kind = BrowserLoginKind.SMS))
+    }
+
+    suspend fun editBrowserCredential(summary: BrowserCredentialSummary, origin: String, username: String, password: String) {
+        checkNotNull(browserCredentialVault).edit(summary, origin, username, password)
+    }
+
+    suspend fun deleteBrowserCredential(summary: BrowserCredentialSummary) {
+        checkNotNull(browserCredentialVault).delete(summary)
     }
 
     fun navigate(intent: MochiNavigationIntent) {
@@ -568,6 +808,7 @@ class MochiHomeViewModel(
         query: String,
         continueListeningAfterReply: Boolean,
     ) {
+        closeManualBrowser()
         val trimmed = query.trim()
         if (trimmed.isEmpty()) {
             return
@@ -972,6 +1213,13 @@ class MochiHomeViewModel(
 
     fun disableWakeWord() {
         wakeRuntime?.disable()
+        mutableWakeFeedback.value = null
+    }
+
+    fun selectWakeKeyword(keyword: WakeKeyword) {
+        if (wakeRuntime?.state?.value?.keyword == keyword) return
+        stopChangedSpeechConnection()
+        wakeRuntime?.selectKeyword(keyword)
         mutableWakeFeedback.value = null
     }
 
@@ -2682,6 +2930,7 @@ class MochiHomeViewModel(
         }
 
     override fun onCleared() {
+        closeManualBrowser()
         stopVoicePreview()
         voiceCatalogJob?.cancel()
         interactionVersion += 1
@@ -2744,6 +2993,7 @@ class MochiHomeViewModel(
                         agentLinkResults = application.agentLinkResults,
                         termuxRuntime = application.termuxRuntime,
                         agentBrowserRuntime = application.agentBrowserRuntime,
+                        browserCredentialVault = application.browserCredentialVault,
                         weatherRepository = application.weatherRepository,
                         locationPermissionGate =
                             application.locationPermissionGate,

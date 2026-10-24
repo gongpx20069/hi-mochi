@@ -112,6 +112,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
@@ -174,8 +175,11 @@ import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.VoiceInputTrigger
 import com.example.mochi_pet.core.voice.VoiceRuntimeState
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
+import com.example.mochi_pet.core.wake.WakeKeyword
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import com.example.mochi_pet.core.web.WebContentException
 import com.example.mochi_pet.platform.browser.AgentBrowserUiState
@@ -472,6 +476,9 @@ private fun MochiAppContent(
     val cameraSnapshot by
         viewModel.cameraSnapshot.collectAsStateWithLifecycle()
     val browserState by viewModel.browserState.collectAsStateWithLifecycle()
+    val assistanceRequest by viewModel.assistanceRequest.collectAsStateWithLifecycle()
+    var showBrowserManager by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(surface) { if (surface != MochiSurface.Tools) showBrowserManager = false }
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
     var focusMode by rememberSaveable { mutableStateOf(false) }
     var focusStandby by rememberSaveable { mutableStateOf(false) }
@@ -746,6 +753,7 @@ private fun MochiAppContent(
             onStopVoice = viewModel::stopVoiceInput,
             onEnableWake = onEnableWake,
             onDisableWake = viewModel::disableWakeWord,
+            onSelectWakeKeyword = viewModel::selectWakeKeyword,
             onProviderProfileAction = viewModel::handleProviderProfileAction,
             onSpeechAction = viewModel::handleSpeechProfileAction,
             onLoadSpeechVoices = viewModel::loadSpeechVoices,
@@ -782,6 +790,7 @@ private fun MochiAppContent(
             onDisconnectAmap = viewModel::disconnectAmap,
             onSetAmapEnabled = viewModel::setAmapEnabled,
             onSetAgentBrowserEnabled = viewModel::setAgentBrowserEnabled,
+            onManageBrowser = { showBrowserManager = true },
             onAgentLinkAction = viewModel::onAgentLinkAction,
             onInstallMijia = viewModel::installMijiaExtension,
             onConfigureMijia = viewModel::configureMijiaExtension,
@@ -840,7 +849,7 @@ private fun MochiAppContent(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    if (browserState.active) {
+                    if (browserState.active && !browserState.manual && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
                             state = browserState,
                             webViewProvider = viewModel::browserWebView,
@@ -920,7 +929,7 @@ private fun MochiAppContent(
                     shape = RoundedCornerShape(28.dp),
                     tonalElevation = 6.dp,
                 ) {
-                    if (homePresentation && browserState.active) {
+                    if (homePresentation && browserState.active && !browserState.manual && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
                             state = browserState,
                             webViewProvider = viewModel::browserWebView,
@@ -1001,6 +1010,8 @@ private fun MochiAppContent(
             },
         )
     }
+    if (showBrowserManager) WebsiteManager(viewModel, onClose = { showBrowserManager = false })
+    BrowserExperience(viewModel)
     addTodoRequest?.let { request ->
         AddTodoDialog(
             scheduledDate = request.scheduledDate,
@@ -1017,13 +1028,10 @@ private fun MochiAppContent(
 private fun BrowserSessionCard(
     state: AgentBrowserUiState,
     webViewProvider: (android.content.Context) -> android.webkit.WebView?,
-    onRelease: () -> Unit,
+    onRelease: (android.webkit.WebView) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    DisposableEffect(state.sessionId) {
-        onDispose(onRelease)
-    }
     Box(
         modifier = modifier
             .background(Color(0xFF8FAEFF))
@@ -1037,14 +1045,17 @@ private fun BrowserSessionCard(
             color = Color.White,
             shape = RoundedCornerShape(25.dp),
         ) {
-            AndroidView(
-                factory = { context ->
-                    checkNotNull(webViewProvider(context)) {
-                        "Active browser session has no WebView"
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
+            androidx.compose.runtime.key(state.sessionId) {
+                AndroidView(
+                    factory = { context ->
+                        checkNotNull(webViewProvider(context)) {
+                            "Active browser session has no WebView"
+                        }
+                    },
+                    onRelease = onRelease,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
         Surface(
             modifier = Modifier
@@ -1121,7 +1132,7 @@ private fun MochiTopBar(
             )
             Text(
                 text = if (wakeState.enabled) {
-                    "Hi Mochi is ${wakeState.status.name.lowercase()}"
+                    "${wakeState.keyword.phrase} is ${wakeState.status.name.lowercase()}"
                 } else {
                     surface.displayName()
                 },
@@ -1426,6 +1437,7 @@ private fun SurfaceContent(
     onStopVoice: () -> Unit,
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
+    onSelectWakeKeyword: (WakeKeyword) -> Unit,
     onProviderProfileAction: (ProviderProfileAction) -> Unit,
     onSpeechAction: (SpeechProfileAction) -> Unit,
     onLoadSpeechVoices: (SpeechProvider, String?) -> Unit,
@@ -1458,6 +1470,7 @@ private fun SurfaceContent(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onManageBrowser: () -> Unit,
     onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
     onConfigureMijia: () -> Unit,
@@ -1527,6 +1540,7 @@ private fun SurfaceContent(
                 wakeFeedback = wakeFeedback,
                 onEnableWake = onEnableWake,
                 onDisableWake = onDisableWake,
+                onSelectWakeKeyword = onSelectWakeKeyword,
                 onProviderAction = onProviderProfileAction,
                 onSpeechAction = onSpeechAction,
                 onLoadSpeechVoices = onLoadSpeechVoices,
@@ -1569,6 +1583,7 @@ private fun SurfaceContent(
                 onDisconnectAmap = onDisconnectAmap,
                 onSetAmapEnabled = onSetAmapEnabled,
                 onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
+                onManageBrowser = onManageBrowser,
                 onAgentLinkAction = onAgentLinkAction,
                 onInstallMijia = onInstallMijia,
                 onConfigureMijia = onConfigureMijia,
@@ -3694,6 +3709,7 @@ private fun ToolsSurface(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onManageBrowser: () -> Unit,
     onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
     onConfigureMijia: () -> Unit,
@@ -3815,6 +3831,9 @@ private fun ToolsSurface(
                             onCheckedChange = onSetAgentBrowserEnabled,
                             enabled = !state.isLoading,
                         )
+                    }
+                    Button(onClick = onManageBrowser, enabled = !state.isLoading) {
+                        Text("Websites and logins")
                     }
                     TextButton(
                         onClick = {
@@ -6004,6 +6023,48 @@ private fun ConversationError(
 }
 
 @Composable
+@androidx.annotation.RequiresApi(37)
+private fun LocalNetworkPermissionSettings() {
+    val context = LocalContext.current
+    val permission = Manifest.permission.ACCESS_LOCAL_NETWORK
+    var granted by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        granted = it
+    }
+    LifecycleResumeEffect(context) {
+        granted = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        onPauseOrDispose { }
+    }
+    PlannerCard {
+        Text("Local network access", fontWeight = FontWeight.Bold)
+        Text(
+            "Only needed for AI or MCP servers on your local network. Public cloud connections do not need this permission.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            if (granted) "Local network access is allowed."
+            else "Local network access is off. Allow it before connecting to a local server.",
+            color = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+        )
+        if (!granted) {
+            OutlinedButton(onClick = { launcher.launch(permission) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Allow local network access")
+            }
+        }
+        TextButton(onClick = {
+            context.startActivity(Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                "package:${context.packageName}".toUri(),
+            ))
+        }, modifier = Modifier.fillMaxWidth()) {
+            Text("Open app permissions")
+        }
+    }
+}
+
+@Composable
 internal fun ProviderSettingsSurface(
     state: ProviderSettingsUiState,
     speechState: SpeechSettingsUiState,
@@ -6027,6 +6088,7 @@ internal fun ProviderSettingsSurface(
     onLoadSpeechVoices: (SpeechProvider, String?) -> Unit = { _, _ -> },
     onPreviewSpeechVoice: (SpeechProvider, String, String?) -> Unit = { _, _, _ -> },
     onStopVoicePreview: () -> Unit = {},
+    onSelectWakeKeyword: (WakeKeyword) -> Unit = {},
 ) {
     var recentTurns by remember(agentSettingsState.settings) {
         mutableStateOf(
@@ -6410,9 +6472,9 @@ internal fun ProviderSettingsSurface(
                             )
                             Text(
                                 text = if (wakeState.enabled) {
-                                    "Hi Mochi is ${wakeState.status.name.lowercase()}"
+                                    "${wakeState.keyword.phrase} is ${wakeState.status.name.lowercase()}"
                                 } else {
-                                    "Say Hi Mochi hands-free"
+                                    "Say ${wakeState.keyword.phrase} hands-free"
                                 },
                                 color =
                                     MaterialTheme.colorScheme.onSurfaceVariant,
@@ -6426,6 +6488,19 @@ internal fun ProviderSettingsSurface(
                             },
                         ) {
                             Text(if (wakeState.enabled) "Disable" else "Enable")
+                        }
+                    }
+                    WakeKeyword.entries.forEach { keyword ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().selectable(
+                                selected = wakeState.keyword == keyword,
+                                role = Role.RadioButton,
+                                onClick = { onSelectWakeKeyword(keyword) },
+                            ).padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = wakeState.keyword == keyword, onClick = null)
+                            Text(if (keyword == WakeKeyword.ENGLISH) "English · Hi Mochi" else "Chinese · 老莫老莫")
                         }
                     }
                     wakeState.errorMessage?.let {
@@ -6444,6 +6519,9 @@ internal fun ProviderSettingsSurface(
             providerShareSection()
             item { SettingsPartHeading("AI connections", "Save multiple providers and choose the connection Mochi uses.") }
             item { ProviderConnectionsSection(state, onProviderAction) }
+            if (Build.VERSION.SDK_INT >= 37) {
+                item { LocalNetworkPermissionSettings() }
+            }
             item { SettingsPartHeading("Speech and wake", "Configure recognition, reply voices, and hands-free wake.") }
             speechSection()
             wakeSection()
@@ -6604,7 +6682,7 @@ internal fun ProviderSettingsSurface(
                         },
                         label = { Text("Mochi Provider link") },
                         placeholder = {
-                            Text("mochi://provider/import#v4...")
+                            Text("mochi://provider/import#v5...")
                         },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
@@ -6618,7 +6696,7 @@ internal fun ProviderSettingsSurface(
                         showReceiveProviders = false
                         receivedProviderLink = ""
                     },
-                    enabled = listOf("v2", "v3", "v4").any { receivedProviderLink.startsWith("mochi://provider/import#$it.") },
+                    enabled = listOf("v2", "v3", "v4", "v5").any { receivedProviderLink.startsWith("mochi://provider/import#$it.") },
                 ) {
                     Text("Continue")
                 }

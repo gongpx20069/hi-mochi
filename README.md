@@ -57,7 +57,8 @@ and choose the APK that matches the device:
    preset or custom endpoint, and enter your model and API key.
    Optionally add a [speech connection](#supported-speech-providers) and tap **Use**.
 3. Start a conversation by text or microphone; grant microphone permission
-   for voice input and enable the **“Hi Mochi”** wake word when ready.
+   for voice input and enable the wake word when ready. In **Settings > Speech
+   and wake**, choose **“Hi Mochi”** (default) or **“老莫老莫”**.
    Configure additional Tools and Skills only as you need them.
 
 The ABI-specific APKs contain the same Mochi features as the universal APK;
@@ -79,13 +80,13 @@ Settings remains available from the top-right action.
 | Provider | Configuration | Credentials |
 | --- | --- | --- |
 | OpenAI | Prefilled `https://api.openai.com/v1`; enter model | [OpenAI API key](https://platform.openai.com/api-keys) |
-| Azure OpenAI | Azure resource endpoint, **deployment name** as the model, and API version | [Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| Azure OpenAI | Azure resource endpoint and **deployment name** as the model; API version for Chat Completions only | [Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
 | DeepSeek | Prefilled `https://api.deepseek.com`; enter model | [Official API guide](https://api-docs.deepseek.com/) |
 | Kimi | Prefilled `https://api.moonshot.cn/v1`; enter model | [Official API guide](https://platform.kimi.com/docs/get-api-key) |
 | GLM | Prefilled `https://open.bigmodel.cn/api/paas/v4`; enter model | [Official API guide](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
 | MiniMax (China) | Prefilled `https://api.minimax.cn/v1`; enter model and verify account region | [Official API guide](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
 | Agnes-AI | Prefilled `https://apihub.agnes-ai.com/v1`; enter model | [Official API guide](https://wiki.agnes-ai.com/en/docs/quickstart) |
-| Custom OpenAI-compatible | User-defined HTTPS endpoint and model using the OpenAI chat/tool-call protocol | API key issued by that provider |
+| Custom OpenAI-compatible | User-defined HTTPS endpoint and model supporting tool calls through the selected API protocol | API key issued by that provider |
 
 **Settings > AI connections** saves multiple named accounts and models, with
 editable official endpoint presets for OpenAI, DeepSeek, Kimi, GLM, MiniMax
@@ -95,11 +96,17 @@ Adding another connection preserves the current choice. **Use** switches and
 cancels running local Agent tasks; future schedules remain enabled. Existing
 single-provider settings migrate without re-entering the key.
 
+Each connection's **Advanced connection settings > API protocol** selects Responses
+or Chat Completions. New OpenAI/Azure connections default to Responses; other
+presets and existing connections retain Chat Completions unless changed.
+Switching only the protocol reuses the saved key. Choose a protocol supported by
+the endpoint and model; Mochi never switches automatically after an error.
+
 Settings starts with **Share/import**, followed by AI connections, Speech/wake,
 Conversation/persona, and Display/language. Sharing can include multiple checked
 LLM and speech connections. Import adds them instead of overwriting saved accounts
-and selects each shared active connection. New v4 links require an updated receiver;
-existing v2/v3 links remain importable. Anyone holding a full link can use the
+and selects each shared active connection. New v5 links include API protocol and
+require an updated receiver; existing v2/v3/v4 links remain importable. Anyone holding a full link can use the
 included API credentials.
 
 ### Supported Speech Providers
@@ -212,7 +219,7 @@ microphone test and voice preview.
 
 ### Always ready for your voice
 
-- Wake Mochi anytime with the on-device **“Hi Mochi”** wake word.
+- Wake Mochi with your selected on-device phrase: **“Hi Mochi”** or **“老莫老莫”**.
 - Continue speaking naturally through automatic follow-up listening.
 - Use Android speech recognition by default, or optionally connect built-in
   iFlytek/Azure Speech-to-Text settings for greater reliability.
@@ -224,7 +231,7 @@ microphone test and voice preview.
 
 | Voice first | Remember what matters | Get real work done |
 | --- | --- | --- |
-| Always-ready “Hi Mochi” wake word and continuous voice conversation | Local conversation history and ICU-tokenized lexical memory recall | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
+| Selectable English/Chinese wake phrase and continuous voice conversation | Local conversation history and ICU-tokenized lexical memory recall | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
 | Android speech by default, with optional iFlytek/Azure recognition and synthesis; text input remains available | Editable `SOUL`, `USER`, and `AGENTS` persona files | Trusted cards, native navigation, and serial Researcher/Analyst Subagents surface useful results |
 
 | Cowork with **Notion** and **Tencent Docs** | Expand through the Skill Market |
@@ -265,14 +272,14 @@ once its provider is connected and its Tools are enabled.
 | Mochi Planner | Enabled | Manages Mochi calendar events and dated todos | None |
 | Voice Navigation | Enabled | Opens the relevant native Mochi surface from conversation intent | None |
 | Scheduled Automations | Enabled | Runs one-time or recurring Agent prompts and writes results to Conversation | Notification permission; exact-alarm access is optional |
-| Web Search | Enabled | Researches public web and WeChat official-account content through Agent Browser | None |
+| Browser | Enabled | Opens links, reads/compares web pages, searches Bing or WeChat sources, and reuses website sessions | None; requires Agent Browser read Tools |
 | Product Search | Enabled | Finds and compares public product pages without ordering or payment | None |
 | Douban Ratings | Enabled | Reads public Douban ratings, counts, and review themes | None |
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
 | **Notion Knowledge** | Disabled | Coworks with you to research, organize material, draft new pages, and find or update information in your authorized private knowledge base | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
 | **Tencent Docs Knowledge** | Disabled | Coworks with you to research, organize material, draft new documents, and find or update information in your authorized private knowledge base | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
 | **Feishu Knowledge** | Disabled | Searches and browses authorized cloud documents, reads before editing, and verifies requested creation/updates by readback | Tools > Feishu MCP; [self-built app and user authorization](https://open.feishu.cn/app) |
-| Travel Planning | Enabled | Uses Amap for grounded routes and weather, then Agent Browser to research public no-login train or flight options without booking | [Create an Amap Web Service Key](https://console.amap.com/); enable Agent Browser |
+| Travel Planning | Enabled | Uses Amap for grounded routes and weather, then Agent Browser to research train or flight options without booking | [Create an Amap Web Service Key](https://console.amap.com/); enable Agent Browser |
 | Merchant Discovery | Enabled | Finds and compares merchants using available Amap ratings, average cost, hours, phone, tags, and photos | [Create an Amap Web Service Key](https://console.amap.com/) |
 
 Skills requiring separately installed apps are listed under
@@ -285,7 +292,7 @@ Skills requiring separately installed apps are listed under
 | **Planner** | `manage_mochi_calendar`<br>`manage_mochi_todo` | Read and update Mochi-owned events and dated todos. No additional setup. |
 | **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
 | **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
-| **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Research public HTTPS pages in one visible, bounded Android WebView session. |
+| **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Browse public HTTPS websites with reusable local login and Agent-selected mobile/desktop mode. |
 | **Native UX** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | Open trusted Mochi surfaces or run bounded pure JavaScript calculations locally. |
 | **Amap Maps** | Place search · Merchant details · Routes<br>Geocoding · Reverse geocoding · Weather | Search places and merchants, compare available ratings and average cost, and plan routes with trusted GCJ-02 coordinates. Requires a Web Service Key. |
 | **Connected MCP** | **Notion** · **Tencent Docs** · **Feishu**<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
@@ -293,14 +300,43 @@ Skills requiring separately installed apps are listed under
 Agent Browser, Mochi built-ins, and provider Tool details are grouped and
 collapsed by default in Tools. Scheduled runs receive only the read-only
 Browser subset; foreground conversations may also click and enter page data.
-Every Tool has an independent switch, and provider-backed Tools also require
+Provider Tools have independent switches, and provider-backed Tools also require
 their provider switch to be enabled.
+
+**Tools > Agent Browser > Websites and logins** opens a Bing search/address field
+and website list. Known websites with detected local data or saved accounts appear
+automatically. Open a website item for its blue Cookie/site-data entry and purple
+password/SMS accounts; labels distinguish them without relying on color.
+Swipe credentials halfway left for Edit/Delete, or site data for Delete only;
+swiping never removes a row. The browser's four bottom controls are Back,
+Forward, Home and Sites. Home keeps the current page for resuming;
+Sites opens the same website lists in a popup. Supported login-form submissions offer to save
+the website, username and password locally with Keystore encryption and native
+confirmation. Passwords never go to the model. Selecting an account allows
+explicit same-origin filling without automatic submission. SMS logins save only
+the website and phone number, never verification codes; expired logins still need
+a new code. **Sites > ... > Add SMS login account** can record an already
+completed or unsupported login without signing out. Deleting an account
+preserves the current website login; separate website-data clearing keeps saved
+passwords. Per-site deletion includes subdomains, warns about sign-out and closes
+the current manual page first. Stored website data is not proof of valid login.
+Mochi chooses the appropriate
+mobile/desktop view; no manual mode setting is needed. Resource
+cache can be cleared separately without logging out. Existing login is reused;
+when human login or verification is needed, Main's `request_user_assistance`
+pauses the task and speaks its explanation. Enter login credentials in the page, not chat,
+then choose Continue; Mochi checks the page before proceeding. Questions use
+choices or typed answers. Complete deletion requires a compatible updated
+System WebView and affects the parent domain's shared subdomain login.
+This version has one shared session store, not isolated account profiles, and
+cannot resume a pending task after process death. Capture supports top-level forms
+and recognizable login buttons, not every AJAX, iframe or external authentication flow.
 
 Travel Planning uses the normal visible controls on public HTTPS pages. Train
 research starts from the official 12306 query page; flight research prefers
-official airline sites. Mochi never logs in, bypasses verification, enters
-passenger or payment data, or continues into booking. It stops when a site
-requires authentication, CAPTCHA, identity verification, or checkout.
+official airline sites. Mochi reuses working sessions or asks the user to handle
+login/verification; it never bypasses verification, enters passenger or payment
+data, or continues into booking or checkout.
 
 ### Skill Market
 
@@ -388,9 +424,9 @@ Subagent/Scheduled Agent access is provided. Linked chats are not cached-live
 task monitors by themselves. Newly submitted Mochi tasks are followed separately
 with durable, encrypted result cards in the conversation and task center.
 Update both AgentLink and its Bridge for this feature. Background collection is
-best effort, not instant push. At the next “Hi Mochi”, a short local briefing may
+best effort, not instant push. On your next wake, a short local briefing may
 replace “Yes?”. Input wins: unsupported simultaneous speech skips the brief.
-Saying “Hi Mochi” again dismisses the current brief and unread markers without
+Repeating the selected wake phrase dismisses the current brief and unread markers without
 deleting history or cancelling the remote task.
 
 ### Run local commands with Termux

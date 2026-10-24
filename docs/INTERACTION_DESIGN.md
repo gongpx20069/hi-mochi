@@ -67,14 +67,20 @@ configuration, and response errors. Raw provider error text is not displayed.
 These messages do not claim that device actions were skipped or rolled back:
 an earlier Tool may already have executed before a later model request failed.
 
-The native `HI MOCHI` foreground wake service is enabled by default once the
+The native foreground wake service is enabled by default once the
 required Android permissions are granted. Settings can disable it, and that
 explicit choice is retained across later launches.
+Settings > Speech > Wake word offers a single selection: English `Hi Mochi`
+(default) or Chinese `老莫老莫`. The selected phrase appears beside its runtime
+status and in the persistent notification. Selection is independent of UI
+language and persists while disabled. A keyword update alone does not enable
+or resume capture; ending an active voice interaction uses the existing safe
+microphone release and wake-restoration path.
 When Mochi is visible, wake and media triggers start listening without changing
 the current surface.
 When it is backgrounded or locked, wake detection posts a lock-screen-visible
 notification; tapping it starts the same permission-checked voice path.
-After a confirmed “Hi Mochi” wake, Mochi speaks a one-syllable acknowledgement
+After a confirmed selected wake phrase, Mochi speaks a one-syllable acknowledgement
 ("嗯？" in Chinese, "Yes?" in English) before listening. The acknowledgement
 is transient feedback, not a conversation message, and is excluded from
 history and model context. Microphone-button and media-button starts do not add
@@ -296,9 +302,13 @@ Add opens a screenshot-protected editor; OpenAI is prefilled, and presets also
 include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Azure, and custom. Each
 links to its official guide. Endpoint remains editable; model is supplied by
 the user because account access varies. Standard APIs are not Coding Plans.
-Azure calls its model field the deployment name and exposes API version.
+Azure calls its model field the deployment name and exposes API version only for
+Chat Completions. Advanced settings has an API protocol selector: new OpenAI/Azure
+connections default to Responses, others to Chat Completions. Existing connections
+retain their protocol; changing it reuses the same key and does not change
+provider, endpoint or model. Unsupported protocols fail rather than auto-switching.
 Keys are masked and never loaded into the editor. Blank preserves only that
-profile's encrypted key; changing provider protocol or endpoint host requires
+profile's encrypted key; changing provider authentication type or endpoint host requires
 replacement. Each profile independently stores timeout and image-input policy.
 First save activates; subsequent additions do not switch. Use cancels running
 local Agents, children and current scheduled runs before the new configuration
@@ -307,6 +317,13 @@ or editing an inactive connection does not. Future schedules remain enabled.
 Remote AgentLink tasks and submitted Termux processes are not stopped by this
 local cancellation. Deleting the active profile requires confirmation and leaves
 no active connection; there is no implicit fallback to another account.
+
+On Android 17 and newer, **AI connections** also contains a local-network
+permission card for local AI/MCP endpoints. It shows the current Android grant,
+an explicit **Allow local network access** action when denied, and **Open app
+permissions** for recovery or revocation. Returning from system settings refreshes
+the state. It does not prompt automatically or imply that public cloud services
+need this permission. Browser and REST public-URL restrictions remain unchanged.
 
 **Speech/wake** shows saved connection cards with Use/Edit/Delete and a separate
 Add speech connection button. Android is a built-in, nondeletable default card;
@@ -374,7 +391,7 @@ Mi Home sessions, and Android permissions require setup on the receiving
 device and never appear in the checklist.
 Speech shares include the synthesis opt-in and selected voice. Older v2 speech
 shares without these fields import with system speech output. New shares use
-v4 and require an updated receiver; existing authenticated v2/v3 links remain
+v5, include AI API protocol, and require an updated receiver; existing authenticated v2/v3/v4 links remain
 importable as additional saved connections.
 
 Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
@@ -436,12 +453,12 @@ debug SHA1 fingerprints are not required, and distinguishes the optional
 digital-signature Security Key from SHA1. Its six map and merchant capabilities
 remain individually selectable in an expandable Tool list. The two built-in
 Travel Planning and Merchant Discovery Skills provide route, destination
-weather, public no-login train or flight research, nearby-search, merchant
+weather, train or flight research, nearby-search, merchant
 detail, rating, average-cost, and missing-review guidance. Travel Planning is
 available only in foreground interactions with its Amap and all five Agent
-Browser Tools enabled. It stops on authentication, CAPTCHA, identity,
-passenger, booking, or payment flows rather than requesting manual takeover or
-bypassing the website.
+Browser Tools enabled. It reuses login and can request human login/verification,
+but never bypasses site controls or proceeds into passenger, booking or payment
+flows.
 Current Location appears as an independent built-in Tool switch. A clearly
 location-dependent Agent request keeps the current surface, continues after
 the Android permission result, and returns typed permission, timeout, or
@@ -450,6 +467,58 @@ Agent Browser uses the same provider-card pattern. Its provider-level enable
 switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
+**Websites and logins** stays outside its collapsed Tool list as a filled button
+matching Connect Feishu. It opens a secure full-screen dialog with only a Bing
+search/address field centered in the page, Mochi's launcher logo above it, and
+an always-visible Close action at the top right. The logo and concise
+"Search the web. Save accounts safely." caption share a softly tinted brand area.
+A separate rounded translucent
+frosted-look panel below search contains website groups and the compact data
+overflow menu. There are no introductory or session-status cards.
+Each website row shows its registrable domain and badges for local data and
+saved credentials. Clicking it opens a second secure bottom-sheet list.
+Its Cookie/site-data row uses a blue text badge and exposes only Delete;
+password/SMS credentials use purple text badges and expose Edit/Delete.
+Credential rows show the account identifier and exact origin; passwords use a
+fixed mask. All left swipes stop halfway, even after repeated swipes or width
+changes; swiping never removes a row. Explicit actions also have accessibility
+alternatives. Color is supplementary, never the only type indicator.
+Search opens a full-screen manual browser with only four bottom controls:
+Back, Forward, Home, and Sites (Chinese: 网站), in an inset rounded navigation
+bar. History uses arrow icons with accessible labels and disabled states;
+Home and Sites use icons with short single-line labels. Sites is the
+emphasized action; its English label must not wrap on a 320 dp screen.
+Home reveals the search/account homepage without destroying or reloading
+the current page; Return to page restores that same WebView. System Back follows
+history, then returns Home. The homepage's Close action ends manual browsing.
+Sites opens the same website-list component in a secure bottom sheet,
+including its swipe/edit/delete interactions, without a separate management page.
+Choosing a saved account for the current exact origin explicitly fills its login
+form and never submits; choosing another origin opens that website. To fill after
+reaching its login form, choose the account from Sites again.
+A supported top-level login submission/button opens a secure Save/Not now dialog,
+showing the native website origin and editable account identifier. Password
+accounts show a fixed password mask; SMS accounts show a phone field and a short
+notice that codes are never saved and expired logins need a new code.
+This is a save offer, not evidence that authentication succeeded.
+SMS rows are labelled SMS login. The account menu's Add SMS login account action
+supports completed or unsupported login flows without asking the user to log out;
+only website and phone are entered. Selecting an SMS account fills only its phone.
+Editing supports username, website and replacement password for password accounts;
+changing their website requires password re-entry. SMS editing offers only website
+and phone. Confirmed account deletion preserves current login.
+The overflow menu has separate cache and confirmed all-website-data deletion;
+both preserve saved passwords. Closing reveals the unchanged Tools page.
+There is no mode selector; Mochi chooses mobile/desktop as needed. Legacy manual
+preferences do not override that decision.
+Website-data deletion includes shared login, unlike saved-account deletion.
+Its confirmation identifies the domain, includes its subdomains, and explains
+that saved credentials remain. During manual browsing it also warns that the
+current page will close; the ViewModel owns the confirmed operation so closing
+that browser popup does not cancel the deletion. The homepage shows its result.
+An active Agent browser blocks this action rather than being cancelled.
+Resource-cache clearing is separate and preserves login. Unsupported complete
+deletion requires a System WebView update, not partial cleanup.
 
 Tools places its Extensions section after all MCP and REST connection cards. The Mi Home
 card always occupies one stable position there, follows Mochi's selected
@@ -567,9 +636,26 @@ shown; the existing global pipeline indicator reports Tool progress. The
 browser closes after the final model response and before TTS, and also closes
 on cancellation, timeout, or failure.
 
-Moving Mochi to the background does not pause Browser Tools. A foreground Agent
-notification shows that browsing is active and provides Stop. Browser actions
-continue without approval prompts or waits.
+Moving Mochi to the background does not itself pause Browser Tools. Ordinary
+actions need no approval. Main can explicitly request user assistance: its
+generated explanation is displayed and spoken once while resumed. Questions
+use a secure bottom sheet with immediate choices; a text field appears only for
+free-text questions or after choosing to write another answer. Dismiss cancels
+the question, never submits an answer.
+Browser handoff presents the existing page as a secure full-screen browser,
+not a help alert: compact origin header, paused-state label and two-line request,
+with the full explanation/privacy information in a details sheet. The rounded
+bottom bar has Accounts and **Return to Mochi**; only exact-origin saved accounts
+are offered for native filling without navigation or submission. The request
+banner hides while the keyboard is open; controls respect system/IME insets.
+Back navigates website history; at its beginning it opens the menu, which has
+**Stop Agent**. Closing details/accounts never resumes the Agent.
+The ordinary Home WebView
+is not mounted simultaneously and does not accept touch. While waiting, no
+Agent page reads/actions run; completion is verified with a fresh read.
+A private generic notification opens Mochi when notifications are enabled;
+no automatic Activity launch or process-death resumption is promised. The
+ten-minute wait ends explicitly on answer, cancellation or timeout.
 Selecting any card opens a rendered Markdown preview; market skills can switch
 between Preview and Edit after installation. The reader hides YAML frontmatter
 and renders headings, paragraphs, ordered/unordered lists, quotes, fenced code,

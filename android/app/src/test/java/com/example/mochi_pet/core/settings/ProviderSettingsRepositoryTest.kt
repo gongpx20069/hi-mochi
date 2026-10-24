@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import com.example.mochi_pet.core.agent.llm.ProviderType
+import com.example.mochi_pet.core.agent.llm.ApiProtocol
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -23,6 +24,31 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ProviderSettingsRepositoryTest {
+    @Test fun `legacy profiles stay chat and changing only protocol preserves key and cancels active runs`() = runBlocking {
+        val store = InMemoryPreferencesDataStore()
+        val runs = ProviderRunCoordinator()
+        val repo = DataStoreProviderSettingsRepository(store, FakeApiKeyCipher(), runs)
+        val first = repo.saveProfile(profile("First", "fixture-key")).active!!
+        val key = stringPreferencesKey("provider.profiles.v1")
+        store.updateData { it.toMutablePreferences().apply {
+            this[key] = this[key]!!.replace(",\"apiProtocol\":\"CHAT_COMPLETIONS\"", "")
+        } }
+        assertFalse(store.data.first()[key]!!.contains("apiProtocol"))
+        assertEquals(ApiProtocol.CHAT_COMPLETIONS, repo.loadRuntimeConfig().apiProtocol)
+        val ready = CompletableDeferred<Unit>()
+        val owner = launch { runs.register(coroutineContext[Job]!!); ready.complete(Unit); awaitCancellation() }
+        ready.await()
+        repo.saveProfile(profile("First", null).let {
+            it.copy(id = first.id, settings = it.settings.copy(apiProtocol = ApiProtocol.RESPONSES))
+        })
+        assertTrue(owner.isCancelled)
+        val restored = DataStoreProviderSettingsRepository(store, FakeApiKeyCipher())
+        assertEquals(ApiProtocol.RESPONSES, restored.loadRuntimeConfig().apiProtocol)
+        assertEquals("fixture-key", restored.loadRuntimeConfig().apiKey)
+        assertEquals(first.id, restored.loadProfiles().activeId)
+        assertEquals(ApiProtocol.RESPONSES, restored.loadRuntimeConfig().forForegroundRequest().apiProtocol)
+    }
+
     @Test fun `migrates legacy credentials exactly once and keeps settings across recreation`() = runBlocking {
         val store = InMemoryPreferencesDataStore()
         store.updateData { it.toMutablePreferences().apply {

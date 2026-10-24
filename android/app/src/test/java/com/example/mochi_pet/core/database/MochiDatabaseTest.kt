@@ -18,6 +18,8 @@ import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -164,8 +166,8 @@ class MochiDatabaseTest {
         val skills = repository.listSkills()
         assertEquals(16, skills.size)
         assertEquals(
-            listOf("Web Search"),
-            skills.filter { it.id.contains("web-search") }.map { it.name },
+            listOf("Browser"),
+            skills.filter { it.id == "builtin:browser" }.map { it.name },
         )
         assertEquals(
             true,
@@ -296,7 +298,7 @@ class MochiDatabaseTest {
 
             repository.setEnabled("builtin:notion-knowledge", true)
             repository.setEnabled("builtin:tencent-docs-knowledge", true)
-            repository.setEnabled("builtin:web-search", false)
+            repository.setEnabled("builtin:browser", false)
             val updated = repository.listSkills()
 
             assertEquals(
@@ -309,7 +311,7 @@ class MochiDatabaseTest {
             )
             assertEquals(
                 false,
-                updated.first { it.name == "Web Search" }.enabled,
+                updated.first { it.name == "Browser" }.enabled,
             )
             val skills = repository.listEnabledMetadata()
             assertEquals(
@@ -322,7 +324,7 @@ class MochiDatabaseTest {
             )
             assertEquals(
                 false,
-                skills.any { it.name == "web-search" },
+                skills.any { it.name == "browser" },
             )
             assertTrue(
                 repository.listEnabledMetadata(emptySet()).isEmpty(),
@@ -373,6 +375,88 @@ class MochiDatabaseTest {
                 ).any { it.name == "travel-planning" },
             )
         }
+
+    @Test
+    fun `browser upgrade preserves legacy preferences without duplicate skills and new overrides win`() = runBlocking<Unit> {
+        val dao = database.skillDao()
+        val repository = RoomSkillRepository(dao)
+        repository.setEnabled("builtin:browser", false)
+        val template = checkNotNull(dao.getById("builtin:browser"))
+        dao.delete(template)
+        for (enabled in listOf(false, true)) {
+            dao.upsert(
+                template.copy(
+                    id = "builtin:web-search",
+                    name = "Web Search",
+                    enabled = enabled,
+                    content = "Old search-only instructions",
+                ),
+            )
+            val restored = RoomSkillRepository(dao)
+            val skills = restored.listSkills()
+            val browser = skills.single { it.id == "builtin:browser" }
+            assertEquals(enabled, browser.enabled)
+            assertFalse(skills.any { it.id == "builtin:web-search" })
+            assertFalse(browser.content.contains("Old search-only instructions"))
+            assertEquals(
+                enabled,
+                restored.listEnabledMetadata().any { it.name == "browser" },
+            )
+            assertFalse(restored.listEnabledMetadata().any { it.name == "web-search" })
+        }
+        repository.setEnabled("builtin:browser", false)
+        assertFalse(
+            RoomSkillRepository(dao).listSkills()
+                .single { it.id == "builtin:browser" }.enabled,
+        )
+    }
+
+    @Test
+    fun `browser loads in read-only roles and declares optional tools only when available`() = runBlocking<Unit> {
+        val repository = RoomSkillRepository(database.skillDao())
+        val reads = setOf("browser_read", "browser_navigate", "browser_scroll")
+        val context = ToolExecutionContext(
+            currentDate = LocalDate.of(2026, 10, 23),
+            currentSurface = MochiSurface.Conversation,
+        )
+        assertEquals(
+            listOf("browser"),
+            repository.listEnabledMetadata(reads).map { it.name },
+        )
+        val foreground = reads +
+            setOf("browser_click", "browser_input", "request_user_assistance")
+        val registries = listOf(
+            reads to reads,
+            (reads + "browser_click") to (reads + "browser_click"),
+            foreground to foreground,
+            (foreground + "manage_mochi_todo") to foreground,
+        )
+        for ((available, expected) in registries) {
+            val result = LoadSkillTool(repository, available).execute(
+                buildJsonObject { put("skill_name", "browser") },
+                context,
+            )
+            assertEquals("ok", result.status)
+            val document = checkNotNull(result.data).jsonObject
+                .getValue("content").jsonPrimitive.content
+            val declared = document.lineSequence()
+                .first { it.startsWith("allowed-tools: ") }
+                .removePrefix("allowed-tools: ").split(" ").toSet()
+            assertEquals(expected, declared)
+            assertTrue(document.contains("no model-facing tool"))
+            assertTrue(document.contains("currently has no saved-account picker"))
+            assertTrue(document.contains("Cache improves loading, not information freshness"))
+        }
+        val missing = reads - "browser_read"
+        assertTrue(repository.listEnabledMetadata(missing).isEmpty())
+        assertEquals(
+            "error",
+            LoadSkillTool(repository, missing).execute(
+                buildJsonObject { put("skill_name", "browser") },
+                context,
+            ).status,
+        )
+    }
 
     @Test
     fun `travel planning preserves the legacy Amap skill enablement`() =
@@ -452,11 +536,11 @@ class MochiDatabaseTest {
             )
 
             val loaded = tool.execute(
-                buildJsonObject { put("skill_name", "web-search") },
+                buildJsonObject { put("skill_name", "browser") },
                 context,
             )
             assertEquals("ok", loaded.status)
-            assertTrue(loaded.data.toString().contains("name: web-search"))
+            assertTrue(loaded.data.toString().contains("name: browser"))
 
             val productSearch = tool.execute(
                 buildJsonObject {
@@ -465,6 +549,7 @@ class MochiDatabaseTest {
                 context,
             )
             assertEquals("ok", productSearch.status)
+            assertTrue(productSearch.data.toString().contains("For a supplied product URL"))
             assertTrue(
                 productSearch.data.toString().contains(
                     "https://www.bing.com/search?q=",
@@ -549,6 +634,8 @@ class MochiDatabaseTest {
                 context,
             )
             assertEquals("ok", stock.status)
+            assertTrue(stock.data.toString().contains("Visit only the requested ticker URLs"))
+            assertTrue(stock.data.toString().contains("For a requested full"))
             assertTrue(stock.data.toString().contains("browser_navigate"))
             assertTrue(
                 stock.data.toString().contains(
@@ -578,9 +665,9 @@ class MochiDatabaseTest {
                 schedules.data.toString().contains("same provider"),
             )
 
-            repository.setEnabled("builtin:web-search", false)
+            repository.setEnabled("builtin:browser", false)
             val disabled = tool.execute(
-                buildJsonObject { put("skill_name", "web-search") },
+                buildJsonObject { put("skill_name", "browser") },
                 context,
             )
             assertEquals("error", disabled.status)

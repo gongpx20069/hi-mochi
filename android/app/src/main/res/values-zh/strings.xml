@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mochi</string>
+    <string name="assistance_notification_channel">Mochi 用户协助</string>
+    <string name="assistance_notification_title">Mochi 需要你的协助</string>
+    <string name="assistance_notification_text">打开 Mochi 回答问题或处理网站登录</string>
     <string name="wake_notification_channel">Mochi 唤醒词</string>
     <string name="wake_notification_title">Mochi 正在聆听</string>
-    <string name="wake_notification_text">说“Hi Mochi”或使用耳机按钮</string>
+    <string name="wake_notification_text">说“%1$s”或使用耳机按钮</string>
     <string name="wake_notification_talk">对话</string>
     <string name="wake_notification_stop">停止</string>
     <string name="wake_detected_channel">Mochi 唤醒通知</string>

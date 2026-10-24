@@ -14,7 +14,6 @@ require(mochiVersionPatch > 0) {
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.parcelize")
     id("org.jetbrains.kotlin.plugin.serialization")
@@ -22,12 +21,12 @@ plugins {
 
 android {
     namespace = "com.example.mochi_mijia"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.mochi_pet.extension.mijia"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 10_000 + mochiVersionPatch
         versionName = mochiVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -95,12 +94,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("com.google.zxing:core:3.5.4")
-    // OkHttp 5.5 requires compileSdk 37, beyond the current AGP maximum.
     //noinspection NewerVersionAvailable
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
     //noinspection NewerVersionAvailable
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.17")

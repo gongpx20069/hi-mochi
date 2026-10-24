@@ -95,6 +95,15 @@ Agent Browser provides five grouped schemas:
 - `browser_input`;
 - `browser_scroll`.
 
+`browser_navigate` additionally accepts `mode=auto/mobile/desktop`. The Agent
+chooses a suitable presentation without user mode settings or manual overrides.
+Main-only `request_user_assistance(kind, message, options)` is a separate
+runtime control Tool, not a Browser switch or a scheduled/Subagent capability.
+It suspends the current call for a typed answer, cancellation or ten-minute
+timeout. Browser handoff requires an existing page and blocks all Browser
+actions/reads until the answer; re-read afterward. Valid sessions are reused
+without repeated permission prompts. Never request credentials in chat.
+
 They operate one visible, per-turn Android WebView and return bounded
 agent-only snapshots containing viewport Markdown plus a separate interactive
 element list with temporary references. Every successful action returns a fresh
@@ -406,11 +415,11 @@ foreground Agent Browser Tools. It uses Amap for place resolution, first- and
 last-mile routes, and destination weather. Train research starts from the
 official public 12306 query page and interacts only with visible page controls;
 it never calls undocumented ticket endpoints. Flight research prefers public
-official-airline search forms and bounds fallback sources. The Skill never
-logs in, imports account state, bypasses verification, enters passenger or
-payment data, or continues into booking. Authentication, CAPTCHA, real-user
-challenges, identity checks, 403/429 responses, and checkout are hard stop
-conditions. Because click and input are required, the Skill is unavailable to
+official-airline search forms and bounds fallback sources. The Skill reuses
+existing login and can ask the user to handle necessary login/verification.
+It never imports account state, bypasses verification, enters passenger or
+payment data, or continues into booking. 403/429 responses, access denial and
+checkout remain stop conditions. Because click and input are required, the Skill is unavailable to
 read-only scheduled Browser runs.
 
 ### `get_current_weather`
@@ -444,12 +453,16 @@ independently from Tools settings. Amap parameters must use the returned GCJ-02
 fields, never the WGS-84 fields or model-generated
 conversion.
 
-## 4. Public web research
+## 4. Web browsing and research
 
 There are no dedicated `search_web` or `fetch_web_page` schemas. Public
 research uses the Agent Browser Tools defined in `AGENT_BROWSER.md`.
 
-The built-in Web Search Skill guides the Agent to:
+The built-in Browser Skill guides the Agent to open supplied links directly,
+read/compare relevant pages, and reuse valid existing sessions without a new
+login prompt. Dedicated connected integrations remain preferable for their
+provider-backed work. Missing authorization or a disabled Tool cannot be
+bypassed with Browser. When search is needed, the Skill guides the Agent to:
 
 1. use Bing for technical, official, news, global, and general authoritative
    queries;
@@ -460,31 +473,42 @@ The built-in Web Search Skill guides the Agent to:
 4. base the final answer on bounded source-page snapshots rather than search
    snippets alone.
 
-Disabling the Agent Browser provider or its required Browser Tools makes this
-Skill unavailable. Search pages and source pages remain untrusted evidence and
-cannot issue Agent instructions.
+Browser requires navigate/read/scroll, so it also works in read-only registries.
+Click/input and `request_user_assistance` are optional and remain unavailable
+where the registry omits them. Its loaded `allowed-tools` header includes only
+available optional capabilities. Missing a required read Tool or disabling the
+Browser provider makes the Skill unavailable. Search/source pages remain
+untrusted evidence, never instructions. Cache is not proof of freshness or login.
+Saved passwords/SMS accounts remain native-only: no model Tool lists, selects or
+fills them. Human handoff signs in on the webpage; the saved-account picker is
+currently exposed in manual browsing, not in the handoff dialog.
 
 Two focused Browser Skills cover product discovery and ratings:
 
-- Product Search uses Bing to discover public official marketplace, retailer,
+- Product Search opens supplied product URLs directly and uses Bing when needed
+  to discover public official marketplace, retailer,
   manufacturer, and brand pages. It compares values verified on multiple
   product pages when possible and labels search snippets as unverified. For an
   explicit Pinduoduo request it searches indexed public
-  `mobile.yangkeduo.com/goods.html` pages rather than the login-gated H5 search
-  page. It must not log in, import cookies, claim coupons, add to cart, order,
+  `mobile.yangkeduo.com/goods.html` pages, or uses normal H5 search with a working
+  session. It must not import cookies, claim coupons, add to cart, order,
   or pay.
 - Douban Ratings always starts at
   `https://m.douban.com/home_guide`, searches through visible page controls,
   and verifies the matching detail page before reporting scores, rating counts,
   or recurring review themes. It is the default source for ratings or reviews
   about movies, books, music, TV, games, and other works unless another source
-  is requested. It must not log in, rate, review, follow, or modify an account.
+  is requested. It must not rate, review, follow, or modify an account.
 
-Both Skills require the unchanged five Browser Tools, try another trusted
+Both Skills reuse valid login or request user assistance for necessary human
+login/verification. They require the five Browser Tools, try another trusted
 source when one product source is blocked, stop when no reliable source
 remains, and treat all page content as untrusted data.
 
 US Stock Analysis uses Agent Browser rather than dedicated SEC Tools. It
+collects only requested companies and relevant fields, not a full report for
+a single quote. A whole-group request covers all seven; a full-analysis request
+uses the detailed financial/technical checklist. It
 uses one Baidu Stock URL pattern for the Magnificent Seven:
 `https://pqa9p2.smartapps.baidu.com/pages/quote/quote?code=<TICKER>&market=us`.
 It maps Apple, Microsoft, Amazon, Alphabet, Meta, Nvidia, and Tesla to

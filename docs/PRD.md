@@ -54,8 +54,8 @@ ordinary commands run in the background without switching away from Mochi.
 
 ### 3.2 Voice interaction
 
-1. Wake with `Hi Mochi`, microphone, media button, or text.
-   A confirmed `Hi Mochi` wake normally receives a one-syllable acknowledgement.
+1. Wake with the selected phrase (`Hi Mochi` or `老莫老莫`), microphone, media button, or text.
+   A confirmed wake phrase normally receives a one-syllable acknowledgement.
    New AgentLink outcomes may replace it with one short local task briefing.
    User input takes priority; unsupported simultaneous input skips the briefing
    and starts listening. This feedback is not conversation data.
@@ -68,7 +68,9 @@ ordinary commands run in the background without switching away from Mochi.
    explicitly enabled synthesis service of the selected speech Provider.
 
 The wake word is enabled by default after Android permissions are granted.
-Users can explicitly disable it in Settings.
+Users can explicitly disable it in Settings > Speech and wake, or select English
+`Hi Mochi` (default) or Chinese `老莫老莫`. Only the selected phrase triggers;
+its choice is independent of interface language and survives app restarts.
 Cloud STT is an optional reliability recommendation, never a prerequisite.
 Cloud synthesis is also optional and default-off. iFlytek and Azure Speech
 reuse their recognition credentials through **Also use this provider for
@@ -114,10 +116,10 @@ support is an optional import/export adapter.
 - Mochi can search current public information through Bing.
 - Mochi can search WeChat official-account articles through Sogou Weixin.
 - Travel Planning combines Amap route and destination context with
-  foreground-only Agent Browser research on public no-login train and flight
+  foreground-only Agent Browser research on normal train and flight
   pages.
 - Ticket research uses visible website controls only, never undocumented
-  endpoints, account login, CAPTCHA bypass, passenger identity, booking, or
+  endpoints, CAPTCHA bypass, passenger identity, booking, or
   payment.
 - Both search engines, result pages, and selected sources are operated through
   the built-in Agent Browser rather than dedicated search or fetch Tools.
@@ -132,7 +134,12 @@ support is an optional import/export adapter.
 
 - A new installation without a configured provider opens Settings directly.
 - Azure OpenAI is a first-class option with resource endpoint, deployment
-  name, API version, and API key fields.
+  name and API key fields; dated API version applies to Chat Completions only.
+- Each AI connection independently selects Responses or Chat Completions under
+  advanced settings. New OpenAI/Azure connections prefer Responses; other presets
+  prefer Chat Completions. Existing connections keep their protocol and key.
+  Responses preserves same-task reasoning/tool continuity without extra server-side
+  response storage. Protocol failures never trigger silent fallback or tool replay.
 - Named LLM connections are saved independently, including multiple accounts
   for one provider. Official editable endpoint presets cover OpenAI, DeepSeek,
   Kimi, GLM, MiniMax (China), and Agnes-AI; Azure and custom endpoints remain.
@@ -145,6 +152,9 @@ support is an optional import/export adapter.
   never silently selects a replacement.
 - Legacy single-provider configuration and encrypted keys migrate in place.
 - Settings is always discoverable from the primary app shell.
+- On Android 17 and newer, Settings offers an explicit local-network permission
+  action for local AI/MCP servers. Public cloud connections do not require it;
+  the grant remains device-local and is never requested automatically at startup.
 - API keys are never displayed again after saving.
 - Settings groups are ordered: Share/import, AI connections, Speech/wake,
   Conversation/persona, Display/language.
@@ -195,11 +205,46 @@ conversation history; authentication material is excluded.
   approval prompts or confirmation waits.
 - Home presents an active session as a trusted live Browser Card. Other
   surfaces remain unchanged and show only the existing Tool pipeline status.
-- Entering the background does not pause or cancel Browser execution. A
-  user-visible Agent notification exposes status and Stop while Browser Tools
-  continue executing.
+- Entering the background does not itself pause or cancel Browser execution.
+  Pending user assistance is exposed by a private notification when enabled;
+  Android process/background limits still apply.
 - The Tools surface groups the Agent Browser provider switch and all five
   individual Browser Tool switches in one card.
+- The Agent chooses auto/mobile/desktop mode according to the task, without
+  asking the user to configure it. Mode switches must not replay forms.
+- Existing website login is reused without repeated prompts. When real login,
+  verification or clarification is necessary, Main may suspend on
+  `request_user_assistance` with its own natural-language explanation.
+  The user completes/cancels in native UI. Website passwords are handled only
+  by the website or native account editor, never chat/model context.
+  A fresh read verifies reported completion.
+- **Tools > Agent Browser > Websites and logins** manages shared local sessions,
+  with a Bing search/address field and a website-grouped list. Known websites
+  with detectable local data or saved credentials appear automatically. Opening
+  a website item shows its Cookie/site-data entry and saved accounts in a new
+  list. Text labels and blue/purple badges distinguish site data from credentials,
+  without claiming that stored data proves login. Credential rows reveal
+  Edit/Delete; site-data rows reveal only Delete. Every swipe stops at half the
+  row and never deletes automatically. Search opens a full-screen manual browser
+  with Home and Sites access to the same lists. No manual mode selector is exposed.
+- A submitted supported top-level HTTPS login form offers native confirmation
+  to save website, username and password locally with Keystore encryption.
+  Passwords never enter model context. Saving does not imply login succeeded.
+  Users can edit/delete saved accounts and explicitly fill a same-origin form,
+  without automatic submission. Deleting a saved account preserves cookies;
+  separate cache/site-data controls do not delete the password catalog.
+  Confirmed per-website deletion clears the registrable domain and subdomains,
+  and explicitly closes any current manual page first. Active Agent browsing
+  must stop before deletion; unrelated websites and saved credentials are kept.
+  Named isolated browser profiles and process-death task resumption remain
+  outside this version.
+- SMS login accounts save only website and phone number, explicitly labelled
+  as SMS login. One-time verification codes are never stored as passwords.
+  Recognized top-level login submissions/buttons offer native confirmation;
+  users can also add SMS accounts manually for an already completed or
+  unsupported login flow. Filling inserts only the phone number, never sends a
+  code or submits. Valid cookies are reused; expired sessions still need a new
+  verification code.
 
 ### 3.7 Subagents
 
@@ -243,6 +288,17 @@ conversation history; authentication material is excluded.
   dependency later becomes unavailable, the saved Skill preference remains but
   the Skill is suspended from Agent discovery until readiness is restored.
 - Bundled scripts and dependencies are never executed automatically.
+- Browser replaces Web Search as the general web Skill: supplied links open
+  directly, search retains Bing/Sogou Weixin source guidance, and valid website
+  sessions are reused. Cache is not proof of freshness; saved credentials stay
+  native-only and cannot be selected or filled by the model.
+- Browser requires navigate/read/scroll; click, input and human assistance are
+  optional and usable only in registries that expose them. The old Web Search
+  enablement is preserved without showing a duplicate Skill.
+- Specialized Skills retain separate provider and action boundaries. Product
+  Search opens supplied product links before searching; stock analysis collects
+  only requested companies/fields. Planner records and their reminders, future
+  Agent schedules, and UI-only navigation must not create duplicate actions.
 
 ### 3.9 Language
 
@@ -319,7 +375,7 @@ conversation history; authentication material is excluded.
   Bounded encrypted results survive process restart, appear in the conversation
   and task center, and distinguish remote execution from verified fulfillment.
   No default unsolicited speech or new system completion notification is added.
-  Viewed and announced are independent. A deliberate second `Hi Mochi` during
+  Viewed and announced are independent. Repeating the selected wake phrase during
   a briefing dismisses that batch's speech and unread markers, keeps its history,
   and never cancels remote execution. Failed/ordinary-interrupted audio stays pending.
 

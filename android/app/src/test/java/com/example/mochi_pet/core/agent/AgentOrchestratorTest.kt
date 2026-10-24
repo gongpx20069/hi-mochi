@@ -28,6 +28,8 @@ import java.time.ZoneOffset
 import java.util.Locale
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -39,6 +41,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentOrchestratorTest {
+    @Test fun `Responses continuation survives tool execution and final reply repair within one run`() = runBlocking {
+        val continuation = buildJsonArray { add(buildJsonObject { put("type", "reasoning"); put("encrypted_content", "fixture") }) }
+        fun continued(response: OpenAiChatResponse) = response.copy(choices = response.choices.map {
+            it.copy(message = it.message.copy(responsesOutput = continuation))
+        })
+        val client = QueueChatClient(
+            continued(toolResponse("call_fixture", "echo", """{"value":"fixture"}""")),
+            continued(finalResponse("not valid JSON")),
+            finalResponse("""{"reply":"Done","emotion":"neutral"}"""),
+        )
+        assertEquals("Done", orchestrator(client, ToolRegistry(listOf(EchoTool()))).run(request()).reply)
+        assertEquals(continuation, client.requests[1].messages.first { it.role == "assistant" }.responsesOutput)
+        assertEquals(2, client.requests[2].messages.count { it.responsesOutput == continuation })
+        assertTrue(client.requests[2].tools.isEmpty())
+    }
+
     private val provider = OpenAiProviderConfig(
         endpoint = "https://example.com/v1",
         apiKey = "test-key",
@@ -69,9 +87,9 @@ class AgentOrchestratorTest {
                 ),
                 availableSkills = listOf(
                     AgentSkillMetadata(
-                        name = "web-search",
+                        name = "browser",
                         description = "Research current public information.",
-                        location = "builtin://web-search/SKILL.md",
+                        location = "builtin://browser/SKILL.md",
                     ),
                 ),
             ),
@@ -96,7 +114,7 @@ class AgentOrchestratorTest {
                 .contains("[Asia/Shanghai]"),
         )
         assertTrue(prompt.contains("Timezone: Asia/Shanghai"))
-        assertTrue(prompt.contains("<name>web-search</name>"))
+        assertTrue(prompt.contains("<name>browser</name>"))
         assertTrue(prompt.contains("Call load_skill"))
         assertTrue(prompt.contains("visual presentation never replaces"))
         assertTrue(
@@ -640,6 +658,31 @@ class AgentOrchestratorTest {
         assertThrows(CancellationException::class.java) {
             runBlocking { orchestrator.run(request()) }
         }
+    }
+
+    @Test fun `user assistance suspends model loop until matching answer`() = runBlocking {
+        val assistance = com.example.mochi_pet.core.browser.UserAssistanceCoordinator()
+        val tool = object : AgentTool {
+            override val name = "request_user_assistance"
+            override val schema = functionToolSchema(name, "Question fixture", buildJsonObject {}, emptyList())
+            override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
+                val answer = assistance.ask("Which city?", false, null, listOf("Paris"))
+                return ToolResultEnvelope.success(buildJsonObject { put("answer", answer.answer) })
+            }
+        }
+        val client = QueueChatClient(
+            toolResponse("question_1", tool.name, "{}"),
+            finalResponse("""{"reply":"Continuing with Paris","emotion":"happy"}"""),
+        )
+        val agent = orchestrator(client, ToolRegistry(listOf(tool)))
+        val run = async(start = CoroutineStart.UNDISPATCHED) { agent.run(request()) }
+        val pending = requireNotNull(assistance.request.value)
+        assertEquals(1, client.requests.size)
+        assertTrue(!run.isCompleted)
+        assistance.respond(pending.id, com.example.mochi_pet.core.browser.UserAssistanceAnswer("completed", "Paris"))
+        assertEquals("Continuing with Paris", run.await().reply)
+        assertEquals(2, client.requests.size)
+        assertTrue(client.requests.last().messages.any { it.role == "tool" && it.content?.contains("Paris") == true })
     }
 
     private fun orchestrator(

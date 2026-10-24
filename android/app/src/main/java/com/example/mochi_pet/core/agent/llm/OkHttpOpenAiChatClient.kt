@@ -30,7 +30,9 @@ class OkHttpOpenAiChatClient(
         config: OpenAiProviderConfig,
         request: OpenAiChatRequest,
     ): OpenAiChatResponse {
-        val body = json.encodeToString(
+        val body = if (config.apiProtocol == ApiProtocol.RESPONSES) {
+            ResponsesAdapter.encode(json, config, request)
+        } else json.encodeToString(
             OpenAiChatRequest.serializer(),
             request.copy(
                 model = if (config.providerType == ProviderType.AZURE_OPENAI) {
@@ -41,7 +43,7 @@ class OkHttpOpenAiChatClient(
             ),
         )
         val requestBuilder = Request.Builder()
-            .url(chatCompletionsUrl(config))
+            .url(if (config.apiProtocol == ApiProtocol.RESPONSES) responsesUrl(config) else chatCompletionsUrl(config))
             .header("Accept", "application/json")
             .post(body.toRequestBody(JSON_MEDIA_TYPE))
         when (config.providerType) {
@@ -80,13 +82,14 @@ class OkHttpOpenAiChatClient(
             )
         }
         val parsed = try {
-            json.decodeFromString(
+            if (config.apiProtocol == ApiProtocol.RESPONSES) ResponsesAdapter.decode(json, responseText)
+            else json.decodeFromString(
                 OpenAiChatResponse.serializer(),
                 responseText,
             )
         } catch (error: SerializationException) {
             throw ProviderProtocolException(
-                "Provider returned invalid chat completion JSON",
+                "Provider returned invalid ${if (config.apiProtocol == ApiProtocol.RESPONSES) "Responses" else "chat completion"} JSON",
             )
         }
         if (parsed.error != null) {
@@ -101,6 +104,24 @@ class OkHttpOpenAiChatClient(
         }
         return parsed
     }
+
+    private fun responsesUrl(config: OpenAiProviderConfig): HttpUrl {
+        val parsed = config.endpoint.trim().trimEnd('/').toHttpUrlOrNull()
+            ?: throw ProviderConfigurationException("Provider endpoint must be an absolute HTTP(S) URL")
+        if (parsed.username.isNotEmpty() || parsed.password.isNotEmpty() || parsed.fragment != null) {
+            throw ProviderConfigurationException("Provider endpoint must not contain embedded credentials or fragments")
+        }
+        val path = parsed.encodedPath.trimEnd('/')
+        if (config.providerType == ProviderType.AZURE_OPENAI) {
+            return parsed.newBuilder().encodedPath("${azureBasePath(parsed)}/openai/v1/responses").query(null).build()
+        }
+        return if (path.endsWith("/responses")) parsed else parsed.newBuilder()
+            .encodedPath(path.removeSuffix("/chat/completions") + "/responses").build()
+    }
+
+    private fun azureBasePath(url: HttpUrl): String =
+        url.encodedPath.trimEnd('/').substringBefore("/openai/deployments/")
+            .removeSuffix("/responses").removeSuffix("/chat/completions").removeSuffix("/openai/v1")
 
     private fun chatCompletionsUrl(config: OpenAiProviderConfig): HttpUrl {
         val parsed = config.endpoint.trim().trimEnd('/').toHttpUrlOrNull()
@@ -120,7 +141,7 @@ class OkHttpOpenAiChatClient(
         return when (config.providerType) {
             ProviderType.AZURE_OPENAI -> parsed.newBuilder()
                 .encodedPath(
-                    parsed.encodedPath.trimEnd('/').ifEmpty { "/" },
+                    azureBasePath(parsed).ifEmpty { "/" },
                 )
                 .query(null)
                 .addPathSegments("openai/deployments")
@@ -136,7 +157,7 @@ class OkHttpOpenAiChatClient(
                 parsed
             } else {
                 parsed.newBuilder()
-                    .addPathSegments("chat/completions")
+                    .encodedPath(parsed.encodedPath.trimEnd('/').removeSuffix("/responses") + "/chat/completions")
                     .build()
             }
         }

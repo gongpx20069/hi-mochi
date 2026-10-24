@@ -1164,6 +1164,10 @@ private class WakeRuntimeFake : WakeRuntime {
 
     override fun disable() = Unit
 
+    override fun selectKeyword(keyword: com.example.mochi_pet.core.wake.WakeKeyword) {
+        state.value = state.value.copy(keyword = keyword)
+    }
+
     override fun pause(onPaused: () -> Unit) {
         pauseCount += 1
         onPaused()

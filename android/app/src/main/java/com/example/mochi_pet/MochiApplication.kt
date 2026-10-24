@@ -272,7 +272,20 @@ class MochiApplication : Application() {
     }
 
     val agentBrowserRuntime: AgentBrowserRuntime by lazy {
-        AgentBrowserRuntime(this)
+        AgentBrowserRuntime(this, com.example.mochi_pet.core.browser.BrowserSettings(toolDataStore)).also { browser ->
+            applicationScope.launch {
+                com.example.mochi_pet.platform.browser.observeUserAssistanceNotification(this@MochiApplication, browser.assistance)
+            }
+        }
+    }
+
+    val browserCredentialVault by lazy {
+        com.example.mochi_pet.core.browser.BrowserCredentialVault(
+            PreferenceDataStoreFactory.create(scope = applicationScope) {
+                File(noBackupFilesDir, "browser_credentials.preferences_pb")
+            },
+            AndroidKeystoreApiKeyCipher("mochi_browser_credentials_v1"),
+        )
     }
 
     val voiceRuntime: AndroidVoiceRuntime by lazy {
