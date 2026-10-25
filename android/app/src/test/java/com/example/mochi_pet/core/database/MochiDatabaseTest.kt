@@ -164,7 +164,7 @@ class MochiDatabaseTest {
         assertEquals(false, installed.enabled)
         assertEquals(true, edited.modified)
         val skills = repository.listSkills()
-        assertEquals(16, skills.size)
+        assertEquals(17, skills.size)
         assertEquals(
             listOf("Browser"),
             skills.filter { it.id == "builtin:browser" }.map { it.name },
@@ -285,6 +285,17 @@ class MochiDatabaseTest {
             assertTrue(repository.listEnabledMetadata(setOf("termux_exec")).none { it.name == "termux" })
             assertTrue(termux.content.contains("Scheduled agents and subagents"))
             repository.setEnabled("builtin:termux", false)
+            val webdav = initial.first { it.id == "builtin:webdav-files" }
+            assertFalse(webdav.enabled)
+            repository.setEnabled(webdav.id, true)
+            assertTrue(repository.listEnabledMetadata(webdav.requiredToolNames).any { it.name == "webdav-files" })
+            assertTrue(repository.listEnabledMetadata(setOf("webdav_list")).none { it.name == "webdav-files" })
+            assertTrue(repository.listEnabledMetadata(emptySet()).none { it.name == "webdav-files" })
+            val webdavArguments = buildJsonObject { put("skill_name", "webdav-files") }
+            val webdavContext = ToolExecutionContext(LocalDate.of(2026, 1, 1), MochiSurface.Face)
+            assertEquals("ok", LoadSkillTool(repository, webdav.requiredToolNames).execute(webdavArguments, webdavContext).status)
+            assertEquals("PERMISSION_DENIED", LoadSkillTool(repository, emptySet()).execute(webdavArguments, webdavContext).code)
+            repository.setEnabled(webdav.id, false)
             assertEquals(
                 true,
                 initial.filter {
@@ -292,7 +303,8 @@ class MochiDatabaseTest {
                         !it.name.endsWith("Knowledge") &&
                         it.name != "Mi Home Smart Home" &&
                         it.name != "AgentLink" &&
-                        it.name != "Termux"
+                        it.name != "Termux" &&
+                        it.name != "WebDAV Files"
                 }.all { it.enabled },
             )
 

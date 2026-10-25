@@ -145,3 +145,8 @@ ideas are recorded in [`BRAINSTORM.md`](BRAINSTORM.md), not promised as shipped.
   in `android/extensions/README.md`, including real QR/external-app flows.
 - [ ] Coordinate AgentLink native authorization/access-management styling in
   its companion repository; host card styling alone does not complete the work.
+- [x] Implement the optional scoped WebDAV Files APK and readiness-gated Skill,
+  conditional file operations, explicit LAN HTTPS access, and native binary staging.
+- [ ] Validate user-owned Nutstore/Nextcloud/NAS compatibility and the WebDAV
+  real-device SAF, certificate, LAN-permission, large-text and cancellation matrix.
+  Local fixture coverage does not establish real-service compatibility.

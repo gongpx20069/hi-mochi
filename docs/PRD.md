@@ -314,6 +314,25 @@ conversation history; authentication material is excluded.
 
 ### 3.10 Optional signed extensions
 
+- The optional **WebDAV Files** extension manages a user-scoped folder on
+  compatible WebDAV services, including Nutstore and NAS, without a separate
+  MCP server. It supports file-name discovery, UTF-8 text reads/writes,
+  directory creation, conditional copy/move/delete, and native binary transfer.
+  It is not an Obsidian synchronization engine or encrypted-vault decoder.
+- WebDAV requires HTTPS with normal certificate validation and an account/application
+  password entered only in the extension. Local-network access is separately
+  authorized and default-off. Credentials never cross Binder or enter the model.
+- The WebDAV provider and its Skill default to off. Its read Tools default to
+  on, but write, management and transfer Tools default to off. The Skill can be
+  enabled only after the trusted extension is connected/enabled and both read
+  Tools are enabled; loss of readiness suspends discovery/activation without
+  erasing the user's saved Skill preference. WebDAV is foreground Main Agent only.
+- Binary import/export requires Android's file picker. Downloads are private
+  staged copies until the user saves them to a chosen destination, not automatic
+  Downloads files. Interrupted writes may have completed or partially completed;
+  inspect the destination before retrying. Existing-resource mutation requires
+  strong ETags; unsupported servers must fail explicitly, never fall back to
+  blind overwrite. Remote names/content are untrusted evidence.
 - Mochi may expose optional Android capabilities through separately installed
   APK extensions rather than increasing every base APK.
 - The first extension is the optional Mi Home connector. It has no launcher

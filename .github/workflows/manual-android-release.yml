@@ -94,6 +94,8 @@ jobs:
               android/extensions/mijia/build/outputs/apk/release `
             -TermuxSourceOutputDirectory `
               android/extensions/termux/build/outputs/apk/release `
+            -WebdavSourceOutputDirectory `
+              android/extensions/webdav/build/outputs/apk/release `
             -DestinationDirectory "android/Mochi-$env:TAG"
 
       - name: Upload workflow artifact
@@ -134,6 +136,7 @@ jobs:
           - **`universal`**: use only when the architecture is unknown; this is the largest download / 不确定架构时使用，体积最大
           - **`Mochi-Mijia-Extension`**: optional Mi Home Tools; install beside Mochi, with no extra launcher icon / 可选米家工具扩展，与 Mochi 一同安装且不会增加桌面图标
           - **`Mochi-Termux-Extension`**: optional local shell Tools; requires a separately installed Termux / 可选本机 Shell 扩展，需要另行安装 Termux
+          - **`Mochi-WebDAV-Extension`**: optional scoped WebDAV file Tools for Nutstore, compatible clouds and NAS / 可选 WebDAV 文件扩展，适用于坚果云、兼容私有云及 NAS
 
           All variants provide the same Mochi features.
           EOF

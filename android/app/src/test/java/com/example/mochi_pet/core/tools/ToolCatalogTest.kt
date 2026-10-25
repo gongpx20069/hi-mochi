@@ -40,6 +40,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
@@ -60,6 +63,42 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ToolCatalogTest {
+    @Test
+    fun `WebDAV Skill readiness requires trusted enabled extension and both read tools`() = runBlocking {
+        val extension = RecordingExtensionClient(TrustedExtension.WEBDAV)
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client, webdavClient = extension)
+        val required = setOf("webdav_list", "webdav_read")
+        assertFalse(catalog.loadSummary().skillReadiness(required).isReady)
+        val enabled = catalog.setWebdavEnabled(true)
+        assertEquals(required, enabled.readyToolNames().filter { it.startsWith("webdav_") }.toSet())
+        assertTrue(enabled.skillReadiness(required).isReady)
+        assertFalse(enabled.copy(webdav = enabled.webdav.copy(trusted = false)).skillReadiness(required).isReady)
+        backgroundScopes.forEach { assertTrue(catalog.loadEnabledExtensionTools(it).isEmpty()) }
+        val old = catalog.loadEnabledExtensionTools().first()
+        catalog.setWebdavEnabled(false)
+        catalog.setWebdavEnabled(true)
+        assertEquals("PERMISSION_DENIED", old.execute(JsonObject(emptyMap()), termuxContext).code)
+        assertTrue(extension.executions.isEmpty())
+        catalog.setWebdavToolEnabled("webdav_read", false)
+        assertFalse(catalog.loadSummary().skillReadiness(required).isReady)
+        assertEquals(listOf("webdav_list"), catalog.loadEnabledExtensionTools().map { it.name })
+        catalog.disconnectWebdav()
+        assertTrue(catalog.loadEnabledExtensionTools().isEmpty())
+    }
+
+    @Test
+    fun `WebDAV revocation cancels an already dispatched call`() = runBlocking {
+        val extension = RecordingExtensionClient(TrustedExtension.WEBDAV).apply { waitForCancellation = true }
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client, webdavClient = extension)
+        catalog.setWebdavEnabled(true)
+        val tool = catalog.loadEnabledExtensionTools().first()
+        val result = async { tool.execute(JsonObject(emptyMap()), termuxContext) }
+        withTimeout(5_000) { extension.started.await() }
+        catalog.setWebdavEnabled(false)
+        assertEquals("PERMISSION_DENIED", withTimeout(5_000) { result.await() }.code)
+        assertTrue(extension.cancelled)
+    }
+
     @Test
     fun `Termux Skill requires connection and both tool switches`() {
         val summary = ToolCatalogSummary(termux = ExtensionProviderSummary(
@@ -215,12 +254,18 @@ class ToolCatalogTest {
     private class RecordingExtensionClient(private val identity: TrustedExtension) : MochiExtensionClient {
         override val attachmentEvents = emptyFlow<ExtensionImageAttachment>()
         var connected = true
+        var waitForCancellation = false
+        var cancelled = false
+        val started = CompletableDeferred<Unit>()
         val executions = mutableListOf<ExtensionToolScope>()
-        private val tools = (if (identity == TrustedExtension.TERMUX) {
-            listOf("termux_exec", "termux_task")
-        } else {
-            listOf("mijia_list_devices")
-        }).map { ExtensionToolDefinition(it, "", """{"type":"object"}""", "sensitive", true) }
+        private val tools = when (identity) {
+            TrustedExtension.TERMUX -> listOf("termux_exec", "termux_task")
+            TrustedExtension.MIJIA -> listOf("mijia_list_devices")
+            TrustedExtension.WEBDAV -> listOf("webdav_list", "webdav_read", "webdav_write", "webdav_manage", "webdav_transfer")
+        }.map {
+            ExtensionToolDefinition(it, "", """{"type":"object","x-webdav-connection":"one"}""", "sensitive",
+                identity != TrustedExtension.WEBDAV || it in setOf("webdav_list", "webdav_read"))
+        }
 
         override suspend fun snapshot() = MochiExtensionSnapshot(
             installed = true, trusted = true, identity = identity, tools = tools,
@@ -235,6 +280,10 @@ class ToolCatalogTest {
             override val schema = JsonObject(emptyMap())
             override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
                 executions += scope
+                started.complete(Unit)
+                if (waitForCancellation) {
+                    try { awaitCancellation() } finally { cancelled = true }
+                }
                 return ToolResultEnvelope.success(buildJsonObject {
                     put("task_id", "task-${executions.size}")
                     put("state", "submitted")

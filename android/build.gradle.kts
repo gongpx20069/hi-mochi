@@ -138,6 +138,9 @@ tasks.register("verifyNative") {
         ":extensions:termux:lintDebug",
         ":extensions:termux:testDebugUnitTest",
         ":extensions:termux:assembleDebug",
+        ":extensions:webdav:lintDebug",
+        ":extensions:webdav:testDebugUnitTest",
+        ":extensions:webdav:assembleDebug",
     )
 }
 
@@ -161,5 +164,8 @@ tasks.register("verifyRelease") {
         ":extensions:termux:lintRelease",
         ":extensions:termux:testDebugUnitTest",
         ":extensions:termux:assembleRelease",
+        ":extensions:webdav:lintRelease",
+        ":extensions:webdav:testDebugUnitTest",
+        ":extensions:webdav:assembleRelease",
     )
 }

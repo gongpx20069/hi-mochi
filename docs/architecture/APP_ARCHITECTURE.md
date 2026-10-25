@@ -54,6 +54,7 @@ run in local JVM tests.
 | `ExtensionToolAdapter` | bounded extension schema registration and Tool result translation |
 | Mi Home extension process | Xiaomi QR session, cloud requests, MIoT mapping, device selection, and ephemeral images |
 | Termux extension process | Setup, command dispatch, task IDs and result callbacks; the bundled supervisor executes inside Termux |
+| WebDAV extension process | Encrypted scoped connection, HTTPS/DNS policy, conditional file operations, private staging and native SAF import/export |
 | `TermuxRuntimeState` | Registry revocation generation and transient task views; no execution approval state |
 | `AgentTaskRuntime` | Bounded process-local run observations and exact foreground coroutine ownership |
 | `TaskCenterViewModel` | Read-only source aggregation, explicit source-specific actions and cancellable configuration reports |
@@ -323,7 +324,7 @@ Compose UI, network client, secret storage, or model dependency.
 The unified extension experience in `INTERACTION_DESIGN.md` uses the
 `:extension-ui` compile-time Android UI library for the shared Mochi theme,
 cards, and setup shell. It is consumed by `app`, `extensions:mijia`, and
-`extensions:termux`. That library owns only
+`extensions:termux`, and `extensions:webdav`. That library owns only
 presentation tokens/components, never authorization, provider state, Binder,
 networking, or secrets. It must not depend on an application module or change
 `extension-api` into a UI dependency. AgentLink remains an independent
@@ -341,6 +342,13 @@ The Mi Home extension is a separate application ID with no `MAIN/LAUNCHER`
 intent filter. Its connection Activity and Binder service require the Mochi
 signature permission. It owns QR authentication, encrypted session refresh,
 region discovery, MIoT specifications, device mapping, and image retrieval.
+
+The WebDAV extension likewise has its own protected Activity/service and no
+launcher. `WebdavApplication` owns one process-local repository/DataStore;
+credentials and transfer bytes never enter host storage. The host persists only
+provider/Tool switches and a revocation revision. Connection-scoped opaque
+identities bind registries to the selected account/root without exposing it to
+the model. The host does not depend on the extension implementation module.
 
 Tool calls are asynchronous and identified by immutable call IDs. The host can
 cancel an active call, and late Binder callbacks are rejected using the same

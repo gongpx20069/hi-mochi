@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.agent.tool.AgentToolJson
 import com.example.mochi_pet.core.agentlink.AgentLinkClient
 import com.example.mochi_pet.core.agentlink.AgentLinkState
 import com.example.mochi_pet.core.extensions.MochiExtensionSnapshot
@@ -57,6 +58,8 @@ import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -68,6 +71,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -93,6 +100,7 @@ data class ToolCatalogSummary(
     val restConnections: List<RestConnectionSummary> = emptyList(),
     val isLoading: Boolean = false,
     val feedback: String? = null,
+    val webdav: ExtensionProviderSummary = ExtensionProviderSummary(),
 )
 
 data class AmapProviderSummary(
@@ -170,6 +178,9 @@ fun ToolCatalogSummary.readyToolNames(): Set<String> =
         if (termux.connected && termux.enabled) {
             termux.tools.filter { it.enabled }.mapTo(this) { it.name }
         }
+        if (webdav.installed && webdav.trusted && webdav.connected && webdav.enabled) {
+            webdav.tools.filter { it.enabled }.mapTo(this) { it.name }
+        }
         if (agentLink.authorized && agentLink.connected && agentLink.enabled) {
             addAll(agentLink.enabledTools)
         }
@@ -204,6 +215,7 @@ private fun ToolCatalogSummary.skillRequirementName(
         toolName.startsWith("amap_") -> "Amap Maps"
         toolName.startsWith("mijia_") -> "Mi Home extension"
         toolName.startsWith("termux_") -> "Termux extension"
+        toolName.startsWith("webdav_") -> "WebDAV Files extension"
         toolName.startsWith("agentlink_") -> "AgentLink"
         toolName.startsWith("notion_") ->
             servers.firstOrNull { it.id == NOTION_SERVER_ID }?.name
@@ -354,6 +366,15 @@ interface ToolCatalogRepository {
     suspend fun disconnectTermux(): ToolCatalogSummary =
         throw UnsupportedOperationException("Termux extension is unavailable")
 
+    suspend fun setWebdavEnabled(enabled: Boolean): ToolCatalogSummary =
+        throw UnsupportedOperationException("WebDAV extension is unavailable")
+
+    suspend fun setWebdavToolEnabled(name: String, enabled: Boolean): ToolCatalogSummary =
+        throw UnsupportedOperationException("WebDAV extension is unavailable")
+
+    suspend fun disconnectWebdav(): ToolCatalogSummary =
+        throw UnsupportedOperationException("WebDAV extension is unavailable")
+
     suspend fun loadAmapCredentials(): AmapCredentials?
 
     suspend fun exportSharedTools(
@@ -408,6 +429,7 @@ class DataStoreToolCatalogRepository(
         com.example.mochi_pet.core.extensions.TermuxRuntimeState(),
     private val feishuOAuthClient: FeishuOAuthClient = FeishuOAuthClient(),
     private val restTransport: RestTransport = RestHttpTransport(),
+    private val webdavClient: MochiExtensionClient = UnavailableExtensionClient,
 ) : ToolCatalogRepository {
     private val tencentCatalogMutex = Mutex()
     private val feishuAuthorizationMutex = Mutex()
@@ -547,6 +569,7 @@ class DataStoreToolCatalogRepository(
         updateCatalog { it }
         val catalog = loadCatalog()
         val termux = termuxClient.snapshot()
+        val webdav = webdavClient.snapshot()
         return catalog.toSummary(extensionClient.snapshot()).copy(
             feedback = if (refreshFailed) TENCENT_CATALOG_REFRESH_ERROR else null,
             agentLink = agentLinkClient?.refresh() ?: AgentLinkState(),
@@ -563,6 +586,18 @@ class DataStoreToolCatalogRepository(
                 tools = termux.tools.map {
                     ExtensionToolSummary(it.name, it.description, it.riskLevel,
                         catalog.termuxToolsEnabled[it.name] ?: it.defaultEnabled)
+                },
+            ),
+            webdav = ExtensionProviderSummary(
+                installed = webdav.installed, trusted = webdav.trusted, connected = webdav.connected,
+                enabled = catalog.webdavEnabled && webdav.connected,
+                status = webdav.connectionState.status, detail = webdav.detail ?: webdav.connectionState.detail,
+                versionName = webdav.metadata?.versionName,
+                configurationPackage = webdav.configurationTarget?.packageName,
+                configurationActivity = webdav.configurationTarget?.className,
+                tools = webdav.tools.map {
+                    ExtensionToolSummary(it.name, it.description, it.riskLevel,
+                        catalog.webdavToolsEnabled[it.name] ?: it.defaultEnabled)
                 },
             ),
         )
@@ -1488,10 +1523,23 @@ class DataStoreToolCatalogRepository(
         } else {
             emptyList()
         }
-        if (!foreground || !catalog.mijiaEnabled) return termuxTools
+        val webdavTools = if (foreground && catalog.webdavEnabled) {
+            val snapshot = webdavClient.snapshot()
+            if (snapshot.connected) snapshot.tools.filter {
+                catalog.webdavToolsEnabled[it.name] ?: it.defaultEnabled
+            }.map {
+                val parameters = AgentToolJson.format.parseToJsonElement(it.inputSchemaJson).jsonObject
+                val connection = parameters["x-webdav-connection"]?.jsonPrimitive?.content
+                check(!connection.isNullOrBlank()) { "WebDAV connection identity is unavailable." }
+                val definition = it.copy(inputSchemaJson = JsonObject(parameters - "x-webdav-connection").toString())
+                webdavTool(webdavClient.agentTool(definition, scope), catalog.webdavRevision, connection)
+            } else emptyList()
+        } else emptyList()
+        val otherTools = termuxTools + webdavTools
+        if (!foreground || !catalog.mijiaEnabled) return otherTools
         val snapshot = extensionClient.snapshot()
-        if (!snapshot.connected) return termuxTools
-        return termuxTools + snapshot.tools
+        if (!snapshot.connected) return otherTools
+        return otherTools + snapshot.tools
             .filter { definition ->
                 catalog.mijiaToolsEnabled[definition.name]
                     ?: definition.defaultEnabled
@@ -1520,6 +1568,64 @@ class DataStoreToolCatalogRepository(
         updateCatalog { it.copy(termuxEnabled = false) }
         termuxClient.disconnect()
         return loadSummary()
+    }
+
+    override suspend fun setWebdavEnabled(enabled: Boolean): ToolCatalogSummary {
+        if (enabled) require(webdavClient.snapshot().connected) { "Connect WebDAV first." }
+        updateCatalog { it.copy(webdavEnabled = enabled, webdavRevision = UUID.randomUUID().toString()) }
+        return loadSummary()
+    }
+
+    override suspend fun setWebdavToolEnabled(name: String, enabled: Boolean): ToolCatalogSummary {
+        require(name in setOf("webdav_list", "webdav_read", "webdav_write", "webdav_manage", "webdav_transfer")) {
+            "Unknown WebDAV tool."
+        }
+        updateCatalog { it.copy(webdavToolsEnabled = it.webdavToolsEnabled + (name to enabled),
+            webdavRevision = UUID.randomUUID().toString()) }
+        return loadSummary()
+    }
+
+    override suspend fun disconnectWebdav(): ToolCatalogSummary {
+        updateCatalog { it.copy(webdavEnabled = false, webdavRevision = UUID.randomUUID().toString()) }
+        webdavClient.disconnect()
+        return loadSummary()
+    }
+
+    private fun webdavTool(delegate: AgentTool, revision: String, connection: String): AgentTool = object : AgentTool {
+        override val name = delegate.name
+        override val schema = delegate.schema
+
+        private suspend fun authorized(): Boolean {
+            val current = loadCatalog()
+            return current.webdavEnabled && current.webdavRevision == revision
+        }
+
+        override suspend fun execute(
+            arguments: kotlinx.serialization.json.JsonObject,
+            context: com.example.mochi_pet.core.agent.tool.ToolExecutionContext,
+        ): com.example.mochi_pet.core.agent.tool.ToolResultEnvelope = kotlinx.coroutines.coroutineScope {
+            fun denied() = com.example.mochi_pet.core.agent.tool.ToolResultEnvelope.error(
+                com.example.mochi_pet.core.agent.tool.ToolErrorCode.PERMISSION_DENIED,
+                "WebDAV tools were disabled or changed. Inspect any already dispatched write before retrying.",
+            )
+            if (!authorized()) return@coroutineScope denied()
+            val operation = async {
+                delegate.execute(JsonObject(arguments + ("_connection_id" to JsonPrimitive(connection))), context)
+            }
+            val monitor = launch {
+                dataStore.data.first { !authorized() }
+                operation.cancel()
+            }
+            try {
+                val result = operation.await()
+                if (authorized()) result else denied()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                currentCoroutineContext().ensureActive()
+                if (!authorized()) denied() else throw cancelled
+            } finally {
+                monitor.cancel()
+            }
+        }
     }
 
     private fun PersistedToolCatalog.loadEnabledMcpTools(
@@ -2174,6 +2280,9 @@ private data class PersistedToolCatalog(
     val mijiaToolsEnabled: Map<String, Boolean> = emptyMap(),
     val termuxEnabled: Boolean = false,
     val termuxToolsEnabled: Map<String, Boolean> = emptyMap(),
+    val webdavEnabled: Boolean = false,
+    val webdavToolsEnabled: Map<String, Boolean> = emptyMap(),
+    val webdavRevision: String = "",
     val servers: List<PersistedMcpServer> = emptyList(),
     val pendingNotionOAuth: PendingOAuthRecord? = null,
 )

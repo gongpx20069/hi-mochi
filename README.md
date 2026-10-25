@@ -379,9 +379,9 @@ manufacturer.
 ## Optional extensions
 
 These integrations add capabilities to Mochi but are **not required for its
-core features**. Install only what you need. Mi Home and Termux use optional
+core features**. Install only what you need. Mi Home, Termux and WebDAV use optional
 Mochi-signed extension APKs; AgentLink connects through its independent
-companion app. Mi Home and AgentLink are foreground Main-Agent integrations;
+companion app. Mi Home, WebDAV and AgentLink are foreground Main-Agent integrations;
 Termux also serves Subagents and Scheduled Agents automatically once connected
 and enabled. Installation alone never enables its provider.
 
@@ -390,6 +390,32 @@ and enabled. Installation alone never enables its provider.
 | Mi Home | Mi Home Smart Home — disabled | Selected device state/control, manual scenes, latest camera event images | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Mijia-Extension` |
 | [AgentLink](https://github.com/gongpx20069/android-agent-link) | AgentLink — disabled | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` for shared remote coding chats | [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases) |
 | Termux | Termux — disabled | `termux_exec` · `termux_task` for unrestricted local shell and task management | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Termux-Extension`, plus [official Termux](https://github.com/termux/termux-app#installation) |
+| WebDAV Files (preview) | WebDAV Files — disabled | Scoped file listing/search, text editing, conditional copy/move/delete and native binary transfer | Matching Mochi + `Mochi-WebDAV-Extension` builds; not yet in a published release |
+
+### WebDAV files: Nutstore, compatible clouds and NAS
+
+Install matching, same-signed Mochi and WebDAV extension APKs. Open **Tools >
+Extensions > WebDAV Files > Connect WebDAV**, enter the HTTPS WebDAV address,
+existing allowed folder, account and application password, then check and save.
+For Nutstore, the preset uses `https://dav.jianguoyun.com/dav/`; create a
+third-party application password in Nutstore rather than entering credentials
+in chat. Other services must expose compatible WebDAV, not just a web login page.
+No separately deployed MCP server is required.
+
+Choose **Enable tools and Skill** to allow reading; write, management and
+transfer Tools remain off unless explicitly enabled. The Skill is suspended
+whenever the extension or either required read Tool is unavailable.
+LAN/VPN NAS access needs a separate opt-in, and Android 17 also requires the
+extension's local-network permission. HTTPS must have a valid trusted certificate.
+
+For binary uploads, use **Connection and files > Choose a file for upload**.
+Mochi can stage a download, but **Save to device** is needed to choose its final
+destination. Limits: 32 MiB/file, four staged files, 64 MiB total and one-hour
+expiry. Text reads/writes are limited to 32 KiB UTF-8. Search matches names,
+not contents, and reports truncation. Existing-file changes require strong
+ETags; servers without them cannot support guarded changes here. This is not
+Obsidian synchronization, and encrypted vault contents are not decoded.
+Real Nutstore/NAS compatibility and device acceptance remain pending.
 
 ### Mi Home smart-home devices
 

@@ -12,17 +12,20 @@ import com.example.mochi_pet.core.tools.ToolCatalogSummary
 enum class ExtensionSetupKind(val title: String, val skillId: String) {
     TERMUX("Termux", "builtin:termux"),
     MIJIA("Mi Home", "builtin:mi-home-smart-home"),
+    WEBDAV("WebDAV Files", "builtin:webdav-files"),
     AGENTLINK("AgentLink", "builtin:agentlink");
 
     fun connected(catalog: ToolCatalogSummary): Boolean = when (this) {
         TERMUX -> catalog.termux.trusted && catalog.termux.connected
         MIJIA -> catalog.mijia.trusted && catalog.mijia.connected
+        WEBDAV -> catalog.webdav.trusted && catalog.webdav.connected
         AGENTLINK -> catalog.agentLink.authorized && catalog.agentLink.connected
     }
 
     fun enabled(catalog: ToolCatalogSummary): Boolean = when (this) {
         TERMUX -> catalog.termux.enabled
         MIJIA -> catalog.mijia.enabled
+        WEBDAV -> catalog.webdav.enabled
         AGENTLINK -> catalog.agentLink.enabled
     }
 
@@ -30,6 +33,7 @@ enum class ExtensionSetupKind(val title: String, val skillId: String) {
         fun fromPackage(packageName: String?): ExtensionSetupKind? = when (packageName) {
             "com.example.mochi_pet.extension.termux" -> TERMUX
             "com.example.mochi_pet.extension.mijia" -> MIJIA
+            "com.example.mochi_pet.extension.webdav" -> WEBDAV
             else -> null
         }
     }
@@ -50,6 +54,7 @@ internal fun ExtensionSetupCompletionDialog(
                 Text(when (kind) {
                     ExtensionSetupKind.TERMUX -> "Run local shell commands and inspect or stop tasks. Output may go to your model Provider."
                     ExtensionSetupKind.MIJIA -> "Read and control selected smart-home devices and scenes."
+                    ExtensionSetupKind.WEBDAV -> "Read-only by default. Writing, deletion and file transfer require separate Tool switches."
                     ExtensionSetupKind.AGENTLINK -> "Use authorized remote workspaces, shared chats, and agent controls."
                 })
                 Text("This also enables any disabled tools required by the Skill. Other tool choices are preserved.")

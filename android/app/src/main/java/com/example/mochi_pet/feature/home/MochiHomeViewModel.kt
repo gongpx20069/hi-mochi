@@ -2095,6 +2095,30 @@ class MochiHomeViewModel(
         }
     }
 
+    fun onWebdavAction(action: WebdavUiAction) {
+        when (action) {
+            WebdavUiAction.Install -> mutableToolsState.update { it.copy(authorizationUrl = MIJIA_RELEASE_URL) }
+            WebdavUiAction.EnableWithSkill -> pendingExtensionSetup.value = ExtensionSetupKind.WEBDAV
+            WebdavUiAction.Configure -> {
+                val summary = mutableToolsState.value.catalog.webdav
+                val pkg = summary.configurationPackage
+                val activity = summary.configurationActivity
+                mutableToolsState.update {
+                    if (pkg == null || activity == null) it.copy(feedback = "WebDAV extension is unavailable")
+                    else it.copy(extensionActivityTarget = ExtensionActivityTarget(pkg, activity))
+                }
+            }
+            else -> updateTools {
+                val repository = requireRepository()
+                when (action) {
+                    WebdavUiAction.Disconnect -> repository.disconnectWebdav()
+                    is WebdavUiAction.Enable -> repository.setWebdavEnabled(action.enabled)
+                    is WebdavUiAction.EnableTool -> repository.setWebdavToolEnabled(action.name, action.enabled)
+                }
+            }
+        }
+    }
+
     fun configureMijiaExtension() {
         val mijia = mutableToolsState.value.catalog.mijia
         val packageName = mijia.configurationPackage
@@ -2152,6 +2176,7 @@ class MochiHomeViewModel(
             val available = when (kind) {
                 ExtensionSetupKind.TERMUX -> catalog.termux.tools.map { it.name }.toSet()
                 ExtensionSetupKind.MIJIA -> catalog.mijia.tools.map { it.name }.toSet()
+                ExtensionSetupKind.WEBDAV -> catalog.webdav.tools.map { it.name }.toSet()
                 ExtensionSetupKind.AGENTLINK -> com.example.mochi_pet.core.agentlink.AGENTLINK_TOOLS
             }
             check(available.containsAll(skill.requiredToolNames)) { "Required Skill tools are unavailable." }
@@ -2159,12 +2184,14 @@ class MochiHomeViewModel(
                 when (kind) {
                     ExtensionSetupKind.TERMUX -> repository.setTermuxToolEnabled(name, true)
                     ExtensionSetupKind.MIJIA -> repository.setMijiaToolEnabled(name, true)
+                    ExtensionSetupKind.WEBDAV -> repository.setWebdavToolEnabled(name, true)
                     ExtensionSetupKind.AGENTLINK -> requireNotNull(agentLinkClient).setToolEnabled(name, true)
                 }
             }
             when (kind) {
                 ExtensionSetupKind.TERMUX -> repository.setTermuxEnabled(true)
                 ExtensionSetupKind.MIJIA -> repository.setMijiaEnabled(true)
+                ExtensionSetupKind.WEBDAV -> repository.setWebdavEnabled(true)
                 ExtensionSetupKind.AGENTLINK -> requireNotNull(agentLinkClient).setEnabled(true)
             }
             skills.setEnabled(kind.skillId, true)

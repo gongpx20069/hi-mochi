@@ -8,8 +8,9 @@ downloaded scripts, remote MCP servers, dynamic-feature splits, or dynamically
 loaded DEX/JAR files.
 
 The extensions are **Mochi Mi Home Extension**, an optional unofficial
-connector for selected Mi Home devices, and **Mochi Termux Extension**, an
-optional local shell connector. The host accepts only explicit
+connector for selected Mi Home devices, **Mochi Termux Extension**, an
+optional local shell connector, and **Mochi WebDAV Files Extension**, a scoped
+remote-file connector. The host accepts only explicit
 official package IDs signed by the same release certificate as Mochi. A future
 third-party extension ecosystem requires a separate trust and review design;
 it is not implied by this contract.
@@ -22,7 +23,8 @@ android/
 ├── extension-api/
 └── extensions/
     ├── mijia/
-    └── termux/
+    ├── termux/
+    └── webdav/
 ```
 
 | Module | Application ID / namespace | Responsibility |
@@ -31,10 +33,11 @@ android/
 | `:extension-api` | `com.example.mochi_extension` | AIDL and immutable cross-process models |
 | `:extensions:mijia` | `com.example.mochi_pet.extension.mijia` | QR login, Xiaomi cloud/MIoT, device Tools, images |
 | `:extensions:termux` | `com.example.mochi_pet.extension.termux` | Termux setup, background shell submission, task state and termination |
+| `:extensions:webdav` | `com.example.mochi_pet.extension.webdav` / `com.example.mochi_webdav` | HTTPS WebDAV, encrypted connection, scoped file operations, private binary staging and native file pickers |
 
 All Mochi applications use `minSdk 26`, the same release version, and the same
-signing key. Each extension is one universal APK because it contains no native
-ABI libraries. The host both defines and requests the shared signature-level
+signing key. Each extension is one universal APK, bundling its dependencies'
+supported ABIs together rather than producing ABI splits. The host both defines and requests the shared signature-level
 bind permission; defining the permission alone does not authorize the host to
 start the protected extension Service or configuration Activity.
 
@@ -120,7 +123,7 @@ bounded typed envelopes as native Tools. Extensions cannot directly navigate,
 render UI, call the model, register Skills, invoke native Tools, or see other
 extension results.
 
-Mi Home Tools remain excluded from Scheduled Agents and Subagents. Termux
+Mi Home and WebDAV Tools remain excluded from Scheduled Agents and Subagents. Termux
 is available to both only through the explicit background authorization below.
 
 ### Mi Home control and verification
@@ -228,6 +231,69 @@ completion. Termux owns command lifetime; it may outlive Mochi, while Android
 may still kill it. Reconnection reinstalls the same versioned helper without
 deleting tasks. Interactive terminal takeover and persistent-service supervision
 are not provided.
+
+### WebDAV Files
+
+The WebDAV provider and `builtin:webdav-files` Skill default to disabled.
+`webdav_list` and `webdav_read` default to enabled; `webdav_write`,
+`webdav_manage`, and `webdav_transfer` require separate enablement. The Skill
+requires only the two read Tools; it cannot register or enable any Tool.
+Both host and extension reject non-foreground execution contexts.
+
+The extension owns one HTTPS endpoint, root folder and Basic-auth account,
+encrypted together with AES-GCM/Android Keystore in backup-excluded DataStore.
+Configuration probes use read-only Depth-0 PROPFIND before saving. Changing
+endpoint/account requires a replacement application password; retaining the
+same connection does not discard staged files. No password is restored into
+the editable form. The Activity protects screenshots and uses the shared theme.
+
+All paths remain below the configured root and on the exact origin. Reject
+dot segments, separators, dangerous nested percent encodings, cross-origin or
+out-of-root hrefs, and root mutations. DNS results and IP literals both enforce
+the address policy. RFC1918/CGNAT/IPv6 ULA require the explicit LAN setting;
+Android 17 additionally requires the extension's own local-network permission.
+Loopback, link-local and other rejected special addresses are never allowed.
+Use normal platform TLS trust and hostname verification, no proxies, automatic
+redirects or connection retries. Only a single read-only PROPFIND redirect
+adding the exact same collection's trailing slash is accepted.
+
+XML listing bodies are bounded to 2 MiB, 1,000 entries and depth 16. Reject
+entities/DOCTYPE, incomplete documents and invalid/out-of-scope responses.
+List/search returns at most 100 entries. Non-recursive `next_offset` pages are
+fresh, sorted listings, not a stable snapshot. Recursive filename search is
+bounded to 32 directories, depth five, 64 queued folders and 2,000 scanned
+entries. Report truncation; this is not full-text search. Nutstore may impose a
+750-entry server limit: flag potentially incomplete results; no undocumented
+server-pagination headers are guessed.
+
+Text is bounded to 32 KiB UTF-8. New PUT uses `If-None-Match: *`; updates and
+existing-resource management require a previously observed strong ETag and
+`If-Match`. Folder management also requires explicit recursive intent.
+MOVE/COPY use scoped Destination and `Overwrite: F`. Servers without suitable
+ETags cannot perform guarded updates/deletion/moves here. A 207 mutation response
+is partial/unknown, not complete success. Receipts distinguish server acceptance
+from readback verification; timeout/cancellation never justify a blind retry.
+Mutation bodies, including empty DELETE/MOVE/COPY bodies, are marked one-shot
+so HTTP retry hints cannot replay them; disabling connection retries alone
+does not disable OkHttp's `503 Retry-After: 0` follow-up.
+
+Binary bytes never use the camera attachment contract. Native SAF import grants
+access to one selected file; downloads are staged for native SAF export. The
+model sees opaque IDs/names/sizes, never local paths/URIs/base64. Private,
+backup-excluded cache staging is bounded to 32 MiB per file, four completed files,
+64 MiB total and one hour; Android may evict it earlier. Expired IDs cannot be
+used, incomplete copies are discarded, and upload/export holds the staging
+mutex. Forget removes only the staged copy. Connection changes discard staged
+capabilities; disconnect removes credentials and staged files, not remote files.
+
+Provider/Tool changes advance a persisted host revision, cancel active waits
+and invalidate old registries even after re-enabling. Tool definitions carry an
+opaque `x-webdav-connection` JSON Schema annotation: the host removes it from
+model-visible schemas and injects `_connection_id` into Binder arguments. The
+service requires that captured revision before network access and checks it
+again before returning. Reconfiguration cancels in-flight calls; old registries
+cannot apply a planned path to a newly configured account/root. This is an
+additive Tool-definition convention, not a change to protocol-v1 Parcelables.
 
 ## 6. Mi Home authentication and storage
 
@@ -388,12 +454,15 @@ The standard Android release builds and signs:
 - five Mochi ABI APKs;
 - one universal Mi Home extension APK, not split by native ABI;
 - one universal Termux extension APK, not split by native ABI;
+- one universal WebDAV extension APK, not split by native ABI;
 - one shared SHA-256 manifest and release metadata file.
 
 The publisher verifies application ID, embedded version, signature, absence of
 a launcher entry, protocol version metadata, and hashes. The extension APK is
-named `Mochi-Mijia-Extension-v<version>.apk` or
-`Mochi-Termux-Extension-v<version>.apk`, respectively.
+named `Mochi-Mijia-Extension-v<version>.apk`,
+`Mochi-Termux-Extension-v<version>.apk`, and
+`Mochi-WebDAV-Extension-v<version>.apk`, respectively. Eight APKs plus the
+checksum manifest are uploaded; `release.json` remains local/workflow metadata.
 
 The protocol uses an integer major version plus additive capability flags.
 Unknown optional fields are ignored. Major-version mismatch leaves the

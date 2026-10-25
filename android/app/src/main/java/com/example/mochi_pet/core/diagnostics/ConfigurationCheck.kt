@@ -4,7 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 
 enum class CheckStatus { PASSED, ATTENTION, NOT_TESTED, DISABLED }
-enum class RepairTarget { MODEL, SPEECH, PERMISSIONS, TOOLS, SKILLS, TERMUX, MIJIA, AGENTLINK }
+enum class RepairTarget { MODEL, SPEECH, PERMISSIONS, TOOLS, SKILLS, TERMUX, MIJIA, AGENTLINK, WEBDAV }
 
 data class ConfigurationCheck(
     val id: String,

@@ -76,6 +76,10 @@ enum class TrustedExtension(
         MochiExtensionProtocol.TERMUX_EXTENSION_ID, MochiExtensionProtocol.TERMUX_PACKAGE,
         MochiExtensionProtocol.TERMUX_SERVICE, MochiExtensionProtocol.TERMUX_CONFIGURATION_ACTIVITY,
     ),
+    WEBDAV(
+        MochiExtensionProtocol.WEBDAV_EXTENSION_ID, MochiExtensionProtocol.WEBDAV_PACKAGE,
+        MochiExtensionProtocol.WEBDAV_SERVICE, MochiExtensionProtocol.WEBDAV_CONFIGURATION_ACTIVITY,
+    ),
 }
 
 data class OpenedExtensionAttachment(

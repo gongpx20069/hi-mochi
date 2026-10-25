@@ -20,7 +20,8 @@ android/
 ├── extension-api/       AIDL and immutable extension contracts
 ├── extension-ui/        shared Mochi theme, cards, and setup shell
 ├── extensions/mijia/    optional universal Mi Home extension APK
-└── extensions/termux/   optional universal Termux extension APK
+├── extensions/termux/   optional universal Termux extension APK
+└── extensions/webdav/   optional universal WebDAV Files extension APK
 ```
 
 ## Prerequisites
@@ -36,7 +37,7 @@ and serialization 1.12.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply
 `org.jetbrains.kotlin.android` in modules. Serialization 1.12.0 uses Kotlin 2.4
 metadata and cannot compile with the former Kotlin 2.2.20 toolchain.
-The host and both extensions compile against and target Android 17 (API 37);
+The host and all three extensions compile against and target Android 17 (API 37);
 the shared libraries also compile against API 37. Android 8.0 (API 26) remains
 the minimum supported version. Keep Lint warnings fatal, including target-SDK
 checks; do not suppress `OldTargetApi` to pass CI.
@@ -87,7 +88,7 @@ Set-Location android
 `verifyNative` checks architecture rules, formatting, Android Lint, JVM tests,
 the debug APK, and extension contract/provider tests. `verifyRelease` runs the
 release checks and assembles the five base APKs plus the universal signed Mi
-Home and Termux extension APKs. `verifyNative` also runs `verifyTermuxRunner`
+Home, Termux and WebDAV extension APKs. `verifyNative` also runs `verifyTermuxRunner`
 on Linux: Python standard-library acceptance tests exercise the exact bundled
 Bash supervisor, deadlines, output caps, exit status and process-group stop.
 That Linux-only task is skipped on Windows; CI must pass it before delivery.
@@ -413,7 +414,8 @@ GitHub CLI with `gh auth login`, then run:
 The build script calculates the next remote version and embeds it in five
 signed base APKs: `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`, and `universal`,
 plus one signed universal `Mochi-Mijia-Extension` APK. It writes them to one
-versioned directory together with `Mochi-Termux-Extension`. Both extension APKs
+versioned directory together with `Mochi-Termux-Extension` and
+`Mochi-WebDAV-Extension`. All three extension APKs
 must match the base application's signing certificate and version. It writes a
 release metadata file and shared SHA-256 manifest. Use
 the exact directory printed by that script in the publish command. Local builds
@@ -425,6 +427,24 @@ version instead of overwriting or reusing a tag. Once a publisher reserves a
 remote tag it is never deleted automatically; an interrupted publication may
 therefore leave a skipped `1.0.x` value, but can never make a released version
 move backward or be silently replaced.
+
+### WebDAV acceptance
+
+Run `:extensions:webdav:testDebugUnitTest :extensions:webdav:lintDebug
+:extensions:webdav:assembleDebug`, plus the host ToolCatalog, extension-client,
+setup-UI, database Skill and AgentOrchestrator tests. Local HTTPS fixtures cover
+scope, XML, chunked/oversized bodies, conditional mutations, partial failure,
+TLS trust, cancellation and staged-file lifetime; they do not prove live-provider
+compatibility.
+
+Before promotion, use user-owned test folders on Nutstore and a compatible
+NAS/private cloud. Check valid-certificate HTTPS, LAN opt-in/denial, strong
+ETag compatibility, read-only Skill gating, mutation switches, SAF import/export
+byte equality, expired IDs, connection-change revocation and interrupted writes.
+Exercise the configuration page in English/Chinese, at 320 dp and 200% font
+scale, with keyboard and file-picker return. Never use real user files as
+mutation fixtures, put passwords in command arguments, or clear app data.
+Real-service/device acceptance remains pending until that evidence is recorded.
 
 ### Termux acceptance
 

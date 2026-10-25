@@ -86,5 +86,41 @@ class ExtensionSetupUiTest {
         )))
         assertFalse(ExtensionSetupKind.MIJIA.connected(ToolCatalogSummary()))
         assertFalse(ExtensionSetupKind.AGENTLINK.connected(ToolCatalogSummary()))
+        assertEquals(ExtensionSetupKind.WEBDAV, ExtensionSetupKind.fromPackage("com.example.mochi_pet.extension.webdav"))
+        assertFalse(ExtensionSetupKind.WEBDAV.connected(ToolCatalogSummary(
+            webdav = ExtensionProviderSummary(connected = true, trusted = false),
+        )))
+    }
+
+    @Test
+    fun `WebDAV enablement discloses read only defaults without granting mutations`() {
+        var enabled = false
+        compose.setContent {
+            MochiTheme {
+                ExtensionSetupCompletionDialog(ExtensionSetupKind.WEBDAV, { enabled = true }, {})
+            }
+        }
+        compose.onNodeWithText("Read-only by default. Writing, deletion and file transfer require separate Tool switches.").assertExists()
+        assertFalse(enabled)
+        compose.onNodeWithText("Enable tools and Skill").performClick()
+        assertEquals(true, enabled)
+    }
+
+    @Test
+    fun `WebDAV broken configuration can be disconnected only after confirmation`() {
+        var disconnected = false
+        compose.setContent {
+            MochiTheme {
+                WebdavProviderCard(
+                    ExtensionProviderSummary(installed = true, trusted = true, status = "error"),
+                    disabled = false,
+                ) { if (it == WebdavUiAction.Disconnect) disconnected = true }
+            }
+        }
+        compose.onNodeWithText("Disconnect").performClick()
+        compose.onNodeWithText("Disconnect WebDAV?").assertIsDisplayed()
+        assertFalse(disconnected)
+        compose.onNodeWithText("Cancel").performClick()
+        assertFalse(disconnected)
     }
 }

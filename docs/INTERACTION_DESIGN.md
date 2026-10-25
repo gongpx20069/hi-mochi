@@ -409,7 +409,8 @@ A group is ready only when its provider and every member Tool required by that
 Skill are ready. A previously enabled Skill whose dependencies become
 unavailable remains switchable off but is suspended from Agent discovery.
 Existing built-ins default to enabled; the
-Notion Knowledge, Tencent Docs Knowledge, Feishu Knowledge, and Mi Home Smart Home built-ins
+Notion Knowledge, Tencent Docs Knowledge, Feishu Knowledge, Mi Home Smart Home,
+Termux, AgentLink, and WebDAV Files built-ins
 default to disabled.
 Each MCP server's detailed Tool list starts collapsed and can be expanded
 without disabling the server or changing individual Tool selections. Built-in
@@ -830,6 +831,30 @@ Save returns to the common Mochi completion/enablement summary. Manage devices,
 reconnect, and disconnect share the common management area. Disconnect requires
 confirmation; it must not sit beside Save as an equally prominent primary
 action. Camera descriptions still say latest available event, not live video.
+
+### WebDAV Files: a scoped connection and explicit file transfer
+
+Show a stable **WebDAV Files** card alongside the other extensions, with
+installation/trust/connection/provider states and **Connection and files**.
+The setup uses the shared shell with HTTPS address, allowed root, account and
+masked application password; a Nutstore preset fills only its service address.
+Explain that `/` includes the configured endpoint's entire tree. LAN access is
+separately opt-in, with the extension's Android 17 permission prompt; certificate
+errors never offer a bypass. Connection testing reads metadata, never writes.
+
+Successful setup returns to the common explicit **Enable tools and Skill**
+dialog. Only the required read Tools are enabled by that action; saved mutation
+Tool choices are preserved. Explain that write, management and transfer are
+default-off and that file contents may reach the selected model Provider.
+The Skill becomes unavailable when the extension or either read Tool is disabled.
+
+**Connection and files** also imports through the system picker and lists private
+staged transfers. A download is labelled ready to export, not saved to Downloads;
+**Save to device** launches the system destination picker. Show file/total/expiry
+limits and distinguish **Remove staged copy** from remote deletion. Reconfiguration
+discards previous staged capabilities. Failed or interrupted exports warn that
+the chosen destination may contain a partial file. No broad storage permission,
+chat password entry, hidden file selection or unattended background sync.
 
 ### AgentLink: distinguish app authorization from computer availability
 
