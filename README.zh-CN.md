@@ -339,7 +339,7 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 | 米家 | Mi Home Smart Home——禁用 | 查询/控制选定设备、执行手动场景、查看最新摄像头事件图片 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：`Mochi-Mijia-Extension` |
 | [AgentLink](https://github.com/gongpx20069/android-agent-link) | AgentLink——禁用 | 通过 `agentlink_workspace`、`agentlink_chat`、`agentlink_control` 控制远程共享编程聊天 | [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases) |
 | Termux | Termux——禁用 | 通过 `termux_exec`、`termux_task` 运行完整本机 Shell 并管理任务 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：`Mochi-Termux-Extension`，另需[官方 Termux](https://github.com/termux/termux-app#installation) |
-| WebDAV 文件（预览） | WebDAV Files——禁用 | 授权目录内列举/查找文件、编辑文本、条件复制/移动/删除、原生二进制传输 | 同版本构建的 Mochi 与 `Mochi-WebDAV-Extension`；尚未包含在公开 Release 中 |
+| WebDAV 文件（预览） | WebDAV Files——禁用 | 授权目录内列举/查找文件、编辑文本、条件复制/移动/删除、原生二进制传输 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：同版本 Mochi 与 `Mochi-WebDAV-Extension`，自 v1.0.15 起提供 |
 
 ### WebDAV 文件：坚果云、兼容私有云与 NAS
 

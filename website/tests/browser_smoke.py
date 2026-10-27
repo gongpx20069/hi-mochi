@@ -46,7 +46,10 @@ def main() -> None:
                 is_home = "agentlink/" not in language
                 source = (SITE_ROOT / language / "index.html").read_text(encoding="utf-8")
                 fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1) if is_home else None
-                modes = ("latest", "unavailable", "untrusted", "missing-extension", "untrusted-extension") if is_home else ("standalone",)
+                modes = (
+                    "latest", "unavailable", "untrusted", "missing-extension",
+                    "untrusted-extension", "missing-webdav", "untrusted-webdav",
+                ) if is_home else ("standalone",)
                 for mode in modes:
                     context = browser.new_context(reduced_motion="reduce")
                     asset_name = f"Mochi-{TEST_VERSION}-arm64-v8a.apk"
@@ -64,15 +67,17 @@ def main() -> None:
                             ),
                         }],
                     }
-                    for extension in ("Mijia", "Termux"):
+                    for extension in ("Mijia", "Termux", "WebDAV"):
                         if mode == "missing-extension" and extension == "Termux":
+                            continue
+                        if mode == "missing-webdav" and extension == "WebDAV":
                             continue
                         filename = f"Mochi-{extension}-Extension-{TEST_VERSION}.apk"
                         payload["assets"].append({
                             "name": filename,
                             "browser_download_url": (
                                 "https://example.invalid/extension.apk"
-                                if mode == "untrusted-extension"
+                                if mode == "untrusted-extension" or (mode == "untrusted-webdav" and extension == "WebDAV")
                                 else f"{RELEASE_ROOT}download/{TEST_VERSION}/{filename}"
                             ),
                         })
@@ -99,16 +104,16 @@ def main() -> None:
                         )
                     for link in page.locator("[data-release-page]").all():
                         assert link.get_attribute("href") == f"{RELEASE_ROOT}tag/{expected}"
-                    for extension, name in (("mijia", "Mijia"), ("termux", "Termux")):
+                    for extension, name in (("mijia", "Mijia"), ("termux", "Termux"), ("webdav", "WebDAV")):
                         if is_home:
                             assert page.locator(f"[data-extension-download='{extension}']").get_attribute("href") == (
                                 f"{RELEASE_ROOT}download/{expected}/Mochi-{name}-Extension-{expected}.apk"
                             )
                     if is_home:
                         preview = page.locator("[data-extension-card='webdav']")
-                        assert preview.get_attribute("data-release-status") == "preview"
-                        assert preview.locator("[data-extension-download], a[href*='.apk']").count() == 0
-                        assert preview.locator("a").get_attribute("href").startswith(
+                        assert preview.get_attribute("data-release-status") == "released-preview"
+                        assert preview.locator("[data-extension-download='webdav']").count() == 1
+                        assert preview.locator(".text-link").get_attribute("href").startswith(
                             "https://github.com/gongpx20069/hi-mochi"
                         )
                         page.locator(".capability-map a[href='#webdav-extension']").click()
@@ -226,6 +231,7 @@ def main() -> None:
                     if is_home:
                         page.locator("[data-extension-card='agentlink'] .button").click()
                         assert page.url.endswith(f"/hi-mochi/{language}agentlink/")
+                        page.wait_for_load_state("networkidle")
                         page.locator(".site-nav a[href='../']").click()
                         assert page.url.endswith(f"/hi-mochi/{language}")
                     else:
@@ -235,12 +241,14 @@ def main() -> None:
                         language_link = "../zh-CN/agentlink/" if language == "agentlink/" else "../../agentlink/"
                         page.locator(f".site-nav a[href='{language_link}']").click()
                         assert page.url.endswith("/zh-CN/agentlink/" if language == "agentlink/" else "/hi-mochi/agentlink/")
+                    page.wait_for_load_state("networkidle")
                     assert not failures, failures
                     context.close()
             for language in ("", "zh-CN/", "agentlink/", "zh-CN/agentlink/"):
                 context = browser.new_context(java_script_enabled=False)
                 page = context.new_page()
                 page.goto(f"http://127.0.0.1:{server.server_port}/hi-mochi/{language}")
+                page.wait_for_load_state("networkidle")
                 if "agentlink/" not in language:
                     source = (SITE_ROOT / language / "index.html").read_text(encoding="utf-8")
                     fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1)
@@ -253,7 +261,9 @@ def main() -> None:
                         disclosure.locator("summary").click()
                         assert disclosure.evaluate("(item) => item.open")
                         assert disclosure.locator("p, ol").first.is_visible()
-                    assert page.locator("[data-extension-download='webdav']").count() == 0
+                    assert page.locator("[data-extension-download='webdav']").get_attribute("href") == (
+                        f"{RELEASE_ROOT}download/{fallback}/Mochi-WebDAV-Extension-{fallback}.apk"
+                    )
                     context.close()
                     continue
                 assert page.locator(".agentlink-hero .reveal").first.evaluate(

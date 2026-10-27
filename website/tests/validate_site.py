@@ -153,7 +153,7 @@ def main() -> None:
                 source,
             )
             versions = set(download_versions + page_versions + label_versions)
-            for extension, name in (("mijia", "Mijia"), ("termux", "Termux")):
+            for extension, name in (("mijia", "Mijia"), ("termux", "Termux"), ("webdav", "WebDAV")):
                 extension_versions = re.findall(
                     rf'data-extension-download="{extension}" href="https://github.com/'
                     rf'gongpx20069/hi-mochi/releases/download/(v1\.0\.[1-9][0-9]*)/'
@@ -164,15 +164,6 @@ def main() -> None:
             for extension in ("mijia", "termux", "agentlink", "webdav"):
                 if source.count(f'data-extension-card="{extension}"') != 1:
                     errors.append(f"{relative_page}: missing or duplicate {extension} card")
-            for preview in re.findall(
-                r'<article\b[^>]*data-release-status="preview"[^>]*>(.*?)</article>',
-                source, re.S,
-            ):
-                if "data-extension-download" in preview or re.search(
-                    r'href="[^"]*(?:/releases/download/|\.apk(?:[?#][^"]*)?")',
-                    preview,
-                ):
-                    errors.append(f"{relative_page}: unpublished preview must not offer an APK")
             if "extensions" not in parser.ids:
                 errors.append(f"{relative_page}: missing extensions section")
             fallback_versions.update(versions)

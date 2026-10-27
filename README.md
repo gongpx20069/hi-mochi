@@ -390,7 +390,7 @@ and enabled. Installation alone never enables its provider.
 | Mi Home | Mi Home Smart Home — disabled | Selected device state/control, manual scenes, latest camera event images | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Mijia-Extension` |
 | [AgentLink](https://github.com/gongpx20069/android-agent-link) | AgentLink — disabled | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` for shared remote coding chats | [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases) |
 | Termux | Termux — disabled | `termux_exec` · `termux_task` for unrestricted local shell and task management | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Termux-Extension`, plus [official Termux](https://github.com/termux/termux-app#installation) |
-| WebDAV Files (preview) | WebDAV Files — disabled | Scoped file listing/search, text editing, conditional copy/move/delete and native binary transfer | Matching Mochi + `Mochi-WebDAV-Extension` builds; not yet in a published release |
+| WebDAV Files (preview) | WebDAV Files — disabled | Scoped file listing/search, text editing, conditional copy/move/delete and native binary transfer | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): matching Mochi + `Mochi-WebDAV-Extension`, available since v1.0.15 |
 
 ### WebDAV files: Nutstore, compatible clouds and NAS
 

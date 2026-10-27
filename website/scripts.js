@@ -77,7 +77,7 @@ const updateLatestRelease = async () => {
     throw new Error("GitHub returned an unexpected release URL");
   }
 
-  const extensionNames = { mijia: "Mijia", termux: "Termux" };
+  const extensionNames = { mijia: "Mijia", termux: "Termux", webdav: "WebDAV" };
   const extensionDownloads = [...document.querySelectorAll("[data-extension-download]")].map((link) => {
     const name = extensionNames[link.dataset.extensionDownload];
     const filename = `Mochi-${name}-Extension-${version}.apk`;
