@@ -42,3 +42,10 @@ tests.
 Explain the user-visible outcome, implementation boundaries, and validation
 performed. Maintainers may ask for a smaller scope or architecture updates
 before merging.
+
+Pull requests targeting `main` require approval from `@gongpx20069`, the sole
+repository-wide owner in [`.github/CODEOWNERS`](.github/CODEOWNERS). The active
+`main protect` ruleset requires at least one approval and code-owner approval.
+Only `@gongpx20069` has an explicit, always-on ruleset bypass, including direct
+pushes. GitHub does not allow authors to approve their own pull requests, so
+owner-authored pull requests use this bypass instead of self-approval.
