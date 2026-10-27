@@ -21,6 +21,10 @@ object MochiExtensionProtocol {
     const val TERMUX_SERVICE = "com.example.mochi_termux.TermuxExtensionService"
     const val TERMUX_CONFIGURATION_ACTIVITY =
         "com.example.mochi_termux.TermuxConfigurationActivity"
+    const val WEBDAV_EXTENSION_ID = "webdav"
+    const val WEBDAV_PACKAGE = "com.example.mochi_pet.extension.webdav"
+    const val WEBDAV_SERVICE = "com.example.mochi_webdav.WebdavExtensionService"
+    const val WEBDAV_CONFIGURATION_ACTIVITY = "com.example.mochi_webdav.WebdavConfigurationActivity"
 }
 
 object ExtensionConnectionStatus {

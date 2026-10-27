@@ -67,6 +67,9 @@ New-MochiReleaseAssets `
     -TermuxSourceOutputDirectory (
         Join-Path $androidRoot 'extensions\termux\build\outputs\apk\release'
     ) `
+    -WebdavSourceOutputDirectory (
+        Join-Path $androidRoot 'extensions\webdav\build\outputs\apk\release'
+    ) `
     -DestinationDirectory $releaseDirectory
 
 Write-Output "Version: $version"

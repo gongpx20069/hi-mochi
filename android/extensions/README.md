@@ -2,7 +2,7 @@
 
 **Status: shared Mochi UI implemented in this repository; external AgentLink
 pages and the full device/usability acceptance matrix remain outstanding.**
-These guidelines cover every Mochi optional integration: Termux, Mi Home,
+These guidelines cover every Mochi optional integration: Termux, Mi Home, WebDAV Files,
 AgentLink, and future extensions. AgentLink is included in the user experience
 even though it uses an independent companion-app protocol, not `extension-api`.
 
@@ -24,7 +24,7 @@ Root READMEs remain user onboarding, not extension implementation manuals.
 | Surface | Code owner | Required treatment |
 | --- | --- | --- |
 | All integration cards and completion/enablement in Mochi | This repository | One card structure and common status/action language |
-| Termux and Mi Home setup Activities | This repository | Same Mochi theme and setup shell; provider-specific content |
+| Termux, Mi Home and WebDAV setup Activities | This repository | Same Mochi theme and setup shell; provider-specific content |
 | AgentLink authorization/access-management handoff | Mochi adapter here; native page in [android-agent-link](https://github.com/gongpx20069/android-agent-link) | Same experience specification, coordinated implementation in the companion repository |
 | Android permission/install/settings screens, Termux terminal, Mi Home scanner, desktop Bridge | Platform or external application | Explain the destination and return path; do not imitate or silently operate another app's UI |
 
@@ -41,7 +41,7 @@ independent page background, button system, or typography.
 The current palette source is
 [`MochiTheme.kt`](../extension-ui/src/main/java/com/example/mochi_ui/MochiTheme.kt).
 The `:extension-ui` library supplies the theme, integration cards, headings,
-and scrolling setup shell to the host and both extension APKs, using Compose
+and scrolling setup shell to the host and all three extension APKs, using Compose
 Material 3 rather than independent platform-View skins. Keep authorization and connection
 logic out of that library. AgentLink needs a coordinated equivalent in its own
 repository; it cannot import this repository's host application module.

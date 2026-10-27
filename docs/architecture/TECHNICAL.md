@@ -26,6 +26,9 @@ explicit action and refreshes the OS grant when resumed. Denial remains visible
 with a link to app permissions; public Internet access is unaffected. The
 cloud-only Mi Home extension and the Termux IPC bridge do not request this
 permission. Existing Browser/REST public-address policies are not relaxed.
+The optional WebDAV extension requests its own local-network permission only
+after its separate, default-off LAN setting is selected. It does not inherit
+the host's grant. HTTPS certificate and configured-root checks always apply.
 
 ## Releases and Provider sharing
 
@@ -460,6 +463,11 @@ activation. Installing/loading a Skill never runs downloaded scripts or
 package-install instructions. Connected, enabled Termux Tools may run user
 scripts or install packages inside Termux; this does not grant other Skills
 or runtimes an execution bypass.
+The default-off WebDAV Files Skill requires the trusted, configured, enabled
+WebDAV extension and both read Tools. Its optional Tool header lists only
+available write/manage/transfer Tools. Binary content remains inside
+the extension and native file-picker flow; it is not an image attachment or
+an automatic upload to the model Provider.
 
 The Browser Skill has the stable discovery name `browser` and storage ID
 `builtin:browser`. Existing `builtin:web-search` enablement is read through

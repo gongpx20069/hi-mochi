@@ -200,6 +200,10 @@ class MochiApplication : Application() {
 
     val termuxRuntime = com.example.mochi_pet.core.extensions.TermuxRuntimeState()
 
+    val webdavClient: MochiExtensionClient by lazy {
+        AndroidMochiExtensionClient(this, com.example.mochi_pet.core.extensions.TrustedExtension.WEBDAV)
+    }
+
     val agentLinkClient: AndroidAgentLinkClient by lazy {
         AndroidAgentLinkClient(this, toolDataStore, agentLinkResults) { scheduleAgentLinkResultCollection(this) }
     }
@@ -228,6 +232,7 @@ class MochiApplication : Application() {
             agentLinkClient = agentLinkClient,
             termuxClient = termuxClient,
             termuxRuntime = termuxRuntime,
+            webdavClient = webdavClient,
         )
     }
 

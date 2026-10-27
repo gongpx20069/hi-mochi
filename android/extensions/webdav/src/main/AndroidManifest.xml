@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="com.example.mochi_pet.permission.BIND_EXTENSION" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <application
+        android:name=".WebdavApplication"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@drawable/ic_webdav"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:theme="@style/Theme.MochiExtension">
+        <activity
+            android:name=".WebdavConfigurationActivity"
+            android:exported="true"
+            android:permission="com.example.mochi_pet.permission.BIND_EXTENSION" />
+        <service
+            android:name=".WebdavExtensionService"
+            android:exported="true"
+            android:permission="com.example.mochi_pet.permission.BIND_EXTENSION">
+            <intent-filter>
+                <action android:name="com.example.mochi_extension.BIND_EXTENSION" />
+            </intent-filter>
+            <meta-data android:name="com.example.mochi_extension.PROTOCOL_VERSION" android:value="1" />
+        </service>
+    </application>
+</manifest>

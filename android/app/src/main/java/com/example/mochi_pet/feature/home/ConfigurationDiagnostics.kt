@@ -59,6 +59,7 @@ internal fun configurationProbes(app: MochiApplication): List<ConfigurationProbe
         listOf(
             extensionCheck("termux", "Termux", catalog.termux, RepairTarget.TERMUX),
             extensionCheck("mijia", "Mi Home", catalog.mijia, RepairTarget.MIJIA),
+            extensionCheck("webdav", "WebDAV Files", catalog.webdav, RepairTarget.WEBDAV),
             ConfigurationCheck("agentlink", "AgentLink", when {
                 !link.installed -> CheckStatus.DISABLED
                 !link.authorized || !link.connected -> CheckStatus.ATTENTION
@@ -127,7 +128,10 @@ internal fun extensionCheck(
     !provider.trusted -> "Install the extension from the same signing channel as Mochi. Do not uninstall to change channels."
     !provider.connected && repair == RepairTarget.TERMUX ->
         "Open Configure Termux to check installation, Android command permission, external access and the Shell helper."
+    !provider.connected && repair == RepairTarget.WEBDAV ->
+        "Open Connection and files to check the WebDAV address, allowed folder, application password and LAN permission."
     !provider.connected -> "Open extension setup and complete connection and device selection."
     !provider.enabled -> "Connected but disabled. Enable only if you want Agents to use it."
+    repair == RepairTarget.WEBDAV -> "A saved WebDAV connection is available. Remote access and file operations were not tested."
     else -> "The extension reports connected. Device actions and Shell execution were not tested."
 }, repair)

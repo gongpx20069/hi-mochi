@@ -297,6 +297,20 @@ registry's required-Tool readiness. There is no model-supplied shell `confirmed`
 flag, silent retry, or unrestricted Android Intent dispatch.
 See `EXTENSIONS.md` for setup, command privacy and process-lifetime guarantees.
 
+### Optional WebDAV tools
+
+The optional foreground-only WebDAV Tools are `webdav_list` (filename search,
+bounded recursive search and non-recursive `next_offset` pages), `webdav_read`
+(UTF-8 text or metadata), `webdav_write` (conditional text PUT), `webdav_manage`
+(mkdir/copy/move/delete), and `webdav_transfer` (staged list/download/upload/forget).
+Only the two read Tools default to enabled; the provider and Skill remain off.
+Mutation flags express the user's explicit task, not a separate approval system.
+Existing-resource changes require strong ETags; uncertain writes are never
+blindly retried. Binary transfer uses native pickers and opaque staged IDs,
+not camera attachments or arbitrary phone paths.
+See [`EXTENSIONS.md`](EXTENSIONS.md#webdav-files) for the authoritative limits,
+connection-revision binding, local-network policy and cancellation semantics.
+
 ### `manage_mochi_calendar`
 
 Operations: `create`, `list`, `update`, `delete`.

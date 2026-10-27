@@ -298,6 +298,8 @@ function New-MochiReleaseAssets {
         [Parameter(Mandatory)]
         [string] $TermuxSourceOutputDirectory,
         [Parameter(Mandatory)]
+        [string] $WebdavSourceOutputDirectory,
+        [Parameter(Mandatory)]
         [string] $DestinationDirectory
     )
 
@@ -414,6 +416,30 @@ function New-MochiReleaseAssets {
             abi = 'universal'
             file = $termuxName
             sha256 = (Get-FileHash -Algorithm SHA256 $termuxDestination).Hash.ToLowerInvariant()
+        }
+
+        $webdavPath = Get-MochiReleaseApkOutputsSingle $WebdavSourceOutputDirectory
+        if ((Get-AndroidApkVersion $webdavPath) -ne $Version) {
+            throw 'WebDAV extension version does not match the release.'
+        }
+        Assert-AndroidApkSignature $webdavPath
+        Assert-AndroidApkIdentity `
+            -ApkPath $webdavPath `
+            -ExpectedApplicationId 'com.example.mochi_pet.extension.webdav' `
+            -ShouldHaveLauncher $false
+        $webdavSigners = @(Get-AndroidApkSignerSha256 $webdavPath)
+        if (Compare-Object $baseSignerDigests $webdavSigners) {
+            throw 'The WebDAV extension APK must use the base APK signer.'
+        }
+        $webdavName = "Mochi-WebDAV-Extension-$tag.apk"
+        $webdavDestination = Join-Path $DestinationDirectory $webdavName
+        Copy-Item $webdavPath $webdavDestination
+        $artifacts += [ordered]@{
+            kind = 'extension'
+            extension = 'webdav'
+            abi = 'universal'
+            file = $webdavName
+            sha256 = (Get-FileHash -Algorithm SHA256 $webdavDestination).Hash.ToLowerInvariant()
         }
 
         $checksumName = "Mochi-$tag-SHA256SUMS.txt"

@@ -22,16 +22,18 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class MochiExtensionClientTest {
     @Test
-    fun `Mi Home adapter rejects background scopes before binding`() = runBlocking {
+    fun `Mi Home and WebDAV adapters reject background scopes before binding`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val client = AndroidMochiExtensionClient(context, TrustedExtension.MIJIA)
         val definition = ExtensionToolDefinition("mijia_list_devices", "", """{"type":"object"}""", "read", true)
-        listOf(ExtensionToolScope.SCHEDULED, ExtensionToolScope.SUBAGENT).forEach { scope ->
-            val result = client.agentTool(definition, scope).execute(
-                JsonObject(emptyMap()), ToolExecutionContext(LocalDate.of(2026, 1, 1), MochiSurface.Face),
-            )
-            assertEquals("PERMISSION_DENIED", result.code)
-            assertEquals("This extension is only available to the foreground Main Agent.", result.message)
+        for (identity in listOf(TrustedExtension.MIJIA, TrustedExtension.WEBDAV)) {
+            val client = AndroidMochiExtensionClient(context, identity)
+            listOf(ExtensionToolScope.SCHEDULED, ExtensionToolScope.SUBAGENT).forEach { scope ->
+                val result = client.agentTool(definition, scope).execute(
+                    JsonObject(emptyMap()), ToolExecutionContext(LocalDate.of(2026, 1, 1), MochiSurface.Face),
+                )
+                assertEquals("PERMISSION_DENIED", result.code)
+                assertEquals("This extension is only available to the foreground Main Agent.", result.message)
+            }
         }
     }
 

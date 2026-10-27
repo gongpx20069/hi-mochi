@@ -330,8 +330,8 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 ## 可选扩展
 
 这些集成用于补充 Mochi 的能力，**不是核心功能的使用前提**，只需按需安装。
-米家和 Termux 使用与 Mochi 同签名的独立扩展 APK；AgentLink 通过独立的
-配套应用连接。米家和 AgentLink 用于前台 Main Agent；Termux 连接并启用后，
+米家、Termux 和 WebDAV 使用与 Mochi 同签名的独立扩展 APK；AgentLink 通过独立的
+配套应用连接。米家、WebDAV 和 AgentLink 用于前台 Main Agent；Termux 连接并启用后，
 也可由 Subagent 和定时 Agent 自动执行。仅安装不会自动启用 Provider。
 
 | 集成 | 内置 Skill（默认状态） | 附加能力 | 安装入口 |
@@ -339,6 +339,27 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 | 米家 | Mi Home Smart Home——禁用 | 查询/控制选定设备、执行手动场景、查看最新摄像头事件图片 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：`Mochi-Mijia-Extension` |
 | [AgentLink](https://github.com/gongpx20069/android-agent-link) | AgentLink——禁用 | 通过 `agentlink_workspace`、`agentlink_chat`、`agentlink_control` 控制远程共享编程聊天 | [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases) |
 | Termux | Termux——禁用 | 通过 `termux_exec`、`termux_task` 运行完整本机 Shell 并管理任务 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：`Mochi-Termux-Extension`，另需[官方 Termux](https://github.com/termux/termux-app#installation) |
+| WebDAV 文件（预览） | WebDAV Files——禁用 | 授权目录内列举/查找文件、编辑文本、条件复制/移动/删除、原生二进制传输 | 同版本构建的 Mochi 与 `Mochi-WebDAV-Extension`；尚未包含在公开 Release 中 |
+
+### WebDAV 文件：坚果云、兼容私有云与 NAS
+
+安装相同版本、同签名的 Mochi 和 WebDAV 扩展 APK。打开 **Tools > Extensions >
+WebDAV 文件 > 连接 WebDAV**，填写 HTTPS WebDAV 地址、已存在的授权目录、
+账号和应用密码，检查并保存。坚果云预设地址为 `https://dav.jianguoyun.com/dav/`，
+请在坚果云中生成第三方应用密码，勿把凭据发到聊天中。其他服务必须提供兼容
+WebDAV，不能只填普通网页登录地址；无需另行部署 MCP 服务器。
+
+选择**启用工具和 Skill**后可读取文件；写入、管理和传输 Tool 仍需单独开启。
+扩展或任一必需读取 Tool 不可用时，Skill 自动暂停发现与调用。
+局域网／VPN NAS 需单独授权，Android 17 还需授予扩展自身的局域网权限；
+HTTPS 必须使用受信任的有效证书，不提供跳过证书验证的选项。
+
+上传二进制文件前，在**连接与文件 > 选择待上传文件**中授权具体文件。
+Mochi 下载后只是暂存，需点击**保存到设备**选择最终位置。单文件上限 32 MiB，
+最多暂存 4 个文件、共 64 MiB，一小时后过期。文本读写上限为 32 KiB UTF-8；
+搜索匹配文件名而非全文，并明确提示截断。修改已有文件需强 ETag，不提供
+强 ETag 的服务无法执行相应安全修改。这不是 Obsidian 同步引擎，也不会解密
+加密仓库；真实坚果云／NAS 兼容性及设备验收仍待完成。
 
 ### 米家智能家居
 

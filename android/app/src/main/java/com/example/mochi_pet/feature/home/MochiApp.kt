@@ -390,6 +390,9 @@ fun MochiApp(
                     RepairTarget.MIJIA -> if (viewModel.toolsState.value.catalog.mijia.trusted) {
                         viewModel.configureMijiaExtension()
                     }
+                    RepairTarget.WEBDAV -> if (viewModel.toolsState.value.catalog.webdav.trusted) {
+                        viewModel.onWebdavAction(WebdavUiAction.Configure)
+                    }
                     RepairTarget.AGENTLINK -> Unit
                     else -> Unit
                 }
@@ -798,6 +801,7 @@ private fun MochiAppContent(
             onSetMijiaEnabled = viewModel::setMijiaEnabled,
             onSetMijiaToolEnabled = viewModel::setMijiaToolEnabled,
             onTermuxAction = viewModel::onTermuxAction,
+            onWebdavAction = viewModel::onWebdavAction,
             onAddMcpServer = viewModel::addManualMcpServer,
             restActions = RestApiActions(viewModel::changeRestApi, viewModel::testRestApi),
             onRemoveMcpServer = viewModel::removeManualMcpServer,
@@ -1478,6 +1482,7 @@ private fun SurfaceContent(
     onSetMijiaEnabled: (Boolean) -> Unit,
     onSetMijiaToolEnabled: (String, Boolean) -> Unit,
     onTermuxAction: (TermuxUiAction) -> Unit,
+    onWebdavAction: (WebdavUiAction) -> Unit,
     onAddMcpServer: (ManualMcpServerInput) -> Unit,
     restActions: RestApiActions,
     onRemoveMcpServer: (String) -> Unit,
@@ -1591,6 +1596,7 @@ private fun SurfaceContent(
                 onSetMijiaEnabled = onSetMijiaEnabled,
                 onSetMijiaToolEnabled = onSetMijiaToolEnabled,
                 onTermuxAction = onTermuxAction,
+                onWebdavAction = onWebdavAction,
                 onAddServer = onAddMcpServer,
                 restActions = restActions,
                 onRemoveServer = onRemoveMcpServer,
@@ -3717,6 +3723,7 @@ private fun ToolsSurface(
     onSetMijiaEnabled: (Boolean) -> Unit,
     onSetMijiaToolEnabled: (String, Boolean) -> Unit,
     onTermuxAction: (TermuxUiAction) -> Unit,
+    onWebdavAction: (WebdavUiAction) -> Unit,
     onAddServer: (ManualMcpServerInput) -> Unit,
     restActions: RestApiActions,
     onRemoveServer: (String) -> Unit,
@@ -4111,6 +4118,9 @@ private fun ToolsSurface(
                     disabled = state.isLoading,
                     onAction = onTermuxAction,
                 )
+            }
+            item {
+                WebdavProviderCard(state.catalog.webdav, state.isLoading, onWebdavAction)
             }
             item {
                 AgentLinkProviderCard(

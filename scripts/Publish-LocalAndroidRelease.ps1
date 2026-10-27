@@ -31,9 +31,9 @@ $extensionArtifacts = @(
 if (
     $baseArtifacts.Count -ne $expectedAbis.Count -or
     @($expectedAbis | Where-Object { $_ -notin $baseArtifacts.abi }) -or
-    $extensionArtifacts.Count -ne 2 -or
-    @('mijia', 'termux' | Where-Object { $_ -notin $extensionArtifacts.extension }) -or
-    $artifacts.Count -ne 7
+    $extensionArtifacts.Count -ne 3 -or
+    @('mijia', 'termux', 'webdav' | Where-Object { $_ -notin $extensionArtifacts.extension }) -or
+    $artifacts.Count -ne 8
 ) {
     throw "Release metadata does not contain the expected APK artifacts."
 }
@@ -42,7 +42,7 @@ $baseSignerDigests = $null
 $extensionSignerDigests = @{}
 foreach ($artifact in $artifacts) {
     $expectedFile = if ($artifact.kind -eq 'extension') {
-        $extensionLabel = if ($artifact.extension -eq 'mijia') { 'Mijia' } else { 'Termux' }
+        $extensionLabel = @{ mijia = 'Mijia'; termux = 'Termux'; webdav = 'WebDAV' }[$artifact.extension]
         "Mochi-$extensionLabel-Extension-v$version.apk"
     } else {
         "Mochi-v$version-$($artifact.abi).apk"
@@ -164,6 +164,7 @@ All variants provide the same Mochi features.
 
 Install **`Mochi-Mijia-Extension`** only if you want optional Mi Home Tools.
 Install **`Mochi-Termux-Extension`** only if you want optional local shell Tools; Termux is installed separately.
+Install **`Mochi-WebDAV-Extension`** only if you want scoped file Tools for Nutstore, compatible WebDAV clouds or NAS.
 It has no launcher icon and must be signed by the same release key as Mochi.
 '@
 

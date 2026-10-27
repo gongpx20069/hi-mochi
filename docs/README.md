@@ -44,7 +44,7 @@ User-facing capability and third-party API setup links are maintained in the
 root [`README.md`](../README.md), including complete built-in Skills coverage
 across the core and optional-extension tables. Keep both README languages
 aligned: installation and essential configuration first, core features next,
-and optional Mi Home, AgentLink, and Termux integrations in a later section.
+and optional Mi Home, AgentLink, Termux, and WebDAV integrations in a later section.
 
 The planned all-extension setup flows live in `INTERACTION_DESIGN.md`.
 [`android/extensions/README.md`](../android/extensions/README.md) contains their

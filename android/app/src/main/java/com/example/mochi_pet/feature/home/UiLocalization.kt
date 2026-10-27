@@ -721,6 +721,27 @@ private val ZH_UI_TEXT = mapOf(
     "Connection is unavailable. Reconnect before enabling tools." to "连接不可用，请重新连接后再启用工具。",
     "Required Skill tools are unavailable." to "该 Skill 必需的工具不可用。",
     "Termux extension" to "Termux 扩展",
+    "WebDAV Files" to "WebDAV 文件",
+    "WebDAV Files extension" to "WebDAV 文件扩展",
+    "WebDAV extension is unavailable" to "WebDAV 扩展不可用",
+    "Connect WebDAV first." to "请先连接 WebDAV。",
+    "Connect WebDAV" to "连接 WebDAV",
+    "Open Connection and files to check the WebDAV address, allowed folder, application password and LAN permission." to
+        "打开“连接与文件”，检查 WebDAV 地址、授权目录、应用密码和局域网权限。",
+    "A saved WebDAV connection is available. Remote access and file operations were not tested." to
+        "已保存 WebDAV 连接配置，尚未测试远程访问和文件操作。",
+    "Connection and files" to "连接与文件",
+    "Browse a scoped WebDAV folder. File content may go to your model Provider. Foreground conversations only." to
+        "访问授权目录中的 WebDAV 文件。文件内容可能发送给模型供应商，仅供前台对话使用。",
+    "Read-only by default. Writing, deletion and file transfer require separate Tool switches." to
+        "默认只读。写入、删除和文件传输需单独启用对应 Tool。",
+    "Disconnect WebDAV?" to "断开 WebDAV？",
+    "Remove the saved connection and staged files. Remote files are not deleted. Inspect any interrupted write before retrying." to
+        "移除已保存的连接与暂存文件，不删除远程文件。中断的写入可能已生效，请先检查再重试。",
+    "Browse and manage files through the optional WebDAV extension, including Nutstore, compatible private clouds and NAS." to
+        "通过可选 WebDAV 扩展浏览和管理坚果云、兼容私有云及 NAS 的文件。",
+    "WebDAV configuration is unavailable. Open connection settings." to "WebDAV 配置不可用，请打开连接设置。",
+    "Allow local network access in WebDAV connection settings." to "请在 WebDAV 连接设置中允许局域网访问。",
     "Termux extension is unavailable" to "Termux 扩展不可用",
     "The extension is unavailable" to "扩展不可用",
     "Android blocked the extension" to "Android 阻止了扩展",
