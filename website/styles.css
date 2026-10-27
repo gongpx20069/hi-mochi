@@ -1553,6 +1553,7 @@ img {
 
 .install-heading,
 .install-steps,
+.install-panel .extension-setup,
 .install-actions {
   position: relative;
   z-index: 2;
@@ -1829,6 +1830,7 @@ img {
 }
 
 .capability-map {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 40px 0 28px;
 }
 
@@ -1908,6 +1910,18 @@ img {
   padding: 10px 0;
   color: var(--mint);
   cursor: pointer;
+}
+
+.install-panel .extension-setup {
+  border-color: rgba(60, 34, 65, 0.2);
+}
+
+.install-panel .extension-setup summary {
+  color: inherit;
+}
+
+#webdav-extension {
+  margin-top: 18px;
 }
 
 .extension-setup ol,
@@ -2381,6 +2395,10 @@ img {
 }
 
 @media (max-width: 980px) {
+  .capability-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .al-faq-layout {
     grid-template-columns: 1fr;
     gap: 24px;

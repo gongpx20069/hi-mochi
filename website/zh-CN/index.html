@@ -54,8 +54,8 @@
             <h1>让你的手机，<br><em>多一点生命力。</em></h1>
             <p class="hero-lede">把闲置 Android 手机变成随时待命的开源语音生活 Agent：数据默认留在本机，模型由你选择，说话就能记事、查资料、规划生活并打开正确的原生界面。</p>
             <div class="hero-actions">
-              <a class="button button-primary" data-release-download href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.13/Mochi-v1.0.13-arm64-v8a.apk" rel="noopener">
-                <span>下载 <span data-release-version>v1.0.13</span></span><span aria-hidden="true">↓</span>
+              <a class="button button-primary" data-release-download href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.14/Mochi-v1.0.14-arm64-v8a.apk" rel="noopener">
+                <span>下载 <span data-release-version>v1.0.14</span></span><span aria-hidden="true">↓</span>
               </a>
               <a class="button button-secondary" href="https://github.com/gongpx20069/hi-mochi" rel="noopener">
                 <span>前往 GitHub</span><span aria-hidden="true">↗</span>
@@ -143,8 +143,9 @@
               <div class="feature-icon mic-icon" aria-hidden="true"><span></span></div>
               <div>
                 <span class="feature-label">语音优先</span>
-                <h3>说“Hi Mochi”，<br>然后自然聊下去。</h3>
-                <p>本地唤醒词与自动继续聆听，让交流保持连贯。使用 Android 系统语音，或保存多个讯飞、Azure Speech 账号；自主切换连接、试听音色，并单独选择是否使用云端语音播报。</p>
+                <h3>说“老莫老莫”，<br>然后自然聊下去。</h3>
+                <p>本地唤醒默认跟随系统：中文使用“老莫老莫”，英文及其他语言使用“Hi Mochi”。在“设置 → 语音与唤醒”中可手动选择，一次只启用一个词；回答后自动继续聆听。</p>
+                <p class="feature-note">使用 Android 系统语音，或保存多个讯飞、Azure Speech 账号；自主切换连接、试听音色，并单独选择是否使用云端语音播报。</p>
               </div>
               <div class="waveform" aria-hidden="true">
                 <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
@@ -181,6 +182,10 @@
               <h3>账号分别保存，<br>模型自由选择。</h3>
               <p>保存多个命名连接，同一服务商也能使用不同账号。官方地址预设降低配置难度，同时保留 Azure 和自定义端点；填写自己的 API 密钥与支持工具调用的模型即可。</p>
               <div class="connection-presets"><span>OpenAI</span><span>DeepSeek</span><span>Kimi</span><span>GLM</span><span>MiniMax</span><span>Agnes-AI</span></div>
+              <details class="extension-setup">
+                <summary>Responses 还是 Chat Completions？</summary>
+                <p>在“高级连接设置 → API 协议”中按服务商和模型支持选择。新建 OpenAI/Azure 连接默认 Responses，其他预设和旧连接保留 Chat Completions；报错后不会自动切换协议。</p>
+              </details>
             </article>
 
             <article class="feature-card tasks-feature reveal" data-tasks-feature>
@@ -191,12 +196,13 @@
               <p class="feature-note">可选的 Mochi 签名 Termux 扩展需要另行安装 Termux。停止 Agent 不会自动停止已经提交的 Shell 或远端工作。</p>
             </article>
 
-            <article class="feature-card feature-wide tools-feature reveal">
+            <article class="feature-card feature-wide tools-feature reveal" data-browser-feature>
               <div class="tools-copy">
                 <div class="feature-icon tools-icon" aria-hidden="true"><span></span><i></i></div>
                 <span class="feature-label">原生 Android Agent Browser</span>
                 <h3>让 Android Agent，<br>真正浏览和操作网页。</h3>
-                <p>Mochi 自己实现了原生 Android Agent Browser，能够访问和读取绝大多数公开 HTTPS 网站，并直接在页面中导航、点击、输入和滚动，完成网页研究。</p>
+                <p>在支持的公开 HTTPS 网页上阅读、导航、点击、输入和滚动。页面读取保留可见正文以及点赞、收藏等统计的标签与数值；可操作控件单独识别，不再只依赖正文转换。</p>
+                <p class="feature-note">复用 Mochi 内的有效网站登录。需要登录或验证时，由你接管网页，完成后点击“继续”；网站与登录管理可保存账号、管理网站数据。密码留在本机，不发送给模型。网站兼容性有差异，不绕过验证码，也不保证所有页面信息都可读取。</p>
                 <a class="text-link" href="https://github.com/gongpx20069/hi-mochi/blob/main/README.zh-CN.md#skills-与-tools" rel="noopener">查看 Tools 与 Skills <span aria-hidden="true">→</span></a>
               </div>
               <div class="tool-stack" aria-hidden="true">
@@ -207,6 +213,19 @@
                 <span class="tool-pill tool-clock"><i>↕</i> 滚动页面</span>
               </div>
             </article>
+            <article class="feature-card reveal" data-skills-feature>
+              <span class="feature-label">Skill Market</span>
+              <h3>按需学习，<br>不必一次开启全部能力。</h3>
+              <p>从内置 skills.sh 市场浏览、搜索和安装社区 Skills，让 Mochi 按流程处理你关心的任务。启用 Skill 不会自动打开它依赖的 Tools；先检查依赖，再决定授权。</p>
+              <a class="text-link" href="https://github.com/gongpx20069/hi-mochi/blob/main/README.zh-CN.md#skill-market">了解 Skills 与依赖 →</a>
+            </article>
+            <article class="feature-card reveal" data-api-feature>
+              <span class="feature-label">REST API · MCP</span>
+              <h3>连接你已有的服务，<br>不用再写一个插件。</h3>
+              <p>从“工具 → 添加工具”连接 REST API 或 MCP 服务。REST API 可配置请求、鉴权与需要的返回字段；预览不联网，真实测试前会询问。</p>
+              <p class="feature-note">REST API 首版面向公网 HTTPS 443 的 JSON 服务，不包含 OAuth 或局域网接入。写入需确认，结果会提供给你配置的模型；连接和工具都需明确启用。</p>
+              <a class="text-link" href="https://github.com/gongpx20069/hi-mochi/blob/main/README.zh-CN.md#连接自己的-rest-api">查看连接指南 →</a>
+            </article>
           </div>
         </div>
       </section>
@@ -215,13 +234,14 @@
         <div class="shell">
           <div class="section-heading centered reveal">
             <span class="kicker">按需连接，让能力走出对话</span>
-            <h2>从家里的设备，到手中的手机，<br>再到电脑上的工作。</h2>
-            <p>交流、记忆与计划，从 Mochi 开始。需要时再连接更多能力：两个签名扩展 APK，以及一个独立配套应用。不必一次装全，只选你需要的。</p>
+            <h2>家里的设备，云端的文件，<br>还有手机与电脑上的工作。</h2>
+            <p>基础交流、记忆与计划只需 Mochi。米家与 Termux 提供已发布的签名扩展，WebDAV 文件扩展正在预览，AgentLink 则是独立配套应用。只连接你需要的能力。</p>
           </div>
           <nav class="capability-map reveal" aria-label="探索扩展能力">
             <a href="#mijia-extension"><span>01 / 家中设备</span><strong>米家</strong><small>家电控制与场景 ↗</small></a>
             <a href="#termux-extension"><span>02 / 手机环境</span><strong>Termux</strong><small>命令与脚本执行 ↗</small></a>
             <a href="#agentlink-extension"><span>03 / 电脑工作区</span><strong>AgentLink</strong><small>共享编程对话 ↗</small></a>
+            <a href="#webdav-extension"><span>04 / 云端文件 · 预览</span><strong>WebDAV</strong><small>笔记与远程文件 ↗</small></a>
           </nav>
           <div class="feature-grid">
             <article class="feature-card feature-wide smart-home-feature reveal" id="mijia-extension" data-smart-home-feature data-extension-card="mijia">
@@ -232,7 +252,7 @@
                 <p>控制支持的家电和电视、查看设备状态、触发手动场景，也能在前台对话中查看和分析摄像头最新可用的事件图片。</p>
                 <blockquote class="example-prompt">“把客厅的电视关掉。”</blockquote>
                 <div class="extension-actions">
-                  <a class="button button-secondary" data-extension-download="mijia" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.13/Mochi-Mijia-Extension-v1.0.13.apk">下载米家扩展 ↓</a>
+                  <a class="button button-secondary" data-extension-download="mijia" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.14/Mochi-Mijia-Extension-v1.0.14.apk">下载米家扩展 ↓</a>
                 </div>
                 <details class="extension-setup">
                   <summary>三步连接米家</summary>
@@ -254,7 +274,7 @@
               <p>在 Termux 中运行命令和脚本、处理它有权访问的文件，并在任务中心查看输出或停止工作。连接并启用后，前台对话、定时 Agent 和子 Agent 都能调用。</p>
               <div class="execution-preview" aria-label="示例流程，非实时任务"><small>在手机上执行 / 流程示意</small><code>提出需求 → 执行脚本 → 查看输出</code><span>提交任务 · 跟进状态 · 检查结果</span></div>
               <div class="extension-actions">
-                <a class="button button-secondary" data-extension-download="termux" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.13/Mochi-Termux-Extension-v1.0.13.apk">下载 Termux 扩展 ↓</a>
+                <a class="button button-secondary" data-extension-download="termux" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.14/Mochi-Termux-Extension-v1.0.14.apk">下载 Termux 扩展 ↓</a>
                 <a class="text-link" href="https://github.com/termux/termux-app#installation">安装官方 Termux ↗</a>
               </div>
               <details class="extension-setup">
@@ -275,7 +295,25 @@
               <p class="feature-note">这是独立产品，不是 Mochi 扩展 APK。需要电脑运行 Bridge 并登录编程 Agent。Mochi 仅在明确授权后进行前台操作；关闭 Mochi 不会停止远端工作。</p>
             </article>
           </div>
-          <p class="extensions-footnote">米家与 Termux 扩展不增加独立桌面图标，从 Mochi Tools 进入配置；AgentLink 则有自己的应用。它们都不是基础聊天的前提，请按需连接、明确启用。</p>
+          <article class="feature-card feature-wide reveal" id="webdav-extension" data-extension-card="webdav" data-release-status="preview">
+            <div>
+              <span class="extension-badge">WebDAV 文件扩展 · 预览</span>
+              <h3>让云端笔记，<br>成为对话中的资料。</h3>
+              <p>面向坚果云、Nextcloud、ownCloud 和兼容 NAS，在授权目录中查找文件、阅读或编辑 Markdown 笔记，也可按需开启文件管理与传输。无需另行部署 MCP Server。</p>
+              <blockquote class="example-prompt">“找文件名包含项目计划的笔记，读完后帮我总结。”</blockquote>
+              <p class="feature-note">已合并至 main，尚未包含在公开 Release 中；v1.0.14 不含该扩展。真实坚果云/NAS 兼容性仍待验证，当前需从源码构建配套主应用和扩展。</p>
+              <a class="text-link" href="https://github.com/gongpx20069/hi-mochi/blob/main/README.zh-CN.md#webdav-文件坚果云兼容私有云与-nas">查看预览使用指南 →</a>
+            </div>
+            <div>
+              <details class="extension-setup">
+                <summary>预览配置与权限</summary>
+                <ol><li>安装同版本、同签名的主应用与扩展，从“工具 → 扩展 → WebDAV 文件”打开连接。</li><li>填写 HTTPS WebDAV 地址、已存在的授权目录、账号和应用密码；坚果云有预设地址。不要把密码发到聊天中。</li><li>保存并检查后选择“启用工具和 Skill”。默认只读；写入、管理和传输工具需单独开启。扩展或必需读取工具不可用时，Skill 暂停提供能力。</li></ol>
+              </details>
+              <p class="feature-note">这不是 Obsidian 双向同步引擎，也不会解密加密仓库。搜索匹配文件名，文本上限 32 KiB，二进制单文件上限 32 MiB；安全修改已有文件需要服务器提供强 ETag。</p>
+              <p class="feature-note">仅用于前台对话。局域网 NAS 需单独授权，HTTPS 必须有有效证书。交给 Agent 分析的文件文本会发送给你配置的模型服务。</p>
+            </div>
+          </article>
+          <p class="extensions-footnote">米家、Termux 和 WebDAV 扩展不增加独立桌面图标，从 Mochi Tools 进入配置；AgentLink 则有自己的应用。它们都不是基础聊天的前提，请按需连接、明确启用。</p>
         </div>
       </section>
 
@@ -312,13 +350,17 @@
               <p>无需注册 Mochi 账号，也没有 Mochi 订阅费。AI 服务由你选择，服务商调用与可选云端语音可能产生费用。</p>
             </div>
             <ol class="install-steps">
-              <li><span>1</span><div><strong>安装或更新</strong><p>下载 <span data-release-version>v1.0.13</span>。大多数手机选择 arm64-v8a，较老的 ARM 设备选择 armeabi-v7a；不确定时选择 universal。更新时使用相同签名渠道直接覆盖安装，不要卸载，以保留数据。</p></div></li>
+              <li><span>1</span><div><strong>安装或更新</strong><p>下载 <span data-release-version>v1.0.14</span>。大多数手机选择 arm64-v8a，较老的 ARM 设备选择 armeabi-v7a；不确定时选择 universal。更新时使用相同签名渠道直接覆盖安装，不要卸载，以保留数据。</p></div></li>
               <li><span>2</span><div><strong>添加连接</strong><p>打开“设置 → AI 连接 → 添加 AI 连接”，选择预设并填写模型与 API 密钥。后续新增连接不会自动切换，点击“使用”再生效；切换 AI 会取消正在运行的本机 Agent 任务。</p></div></li>
-              <li><span>3</span><div><strong>开始交流</strong><p>直接打字，或授权麦克风后语音交流；需要时开启“Hi Mochi”。Android 系统语音已内置，也可添加语音连接并点击“使用”；切换语音只停止当前语音交互与试听，不影响文字对话和后台工作。</p></div></li>
+              <li><span>3</span><div><strong>开始交流</strong><p>直接打字，或授权麦克风后语音交流。在“设置 → 语音与唤醒”开启唤醒，默认跟随系统选择“老莫老莫”或“Hi Mochi”，也可手动指定。Android 系统语音已内置，可选添加云端语音连接。</p></div></li>
             </ol>
+            <details class="extension-setup">
+              <summary>配置遇到问题？</summary>
+              <p>打开“设置 → 配置自检”，查看 AI、语音、扩展和 Skill 依赖的检查结果及修复入口。自检会发送一次短文本模型请求，可能消耗额度；不会自动修改设置或录音。真实语音效果仍需麦克风测试与音色试听。切换语音连接只停止当前语音交互与试听，不影响文字对话和后台工作。</p>
+            </details>
             <div class="install-actions">
-              <a class="button button-light" data-release-download href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.13/Mochi-v1.0.13-arm64-v8a.apk" rel="noopener">大多数手机下载 <span aria-hidden="true">↓</span></a>
-              <a class="text-link light-link" data-release-page href="https://github.com/gongpx20069/hi-mochi/releases/tag/v1.0.13" rel="noopener">其他架构与可选扩展 <span aria-hidden="true">→</span></a>
+              <a class="button button-light" data-release-download href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.14/Mochi-v1.0.14-arm64-v8a.apk" rel="noopener">大多数手机下载 <span aria-hidden="true">↓</span></a>
+              <a class="text-link light-link" data-release-page href="https://github.com/gongpx20069/hi-mochi/releases/tag/v1.0.14" rel="noopener">其他架构与已发布扩展 <span aria-hidden="true">→</span></a>
             </div>
           </div>
         </div>
@@ -354,7 +396,7 @@
           <p>让你的手机，多一点生命力。</p>
         </div>
         <div class="footer-links">
-          <div><strong>项目</strong><a href="https://github.com/gongpx20069/hi-mochi">GitHub</a><a data-release-page href="https://github.com/gongpx20069/hi-mochi/releases/tag/v1.0.13"><span data-release-version>v1.0.13</span> 版本</a><a href="https://github.com/gongpx20069/hi-mochi/issues">问题反馈</a></div>
+          <div><strong>项目</strong><a href="https://github.com/gongpx20069/hi-mochi">GitHub</a><a data-release-page href="https://github.com/gongpx20069/hi-mochi/releases/tag/v1.0.14"><span data-release-version>v1.0.14</span> 版本</a><a href="https://github.com/gongpx20069/hi-mochi/issues">问题反馈</a></div>
           <div><strong>了解</strong><a href="#features">功能</a><a href="#extensions">扩展能力</a><a href="agentlink/">AgentLink</a><a href="#privacy">隐私</a><a href="https://github.com/gongpx20069/hi-mochi/tree/main/docs">文档</a></div>
           <div><strong>语言</strong><a href="../" lang="en">English</a><a href="./">简体中文</a></div>
         </div>

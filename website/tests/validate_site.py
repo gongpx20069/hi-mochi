@@ -122,7 +122,10 @@ def main() -> None:
 
         if page in (SITE_ROOT / "index.html", SITE_ROOT / "zh-CN" / "index.html"):
             source = page.read_text(encoding="utf-8")
-            for feature in ("smart-home", "speech", "documents", "connections", "tasks"):
+            for feature in (
+                "smart-home", "speech", "documents", "connections", "tasks",
+                "browser", "skills", "api",
+            ):
                 if source.count(f"data-{feature}-feature") != 1:
                     errors.append(
                         f"{relative_page}: expected one {feature} feature",
@@ -158,9 +161,18 @@ def main() -> None:
                 )
                 if len(extension_versions) != 1 or set(extension_versions) != versions:
                     errors.append(f"{relative_page}: inconsistent {extension} download")
-            for extension in ("mijia", "termux", "agentlink"):
+            for extension in ("mijia", "termux", "agentlink", "webdav"):
                 if source.count(f'data-extension-card="{extension}"') != 1:
                     errors.append(f"{relative_page}: missing or duplicate {extension} card")
+            for preview in re.findall(
+                r'<article\b[^>]*data-release-status="preview"[^>]*>(.*?)</article>',
+                source, re.S,
+            ):
+                if "data-extension-download" in preview or re.search(
+                    r'href="[^"]*(?:/releases/download/|\.apk(?:[?#][^"]*)?")',
+                    preview,
+                ):
+                    errors.append(f"{relative_page}: unpublished preview must not offer an APK")
             if "extensions" not in parser.ids:
                 errors.append(f"{relative_page}: missing extensions section")
             fallback_versions.update(versions)

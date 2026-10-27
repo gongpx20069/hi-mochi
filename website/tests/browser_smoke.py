@@ -104,6 +104,24 @@ def main() -> None:
                             assert page.locator(f"[data-extension-download='{extension}']").get_attribute("href") == (
                                 f"{RELEASE_ROOT}download/{expected}/Mochi-{name}-Extension-{expected}.apk"
                             )
+                    if is_home:
+                        preview = page.locator("[data-extension-card='webdav']")
+                        assert preview.get_attribute("data-release-status") == "preview"
+                        assert preview.locator("[data-extension-download], a[href*='.apk']").count() == 0
+                        assert preview.locator("a").get_attribute("href").startswith(
+                            "https://github.com/gongpx20069/hi-mochi"
+                        )
+                        page.locator(".capability-map a[href='#webdav-extension']").click()
+                        assert page.url.endswith("#webdav-extension")
+                        for disclosure in page.locator(
+                            "[data-connections-feature] details, #webdav-extension details, #install details"
+                        ).all():
+                            summary = disclosure.locator("summary")
+                            summary.focus()
+                            summary.press("Enter")
+                            assert disclosure.evaluate("(item) => item.open")
+                            summary.press("Enter")
+                            assert not disclosure.evaluate("(item) => item.open")
                     if not is_home:
                         assert page.locator("[data-agent]").count() == 5
                         assert page.locator("[data-image-feature]").count() == 1
@@ -141,6 +159,7 @@ def main() -> None:
                             const cards = document.querySelectorAll(
                                 "[data-speech-feature], [data-documents-feature], " +
                                 "[data-connections-feature], [data-tasks-feature], " +
+                                "[data-browser-feature], [data-skills-feature], [data-api-feature], " +
                                 "[data-extension-card], .link-benefits article, .link-stage, " +
                                 ".al-agent-card, .al-feature-grid article, .al-setup-grid li"
                             );
@@ -153,7 +172,9 @@ def main() -> None:
                                     const box = item.getBoundingClientRect();
                                     if (box.bottom > bounds.bottom || box.right > bounds.right ||
                                         item.scrollWidth > item.clientWidth + 1) {
-                                        errors.push(`${card.className}: clipped content`);
+                                        errors.push(`${card.id || card.className}: clipped ${item.tagName} ` +
+                                            `"${item.textContent.trim().slice(0, 100)}" ` +
+                                            `(width ${item.scrollWidth}/${item.clientWidth})`);
                                     }
                                     for (const other of items.slice(index + 1)) {
                                         const next = other.getBoundingClientRect();
@@ -216,10 +237,25 @@ def main() -> None:
                         assert page.url.endswith("/zh-CN/agentlink/" if language == "agentlink/" else "/hi-mochi/agentlink/")
                     assert not failures, failures
                     context.close()
-            for language in ("agentlink/", "zh-CN/agentlink/"):
+            for language in ("", "zh-CN/", "agentlink/", "zh-CN/agentlink/"):
                 context = browser.new_context(java_script_enabled=False)
                 page = context.new_page()
                 page.goto(f"http://127.0.0.1:{server.server_port}/hi-mochi/{language}")
+                if "agentlink/" not in language:
+                    source = (SITE_ROOT / language / "index.html").read_text(encoding="utf-8")
+                    fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1)
+                    assert page.locator("[data-release-download]").first.get_attribute("href") == (
+                        f"{RELEASE_ROOT}download/{fallback}/Mochi-{fallback}-arm64-v8a.apk"
+                    )
+                    for disclosure in page.locator(
+                        "[data-connections-feature] details, #webdav-extension details, #install details"
+                    ).all():
+                        disclosure.locator("summary").click()
+                        assert disclosure.evaluate("(item) => item.open")
+                        assert disclosure.locator("p, ol").first.is_visible()
+                    assert page.locator("[data-extension-download='webdav']").count() == 0
+                    context.close()
+                    continue
                 assert page.locator(".agentlink-hero .reveal").first.evaluate(
                     "(item) => getComputedStyle(item).opacity"
                 ) == "1"

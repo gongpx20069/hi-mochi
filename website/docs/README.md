@@ -55,16 +55,36 @@ event images. It must not imply support for camera live view, playback, PTZ,
 two-way audio, locks, alarms, body-composition measurements, or sharing Xiaomi
 session credentials.
 
+Wake copy follows the shipped language setting: Chinese systems select
+“老莫老莫”; English and other systems select “Hi Mochi”. Users may override
+the choice, with one active keyword at a time. Browser copy describes visible
+text/statistics, separate interactive controls, local login reuse and user
+handoff without promising universal site compatibility or verification bypass.
+Saved passwords remain local; page content used by the Agent reaches its model.
+Keep Responses/Chat Completions guidance in the AI card disclosure and
+configuration-check guidance in the installation disclosure, including its
+possible model-request cost. Skill Market does not auto-enable dependent Tools.
+REST copy must distinguish its public HTTPS JSON scope from MCP support.
+
 ## Capabilities and AgentLink
 
 The homepage groups optional capabilities under `#extensions`: Mi Home and
-Termux are same-signer extension APKs; AgentLink is an independent Android app
-with a computer-side Bridge. Keep all three discoverable through navigation,
-the capability map, feature cards, and installation links. Show benefits first,
+Termux are released same-signer extension APKs; WebDAV Files is an unpublished
+extension preview; AgentLink is an independent Android app with a computer-side
+Bridge. Keep all four discoverable through the capability map and feature
+cards, using installation links only for released packages. Show benefits first,
 then setup and permissions; basic Mochi use does not require any of them.
 Mi Home setup and Termux setup use native HTML disclosures, not JavaScript.
 Termux copy must disclose automatic command execution after enablement, the
 absence of a sandbox, and model-provider access to output used by the Agent.
+
+WebDAV's preview card uses `data-release-status="preview"` and links to the
+source-build/setup guide, not an APK. Disclose pending real-service validation,
+read-only defaults, Skill readiness gating, foreground-only access, valid HTTPS
+and explicit LAN authorization. It is not Obsidian synchronization or vault
+decryption. File text analyzed by the Agent goes to the configured model.
+The four-item map uses four desktop columns, two tablet columns and one mobile
+column; retain readable expanded disclosures in both languages.
 
 AgentLink's official website lives at `agentlink/` and `zh-CN/agentlink/`.
 Treat these as a standalone product destination, not a Mochi extension detail:
@@ -113,17 +133,23 @@ link to the user guide for cache and compatibility details.
 Download controls include a checked-in current-release fallback. On page load,
 `scripts.js` reads GitHub's public `releases/latest` API, validates the returned
 repository URLs, and updates the displayed version, ARM64 download, and release
-page links, plus both extension APK links. All expected assets and repository
+page links, plus both released extension APK links. All expected assets and repository
 URLs are validated before any link changes, so missing/untrusted extensions
 preserve the matching bundled release as a whole. If the API is unavailable or
 rate-limited, the fallback remains usable. AgentLink pages do not request the
 Mochi release API.
 
-The bundled fallback is **v1.0.13**. After publishing a new release, update
+The bundled fallback is **v1.0.14**. After publishing a new release, update
 both homepages' base/extension download URLs, release-page URLs, and version labels together.
 The static check enforces consistency within and between languages; it does
 not query GitHub or infer an unpublished version. An API outage must not send
 visitors back to an obsolete installation guide.
+
+WebDAV is deliberately absent from `data-extension-download` and the download
+updater's required assets while unpublished. Adding a preview card must not
+block stable downloads when the release has no WebDAV APK. When its first
+public release is available, update both languages' availability copy, the
+fallback set, updater asset mapping and download tests together.
 
 ## Validation
 
@@ -152,6 +178,9 @@ the project path, checks all four pages at 320/390/768/1024/1280/1440 pixels, ex
 mobile/cross-page navigation and expanded setup disclosures, and mocks GitHub
 responses to verify matching base/extension updates, API-outage fallback,
 missing extension assets, and rejection of untrusted download URLs.
+It also verifies that the WebDAV preview remains a guide-only entry while
+stable downloads update without a WebDAV asset, and that setup disclosures
+work with keyboard input and without JavaScript.
 AgentLink checks also cover keyboard-operated setup disclosures, no-JavaScript
 setup, all five loaded local logos, reading order, image-input visibility,
 language switching, and desktop navigation bounds.
