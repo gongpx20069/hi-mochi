@@ -428,6 +428,14 @@ remote tag it is never deleted automatically; an interrupted publication may
 therefore leave a skipped `1.0.x` value, but can never make a released version
 move backward or be silently replaced.
 
+If Git tag discovery fails for a GitHub remote, local release scripts warn and
+read the same remote tag namespace through the GitHub CLI REST API instead.
+Both paths include reserved tags, not only published Releases; API failure
+stops allocation rather than guessing a version. Run
+`.\scripts\Test-AndroidReleaseVersion.ps1` to check this fallback without network
+access. Git transfers use a bounded low-speed timeout; configure `gh`
+authentication as above before relying on the API fallback.
+
 ### WebDAV acceptance
 
 Run `:extensions:webdav:testDebugUnitTest :extensions:webdav:lintDebug

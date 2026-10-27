@@ -18,7 +18,8 @@ function Get-MochiNextVersion {
 
     $remoteTags = $null
     foreach ($attempt in 1..3) {
-        $remoteTags = & git ls-remote --tags $Remote 'refs/tags/v1.0.*'
+        $remoteTags = & git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=20 `
+            ls-remote --tags $Remote 'refs/tags/v1.0.*'
         if ($LASTEXITCODE -eq 0) {
             break
         }
@@ -27,7 +28,20 @@ function Get-MochiNextVersion {
         }
     }
     if ($LASTEXITCODE -ne 0 -or $null -eq $remoteTags) {
-        throw "Could not read Android release tags from remote '$Remote'."
+        $remoteUrl = & git remote get-url $Remote
+        if ($LASTEXITCODE -ne 0 -or -not $remoteUrl) {
+            throw "Could not resolve Android release remote '$Remote'."
+        }
+        $httpsUrl = $remoteUrl.Trim() -replace '^git@github\.com:', 'https://github.com/'
+        if ($httpsUrl -notmatch '^https://github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$') {
+            throw "Could not read Android release tags from remote '$Remote'."
+        }
+        $repository = "$($Matches[1])/$($Matches[2])"
+        Write-Warning "Git tag discovery failed; reading '$repository' tags through GitHub REST API."
+        $remoteTags = & gh api "repos/$repository/git/matching-refs/tags/v1.0." --jq '.[].ref'
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not read Android release tags through GitHub REST API."
+        }
     }
 
     $patches = @(
