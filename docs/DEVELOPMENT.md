@@ -96,6 +96,38 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Tencent Docs Smart Canvas regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*ToolCatalogTest" `
+  --tests "*MochiDatabaseTest" --tests "*AgentOrchestratorTest" --no-daemon
+```
+
+These use synthetic schemas to cover default-on current Smart Canvas Tools,
+version-1 catalog upgrade, preserved individual switches, deferred discovery
+for disabled connections, and the concise Skill's update/readiness contract.
+For separately authorized device diagnostics, `DocumentToolCatalogDiagnosticTest`
+has an opt-in `inspectLiveTencentTools` method (`mochiTencentDiscoveryDiagnostic=true`).
+It lists the live, unfiltered Tencent MCP catalog using the existing native
+connection, logging only tool metadata, never credentials or document contents.
+This distinguishes server changes from stale caches and allowlist omissions;
+normal instrumentation runs skip live discovery.
+
+Only after explicit user authorization, the same class's
+`createAndEditIndependentSmartCanvas` (`mochiTencentWriteDiagnostic=true`) creates
+one uniquely titled fixture through the enabled production Tools, verifies its
+initial body, appends MDX, updates that exact appended block, and reads back
+the result while checking the original paragraph. It never searches,
+edits or deletes existing user documents. A private cache receipt is written
+before creation and retained with the returned file ID/link to prevent blind
+replay after a timeout. Inspect that exact receipt and its fixture before
+authorizing another run; never delete unrelated app data.
+`updatePreviouslyCreatedFixture` (`mochiTencentUpdateFixtureDiagnostic=true`)
+can separately verify updating the still-unmodified appended paragraph of that
+exact receipt's fixture; it rejects missing or ambiguous targets and does not
+create another document. Live checks are not
+part of CI and require a same-signer in-place app/test APK update.
+
 Browser assistance regressions:
 
 ```powershell

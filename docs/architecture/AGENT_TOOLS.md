@@ -169,13 +169,14 @@ explicitly supports it. Removing content is not the same as deleting its page.
 For asynchronous writes, consume the returned task status with its backoff
 instead of repeating the write or treating submission as completion.
 
-Tencent Docs has 51 selected candidate names: the following 44 default-enabled
+Tencent Docs has 54 selected candidate names: the following 47 default-enabled
 document Tools and seven optional Tools. Only actual discovered schemas appear.
 
 | Purpose | Remote Tool names |
 | --- | --- |
 | Find/read | `query_space_node`, `search_space_file`, `manage.search_file`, `get_content`, `manage.query_folder_meta` |
 | Create/delete files | `manage.create_file`, `create_space_node`, `delete_space_node` |
+| Current Smart Canvas create/read/edit | `create_smartcanvas_by_mdx`, `smartcanvas.read`, `smartcanvas.edit` |
 | Create document formats | `create_smartcanvas_by_markdown`, `create_word_by_markdown`, `create_excel_by_markdown`, `create_slide_by_markdown`, `create_mind_by_markdown`, `create_flowchart_by_mermaid` |
 | Smart Canvas structure | `smartcanvas.get_top_level_pages`, `smartcanvas.get_page_info`, `smartcanvas.get_element_info`, `smartcanvas.find` |
 | Smart Canvas edits | `smartcanvas.create_smartcanvas_element`, `smartcanvas.append_insert_smartcanvas_by_markdown`, `smartcanvas.update_element`, `smartcanvas.delete_element` |
@@ -188,17 +189,32 @@ document Tools and seven optional Tools. Only actual discovered schemas appear.
 
 The seven default-off candidates are `manage.export_file`, `manage.get_privilege`,
 `manage.set_privilege`, `doc.get_comments`, `doc.compare_documents`,
-`sheet.set_link`, and `sheet.set_freeze`. Selection is limited to these 51 names,
+`sheet.set_link`, and `sheet.set_freeze`. Selection is limited to these 54 names,
 not every Tool advertised by Tencent Docs. The default-enabled candidates sort
 first; duplicates and unknown names do not consume additional slots.
 File/element deletion requires explicit user intent and exact targets.
 Recursive `delete_space_node(remove_type=all)` requires explicit recursive
 intent; a request to delete one document must not expand to its descendants.
 
+Smart Canvas creation and body editing are core default-on capabilities.
+The current service advertises `create_smartcanvas_by_mdx`, `smartcanvas.read`
+and `smartcanvas.edit`; an allowlist containing only the older Markdown/element
+names silently excludes the real writing APIs. Preserve discovered schemas.
+For creation, pass a nonempty body in `mdx` and explicitly set
+`content_format=markdown` for Markdown. For editing, `content` is Tencent MDX:
+`INSERT_BEFORE`/`INSERT_AFTER` insert beside a block (no `id` appends),
+and `UPDATE`/`DELETE` require the actual target block ID. `smartcanvas.read`
+provides MDX and block IDs; follow its `next_token` and discover other pages
+with `smartcanvas.get_top_level_pages`. Generic file creation without a body
+does not fulfill a request to create a populated document.
+
 Default policy version 3 resets existing connected built-in providers' child
 switches once, preserving credentials and master switches. Tencent catalog
-selection version 1 rediscovers enabled old connections once to replace the
-previously truncated catalog with the available subset of these 51 candidates.
+selection version 2 rediscovers enabled older connections once to include the
+available subset of these 54 candidates, including the current Smart Canvas
+APIs. Version 1 fixed the old truncated catalog but lacked these three names.
+Version 2 enables newly discovered document Tools by default without resetting
+existing individual switches, credentials, or the master switch.
 Disabled connections wait until enabled. Failed discovery keeps cached Tools,
 shows a localized Tools notice, and can be retried by reopening Tools.
 Cancellation propagates; stale discovery cannot restore a disconnected or
@@ -207,14 +223,16 @@ Subsequent individual switch changes persist across reloads and master toggles.
 Explicit shared-provider imports retain their selected switches. These expanded
 defaults do not expand the read-only Subagent allowlists or enable any Skill.
 
-The Tencent Docs Skill begins with global search and directory browsing, including
-scope discovery, pagination, deduplication and honest partial-coverage reporting.
+The concise Tencent Docs Skill covers search/browsing, a complete Smart Canvas
+create/read/edit/readback workflow, short type-specific guidance and outcome
+checks. Search includes scope discovery, pagination, deduplication and honest
+partial-coverage reporting.
 Its search requirement accepts either enabled `manage.search_file` or
 `search_space_file`; discovery, UI readiness and Skill loading use the same rule
 without inventing an executable alias. Browsing and content-read Tools remain
-required. Each document type has separate create/read/update/delete guidance:
-Smart Canvas resolves page/element IDs; Word uses document structure; ordinary
-spreadsheets resolve sheets/ranges; SmartSheet resolves field/record IDs; PPT
+required. Smart Canvas uses the current MDX APIs and resolves page/block IDs;
+Word uses document structure; ordinary spreadsheets resolve sheets/ranges;
+SmartSheet resolves field/record IDs; PPT
 distinguishes creation/append from unsupported arbitrary edits. Whole-file
 deletion is separate from deleting content, records or worksheets. Writes use
 targeted readback where possible and never replay solely to check their outcome.
@@ -606,7 +624,7 @@ tool counts are bounded.
 Document-provider defaults are defined in section 1 above. Tencent Docs Tool
 descriptions are normalized to bounded English labels locally, including for
 previously discovered definitions. Up to 256 remote Tools can be discovered;
-Tencent retains the 51 explicitly selected candidates, with 44 default-on and
+Tencent retains the 54 explicitly selected candidates, with 47 default-on and
 seven optional. Versioned rediscovery and default migration follow section 1.
 Current Tencent Docs deployments expose workspace search as
 `manage.search_file`; the older `search_space_file` name remains supported.
@@ -624,8 +642,8 @@ The built-in Tencent Docs provider uses the official hosted endpoint
 encryption and sends it as the provider-required raw `Authorization` value.
 Search, read, SmartCanvas creation, append, and update tools are selected by
 default after successful discovery. The separate Tencent Docs Knowledge Skill
-is read-only and disabled by default. Its readiness prerequisite is presented
-as the single **Tencent Docs MCP** aggregate; the aggregate is unavailable when
+teaches both reading and writing and remains disabled by default. Its readiness
+prerequisite is presented as the single **Tencent Docs MCP** aggregate; the aggregate is unavailable when
 the server or any Tencent Docs Tool required by the Skill is unavailable.
 
 ### Feishu user authorization

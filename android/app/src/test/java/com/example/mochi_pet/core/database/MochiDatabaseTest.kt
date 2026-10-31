@@ -192,9 +192,11 @@ class MochiDatabaseTest {
         database.skillDao().upsert(stored.copy(content = "Old search-only guidance"))
         val skill = repository.listSkills().single { it.id == id }
         assertTrue(skill.enabled)
-        for (section in listOf("Global search and browsing first", "Smart Canvas:", "Ordinary documents:",
-            "Ordinary spreadsheets", "SmartSheet:", "Presentations:", "Whole-file deletion and result checks")) {
-            assertTrue(section, skill.content.contains(section))
+        assertTrue("Keep the operational Skill concise", skill.content.length <= 5_500)
+        for (instruction in listOf("create_smartcanvas_by_mdx", "content_format=\"markdown\"",
+            "smartcanvas_read", "smartcanvas_edit", "INSERT_AFTER", "MDX", "read back",
+            "Word:", "Spreadsheet:", "SmartSheet:", "Slides:", "empty file is not completing")) {
+            assertTrue(instruction, skill.content.contains(instruction, ignoreCase = true))
         }
         assertTrue(skill.content.contains("remove_type=all"))
         assertTrue(skill.content.contains("not proof of deletion"))

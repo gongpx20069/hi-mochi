@@ -2573,6 +2573,9 @@ private val DEFAULT_TENCENT_DOCS_TOOLS = setOf(
     "manage.create_file",
     "create_space_node",
     "delete_space_node",
+    "create_smartcanvas_by_mdx",
+    "smartcanvas.read",
+    "smartcanvas.edit",
     "create_smartcanvas_by_markdown",
     "create_word_by_markdown",
     "create_excel_by_markdown",
@@ -2632,7 +2635,7 @@ private val TENCENT_DOCS_TOOL_PRIORITY = DEFAULT_TENCENT_DOCS_TOOLS.toList() + l
 private val TENCENT_DOCS_TOOL_PRIORITY_INDEX =
     TENCENT_DOCS_TOOL_PRIORITY.withIndex().associate { it.value to it.index }
 private const val BUILT_IN_TOOL_DEFAULTS_VERSION = 3
-private const val TENCENT_DOCS_CATALOG_VERSION = 1
+private const val TENCENT_DOCS_CATALOG_VERSION = 2
 private const val TENCENT_CATALOG_REFRESH_ERROR =
     "Tencent Docs tools could not be refreshed. Check the connection and reopen Tools."
 private val TENCENT_DOCS_TOOL_DESCRIPTIONS = mapOf(
@@ -2648,6 +2651,12 @@ private val TENCENT_DOCS_TOOL_DESCRIPTIONS = mapOf(
         "Create a file, folder, document, or link in Tencent Docs.",
     "delete_space_node" to
         "Delete a Tencent Docs file or folder.",
+    "create_smartcanvas_by_mdx" to
+        "Create a Smart Canvas document with its body. For Markdown, set content_format=markdown and pass the body in mdx.",
+    "smartcanvas.read" to
+        "Read a Smart Canvas page as MDX with block IDs and pagination; use before editing and to verify writes.",
+    "smartcanvas.edit" to
+        "Insert, update, or delete Smart Canvas MDX blocks. Read first for exact block IDs; an insert without id appends.",
     "create_smartcanvas_by_markdown" to
         "Create a Smart Canvas document from Markdown.",
     "smartcanvas.append_insert_smartcanvas_by_markdown" to

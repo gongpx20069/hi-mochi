@@ -46,6 +46,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
@@ -534,7 +536,7 @@ class ToolCatalogTest {
             client.tools = (defaults + excluded).map { McpRemoteTool(it) }
             if (id == TENCENT_DOCS_SERVER_ID) {
                 val fresh = repository.configureTencentDocs("fixture-token").servers.single { it.id == id }
-                assertEquals(46, fresh.tools.size)
+                assertEquals(49, fresh.tools.size)
                 val retained = fresh.tools.map { it.remoteName }.toSet()
                 assertEquals(defaults.intersect(retained), fresh.tools.filter { it.enabled }.map { it.remoteName }.toSet())
             }
@@ -569,11 +571,11 @@ class ToolCatalogTest {
         assertEquals(1, client.listCalls)
         val persisted = dataStore.data.first()[stringPreferencesKey("tools.catalog")].orEmpty()
         assertTrue(persisted.contains("\"toolDefaultsVersion\":3"))
-        assertTrue(persisted.contains("\"toolSelectionVersion\":1"))
+        assertTrue(persisted.contains("\"toolSelectionVersion\":2"))
     }
 
     @Test
-    fun `51 candidates preserve original 32 tools and enable exactly 44 document tools`() = runBlocking {
+    fun `54 candidates preserve original tools and enable exactly 47 document tools`() = runBlocking {
         val original = listOf(
             "query_space_node", "search_space_file", "manage.search_file", "get_content",
             "manage.query_folder_meta", "manage.create_file", "manage.export_file",
@@ -587,7 +589,7 @@ class ToolCatalogTest {
         )
         client.tools = (tencentDocumentDefaults + original + listOf("ocr.extract")).reversed().map { McpRemoteTool(it) }
         val server = repository.configureTencentDocs("fixture-token").servers.single { it.id == TENCENT_DOCS_SERVER_ID }
-        assertEquals(51, server.tools.size)
+        assertEquals(54, server.tools.size)
         assertEquals(tencentDocumentDefaults + original, server.tools.map { it.remoteName }.toSet())
         assertEquals(7, server.tools.count { !it.enabled })
         assertEquals(tencentDocumentDefaults,
@@ -625,11 +627,49 @@ class ToolCatalogTest {
         assertEquals(3, client.listCalls)
     }
 
+    @Test
+    fun `current Smart Canvas schemas are default on and survive catalog v1 upgrade without resetting switches`() = runBlocking {
+        val editSchema = Json.parseToJsonElement(
+            """{"type":"object","properties":{"file_id":{"type":"string"},"action":{"type":"string"},"id":{"type":"string"},"content":{"type":"string","description":"MDX content"}},"required":["file_id","action"]}""",
+        ).jsonObject
+        val modern = listOf(
+            McpRemoteTool("create_smartcanvas_by_mdx"),
+            McpRemoteTool("smartcanvas.read", readOnlyHint = true),
+            McpRemoteTool("smartcanvas.edit", inputSchema = editSchema),
+        )
+        val oldNames = setOf("get_content", "doc.insert_paragraph_with_text", "manage.set_privilege")
+        client.tools = modern + oldNames.map { McpRemoteTool(it) } + McpRemoteTool("smartcanvas.unknown_operation")
+        val fresh = repository.configureTencentDocs("fixture-token").servers.single { it.id == TENCENT_DOCS_SERVER_ID }
+        assertTrue(modern.all { tool -> fresh.tools.single { it.remoteName == tool.name }.enabled })
+        assertFalse(fresh.tools.any { it.remoteName == "smartcanvas.unknown_operation" })
+
+        seedDocumentServer(TENCENT_DOCS_SERVER_ID, oldNames, enabled = false, selectionVersion = 1, defaultsVersion = 3)
+        repository.loadSummary()
+        assertEquals(1, client.listCalls)
+        val upgraded = repository.setServerEnabled(TENCENT_DOCS_SERVER_ID, true).servers.single { it.id == TENCENT_DOCS_SERVER_ID }
+        assertTrue(modern.all { tool -> upgraded.tools.single { it.remoteName == tool.name }.enabled })
+        assertFalse(upgraded.tools.single { it.remoteName == "doc.insert_paragraph_with_text" }.enabled)
+        assertTrue(upgraded.tools.single { it.remoteName == "manage.set_privilege" }.enabled)
+        val edit = repository.loadEnabledMcpTools().single { it.name == "tencent_docs_smartcanvas_edit" }
+        assertEquals(editSchema, edit.schema["function"]?.jsonObject?.get("parameters"))
+        assertEquals("fixture-token", client.runtime?.authorizationHeader)
+        assertFalse(repository.loadEnabledReadOnlyMcpTools().any {
+            it.name in setOf("tencent_docs_create_smartcanvas_by_mdx", "tencent_docs_smartcanvas_edit")
+        })
+        repository.setMcpToolEnabled(TENCENT_DOCS_SERVER_ID, "smartcanvas.edit", false)
+        repository.setServerEnabled(TENCENT_DOCS_SERVER_ID, false)
+        val restored = repository.setServerEnabled(TENCENT_DOCS_SERVER_ID, true)
+        assertFalse(restored.servers.single { it.id == TENCENT_DOCS_SERVER_ID }
+            .tools.single { it.remoteName == "smartcanvas.edit" }.enabled)
+        assertEquals(2, client.listCalls)
+    }
+
     private suspend fun seedDocumentServer(
         id: String,
         tools: Set<String>,
         enabled: Boolean = true,
-        selectionVersion: Int = 1,
+        selectionVersion: Int = 2,
+        defaultsVersion: Int = 2,
     ) {
         val server = buildJsonObject {
             put("id", id)
@@ -639,7 +679,7 @@ class ToolCatalogTest {
             put("enabled", enabled)
             put("authMode", if (id == NOTION_SERVER_ID) "OAUTH" else "TOKEN")
             put("accessToken", buildJsonObject { put("ciphertext", "fixture-token"); put("iv", "test") })
-            put("toolDefaultsVersion", 2)
+            put("toolDefaultsVersion", defaultsVersion)
             put("toolSelectionVersion", selectionVersion)
             put("tools", JsonArray(tools.map { name ->
                 buildJsonObject {
@@ -910,6 +950,7 @@ private val notionDocumentDefaults = setOf(
 private val tencentDocumentDefaults = setOf(
         "query_space_node", "search_space_file", "manage.search_file", "get_content",
         "manage.query_folder_meta", "manage.create_file", "create_space_node", "delete_space_node",
+        "create_smartcanvas_by_mdx", "smartcanvas.read", "smartcanvas.edit",
         "create_smartcanvas_by_markdown", "create_word_by_markdown", "create_excel_by_markdown",
         "create_slide_by_markdown", "create_mind_by_markdown", "create_flowchart_by_mermaid",
         "smartcanvas.get_top_level_pages", "smartcanvas.get_page_info", "smartcanvas.get_element_info",
