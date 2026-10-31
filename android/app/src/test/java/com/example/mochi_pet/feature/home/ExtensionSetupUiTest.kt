@@ -4,9 +4,13 @@ import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -14,9 +18,13 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.example.mochi_pet.core.tools.ExtensionProviderSummary
 import com.example.mochi_pet.core.tools.ToolCatalogSummary
+import com.example.mochi_pet.core.skills.MochiSkill
+import com.example.mochi_pet.core.skills.SkillOrigin
+import com.example.mochi_pet.core.skills.SkillReadiness
 import com.example.mochi_ui.ExtensionSetupScreen
 import com.example.mochi_ui.MochiTheme
 import java.util.Locale
+import java.time.Instant
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,6 +45,41 @@ class ExtensionSetupUiTest {
     private val locale = Locale.getDefault()
     @Before fun english() { Locale.setDefault(Locale.ENGLISH) }
     @After fun restore() { Locale.setDefault(locale) }
+
+    @Test
+    fun `Skill switch waits for readiness and missing dependencies show suspension rather than read only`() {
+        val skill = MochiSkill(
+            id = "builtin:tencent-docs-knowledge", name = "Tencent Docs Knowledge",
+            description = "Use connected document tools.", content = "# Fixture",
+            origin = SkillOrigin.BUILT_IN, source = "Mochi", sourceUrl = "",
+            upstreamDigest = "fixture", localDigest = "fixture", enabled = false,
+            modified = false, updateAvailable = false, installedAt = Instant.EPOCH, updatedAt = Instant.EPOCH,
+        )
+        val current = mutableStateOf(skill)
+        val readiness = mutableStateOf<SkillReadiness?>(null)
+        val changes = mutableListOf<Boolean>()
+        compose.setContent {
+            MochiTheme {
+                InstalledSkillCard(current.value, readiness.value, {},
+                    { _, enabled -> changes += enabled }, {}, {})
+            }
+        }
+        compose.onNode(isToggleable()).assertIsNotEnabled()
+        readiness.value = SkillReadiness(emptySet(), emptySet(),
+            anyToolRequirements = mapOf("Tencent Docs MCP" to emptySet()))
+        compose.onNodeWithText("Enable at least one Tool in: Tencent Docs MCP").assertIsDisplayed()
+        compose.onNode(isToggleable()).assertIsNotEnabled()
+        readiness.value = SkillReadiness(emptySet(), setOf("tencent_docs_get_content"),
+            anyToolRequirements = mapOf("Tencent Docs MCP" to setOf("tencent_docs_get_content")))
+        compose.onNode(isToggleable()).assertIsEnabled().performClick()
+        assertEquals(listOf(true), changes)
+        current.value = skill.copy(enabled = true)
+        readiness.value = SkillReadiness(emptySet(), emptySet(),
+            anyToolRequirements = mapOf("Tencent Docs MCP" to emptySet()))
+        compose.onNodeWithText("Built-in · Suspended").assertIsDisplayed()
+        compose.onNode(isToggleable()).assertIsEnabled().performClick()
+        assertEquals(listOf(true, false), changes)
+    }
 
     @Test
     fun `not now grants nothing and discloses disabled tool restoration`() {

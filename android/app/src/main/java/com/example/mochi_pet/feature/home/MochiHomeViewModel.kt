@@ -1801,13 +1801,13 @@ class MochiHomeViewModel(
                     val catalog = toolCatalogRepository?.loadSummary()
                         ?: ToolCatalogSummary()
                     val readiness = catalog.skillReadiness(
-                        skill.requiredToolNames,
+                        skill,
                     )
                     require(readiness.isReady) {
-                        "Enable required Tool groups first: " +
-                            readiness.missingRequirements
-                                .sorted()
-                                .joinToString()
+                        readiness.declarationError ?: (
+                            if (readiness.anyToolRequirements.isNotEmpty()) "Enable at least one Tool in: "
+                            else "Enable required Tool groups first: "
+                        ) + readiness.missingRequirements.sorted().joinToString()
                     }
                     mutableToolsState.value = ToolsUiState(
                         catalog = catalog,
@@ -2645,7 +2645,7 @@ class MochiHomeViewModel(
                     skills = skills,
                     readinessById = skills.associate { skill ->
                         skill.id to catalog.skillReadiness(
-                            skill.requiredToolNames,
+                            skill,
                         )
                     },
                     isLoading = false,
@@ -2662,7 +2662,7 @@ class MochiHomeViewModel(
             state.copy(
                 readinessById = state.skills.associate { skill ->
                     skill.id to catalog.skillReadiness(
-                        skill.requiredToolNames,
+                        skill,
                     )
                 },
             )

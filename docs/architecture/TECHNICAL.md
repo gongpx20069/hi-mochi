@@ -452,14 +452,20 @@ bounded resources are accessed relative to the Skill root. Disabled Skills are
 absent from discovery and cannot be activated. A Skill never enables a Tool:
 provider and individual Tool switches still determine ToolRegistry membership,
 and activation reports missing required Tools. The UI also derives a readiness
-set from actual ToolRegistry prerequisites, groups those requirements by their
-owning provider or Tool group, and blocks enablement until every aggregate is
-ready. Provider-backed groups require the provider to be installed when
-applicable, connected, and enabled; every member Tool used by that Skill must
-also remain individually enabled. The UI reports the aggregate label, such as
+set from actual ToolRegistry prerequisites and groups them by their owning
+provider or Tool group. Notion Knowledge, Tencent Docs Knowledge and Feishu
+Knowledge require **any one** enabled Tool from their connected, enabled
+provider. All other Skills require every declared mandatory Tool; explicitly
+optional capabilities do not block enablement. Provider-backed groups require
+the provider to be installed when applicable, connected, and enabled.
+The UI reports the aggregate label, such as
 `Tencent Docs MCP`, rather than raw Tool IDs. If readiness later fails, the
 saved preference remains but the Skill is omitted from discovery and
-activation. Installing/loading a Skill never runs downloaded scripts or
+activation, while retaining the ability to turn off its saved preference.
+Cards show the missing dependency; built-in status changes to **Suspended**.
+Unknown/loading readiness cannot enable a Skill.
+Built-in instructions are app-managed, not a claim that their Tools are read-only.
+Installing/loading a Skill never runs downloaded scripts or
 package-install instructions. Connected, enabled Termux Tools may run user
 scripts or install packages inside Termux; this does not grant other Skills
 or runtimes an execution bypass.
@@ -476,7 +482,25 @@ record is not a second installed Skill, and no database schema changes.
 Its minimum prerequisite is navigate/read/scroll. `load_skill` includes optional
 click/input/assistance in its `allowed-tools` header only when available in the
 calling registry; loading cannot grant a foreground capability to a background
-or child run. Other built-in and installed Skill prerequisites are unchanged.
+or child run. Document-provider Skills declare all and only their provider's
+Tools present in the calling registry, including writes when available.
+Other Skills declare their mandatory Tools plus available, explicitly listed
+optional Tools (for example assistance, location or navigation). The header
+never synthesizes a missing alias or changes Tool enablement.
+
+Installed Skill `allowed-tools` declarations accept whitespace-delimited tool
+names, quoted scalars, folded/literal multiline scalars, and inline/block lists.
+Names must be exact Mochi Tool names; unsupported dependency values, duplicate
+declarations and permission expressions are rejected rather than interpreted
+as no dependencies. Existing invalid declarations remain visible for repair,
+but cannot be enabled, discovered or loaded. Skills without this optional field
+have no declared Tool prerequisites; prose is not used to infer or grant Tools.
+The foreground readiness check also recognizes native `request_user_assistance`,
+which is always registered for the Main Agent and has no selectable Tool switch.
+
+Built-in Skill instructions describe current workflows and capability limits.
+Do not include migration history, removed Tool names, or instructions for older
+versions. Compatibility migrations belong to repository code/docs, not prompts.
 
 The unauthenticated Explore default parses the public skills.sh Trending (24h)
 leaderboard and falls back to install-ranked public search if the page shape

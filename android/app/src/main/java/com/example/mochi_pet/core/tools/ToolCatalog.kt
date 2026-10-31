@@ -49,7 +49,9 @@ import com.example.mochi_pet.core.rest.selectRestOutput
 import com.example.mochi_pet.core.rest.validateRestConnection
 import com.example.mochi_pet.core.rest.validateRestTool
 import com.example.mochi_pet.core.skills.SkillReadiness
-import com.example.mochi_pet.core.skills.satisfiedSkillTools
+import com.example.mochi_pet.core.skills.MochiSkill
+import com.example.mochi_pet.core.skills.readiness
+import com.example.mochi_pet.core.skills.requiredToolNames
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -200,12 +202,18 @@ fun ToolCatalogSummary.skillReadiness(
     val readyToolNames = readyToolNames()
     return SkillReadiness(
         requiredTools = requiredToolNames,
-        readyTools = satisfiedSkillTools(requiredToolNames, readyToolNames),
+        readyTools = requiredToolNames.intersect(readyToolNames),
         requirements = requiredToolNames
             .groupBy { skillRequirementName(it) }
             .mapValues { (_, tools) -> tools.toSet() },
     )
 }
+
+fun ToolCatalogSummary.skillReadiness(skill: MochiSkill): SkillReadiness =
+    skill.readiness(readyToolNames() + "request_user_assistance").copy(
+        requirements = skill.requiredToolNames.groupBy { skillRequirementName(it) }
+            .mapValues { (_, tools) -> tools.toSet() },
+    )
 
 private fun ToolCatalogSummary.skillRequirementName(
     toolName: String,

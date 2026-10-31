@@ -146,7 +146,7 @@ Feishu defaults are exactly `search-doc`, `fetch-doc`, `create-doc`,
 `update-doc`, and `list-docs`. Discovery must return all five before connection
 succeeds; other remote names are excluded. Only search/fetch/list enter
 read-only Subagent registries. The optional Feishu Knowledge Skill requires
-all five, starts disabled, and teaches search pagination, wiki browsing,
+any one enabled Feishu Tool, starts disabled, and teaches search pagination, wiki browsing,
 read-before-write, ambiguity resolution, and post-write readback. It must
 disclose that search covers doc/docx only, wiki listing is node-scoped, embedded
 sheet/Bitable content is unsupported, and whole-document deletion, spreadsheets,
@@ -227,10 +227,12 @@ The concise Tencent Docs Skill covers search/browsing, a complete Smart Canvas
 create/read/edit/readback workflow, short type-specific guidance and outcome
 checks. Search includes scope discovery, pagination, deduplication and honest
 partial-coverage reporting.
-Its search requirement accepts either enabled `manage.search_file` or
-`search_space_file`; discovery, UI readiness and Skill loading use the same rule
-without inventing an executable alias. Browsing and content-read Tools remain
-required. Smart Canvas uses the current MDX APIs and resolves page/block IDs;
+Like Notion and Feishu, it can be enabled when the provider is connected and
+enabled and any one of its Tools is enabled. Discovery, UI readiness and Skill
+loading use that same rule. The loaded `allowed-tools` header contains only
+the provider's actual Tools in the calling registry, not a fixed read-only
+subset or a synthetic search alias. Missing individual operations do not make
+the whole provider unavailable. Smart Canvas uses the current MDX APIs and resolves page/block IDs;
 Word uses document structure; ordinary spreadsheets resolve sheets/ranges;
 SmartSheet resolves field/record IDs; PPT
 distinguishes creation/append from unsupported arbitrary edits. Whole-file
@@ -633,8 +635,9 @@ The built-in Notion provider uses `https://mcp.notion.com/mcp`, OAuth
 Authorization Code with PKCE, dynamic client registration, encrypted rotating
 tokens, and the `mochi://oauth/notion` callback. Notion schemas are excluded
 until authorization succeeds, the server is enabled, and at least one
-discovered Tool is selected. The separate read-only Notion Knowledge Skill is
-disabled by default and enters the prompt only when the user enables it.
+discovered Tool is selected. The separate Notion Knowledge Skill supports the
+available read/write operations, is disabled by default, and can be enabled
+when any one Notion Tool is available.
 
 The built-in Tencent Docs provider uses the official hosted endpoint
 `https://docs.qq.com/openapi/mcp`. The user obtains a personal MCP token from
@@ -643,8 +646,8 @@ encryption and sends it as the provider-required raw `Authorization` value.
 Search, read, SmartCanvas creation, append, and update tools are selected by
 default after successful discovery. The separate Tencent Docs Knowledge Skill
 teaches both reading and writing and remains disabled by default. Its readiness
-prerequisite is presented as the single **Tencent Docs MCP** aggregate; the aggregate is unavailable when
-the server or any Tencent Docs Tool required by the Skill is unavailable.
+prerequisite is presented as the single **Tencent Docs MCP** aggregate. It is
+unavailable when the server is disconnected/disabled or no Tencent Tool is enabled.
 
 ### Feishu user authorization
 

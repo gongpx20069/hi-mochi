@@ -14,7 +14,6 @@ import com.example.mochi_pet.core.diagnostics.ConfigurationProbe
 import com.example.mochi_pet.core.diagnostics.RepairTarget
 import com.example.mochi_pet.core.settings.SpeechProvider
 import com.example.mochi_pet.core.settings.ProviderSettingsRepository
-import com.example.mochi_pet.core.skills.requiredToolNames
 import com.example.mochi_pet.core.tools.ExtensionProviderSummary
 import com.example.mochi_pet.core.tools.skillReadiness
 
@@ -77,16 +76,17 @@ internal fun configurationProbes(app: MochiApplication): List<ConfigurationProbe
     ConfigurationProbe("skills", "Skills and Tools", RepairTarget.SKILLS) {
         val catalog = app.toolCatalogRepository.loadSummary()
         app.skillRepository.listSkills().map { skill ->
-            val readiness = catalog.skillReadiness(skill.requiredToolNames)
+            val readiness = catalog.skillReadiness(skill)
             ConfigurationCheck("skill:${skill.id}", skill.name, when {
                 !skill.enabled -> CheckStatus.DISABLED
                 readiness.isReady -> CheckStatus.PASSED
                 else -> CheckStatus.ATTENTION
             }, when {
+                readiness.declarationError != null -> "Edit the Skill's allowed-tools declaration."
                 !skill.enabled -> "Skill is disabled; no changes are needed unless you want to use it."
                 readiness.isReady -> "Required Tools are available. External service calls were not tested."
                 else -> "Connect and enable the missing groups and their required Tool switches."
-            }, if (readiness.isReady || !skill.enabled) RepairTarget.SKILLS else RepairTarget.TOOLS,
+            }, if (readiness.isReady || !skill.enabled || readiness.declarationError != null) RepairTarget.SKILLS else RepairTarget.TOOLS,
                 missingRequirements = if (skill.enabled) readiness.missingRequirements.toList() else emptyList())
         }
     },

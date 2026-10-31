@@ -51,6 +51,8 @@ data class SkillReadiness(
     val readyTools: Set<String>,
     val requirements: Map<String, Set<String>> =
         requiredTools.associateWith { setOf(it) },
+    val anyToolRequirements: Map<String, Set<String>> = emptyMap(),
+    val declarationError: String? = null,
 ) {
     val missingTools: Set<String>
         get() = requiredTools - readyTools
@@ -58,7 +60,8 @@ data class SkillReadiness(
     val missingRequirements: Set<String>
         get() = requirements
             .filterValues { tools -> !readyTools.containsAll(tools) }
-            .keys
+            .keys + anyToolRequirements.filterValues { tools -> tools.none { it in readyTools } }.keys +
+            listOfNotNull(declarationError)
 
     val isReady: Boolean
         get() = missingRequirements.isEmpty()
@@ -121,6 +124,7 @@ class RoomSkillRepository(
     ): List<AgentSkillMetadata> =
         listSkills()
             .filter(MochiSkill::enabled)
+            .filter { declaredSkillTools(it.content).error == null }
             .filter { skill ->
                 availableToolNames == null ||
                     skill.readiness(availableToolNames).isReady
@@ -332,13 +336,12 @@ class LoadSkillTool(
                 ToolErrorCode.NOT_FOUND,
                 "Skill is unavailable or disabled: $skillName",
             )
-        val requiredTools = skill.requiredToolNames
-        val missingTools = requiredTools - satisfiedSkillTools(requiredTools, availableToolNames)
-        if (missingTools.isNotEmpty()) {
+        val readiness = skill.readiness(availableToolNames)
+        if (!readiness.isReady) {
             return ToolResultEnvelope.error(
                 ToolErrorCode.PERMISSION_DENIED,
                 "Skill requires disabled or unavailable tools: " +
-                    missingTools.sorted().joinToString(),
+                    readiness.missingRequirements.sorted().joinToString(),
             )
         }
         return ToolResultEnvelope.success(
@@ -372,7 +375,8 @@ private fun MochiSkill.standardDocument(availableToolNames: Set<String>): String
         appendLine(
             "  source: \"${source.ifBlank { "local" }.yamlEscape()}\"",
         )
-        val permittedTools = requiredToolNames +
+        val permittedTools = requiredToolNames.intersect(availableToolNames) +
+            providerToolNames(availableToolNames) +
             OPTIONAL_BUILT_IN_SKILL_TOOLS[id].orEmpty().intersect(availableToolNames)
         permittedTools.takeIf { it.isNotEmpty() }?.let { tools ->
             appendLine("allowed-tools: ${tools.sorted().joinToString(" ")}")
@@ -384,11 +388,7 @@ private fun MochiSkill.standardDocument(availableToolNames: Set<String>): String
 
 val MochiSkill.requiredToolNames: Set<String>
     get() = BUILT_IN_SKILL_TOOLS[id]
-        ?: parseFrontmatterField(content, "allowed-tools")
-            ?.split(Regex("\\s+"))
-            ?.filter(String::isNotBlank)
-            ?.toSet()
-            .orEmpty()
+        ?: declaredSkillTools(content).names
 
 private fun MochiSkill.toAgentSkillMetadata(): AgentSkillMetadata =
     requireAgentSkillCompatible().let {
@@ -411,6 +411,7 @@ private fun MochiSkill.requireAgentSkillCompatible(): MochiSkill {
     require(description.trim().length in 1..1024) {
         "Skill description must contain 1-1024 characters"
     }
+    require(declaredSkillTools(content).error == null) { INVALID_SKILL_TOOLS }
     return this
 }
 
@@ -433,7 +434,7 @@ private fun parseFrontmatterField(
     content: String,
     field: String,
 ): String? {
-    val lines = content.lines()
+    val lines = content.removePrefix("\uFEFF").lines()
     if (lines.firstOrNull()?.trim() != "---") {
         return null
     }
@@ -453,12 +454,56 @@ private fun parseFrontmatterField(
 }
 
 private fun stripFrontmatter(content: String): String {
-    val lines = content.lines()
+    val lines = content.removePrefix("\uFEFF").lines()
     if (lines.firstOrNull()?.trim() != "---") {
         return content
     }
     val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
     return if (end < 0) content else lines.drop(end + 2).joinToString("\n")
+}
+
+private const val INVALID_SKILL_TOOLS = "Invalid Skill tool declaration"
+private data class DeclaredSkillTools(val names: Set<String>, val error: String? = null)
+
+private fun declaredSkillTools(content: String): DeclaredSkillTools {
+    val lines = content.removePrefix("\uFEFF").lines()
+    if (lines.firstOrNull()?.trim() != "---") return DeclaredSkillTools(emptySet())
+    val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
+    if (end < 0) return DeclaredSkillTools(emptySet(), INVALID_SKILL_TOOLS)
+    val fields = lines.subList(1, end + 1).joinToString("\n").trimIndent().lines()
+    val key = Regex("""^(?:allowed-tools|"allowed-tools"|'allowed-tools')\s*:""")
+    val declarations = fields.indices.filter { key.containsMatchIn(fields[it]) }
+    if (declarations.isEmpty()) return DeclaredSkillTools(emptySet())
+    if (declarations.size != 1) return DeclaredSkillTools(emptySet(), INVALID_SKILL_TOOLS)
+    val index = declarations.single()
+    val scalar = fields[index].substringAfter(':').trim()
+    val continuation = fields.drop(index + 1).takeWhile {
+        it.isBlank() || it.first().isWhitespace() || it.startsWith("- ")
+    }
+        .map(String::trim).filter(String::isNotEmpty)
+    val entries = when {
+        scalar.isEmpty() && continuation.all { it.startsWith("- ") } -> continuation.map { it.removePrefix("- ") }
+        scalar in setOf(">", ">-", "|", "|-") -> listOf(continuation.joinToString(" "))
+        continuation.isNotEmpty() -> return DeclaredSkillTools(emptySet(), INVALID_SKILL_TOOLS)
+        scalar.startsWith("[") && scalar.endsWith("]") -> scalar.drop(1).dropLast(1).split(',')
+        else -> listOf(scalar)
+    }
+    val names = linkedSetOf<String>()
+    for (entry in entries) {
+        val value = entry.trim()
+        val unquoted = when {
+            value.startsWith('"') && value.endsWith('"') && value.length >= 2 -> value.drop(1).dropLast(1)
+            value.startsWith('\'') && value.endsWith('\'') && value.length >= 2 -> value.drop(1).dropLast(1)
+            else -> value
+        }
+        for (name in unquoted.split(Regex("\\s+")).filter(String::isNotEmpty)) {
+            if (!Regex("[A-Za-z0-9_.-]+").matches(name)) {
+                return DeclaredSkillTools(emptySet(), INVALID_SKILL_TOOLS)
+            }
+            names += name
+        }
+    }
+    return DeclaredSkillTools(names)
 }
 
 private val BROWSER_SKILL_TOOLS = setOf(
@@ -489,21 +534,6 @@ private val BUILT_IN_SKILL_TOOLS = mapOf(
     "builtin:douban-ratings" to BROWSER_SKILL_TOOLS,
     "builtin:us-stock-analysis" to
         READ_ONLY_BROWSER_SKILL_TOOLS + "run_sandboxed_javascript",
-    "builtin:notion-knowledge" to setOf(
-        "notion_search",
-        "notion_fetch",
-        "notion_create_pages",
-        "notion_update_page",
-    ),
-    "builtin:tencent-docs-knowledge" to setOf(
-        "tencent_docs_query_space_node",
-        "tencent_docs_manage_search_file",
-        "tencent_docs_get_content",
-    ),
-    "builtin:feishu-knowledge" to setOf(
-        "feishu_search_doc", "feishu_fetch_doc", "feishu_list_docs",
-        "feishu_create_doc", "feishu_update_doc",
-    ),
     "builtin:travel-planning" to
         BROWSER_SKILL_TOOLS + setOf(
             "amap_search_poi",
@@ -531,21 +561,36 @@ private val BUILT_IN_SKILL_TOOLS = mapOf(
 private val OPTIONAL_BUILT_IN_SKILL_TOOLS = mapOf(
     "builtin:webdav-files" to setOf("webdav_write", "webdav_manage", "webdav_transfer"),
     "builtin:browser" to setOf("browser_click", "browser_input", "request_user_assistance"),
+    "builtin:mochi-planner" to setOf("navigate_mochi_ui"),
+    "builtin:product-search" to setOf("request_user_assistance"),
+    "builtin:douban-ratings" to setOf("request_user_assistance"),
+    "builtin:us-stock-analysis" to setOf("request_user_assistance"),
+    "builtin:travel-planning" to setOf("get_current_location", "request_user_assistance"),
+    "builtin:merchant-discovery" to setOf("get_current_location"),
 )
+
+private val DOCUMENT_SKILL_PROVIDERS = mapOf(
+    "builtin:notion-knowledge" to ("Notion MCP" to "notion_"),
+    "builtin:tencent-docs-knowledge" to ("Tencent Docs MCP" to "tencent_docs_"),
+    "builtin:feishu-knowledge" to ("Feishu MCP" to "feishu_"),
+)
+
+private fun MochiSkill.providerToolNames(available: Set<String>): Set<String> =
+    DOCUMENT_SKILL_PROVIDERS[id]?.second?.let { prefix ->
+        available.filterTo(mutableSetOf()) { it.startsWith(prefix) }
+    }.orEmpty()
 
 fun MochiSkill.readiness(
     availableToolNames: Set<String>,
-): SkillReadiness =
-    SkillReadiness(
+): SkillReadiness {
+    val providerTools = providerToolNames(availableToolNames)
+    return SkillReadiness(
         requiredTools = requiredToolNames,
-        readyTools = satisfiedSkillTools(requiredToolNames, availableToolNames),
+        readyTools = requiredToolNames.intersect(availableToolNames) + providerTools,
+        anyToolRequirements = DOCUMENT_SKILL_PROVIDERS[id]?.first?.let { mapOf(it to providerTools) }.orEmpty(),
+        declarationError = declaredSkillTools(content).error,
     )
-
-internal fun satisfiedSkillTools(required: Set<String>, available: Set<String>): Set<String> =
-    required.filterTo(mutableSetOf()) {
-        it in available ||
-            (it == "tencent_docs_manage_search_file" && "tencent_docs_search_space_file" in available)
-    }
+}
 
 private val BUILT_IN_SKILLS = listOf(
     builtInSkill(
@@ -609,7 +654,7 @@ private val BUILT_IN_SKILLS = listOf(
 
             Use only enabled termux_exec and termux_task tools for explicit local execution tasks.
             Connected and enabled tools execute automatically for foreground conversations,
-            scheduled agents, and subagents. Do not ask for per-command execution approval.
+            scheduled agents, and subagents within the user's requested task.
             A Skill never enables the provider or tools. Never bypass a disabled tool or
             unavailable connection through another tool or delegation.
 
@@ -654,8 +699,8 @@ private val BUILT_IN_SKILLS = listOf(
 
             Mochi is the primary controller, not a second coding session. Shared remote
             chats are distinct from Mochi's current draft and conversation history.
-            First ask the user to open Tools > AgentLink > Connect/Open AgentLink and
-            approve the native scoped authorization page, then return to Mochi.
+            If disconnected, direct the user to Tools > AgentLink > Connect/Open
+            AgentLink for native scoped authorization, then return to Mochi.
             Never request credentials or bypass disabled tools using Browser, HTTP,
             JavaScript, MCP, shell, or guessed intents.
 
@@ -1106,8 +1151,9 @@ private val BUILT_IN_SKILLS = listOf(
         content = """
             # Notion Knowledge
 
-            Use Notion as Mochi's editable external knowledge base only when
-            the matching Notion MCP tools are available.
+            Use the connected Notion workspace through the Tools declared in this
+            Skill's allowed-tools header. Only those operations are available;
+            a missing operation does not make the whole provider unavailable.
 
             ## Tool workflow
 
@@ -1129,8 +1175,7 @@ private val BUILT_IN_SKILLS = listOf(
                when available and respect its polling backoff. A queued task
                is not a completed write; do not resubmit the write to check it.
             8. Use `notion_get_tool_access` when available to check plan-dependent
-               capabilities. Do not invent a page-delete Tool or assume update
-               supports trash/archive unless its discovered schema declares it.
+               capabilities; follow the discovered schema for the requested change.
 
             ## Safety
 
@@ -1153,8 +1198,8 @@ private val BUILT_IN_SKILLS = listOf(
             # Feishu Knowledge
 
             Use the connected user's Feishu cloud documents as an external knowledge
-            source. Use only currently enabled schemas; this is the official hosted
-            document MCP, not the broader local OpenAPI MCP package.
+            source. Use only the operations in this Skill's allowed-tools header
+            and their actual schemas. Report a missing operation precisely.
 
             ## Find and browse
 
@@ -1178,8 +1223,8 @@ private val BUILT_IN_SKILLS = listOf(
             - For `feishu_update_doc`, establish the exact document and intended
               change, fetch current content, then choose append, insert, or a bounded
               replacement from its actual schema. Preserve unrelated content.
-              Read before writing again if the target has changed. Link-anchor
-              positioning is not supported; use schema-supported locating fields.
+              Read before writing again if the target has changed; use the
+              locating fields declared by the schema.
             - Disambiguate similar names before any write. Broad replacement needs
               explicit user intent. Default-on tools are not standing write consent.
             - After a write, fetch the affected content and verify the requested
@@ -1190,12 +1235,9 @@ private val BUILT_IN_SKILLS = listOf(
 
             ## Limits and safety
 
-            - There is no whole-document delete tool in this integration. Do not
-              empty a document or replace it with a new file as pretend deletion.
-              Explain the limitation and direct the user to delete in Feishu.
-            - Native spreadsheet, Bitable, PPT editing, file downloads, comments,
-              sharing, permissions, membership, and messaging are not exposed.
-              Do not fabricate tools or use a document operation as a substitute.
+            - Keep document edits distinct from file deletion, permissions and
+              other file types. If the requested operation is unavailable,
+              explain that limitation instead of substituting a destructive edit.
             - Tool errors, including HTTP-200 isError results, are not success.
               Missing permissions require the user to fix app permissions,
               publication and availability, then reconnect via Tools. Do not ask
@@ -1218,13 +1260,14 @@ private val BUILT_IN_SKILLS = listOf(
 
             Search, read and edit through the connected Tencent Docs MCP.
             Below, short remote names map to `tencent_docs_` aliases with dots
-            replaced by underscores. Use only enabled Tools and their actual
+            replaced by underscores. The allowed-tools header lists the enabled
+            operations for this run. Use only those Tools and their actual
             schemas; never invent Tools, parameters, IDs or document types.
 
             ## Find the right document
 
-            - Use an exact supplied URL/ID directly; otherwise search with the
-              available `manage.search_file` or `search_space_file`, and resolve
+            - Use an exact supplied URL/ID directly; otherwise search with
+              `manage.search_file` when available, and resolve
               ambiguous matches before editing.
             - Browse with `query_space_node` / `manage.query_folder_meta`.
               Discover real space/root IDs, search the requested accessible
@@ -1254,8 +1297,7 @@ private val BUILT_IN_SKILLS = listOf(
               Block components use multiline tags, four-space indentation and
               double-quoted attributes; no expressions, scripts or imports.
             - Read back the affected page to confirm the requested text and
-              preserved surrounding content. Legacy Smart Canvas Tools may be
-              used only when actually present, following their own schemas.
+              preserved surrounding content.
 
             ## Other document types
 
@@ -1474,11 +1516,8 @@ private val BUILT_IN_SKILLS = listOf(
                  later check has been scheduled. Never treat offline/null/error
                  as confirmation, promise later verification, or blindly send
                  an OK/Enter key to dismiss a television power menu.
-            7. For older extension results without `verification`, perform one
-               `mijia_get_device_state` after control when the corresponding
-               readable property is available. Do not merely defer checking to
-               the user. If no readable property exists, state that limitation.
-               Never repeat control just because verification failed.
+            7. A missing or failed verification is an unverified result. Report
+               that uncertainty; never repeat control merely to verify it.
 
             ## Cameras
 

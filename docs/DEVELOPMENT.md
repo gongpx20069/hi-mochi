@@ -96,6 +96,21 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Skill readiness/content regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*MochiDatabaseTest" `
+  --tests "*ToolCatalogTest" --tests "*AgentOrchestratorTest" `
+  --tests "*MochiHomeViewModelTest" --tests "*ExtensionSetupUiTest" `
+  --tests "*SkillsShClientTest" --tests "*AgentLinkToolTest" --no-daemon
+```
+
+These cover every built-in Skill's mandatory dependencies, document-provider
+any-one-Tool readiness, exact role-scoped `allowed-tools` headers, multiline
+imported declarations and explicit invalid-metadata rejection, suspended/unknown
+UI states, and the absence of retired-operation/version-history guidance in
+built-in prompts. They do not modify phone configuration or call live providers.
+
 Tencent Docs Smart Canvas regressions:
 
 ```powershell

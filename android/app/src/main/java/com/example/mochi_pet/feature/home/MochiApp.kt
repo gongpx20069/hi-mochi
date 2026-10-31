@@ -3529,6 +3529,7 @@ private fun SkillsSurface(
     selectedSkill?.let { skill ->
         SkillContentDialog(
             skill = skill,
+            readiness = state.readinessById[skill.id],
             onDismiss = { selectedSkill = null },
             onSave = { content ->
                 onEdit(skill.id, content)
@@ -4734,7 +4735,7 @@ private fun SkillSectionTab(
 }
 
 @Composable
-private fun InstalledSkillCard(
+internal fun InstalledSkillCard(
     skill: MochiSkill,
     readiness: SkillReadiness?,
     onView: () -> Unit,
@@ -4771,10 +4772,10 @@ private fun InstalledSkillCard(
                         Text(
                             text =
                             "Built-in · " +
-                                if (skill.enabled) {
-                                    "Enabled · Read only"
-                                } else {
-                                    "Disabled · Read only"
+                                when {
+                                    !skill.enabled -> "Disabled"
+                                    readiness?.isReady != true -> "Suspended"
+                                    else -> "Enabled"
                                 },
                             color =
                                 MaterialTheme.colorScheme.onSurfaceVariant,
@@ -4799,7 +4800,7 @@ private fun InstalledSkillCard(
                         onCheckedChange = {
                             onSetEnabled(skill.id, it)
                         },
-                        enabled = skill.enabled || readiness?.isReady != false,
+                        enabled = skill.enabled || readiness?.isReady == true,
                     )
                     if (skill.updateAvailable) {
                         Text(
@@ -4826,8 +4827,10 @@ private fun InstalledSkillCard(
             }
             if (readiness?.isReady == false) {
                 Text(
-                    text = "Enable required Tool groups first: " +
-                        readiness.missingRequirements.sorted().joinToString(),
+                    text = readiness.declarationError ?: (
+                        if (readiness.anyToolRequirements.isNotEmpty()) "Enable at least one Tool in: "
+                        else "Enable required Tool groups first: "
+                    ) + readiness.missingRequirements.sorted().joinToString(),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelSmall,
                 )
@@ -4929,6 +4932,7 @@ private fun MarketSkillSummary.installMetricText(): String =
 @Composable
 private fun SkillContentDialog(
     skill: MochiSkill,
+    readiness: SkillReadiness?,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
@@ -4956,14 +4960,18 @@ private fun SkillContentDialog(
                     Text(
                         text =
                         "Built-in · " +
-                            if (skill.enabled) {
-                                "Enabled · Read only"
-                            } else {
-                                "Disabled · Read only"
+                            when {
+                                !skill.enabled -> "Disabled"
+                                readiness?.isReady != true -> "Suspended"
+                                else -> "Enabled"
                             },
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Instructions are managed by Mochi.",
+                        style = MaterialTheme.typography.labelSmall,
                     )
                 } else {
                     MaterialText(

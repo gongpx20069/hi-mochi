@@ -14,6 +14,11 @@ import com.example.mochi_pet.core.skills.RoomSkillRepository
 import com.example.mochi_pet.core.skills.SkillOrigin
 import com.example.mochi_pet.core.skills.requiredToolNames
 import com.example.mochi_pet.core.skills.readiness
+import com.example.mochi_pet.core.tools.ToolCatalogSummary
+import com.example.mochi_pet.core.tools.McpServerSummary
+import com.example.mochi_pet.core.tools.McpToolSummary
+import com.example.mochi_pet.core.tools.McpAuthMode
+import com.example.mochi_pet.core.tools.skillReadiness
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
@@ -25,6 +30,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -133,7 +139,8 @@ class MochiDatabaseTest {
         val upgraded = repository.listSkills().single { it.id == id }
         assertEquals(true, upgraded.enabled)
         assertEquals(true, upgraded.content.contains("verification.status"))
-        assertEquals(true, upgraded.content.contains("perform one"))
+        assertEquals(true, upgraded.content.contains("unverified result"))
+        assertFalse(upgraded.content.contains("older extension"))
         assertEquals(false, upgraded.content.contains("Old acceptance-only instructions"))
     }
 
@@ -202,7 +209,7 @@ class MochiDatabaseTest {
         assertTrue(skill.content.contains("not proof of deletion"))
         assertFalse(skill.content.contains("Old search-only guidance"))
         for (search in listOf("tencent_docs_manage_search_file", "tencent_docs_search_space_file")) {
-            val available = setOf(search, "tencent_docs_query_space_node", "tencent_docs_get_content")
+            val available = setOf(search)
             assertTrue(skill.readiness(available).isReady)
             assertTrue(repository.listEnabledMetadata(available).any { it.name == "tencent-docs-knowledge" })
             val arguments = buildJsonObject { put("skill_name", "tencent-docs-knowledge") }
@@ -215,22 +222,145 @@ class MochiDatabaseTest {
     }
 
     @Test
-    fun `Feishu skill stays optional and requires all five document tools`() = runBlocking {
+    fun `Feishu skill stays optional and allows any enabled document tool`() = runBlocking {
         val repository = RoomSkillRepository(database.skillDao())
         val id = "builtin:feishu-knowledge"
         val skill = repository.listSkills().single { it.id == id }
         assertFalse(skill.enabled)
         val tools = setOf("feishu_search_doc", "feishu_fetch_doc", "feishu_list_docs",
             "feishu_create_doc", "feishu_update_doc")
-        assertEquals(tools, skill.requiredToolNames)
         repository.setEnabled(id, true)
         assertTrue(repository.listEnabledMetadata(tools).any { it.name == "feishu-knowledge" })
-        tools.forEach { missing ->
-            assertFalse(repository.listEnabledMetadata(tools - missing).any { it.name == "feishu-knowledge" })
+        tools.forEach { tool ->
+            assertTrue(repository.listEnabledMetadata(setOf(tool)).any { it.name == "feishu-knowledge" })
         }
+        assertFalse(repository.listEnabledMetadata(emptySet()).any { it.name == "feishu-knowledge" })
         assertTrue(skill.content.contains("fetch the affected content"))
-        assertTrue(skill.content.contains("no whole-document delete tool"))
         assertTrue(skill.content.contains("Never repeat create/update"))
+    }
+
+    @Test
+    fun `document Skills share any-tool gating across UI discovery and loading and expose only actual tools`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val context = ToolExecutionContext(LocalDate.of(2026, 11, 1), MochiSurface.Conversation)
+        for ((id, tool) in listOf(
+            "notion-knowledge" to "notion_update_page",
+            "tencent-docs-knowledge" to "tencent_docs_smartcanvas_edit",
+            "feishu-knowledge" to "feishu_fetch_doc",
+        )) {
+            val skill = repository.setEnabled("builtin:$id", true)
+            val server = McpServerSummary(
+                id = id, name = id, endpoint = "https://example.com/mcp", builtIn = true,
+                enabled = true, connected = true, authMode = McpAuthMode.TOKEN,
+                tools = listOf(McpToolSummary(tool, tool, "", true)),
+            )
+            val ready = ToolCatalogSummary(servers = listOf(server))
+            assertTrue(ready.skillReadiness(skill).isReady)
+            for (unavailable in listOf(
+                ready.copy(servers = listOf(server.copy(enabled = false))),
+                ready.copy(servers = listOf(server.copy(connected = false))),
+                ready.copy(servers = listOf(server.copy(tools = server.tools.map { it.copy(enabled = false) }))),
+                ToolCatalogSummary(),
+            )) {
+                assertFalse(unavailable.skillReadiness(skill).isReady)
+            }
+            for (available in listOf(setOf(tool), setOf(tool, "browser_read", "manage_mochi_todo"))) {
+                assertTrue(repository.listEnabledMetadata(available).any { it.name == id })
+                val loaded = LoadSkillTool(repository, available).execute(buildJsonObject { put("skill_name", id) }, context)
+                assertEquals("ok", loaded.status)
+                val content = checkNotNull(loaded.data).jsonObject.getValue("content").jsonPrimitive.content
+                assertEquals("allowed-tools: $tool", content.lineSequence().single { it.startsWith("allowed-tools:") })
+            }
+            assertFalse(repository.listEnabledMetadata(setOf("browser_read")).any { it.name == id })
+            assertEquals("PERMISSION_DENIED", LoadSkillTool(repository, emptySet())
+                .execute(buildJsonObject { put("skill_name", id) }, context).code)
+            assertTrue(repository.listSkills().single { it.id == skill.id }.enabled)
+        }
+    }
+
+    @Test
+    fun `all other built-in Skills require every mandatory tool and expose available optional capabilities only`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val context = ToolExecutionContext(LocalDate.of(2026, 11, 1), MochiSurface.Conversation)
+        for (initial in repository.listSkills().filter { it.requiredToolNames.isNotEmpty() }) {
+            val skill = repository.setEnabled(initial.id, true)
+            val name = skill.id.removePrefix("builtin:")
+            assertTrue(skill.readiness(skill.requiredToolNames).isReady)
+            for (missing in skill.requiredToolNames) {
+                val available = skill.requiredToolNames - missing
+                assertFalse(skill.readiness(available).isReady)
+                assertFalse(ToolCatalogSummary().skillReadiness(skill).isReady)
+                assertEquals("PERMISSION_DENIED", LoadSkillTool(repository, available)
+                    .execute(buildJsonObject { put("skill_name", name) }, context).code)
+            }
+            val available = skill.requiredToolNames + setOf("request_user_assistance", "get_current_location", "unrelated_tool")
+            val result = LoadSkillTool(repository, available).execute(buildJsonObject { put("skill_name", name) }, context)
+            assertEquals("ok", result.status)
+            val header = checkNotNull(result.data).jsonObject.getValue("content").jsonPrimitive.content
+                .lineSequence().single { it.startsWith("allowed-tools:") }.removePrefix("allowed-tools: ").split(" ").toSet()
+            assertTrue(available.containsAll(header))
+            assertFalse("unrelated_tool" in header)
+            if (name in setOf("product-search", "douban-ratings", "us-stock-analysis", "travel-planning")) {
+                assertTrue("request_user_assistance" in header)
+            }
+        }
+    }
+
+    @Test
+    fun `built-in prompts contain current workflows rather than retired operations or compatibility history`() = runBlocking {
+        val skills = RoomSkillRepository(database.skillDao()).listSkills()
+        val retiredGuidance = Regex(
+            """\b(legacy|older extension|previous version|deprecated|formerly|search_web|fetch_web_page|dianping_\w*)\b""",
+            RegexOption.IGNORE_CASE,
+        )
+        for (skill in skills) {
+            assertFalse(skill.name, retiredGuidance.containsMatchIn(skill.content))
+        }
+    }
+
+    @Test
+    fun `market tool declarations retain multiline dependencies and invalid declarations cannot bypass readiness`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val context = ToolExecutionContext(LocalDate.of(2026, 11, 1), MochiSurface.Conversation)
+        val declarations = listOf(
+            "browser_read browser_scroll",
+            "[browser_read, 'browser_scroll']",
+            "\n  - browser_read\n  - browser_scroll",
+            "\n- browser_read\n- browser_scroll",
+            ">-\n  browser_read\n  browser_scroll",
+            "|-\n  browser_read\n  browser_scroll",
+        )
+        for ((index, declaration) in declarations.withIndex()) {
+            val name = "fixture-$index"
+            val content = "---\nname: $name\ndescription: Fixture\nallowed-tools: $declaration\n---\nRead a page."
+            val installed = repository.install(DownloadedSkill(
+                "fixture/$name", name, "Fixture", content, "fixture", "", null, "fixture",
+            ))
+            val skill = repository.setEnabled(installed.id, true)
+            assertEquals(setOf("browser_read", "browser_scroll"), skill.requiredToolNames)
+            assertFalse(skill.readiness(setOf("browser_read")).isReady)
+            assertEquals("PERMISSION_DENIED", LoadSkillTool(repository, setOf("browser_read"))
+                .execute(buildJsonObject { put("skill_name", name) }, context).code)
+            assertTrue(skill.readiness(skill.requiredToolNames).isReady)
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { repository.updateContent(skill.id, content.replace(declaration, "{unknown: structure}")) }
+            }
+            val stored = checkNotNull(database.skillDao().getById(skill.id))
+            database.skillDao().upsert(stored.copy(content = content.replace(declaration, "{unknown: structure}")))
+            val invalid = repository.listSkills().single { it.id == skill.id }
+            assertFalse(ToolCatalogSummary().skillReadiness(invalid).isReady)
+            assertTrue(invalid.readiness(emptySet()).declarationError != null)
+            assertFalse(repository.listEnabledMetadata().any { it.name == name })
+            assertEquals("PERMISSION_DENIED", LoadSkillTool(repository, emptySet())
+                .execute(buildJsonObject { put("skill_name", name) }, context).code)
+        }
+        val assistance = repository.install(DownloadedSkill(
+            "fixture/assistance", "assistance", "Fixture",
+            "---\nname: assistance\nallowed-tools: request_user_assistance\n---\nAsk the user.",
+            "fixture", "", null, "fixture",
+        ))
+        assertTrue(ToolCatalogSummary().skillReadiness(assistance).isReady)
+        assertFalse(assistance.readiness(emptySet()).isReady)
     }
 
     @Test

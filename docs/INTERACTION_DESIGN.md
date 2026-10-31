@@ -401,13 +401,19 @@ Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
 Installed/Explore uses a dark selected segment. Explore opens with the public
 skills.sh Trending (24h) leaderboard, then switches to search results after a
 query. Cards show rank, source, install count, and a derived popularity label.
-Every installed Skill, including read-only built-ins, can be enabled or
+Every installed Skill, including app-managed built-ins, can be enabled or
 disabled. A Skill cannot be enabled until all of its required aggregate Tool
 groups are ready; its card names missing provider/group labels such as
 **Tencent Docs MCP**, never a list of raw Tool IDs, and keeps the switch off.
-A group is ready only when its provider and every member Tool required by that
-Skill are ready. A previously enabled Skill whose dependencies become
-unavailable remains switchable off but is suspended from Agent discovery.
+A document-provider group (Tencent Docs, Notion or Feishu) is ready when its
+provider is connected and enabled and **at least one** of its Tools is enabled.
+Other Skills require every mandatory Tool; optional Tools are not prerequisites.
+A previously enabled Skill whose dependencies become unavailable remains
+switchable off, shows the missing dependency (and **Suspended** for built-ins),
+and is excluded from Agent discovery/loading.
+Unknown readiness blocks enablement. Invalid imported Tool declarations show
+an explicit repair error instead of bypassing dependencies. Built-in content is
+labeled app-managed, not "read only", which could be mistaken for Tool behavior.
 Existing built-ins default to enabled; the
 Notion Knowledge, Tencent Docs Knowledge, Feishu Knowledge, Mi Home Smart Home,
 Termux, AgentLink, and WebDAV Files built-ins

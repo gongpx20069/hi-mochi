@@ -172,6 +172,9 @@ internal fun localizeUiText(
                 .joinToString("、") { localizeUiText(it, language) }
             "请先启用所需的工具组：$requirements"
         }
+        text.startsWith("Enable at least one Tool in: ") ->
+            "请在以下服务中至少启用一个工具：" +
+                localizeUiText(text.removePrefix("Enable at least one Tool in: "), language)
         else -> text
     }
 }
@@ -1143,8 +1146,12 @@ private val ZH_UI_TEXT = mapOf(
         "此技能包含本地修改。更新会使用最新 skills.sh 版本覆盖这些修改。",
     "Replace the installed content with the latest skills.sh version." to
         "使用最新 skills.sh 版本替换已安装内容。",
-    "Built-in · Enabled · Read only" to "内置 · 已启用 · 只读",
-    "Built-in · Disabled · Read only" to "内置 · 已禁用 · 只读",
+    "Built-in · Enabled" to "内置 · 已启用",
+    "Built-in · Disabled" to "内置 · 已禁用",
+    "Built-in · Suspended" to "内置 · 暂不可用",
+    "Instructions are managed by Mochi." to "操作指引由 Mochi 维护。",
+    "Invalid Skill tool declaration" to "Skill 的工具依赖声明无效",
+    "Edit the Skill's allowed-tools declaration." to "请修改 Skill 的 allowed-tools 工具依赖声明。",
     "Modified" to "已修改",
     "Mochi Calendar" to "Mochi 日历",
     "Read and update Mochi calendar events." to "读取和更新 Mochi 日历事件。",

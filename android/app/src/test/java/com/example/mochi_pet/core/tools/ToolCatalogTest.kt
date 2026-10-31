@@ -597,11 +597,12 @@ class ToolCatalogTest {
     }
 
     @Test
-    fun `Tencent Skill readiness accepts either enabled search alias but requires search and browsing`() = runBlocking {
+    fun `explicit tool dependencies do not invent unavailable Tencent search aliases`() = runBlocking {
         val required = setOf("tencent_docs_manage_search_file", "tencent_docs_query_space_node", "tencent_docs_get_content")
         for (search in listOf("search_space_file", "manage.search_file")) {
             client.tools = listOf(search, "query_space_node", "get_content").map { McpRemoteTool(it) }
-            assertTrue(repository.configureTencentDocs("fixture-token").skillReadiness(required).isReady)
+            assertEquals(search == "manage.search_file",
+                repository.configureTencentDocs("fixture-token").skillReadiness(required).isReady)
             assertFalse(repository.setMcpToolEnabled(TENCENT_DOCS_SERVER_ID, search, false).skillReadiness(required).isReady)
             repository.setMcpToolEnabled(TENCENT_DOCS_SERVER_ID, search, true)
             assertFalse(repository.setMcpToolEnabled(TENCENT_DOCS_SERVER_ID, "query_space_node", false).skillReadiness(required).isReady)
