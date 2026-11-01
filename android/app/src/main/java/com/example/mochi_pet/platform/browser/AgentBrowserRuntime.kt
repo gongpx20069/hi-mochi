@@ -349,6 +349,7 @@ class AgentBrowserRuntime(
         modeLocked = true
         updateAction("Clicking page control")
         try {
+            requestInputFocus(current)
             val result = evaluate(
                 current,
                 """
@@ -506,6 +507,7 @@ class AgentBrowserRuntime(
                     "Unsupported input operation",
                 )
             }
+            requestInputFocus(current)
             val result = evaluate(current, script)
             if (!result.booleanValue("ok")) {
                 when (result["error"]?.jsonPrimitive?.contentOrNull) {
@@ -518,6 +520,13 @@ class AgentBrowserRuntime(
             return snapshot(current)
         } finally {
             updateAction(null)
+        }
+    }
+
+    private suspend fun requestInputFocus(current: WebView) = withContext(Dispatchers.Main.immediate) {
+        // DOM focus alone can change editable text without firing the site's focus handlers.
+        if (!current.requestFocus()) {
+            throw AgentBrowserException("The browser page could not receive input focus.")
         }
     }
 

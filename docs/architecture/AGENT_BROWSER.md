@@ -111,6 +111,11 @@ References are held in a document-local identity map, not cloned DOM attributes.
 Clicks recheck visibility, disabled/inert state and center-point occlusion.
 Typing uses native value setters and composed input/change events; custom
 contenteditable controls and selection by option label are supported.
+Before click or input actions, the runtime requests native WebView input focus
+on the main thread. DOM `focus()` alone can leave focus-driven editors inactive
+even when their text changes, hiding reply/publish controls. Failure to obtain
+native focus is an explicit Tool error; this does not launch an Activity, change
+the current Mochi surface, submit a form or clear site data.
 
 ## 3. Per-turn lifecycle
 

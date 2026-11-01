@@ -164,6 +164,10 @@ live-provider model choices or real-site authentication.
 DIV/SPAN statistics, action prioritization beyond 100 links, shadow controls,
 editable-value redaction, native input/select events, reference replacement and
 covered/hidden click rejection. No real video likes/favorites are mutated.
+Its nested-shadow comment fixture also requires typing and clicking a reply
+control to activate focus-driven editor UI: the publish button must become
+visible in both the DOM and the Tool snapshot without any publication. This
+exercises native WebView input focus even without a mounted browser card.
 `WakeKeywordDeviceTest` feeds 16 kHz mono PCM16 fixtures through the production
 native detector. For each selected language, it requires its wake phrase to be
 accepted and the other phrase plus two ordinary commands to be rejected.

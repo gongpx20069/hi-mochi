@@ -50,6 +50,48 @@ class AgentBrowserSemanticSnapshotTest {
     }
 
     @Test
+    fun typingActivatesShadowCommentEditorAndRevealsPublishControl() = fixture { runtime, page ->
+        installCommentEditor(page)
+        val editor = ref(runtime.read(), "Comment fixture")
+        val result = runtime.input("type", editor, "Synthetic comment, never submitted", null, null, true)
+        assertCommentPublishVisible(page, result)
+    }
+
+    @Test
+    fun clickingActivatesShadowReplyEditorWithoutPublishing() = fixture { runtime, page ->
+        installCommentEditor(page)
+        val result = runtime.click(ref(runtime.read(), "Reply fixture"))
+        assertCommentPublishVisible(page, result)
+    }
+
+    private suspend fun installCommentEditor(page: WebView) {
+        script(page, """
+            document.body.innerHTML = '<div id="comments"></div>';
+            const comments = document.getElementById('comments').attachShadow({mode:'open'});
+            comments.innerHTML = '<div id="box"></div>';
+            const box = comments.getElementById('box').attachShadow({mode:'open'});
+            box.innerHTML = '<button id="reply">Reply fixture</button><div contenteditable="true" aria-label="Comment fixture"></div><button id="publish" hidden>Publish fixture</button>';
+            const editor = box.querySelector('[contenteditable]');
+            const publish = box.getElementById('publish');
+            window.fixturePublishes = 0;
+            publish.addEventListener('click', () => { window.fixturePublishes++; });
+            box.getElementById('reply').addEventListener('click', () => { editor.focus(); });
+            editor.addEventListener('focus', () => { publish.hidden = false; });
+            editor.addEventListener('input', () => { publish.disabled = !editor.textContent.trim(); });
+        """.trimIndent())
+    }
+
+    private suspend fun assertCommentPublishVisible(page: WebView, result: JsonObject) {
+        assertEquals("The page itself must reveal the publish control", "false",
+            script(page, "document.getElementById('comments').shadowRoot.getElementById('box').shadowRoot.getElementById('publish').hidden"))
+        assertTrue("The revealed publish control must be available in the snapshot",
+            result.getValue("interactive_elements").jsonArray.any {
+                it.jsonObject["name"]?.jsonPrimitive?.content == "Publish fixture"
+            })
+        assertEquals("Editing must not publish", "0", script(page, "window.fixturePublishes"))
+    }
+
+    @Test
     fun exposesSafeControlsWithoutEditableValuesAndRejectsCoveredClicks() = fixture { runtime, page ->
         val initial = runtime.read()
         for (secret in listOf("fixture-password", "fixture-account", "fixture-editor", "fixture-hidden", "fixture-script")) {
