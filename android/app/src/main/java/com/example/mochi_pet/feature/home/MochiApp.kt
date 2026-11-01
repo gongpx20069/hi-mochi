@@ -856,8 +856,8 @@ private fun MochiAppContent(
                     if (browserState.active && !browserState.manual && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
                             state = browserState,
-                            webViewProvider = viewModel::browserWebView,
-                            onRelease = viewModel::releaseBrowserWebView,
+                            hostProvider = viewModel::browserViewHost,
+                            onRelease = viewModel::releaseBrowserViewHost,
                             onStop = viewModel::cancelConversation,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -936,8 +936,8 @@ private fun MochiAppContent(
                     if (homePresentation && browserState.active && !browserState.manual && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
                             state = browserState,
-                            webViewProvider = viewModel::browserWebView,
-                            onRelease = viewModel::releaseBrowserWebView,
+                            hostProvider = viewModel::browserViewHost,
+                            onRelease = viewModel::releaseBrowserViewHost,
                             onStop = viewModel::cancelConversation,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -1031,8 +1031,8 @@ private fun MochiAppContent(
 @Composable
 private fun BrowserSessionCard(
     state: AgentBrowserUiState,
-    webViewProvider: (android.content.Context) -> android.webkit.WebView?,
-    onRelease: (android.webkit.WebView) -> Unit,
+    hostProvider: (android.content.Context) -> android.widget.FrameLayout?,
+    onRelease: (android.widget.FrameLayout) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1052,7 +1052,7 @@ private fun BrowserSessionCard(
             androidx.compose.runtime.key(state.sessionId) {
                 AndroidView(
                     factory = { context ->
-                        checkNotNull(webViewProvider(context)) {
+                        checkNotNull(hostProvider(context)) {
                             "Active browser session has no WebView"
                         }
                     },

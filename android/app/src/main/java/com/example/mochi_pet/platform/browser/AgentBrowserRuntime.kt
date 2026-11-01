@@ -24,6 +24,7 @@ import android.webkit.WebViewClient
 import android.webkit.WebStorage
 import android.net.http.SslError
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.annotation.RequiresApi
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebStorageCompat
@@ -184,15 +185,21 @@ class AgentBrowserRuntime(
         }
     }
 
-    fun webViewForUi(context: Context): WebView? {
+    fun createUiHost(context: Context): FrameLayout? {
         val current = webView ?: return null
-        (current.context as? MutableContextWrapper)?.baseContext = context
         (current.parent as? ViewGroup)?.removeView(current)
-        return current
+        (current.context as? MutableContextWrapper)?.baseContext = context
+        return FrameLayout(context).apply {
+            addView(current, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+            ))
+        }
     }
 
-    fun releaseWebViewFromUi(view: WebView) {
-        (view.parent as? ViewGroup)?.removeView(view)
+    fun releaseUiHost(host: FrameLayout) {
+        // A later mount may already own the page when this host is released.
+        val view = host.getChildAt(0) as? WebView ?: return
+        host.removeView(view)
         (view.context as? MutableContextWrapper)?.baseContext = applicationContext
     }
 

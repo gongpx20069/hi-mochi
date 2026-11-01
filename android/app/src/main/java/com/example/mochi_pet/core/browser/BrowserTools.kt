@@ -218,7 +218,9 @@ class RequestUserAssistanceTool(private val runtime: AgentBrowserRuntime) : Agen
             buildJsonObject {
                 put("outcome", answer.outcome)
                 put("answer", answer.answer)
-                put("notice", "User input is not proof that login or a remote action succeeded. Re-read the page before continuing.")
+                put("notice", "User input is not proof that login or a remote action succeeded. Re-read the page before continuing. " +
+                    "A blank or unreadable page is not proof of login failure; verify the requested destination in the same session " +
+                    "without resubmitting login or clearing site data.")
             }
         }
     }

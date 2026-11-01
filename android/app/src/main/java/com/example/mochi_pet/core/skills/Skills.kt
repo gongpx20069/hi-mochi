@@ -903,11 +903,13 @@ private val BUILT_IN_SKILLS = listOf(
               to list, read, select or fill them. Never claim automatic credential
               use or request passwords, tokens, cookies or verification codes in chat.
             - For necessary login/verification, use available `request_user_assistance`
-              with a task-specific explanation in the user's language. Handoff
-              currently has no saved-account picker: the user signs in on the page.
-              Manual browsing's Sites list supports user-selected, same-origin
-              credential filling without submission. SMS accounts save only the
-              phone number; fresh codes may still be needed. Re-read after Continue.
+              with a task-specific explanation in the user's language. The user
+              signs in on the page; Handoff's Accounts and manual browsing support
+              user-selected, same-origin credential filling without submission.
+              SMS accounts save only the phone number; fresh codes may still be
+              needed. Re-read after Return to Mochi. A blank or unreadable page
+              is not proof of login failure: verify the requested destination in
+              the same session without resubmitting login or clearing site data.
               If assistance is unavailable, report it or use another public source.
 
             ## Search

@@ -4,7 +4,7 @@ import android.database.sqlite.SQLiteException
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.webkit.WebView
+import android.widget.FrameLayout
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -485,11 +485,11 @@ class MochiHomeViewModel(
         }
     }
 
-    fun browserWebView(context: Context): WebView? =
-        agentBrowserRuntime?.webViewForUi(context)
+    fun browserViewHost(context: Context): FrameLayout? =
+        agentBrowserRuntime?.createUiHost(context)
 
-    fun releaseBrowserWebView(view: android.webkit.WebView) {
-        agentBrowserRuntime?.releaseWebViewFromUi(view)
+    fun releaseBrowserViewHost(host: FrameLayout) {
+        agentBrowserRuntime?.releaseUiHost(host)
     }
 
     fun speakAssistance(id: String) {

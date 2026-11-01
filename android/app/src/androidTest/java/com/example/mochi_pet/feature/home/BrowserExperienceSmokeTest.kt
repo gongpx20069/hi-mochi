@@ -112,6 +112,9 @@ class BrowserExperienceSmokeTest {
             withTimeout(5_000) { while (script(view, "location.pathname") != "/") delay(50) }
             assertFalse("Website navigation must not return control", waiting.isCompleted)
             tapFixtureButton(view, "fixture-username")
+            withTimeout(5_000) {
+                while (script(view, "document.activeElement.id") != "fixture-username") delay(50)
+            }
             assertEquals("fixture-username", script(view, "document.activeElement.id"))
             compose.waitUntil(5_000) { compose.onAllNodesWithTag("handoff-details").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithTag("handoff-return").assertIsDisplayed()
@@ -165,12 +168,14 @@ class BrowserExperienceSmokeTest {
             compose.onNodeWithTag("handoff-return").performClick()
             assertEquals("completed", withTimeout(5_000) { waiting.await() }.outcome)
             assertFalse(runtime.state.value.userControl)
+            displayedWebView(expected = view)
             try {
                 runtime.assistanceBack("expired-fixture")
                 fail("A stale handoff must not navigate")
             } catch (_: IllegalStateException) { }
             val snapshot = runtime.read()
             assertNotNull(snapshot["snapshot_id"])
+            assertTrue(snapshot.getValue("markdown").jsonPrimitive.content.contains("Browser fixture"))
             assertFalse(snapshot.toString().contains("synthetic-browser-password"))
             assertFalse(snapshot.toString().contains("975310"))
             app.browserCredentialVault.delete(saved)
@@ -362,8 +367,14 @@ class BrowserExperienceSmokeTest {
         }
         var result: WebView? = null
         compose.waitUntil(5_000) {
-            compose.runOnUiThread { result = find(root) }
-            result != null && (expected == null || result === expected)
+            var visible = false
+            compose.runOnUiThread {
+                result = find(root)
+                visible = result?.let { view ->
+                    view.isAttachedToWindow && view.isShown && view.getGlobalVisibleRect(android.graphics.Rect())
+                } == true
+            }
+            visible && (expected == null || result === expected)
         }
         return requireNotNull(result) { "Live browser card must contain its WebView" }
     }

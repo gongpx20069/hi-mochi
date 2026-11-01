@@ -147,7 +147,7 @@ Browser assistance regressions:
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest --tests "*UserAssistanceTest" `
-  --tests "*BrowserSettingsTest" --tests "*BrowserModeTest" `
+  --tests "*BrowserSettingsTest" --tests "*BrowserModeTest" --tests "*BrowserViewOwnershipTest" `
   --tests "*BrowserCredentialsTest" --tests "*BrowserCredentialCaptureTest" `
   --tests "*BrowserCredentialsUiTest" `
   --tests "*AgentOrchestratorTest" --tests "*Skill*Test" --no-daemon
@@ -192,7 +192,11 @@ Handoff layout cases in `BrowserCredentialsUiTest` cover compact page allocation
 large text, explicit return, details/menu actions and question-sheet answers.
 The device handoff case checks website history without returning control, keyboard
 insets hiding/restoring the request strip, filling through the exact-origin picker,
-and rejection of stale handoff navigation; it never uses a real saved account.
+and rejection of stale handoff navigation; after Return to Mochi the same WebView
+must be attached and visible in Home, not merely readable while detached.
+`BrowserViewOwnershipTest` covers delayed/duplicate release of an old UI host
+after reparenting, current-host detachment and remounting without replacing the
+page. These cases never use a real saved account.
 A separate device case submits the
 non-sensitive query `mochi browser fixture` to public Bing and checks full-screen
 manual browsing, back/forward, the shared credentials popup and Home/resume
@@ -209,6 +213,12 @@ deletes only that fixture site's data. Actual website login/expiry, authenticati
 compatibility and mode quality still require manual user-owned website testing.
 The handoff may speak its synthetic explanation through the configured TTS.
 Never clear all phone website data as a test or record real login credentials.
+Only after explicit authorization, `platform.browser.BrowserSiteDataDiagnosticTest`
+can clear one real website with `mochiAuthorizeBrowserSiteDeletion=true` and
+`mochiClearBrowserSite=<exact-registrable-domain>`. It uses the production scoped
+deletion path, verifies absent site data and unchanged saved-account metadata,
+and never prints Cookie/credential values. It rejects subdomains, URLs and public
+suffixes rather than silently broadening the target; normal runs skip it.
 
 On MIUI, a runner can report a test as started while
 `Instrumentation.startActivitySync` is still waiting: system logs may show

@@ -59,6 +59,9 @@ receive it. The Agent generates the explanation and optional choices in the
 user's language. The call suspends on an ID-correlated deferred answer, without
 model polling, for at most ten minutes. Results are `completed`, `cancelled`, or
 `timed_out`; completion is not proof of successful login. Re-read to verify.
+A blank or unreadable post-handoff page is not proof of login failure either:
+verify the requested destination in the same session without resubmitting login
+or clearing site data. Report missing evidence rather than an unverified logout.
 Cancellation abandons the pending request and rejects late/duplicate answers.
 
 ### 2.1 Public search

@@ -96,6 +96,10 @@ Agent Browser does not add a navigation surface: Home may render a temporary
 Browser Card, while every other current surface remains unchanged.
 Researcher and Analyst reuse that top-level Browser session; the runtime actor
 label changes the Home card title without creating a second WebView.
+Home, handoff and manual-browser mounts each own a separate native host
+container, not the shared WebView itself. Releasing an old host may detach only
+its own child; it must not detach the page or reset its context after a newer
+host has taken ownership. Handoff preserves the page, history and site session.
 
 ## 4. Dependency rules
 

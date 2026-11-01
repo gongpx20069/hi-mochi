@@ -588,7 +588,8 @@ class MochiDatabaseTest {
                 .removePrefix("allowed-tools: ").split(" ").toSet()
             assertEquals(expected, declared)
             assertTrue(document.contains("no model-facing tool"))
-            assertTrue(document.contains("currently has no saved-account picker"))
+            assertTrue(document.contains("Handoff's Accounts"))
+            assertTrue(document.contains("is not proof of login failure"))
             assertTrue(document.contains("Cache improves loading, not information freshness"))
         }
         val missing = reads - "browser_read"

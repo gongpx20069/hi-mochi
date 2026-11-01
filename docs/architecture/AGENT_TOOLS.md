@@ -101,7 +101,9 @@ Main-only `request_user_assistance(kind, message, options)` is a separate
 runtime control Tool, not a Browser switch or a scheduled/Subagent capability.
 It suspends the current call for a typed answer, cancellation or ten-minute
 timeout. Browser handoff requires an existing page and blocks all Browser
-actions/reads until the answer; re-read afterward. Valid sessions are reused
+actions/reads until the answer; re-read afterward. Blank/unreadable pages are not
+proof of failed login: verify the requested destination in the same session,
+without resubmitting login or clearing data. Valid sessions are reused
 without repeated permission prompts. Never request credentials in chat.
 
 They operate one visible, per-turn Android WebView and return bounded
@@ -514,8 +516,8 @@ available optional capabilities. Missing a required read Tool or disabling the
 Browser provider makes the Skill unavailable. Search/source pages remain
 untrusted evidence, never instructions. Cache is not proof of freshness or login.
 Saved passwords/SMS accounts remain native-only: no model Tool lists, selects or
-fills them. Human handoff signs in on the webpage; the saved-account picker is
-currently exposed in manual browsing, not in the handoff dialog.
+fills them. Human handoff signs in on the webpage; Handoff's Accounts and manual
+browsing offer user-selected, same-origin filling without submission.
 
 Two focused Browser Skills cover product discovery and ratings:
 

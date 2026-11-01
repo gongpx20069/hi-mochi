@@ -109,8 +109,8 @@ private fun BrowserHandoff(viewModel: MochiHomeViewModel, pending: UserAssistanc
         ) {
             key(state.sessionId) {
                 AndroidView(
-                    factory = { context -> checkNotNull(viewModel.browserWebView(context)) },
-                    onRelease = viewModel::releaseBrowserWebView,
+                    factory = { context -> checkNotNull(viewModel.browserViewHost(context)) },
+                    onRelease = viewModel::releaseBrowserViewHost,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -282,8 +282,8 @@ private fun ManualBrowser(viewModel: MochiHomeViewModel) {
                 if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                 key(state.sessionId) {
                     AndroidView(
-                        factory = { context -> checkNotNull(viewModel.browserWebView(context)) },
-                        onRelease = viewModel::releaseBrowserWebView,
+                        factory = { context -> checkNotNull(viewModel.browserViewHost(context)) },
+                        onRelease = viewModel::releaseBrowserViewHost,
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                 }
