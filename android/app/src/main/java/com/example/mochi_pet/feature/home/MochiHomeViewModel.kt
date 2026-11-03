@@ -2048,6 +2048,12 @@ class MochiHomeViewModel(
         }
     }
 
+    fun setMediaEnabled(enabled: Boolean) {
+        updateTools {
+            requireRepository().setMediaEnabled(enabled)
+        }
+    }
+
     fun installMijiaExtension() {
         mutableToolsState.update {
             it.copy(

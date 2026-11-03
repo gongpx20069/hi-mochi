@@ -96,6 +96,22 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
+Media Control regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*MediaToolsTest" `
+  --tests "*AndroidMediaPlatformTest" --tests "*MediaToolsUiTest" `
+  --tests "*ToolCatalogTest" --no-daemon
+```
+
+These use fake media state, Robolectric native controllers/audio settings and
+Compose to cover permissions, exact player targeting, self-session exclusion,
+supported actions, single-dispatch/uncertain outcomes, cancellation, local-only
+volume, persistent switches and Browser > Media Control > Amap ordering. They
+do not grant notification access on a phone, change real device volume or
+certify a particular QQ Music/NetEase/OEM player version. Real-player acceptance
+requires explicit user authorization and readback on the installed version.
+
 Skill readiness/content regressions:
 
 ```powershell

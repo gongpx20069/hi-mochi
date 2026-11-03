@@ -36,6 +36,7 @@ The native `ToolRegistry` currently supports:
 - `run_sandboxed_javascript`;
 - `delegate_agent` in the Main Agent's request-scoped registry;
 - the five grouped Agent Browser Tools;
+- the three grouped Media Control Tools for Main Agent conversations and schedules;
 - configured Amap map and merchant Tools;
 - enabled MCP tools discovered through the Tool catalog;
 - enabled custom REST tools in foreground Main Agent conversations only.
@@ -242,6 +243,47 @@ deletion is separate from deleting content, records or worksheets. Writes use
 targeted readback where possible and never replay solely to check their outcome.
 The Skill cannot grant unavailable APIs or claim full global search when the
 connection cannot discover/access all requested scopes.
+
+### Media Control
+
+Media Control is a separately grouped set of bundled Tools, not part of
+**Mochi Built-ins**. Its master switch and three child switches default to on.
+Foreground and Scheduled Main Agents receive enabled Tools; Subagents do not.
+Every invocation checks both switches again, including before dispatch and
+during bounded outcome observation. Disabling does not undo a sent command.
+No extra Skill, extension APK, service account, or API key is required.
+
+| Tool | Arguments and result |
+| --- | --- |
+| `media_read` | No arguments. Returns notification-access status, up to 32 active external sessions, a truncation flag, local media volume and its percentage. |
+| `media_control` | Requires a discovered `session_id` and `action`: `play`, `pause`, `next`, `previous`, or `seek`. Only `seek` requires `position_ms` (0 through 2,147,483,647, not beyond a known track duration). |
+| `media_volume` | `action`: `increase`/`decrease` (one hardware step), `set` (requires integer `percent` 0-100), or `mute` (zero). Other argument combinations are rejected. |
+
+Android's notification-listener authorization gates cross-app session discovery
+and control. The listener is an authorization bridge only; it never inspects,
+stores, or forwards notification contents. Only bounded media metadata enters
+Tool output and may reach the selected model/history. Without authorization,
+read explicitly reports the missing permission and still returns local volume.
+Control returns `PERMISSION_DENIED`. Revocation is checked live. Mochi's own
+wake/voice session is excluded, and commands target a specific MediaController,
+never global media-key broadcasts or arbitrary Intents.
+
+Session IDs are ephemeral native references, not package-name guesses. The
+Agent must discover the target and ask when user intent is ambiguous. Missing
+sessions, unsupported actions, or fixed volume fail visibly. The app does not
+launch players, search songs, access accounts/playlists, simulate screen taps,
+or promise compatibility with every version of QQ Music, NetEase Cloud Music,
+or OEM players. Only each active session's advertised actions are available.
+
+Mutations are serialized and dispatched once. Playback commands observe state
+for at most about 3.2 seconds; skip verification requires a changed, previously
+known media ID, queue item, or track title. An unconfirmed result is `TIMEOUT`,
+not success, and must not automatically be replayed. Cancellation stops waiting,
+not the already sent operation. Volume changes target only `STREAM_MUSIC`, with
+rounded/clamped device steps and readback. Restrictions or safe-volume limits
+are not bypassed. The applied index/percentage is returned, not the requested
+percentage. This is shared local music/video/Mochi speech volume, not per-app,
+ringtone, notification, alarm, or remote/cast volume; muting may silence Mochi.
 
 ## 1.1 AgentLink companion provider
 

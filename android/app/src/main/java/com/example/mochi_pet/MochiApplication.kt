@@ -190,6 +190,12 @@ class MochiApplication : Application() {
         AmapMapsClient()
     }
 
+    val mediaToolRuntime by lazy {
+        com.example.mochi_pet.core.media.MediaToolRuntime(
+            com.example.mochi_pet.platform.media.AndroidMediaPlatform(this),
+        )
+    }
+
     val extensionClient: MochiExtensionClient by lazy {
         AndroidMochiExtensionClient(this)
     }

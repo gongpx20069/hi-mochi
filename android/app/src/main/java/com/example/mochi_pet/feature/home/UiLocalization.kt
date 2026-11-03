@@ -929,6 +929,25 @@ private val ZH_UI_TEXT = mapOf(
     "Choose what Mochi may call" to "选择 Mochi 可以调用的工具",
     "Built-in" to "内置",
     "Mochi Built-ins" to "Mochi 内建能力",
+    "Media Control" to "媒体控制",
+    "Read Media" to "读取媒体",
+    "Control Playback" to "控制播放",
+    "Media Volume" to "媒体音量",
+    "Read active players, tracks and local media volume." to "读取当前播放器、歌曲及本机媒体音量。",
+    "Play, pause, skip or seek in an authorized media player." to "控制已授权播放器的播放、暂停、切歌或进度。",
+    "Adjust the phone's shared media volume, including Mochi speech." to "调整手机共用的媒体音量，包括 Mochi 朗读音量。",
+    "Player access granted" to "已授予播放器访问权限",
+    "Notification access required for players" to "播放器控制需要通知使用权",
+    "Controls active players, not song search. Enabled tools may run in conversations and Scheduled Agents, not Subagents." to
+        "控制当前播放器，不支持点歌。启用的工具可用于对话和定时任务，不提供给子 Agent。",
+    "Notification access is a broad Android permission. Mochi uses media sessions only, not message notifications. Track metadata may be sent to your model Provider." to
+        "通知使用权是范围较广的 Android 授权。Mochi 仅使用媒体会话，不读取消息通知。歌曲信息可能发送给你配置的模型提供商。",
+    "Volume affects this phone's music, video and Mochi speech, not ringtone, alarms or cast devices. It works without notification access." to
+        "音量影响本机音乐、视频及 Mochi 朗读，不调整铃声、闹钟或投屏设备。无需通知使用权即可调节。",
+    "Grant notification access" to "授予通知使用权",
+    "Manage notification access" to "管理通知使用权",
+    "Cannot open notification access settings. Open them from Android Settings." to
+        "无法打开通知使用权设置，请从 Android 系统设置中进入。",
     "Calendar, todos, schedules, weather, navigation, and sandbox" to
         "日历、待办、Agent 定时任务、当前天气、Mochi 导航和 JS 沙箱",
     "Web Service Key required" to "需要 Web 服务 Key",

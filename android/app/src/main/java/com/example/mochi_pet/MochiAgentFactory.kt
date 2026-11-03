@@ -72,6 +72,7 @@ suspend fun MochiApplication.createAgentRunner(
             agentScheduleController,
         ),
     )
+    builtInTools += mediaToolRuntime.tools(extensionScope, toolCatalogRepository::isBuiltInEnabled)
     if (includeBrowserInteractions) {
         builtInTools += NavigateMochiUiTool(
             navigationPolicy,

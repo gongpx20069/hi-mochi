@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mochi</string>
+    <string name="media_control_access">Mochi 媒体控制</string>
     <string name="assistance_notification_channel">Mochi 用户协助</string>
     <string name="assistance_notification_title">Mochi 需要你的协助</string>
     <string name="assistance_notification_text">打开 Mochi 回答问题或处理网站登录</string>

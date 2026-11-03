@@ -195,6 +195,25 @@ and credentials are not part of Provider sharing, Scheduled Agents, or Subagent
 registries. Returned selected data may be sent to the model and stored in
 conversation history; authentication material is excluded.
 
+### 3.5.2 Media Control tools
+
+The bundled `media_read`, `media_control`, and `media_volume` Tools form a
+separate **Media Control** group between Agent Browser and Amap Maps, not inside
+Mochi Built-ins. The group and individual switches default to enabled. They
+support Main Agent conversations and Scheduled Agents, but not Subagents.
+Android notification access remains an explicit prerequisite for discovering
+and controlling other apps' active players. No message-notification content is
+read or uploaded. Media metadata may be sent to the configured model.
+
+The first version reads player/track state and supports advertised play, pause,
+skip and seek operations, plus local shared media-volume adjustment. It does
+not implement song search, personal playlists, account actions, UI automation,
+or remote/cast-device volume. Authorization and actual player capabilities
+determine availability, not merely installation. Commands report observed
+outcomes; unconfirmed actions must not be presented as completed or retried
+automatically. Local media volume also affects Mochi speech, but never changes
+ringtone, notification or alarm streams.
+
 ### 3.6 Agent Browser
 
 - The Agent may use one lightweight Android System WebView through

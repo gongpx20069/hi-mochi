@@ -222,6 +222,14 @@ Playback and speech audio focus use media usage with speech content, following
 the normal media-volume control rather than an OEM's separately muted assistant
 stream. Do not modify system volumes to make synthesis audible.
 
+The separate Media Control Tools may change local media volume only for the
+user's requested operation or authorized schedule; synthesis itself never
+changes volume. Media control excludes Mochi's wake/voice MediaSession and
+targets the selected external MediaController directly, avoiding global media
+keys that would trigger Mochi input. Existing STT/TTS audio-focus policy remains
+in force; playback may duck or pause according to the other player's behavior.
+An explicit media mute also silences Mochi reply audio on the shared stream.
+
 Interruption, focus loss, or runtime closure cancels the network operation and
 releases playback resources. Late completion/error events are checked against
 the active utterance on the main thread. Failed chunks are not retried, earlier

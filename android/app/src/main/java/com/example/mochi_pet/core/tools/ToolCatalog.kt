@@ -103,6 +103,12 @@ data class ToolCatalogSummary(
     val isLoading: Boolean = false,
     val feedback: String? = null,
     val webdav: ExtensionProviderSummary = ExtensionProviderSummary(),
+    val media: MediaProviderSummary = MediaProviderSummary(),
+)
+
+data class MediaProviderSummary(
+    val enabled: Boolean = true,
+    val tools: List<BuiltInToolSummary> = emptyList(),
 )
 
 data class AmapProviderSummary(
@@ -171,6 +177,9 @@ fun ToolCatalogSummary.readyToolNames(): Set<String> =
         if (agentBrowser.enabled) {
             agentBrowser.tools.filterToReadyNames(this)
         }
+        if (media.enabled) {
+            media.tools.filterToReadyNames(this)
+        }
         if (amap.connected && amap.enabled) {
             amap.tools.filterToReadyNames(this)
         }
@@ -220,6 +229,7 @@ private fun ToolCatalogSummary.skillRequirementName(
 ): String =
     when {
         toolName.startsWith("browser_") -> "Agent Browser"
+        toolName in com.example.mochi_pet.core.media.MEDIA_TOOL_NAMES -> "Media Control"
         toolName.startsWith("amap_") -> "Amap Maps"
         toolName.startsWith("mijia_") -> "Mi Home extension"
         toolName.startsWith("termux_") -> "Termux extension"
@@ -355,6 +365,9 @@ interface ToolCatalogRepository {
     suspend fun setAmapEnabled(enabled: Boolean): ToolCatalogSummary
 
     suspend fun setAgentBrowserEnabled(enabled: Boolean): ToolCatalogSummary
+
+    suspend fun setMediaEnabled(enabled: Boolean): ToolCatalogSummary =
+        throw UnsupportedOperationException("Media Control is unavailable")
 
     suspend fun setMijiaEnabled(enabled: Boolean): ToolCatalogSummary
 
@@ -1327,6 +1340,11 @@ class DataStoreToolCatalogRepository(
         return loadSummary()
     }
 
+    override suspend fun setMediaEnabled(enabled: Boolean): ToolCatalogSummary {
+        updateCatalog { it.copy(mediaEnabled = enabled) }
+        return loadSummary()
+    }
+
     override suspend fun setMijiaEnabled(enabled: Boolean): ToolCatalogSummary {
         if (enabled) {
             require(extensionClient.snapshot().connected) {
@@ -1489,6 +1507,9 @@ class DataStoreToolCatalogRepository(
             ?: return false
         val catalog = loadCatalog()
         if (descriptor.isAgentBrowserTool() && !catalog.agentBrowserEnabled) {
+            return false
+        }
+        if (descriptor.isMediaTool() && !catalog.mediaEnabled) {
             return false
         }
         return catalog.builtInEnabled[name] ?: descriptor.defaultEnabled
@@ -1846,7 +1867,7 @@ class DataStoreToolCatalogRepository(
             restConnections = restConnections.map { RestConnectionSummary(it.connection, it.secret != null) },
             builtInTools = BUILT_IN_TOOLS
                 .filterNot {
-                    it.isAmapTool() || it.isAgentBrowserTool()
+                    it.isAmapTool() || it.isAgentBrowserTool() || it.isMediaTool()
                 }
                 .map { descriptor ->
                     toBuiltInToolSummary(descriptor)
@@ -1867,6 +1888,11 @@ class DataStoreToolCatalogRepository(
                     .map { descriptor ->
                         toBuiltInToolSummary(descriptor)
                     },
+            ),
+            media = MediaProviderSummary(
+                enabled = mediaEnabled,
+                tools = BUILT_IN_TOOLS.filter(BuiltInToolDescriptor::isMediaTool)
+                    .map { toBuiltInToolSummary(it) },
             ),
             mijia = ExtensionProviderSummary(
                 installed = extension.installed,
@@ -2284,6 +2310,7 @@ private data class PersistedToolCatalog(
     val amapCredentials: StoredSecret? = null,
     val amapEnabled: Boolean = false,
     val agentBrowserEnabled: Boolean = true,
+    val mediaEnabled: Boolean = true,
     val mijiaEnabled: Boolean = false,
     val mijiaToolsEnabled: Map<String, Boolean> = emptyMap(),
     val termuxEnabled: Boolean = false,
@@ -2515,6 +2542,24 @@ val BUILT_IN_TOOLS = listOf(
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
+        name = "media_read",
+        displayName = "Read Media",
+        description = "Read active players, tracks and local media volume.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "media_control",
+        displayName = "Control Playback",
+        description = "Play, pause, skip or seek in an authorized media player.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "media_volume",
+        displayName = "Media Volume",
+        description = "Adjust the phone's shared media volume, including Mochi speech.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
         name = "amap_get_poi",
         displayName = "Amap Place Details",
         description = "Read merchant details, ratings, cost, hours, and photos.",
@@ -2551,6 +2596,9 @@ private fun BuiltInToolDescriptor.isAmapTool(): Boolean =
 
 private fun BuiltInToolDescriptor.isAgentBrowserTool(): Boolean =
     name.startsWith("browser_")
+
+private fun BuiltInToolDescriptor.isMediaTool(): Boolean =
+    name in com.example.mochi_pet.core.media.MEDIA_TOOL_NAMES
 
 private val DEFAULT_NOTION_TOOLS = setOf(
     "notion-search",

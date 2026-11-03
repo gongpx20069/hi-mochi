@@ -793,6 +793,7 @@ private fun MochiAppContent(
             onDisconnectAmap = viewModel::disconnectAmap,
             onSetAmapEnabled = viewModel::setAmapEnabled,
             onSetAgentBrowserEnabled = viewModel::setAgentBrowserEnabled,
+            onSetMediaEnabled = viewModel::setMediaEnabled,
             onManageBrowser = { showBrowserManager = true },
             onAgentLinkAction = viewModel::onAgentLinkAction,
             onInstallMijia = viewModel::installMijiaExtension,
@@ -1474,6 +1475,7 @@ private fun SurfaceContent(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onSetMediaEnabled: (Boolean) -> Unit,
     onManageBrowser: () -> Unit,
     onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
@@ -1588,6 +1590,7 @@ private fun SurfaceContent(
                 onDisconnectAmap = onDisconnectAmap,
                 onSetAmapEnabled = onSetAmapEnabled,
                 onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
+                onSetMediaEnabled = onSetMediaEnabled,
                 onManageBrowser = onManageBrowser,
                 onAgentLinkAction = onAgentLinkAction,
                 onInstallMijia = onInstallMijia,
@@ -3702,7 +3705,7 @@ internal fun BuiltInToolRow(
 }
 
 @Composable
-private fun ToolsSurface(
+internal fun ToolsSurface(
     state: ToolsUiState,
     onSetBuiltInEnabled: (String, Boolean) -> Unit,
     onConnectNotion: () -> Unit,
@@ -3716,6 +3719,7 @@ private fun ToolsSurface(
     onDisconnectAmap: () -> Unit,
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
+    onSetMediaEnabled: (Boolean) -> Unit,
     onManageBrowser: () -> Unit,
     onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
@@ -3907,6 +3911,14 @@ private fun ToolsSurface(
                         }
                     }
                 }
+            }
+            item {
+                MediaProviderCard(
+                    summary = state.catalog.media,
+                    disabled = state.isLoading,
+                    onSetEnabled = onSetMediaEnabled,
+                    onSetToolEnabled = onSetBuiltInEnabled,
+                )
             }
             item {
                     PlannerCard {

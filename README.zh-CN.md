@@ -263,6 +263,7 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
 | **智能体浏览器（Agent Browser）** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 浏览公网 HTTPS 网站，复用本地登录状态，由 Agent 选择手机或桌面模式。 |
+| **媒体控制** | `media_read` · `media_control` · `media_volume` | 读取当前播放器与歌曲，执行支持的播放、暂停、切歌、进度控制，并调整本机共用媒体音量。播放器控制需要 Android 通知使用权；不支持点歌，无需额外 APK。 |
 | **原生体验** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | 打开可信 Mochi 界面，或在本地运行有界的纯 JavaScript 计算。 |
 | **高德地图** | 地点搜索 · 商家详情 · 路线<br>地理编码 · 逆地理编码 · 天气 | 使用可信 GCJ-02 坐标搜索地点和商家、比较可用评分与人均并规划路线，需要 Web 服务 Key。 |
 | **已连接 MCP** | **Notion** · **腾讯文档** · **飞书**<br>手动配置的 MCP Server | 检索私人知识、开展调研，并在已授权工作区中协作创建或更新文档。 |
@@ -270,6 +271,13 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 Tools 页面会将智能体浏览器、Mochi 内建能力和 Provider Tools 分组并默认
 收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
 Provider Tools 有独立开关，还要求对应 Provider 开关已启用。
+
+**媒体控制**位于智能体浏览器和高德地图之间，不归入 Mochi 内建能力。
+分组及三个工具默认开启，可用于主 Agent 对话和定时任务，不提供给子 Agent。
+从分组卡片授予通知使用权后才能控制当前播放器；Mochi 不读取消息通知，
+但歌曲信息可能发送给你配置的模型提供商。本机音量调节不需要该授权，也会
+影响 Mochi 朗读，不调整铃声、闹钟或投屏设备。具体兼容性取决于已安装
+播放器开放的媒体会话操作。
 
 **Tools > 智能体浏览器 > 网站与登录管理**会打开 Bing 搜索/地址框和按网站归组的列表。
 已知网站中检测到本地数据或保存账号的，会自动出现在列表。点击网站弹出第二层列表，

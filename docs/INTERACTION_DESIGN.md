@@ -264,6 +264,18 @@ subsequent microphone test or voice preview to establish real operation.
 Checks stop on Back/Close, retain explicitly incomplete results after cancellation,
 and reject late callbacks from superseded checks.
 
+The Tools surface places **Media Control** immediately after **Agent Browser**
+and before **Amap Maps**, outside **Mochi Built-ins**. Its enabled master switch
+and three independent child switches retain their settings; children are
+collapsed initially. The card explains active-player-only control, Main/schedule
+availability, and shared local media-volume scope. A notification-access button
+opens Android settings only after a tap, and authorization status refreshes on
+resume. The disclosure distinguishes this broad special access from ordinary
+notification delivery permission: no message-notification content is read,
+while track metadata can reach the model. Volume remains usable without that
+grant. Disabling the group neither revokes the OS permission nor clears child
+choices; **Manage notification access** remains available.
+
 The Tools surface has a stable **AgentLink** provider card even before connection.
 It reuses the same rounded surface, spacing, localized typography, and Tool rows
 as other providers. The three Tools start collapsed behind **Show tools (3)**;

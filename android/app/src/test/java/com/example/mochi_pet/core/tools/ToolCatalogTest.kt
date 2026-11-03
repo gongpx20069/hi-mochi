@@ -66,6 +66,28 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class ToolCatalogTest {
     @Test
+    fun `media is a separate default enabled provider with persistent master and child switches`() = runBlocking {
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        val names = com.example.mochi_pet.core.media.MEDIA_TOOL_NAMES
+        val initial = catalog.loadSummary()
+        assertTrue(initial.media.enabled)
+        assertEquals(names, initial.media.tools.map { it.name }.toSet())
+        assertTrue(initial.media.tools.all { it.enabled })
+        assertTrue(initial.builtInTools.none { it.name in names })
+        assertTrue(initial.readyToolNames().containsAll(names))
+        catalog.setBuiltInEnabled("media_control", false)
+        val disabled = catalog.setMediaEnabled(false)
+        assertTrue(disabled.readyToolNames().none { it in names })
+        names.forEach { assertFalse(catalog.isBuiltInEnabled(it)) }
+        val restored = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        assertFalse(restored.loadSummary().media.enabled)
+        restored.setMediaEnabled(true)
+        assertFalse(restored.isBuiltInEnabled("media_control"))
+        assertTrue(restored.isBuiltInEnabled("media_volume"))
+        assertTrue(restored.isBuiltInEnabled("media_read"))
+    }
+
+    @Test
     fun `WebDAV Skill readiness requires trusted enabled extension and both read tools`() = runBlocking {
         val extension = RecordingExtensionClient(TrustedExtension.WEBDAV)
         val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client, webdavClient = extension)

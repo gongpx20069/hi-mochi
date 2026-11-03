@@ -296,6 +296,7 @@ Skills requiring separately installed apps are listed under
 | **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
 | **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Browse public HTTPS websites with reusable local login and Agent-selected mobile/desktop mode. |
+| **Media Control** | `media_read` · `media_control` · `media_volume` | Read active players/tracks; play, pause, skip or seek when supported; adjust local shared media volume. Player access requires Android notification access. No song search or extra APK. |
 | **Native UX** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | Open trusted Mochi surfaces or run bounded pure JavaScript calculations locally. |
 | **Amap Maps** | Place search · Merchant details · Routes<br>Geocoding · Reverse geocoding · Weather | Search places and merchants, compare available ratings and average cost, and plan routes with trusted GCJ-02 coordinates. Requires a Web Service Key. |
 | **Connected MCP** | **Notion** · **Tencent Docs** · **Feishu**<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
@@ -305,6 +306,14 @@ collapsed by default in Tools. Scheduled runs receive only the read-only
 Browser subset; foreground conversations may also click and enter page data.
 Provider Tools have independent switches, and provider-backed Tools also require
 their provider switch to be enabled.
+
+**Media Control** appears between Agent Browser and Amap Maps, outside Mochi
+built-ins. Its group and three Tools default to enabled for conversations and
+Scheduled Agents, not Subagents. Grant notification access from its card to
+control active players; Mochi does not read message notifications. Track metadata
+may reach your model Provider. Local volume works without that grant and also
+affects Mochi speech, not ringtone, alarms or cast devices. Player compatibility
+depends on the installed app's supported media-session actions.
 
 **Tools > Agent Browser > Websites and logins** opens a Bing search/address field
 and website list. Known websites with detected local data or saved accounts appear

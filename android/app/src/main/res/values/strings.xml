@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mochi</string>
+    <string name="media_control_access">Mochi media control</string>
     <string name="assistance_notification_channel">Mochi user assistance</string>
     <string name="assistance_notification_title">Mochi needs your help</string>
     <string name="assistance_notification_text">Open Mochi to answer or manage the website login</string>
