@@ -202,6 +202,15 @@ Only installed offline
 voices are used for Android output; missing selected voices fail visibly. Local
 Android voice IDs are stored separately and excluded from cross-device shares.
 
+Before truncation or synthesis chunking, the shared speech path replaces inline
+Markdown links (`[label](destination)`) with their labels, omitting destinations
+and optional link titles for Android, iFlytek, and Azure alike. This affects
+speech only: displayed/persisted replies and model context retain the original
+text. Bare URLs, reference-style links, images, and backtick-delimited code are
+unchanged.
+Balanced parentheses and escaped brackets in inline links are supported;
+malformed links remain unchanged. No extra model call or setting is required.
+
 Reply text is split at sentence boundaries where possible, with at most 300
 Unicode code points per request (strictly below iFlytek's 8000-byte limit).
 Each request has a 30-second synthesis deadline and a 4 MiB PCM bound. Chunks

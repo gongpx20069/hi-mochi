@@ -2,6 +2,9 @@ package com.example.mochi_pet.platform.voice
 
 import android.os.Looper
 import android.media.AudioAttributes
+import android.speech.tts.TextToSpeech
+import android.speech.tts.Voice
+import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.SpeechRuntimeConfig
 import com.example.mochi_pet.core.settings.SpeechSettingsInput
 import com.example.mochi_pet.core.settings.SpeechSettingsRepository
@@ -20,6 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowTextToSpeech
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -33,6 +37,35 @@ class CloudSpeechRuntimeTest {
 
     private var runtime: AndroidVoiceRuntime? = null
     private var settingsReads = 0
+
+    @Test
+    fun `reply speaks link labels before splitting cloud synthesis requests`() {
+        val spoken = mutableListOf<String>()
+        val results = mutableListOf<SpeechPlaybackResult>()
+        val voice = runtime(synthesizer = SpeechSynthesizer { _, text, _ ->
+            spoken += text
+            byteArrayOf(0, 0)
+        })
+        val destination = "https://example.com/" + "path".repeat(100)
+        voice.speak("See [the guide]($destination) and https://example.org.") { results += it }
+        idle()
+        assertEquals(listOf("See the guide and https://example.org."), spoken)
+        assertEquals(listOf(SpeechPlaybackResult.COMPLETED), results)
+    }
+
+    @Test
+    fun `system speech receives link labels without changing bare URLs`() {
+        val locale = AppLanguage.resolveContentLocale()
+        ShadowTextToSpeech.addLanguageAvailability(locale)
+        ShadowTextToSpeech.addVoice(Voice("offline", locale, 300, 300, false, emptySet()))
+        val voice = runtime(synthesisEnabled = false)
+        val tts = shadowOf(ShadowTextToSpeech.getLastTextToSpeechInstance())
+        tts.onInitListener.onInit(TextToSpeech.SUCCESS)
+        idle()
+        voice.speak("See [the guide](https://example.com) or https://example.org.")
+        idle()
+        assertEquals("See the guide or https://example.org.", tts.lastSpokenText)
+    }
 
     @Test fun `preview uses the selected inactive account without switching normal speech`() {
         val configs = mutableListOf<SpeechRuntimeConfig.IFlytek>()

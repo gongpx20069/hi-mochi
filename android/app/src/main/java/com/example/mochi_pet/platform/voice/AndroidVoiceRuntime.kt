@@ -235,7 +235,7 @@ class AndroidVoiceRuntime internal constructor(
         previewProfileId: String?,
         onCompleted: (SpeechPlaybackResult) -> Unit,
     ) {
-        val bounded = text.trim().take(MAX_TRANSCRIPT_CHARS)
+        val bounded = speechText(text).trim().take(MAX_TRANSCRIPT_CHARS)
         mainHandler.post {
             if (purpose == SpeechPurpose.WAKE_BRIEFING && briefing?.interrupted != false) return@post
             textToSpeech?.stop()
