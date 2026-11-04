@@ -59,7 +59,7 @@ run in local JVM tests.
 | `AgentTaskRuntime` | Bounded process-local run observations and exact foreground coroutine ownership |
 | `TaskCenterViewModel` | Read-only source aggregation, explicit source-specific actions and cancellable configuration reports |
 | `AgentBrowserRuntime` | per-turn WebView, mode, snapshots, handoff and serialized cleanup/deletion |
-| `MediaToolRuntime` / `AndroidMediaPlatform` | typed media actions, live Tool gates, serialized outcome checks, ephemeral external-session IDs and local media volume |
+| `MediaToolRuntime` / `AndroidMediaPlatform` | typed media actions, live Tool gates, serialized outcome checks, ephemeral player/session IDs, native discovery and search dispatch, weak resumed-Activity launch ownership and local media volume |
 | `UserAssistanceCoordinator` | process-local ID-correlated, cancellable pending question/browser handoff |
 | `BrowserSettings` | visited host/time and last Agent-selected mode in Tool DataStore; no credentials or manual mode overrides |
 | `BrowserWebsite` | transient native UI grouping by registrable domain; exact-origin credentials and a data-presence flag, never Cookie values |

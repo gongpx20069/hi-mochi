@@ -31,7 +31,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], application = Application::class)
+@Config(sdk = [35], application = Application::class, qualifiers = "w320dp-h640dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MediaToolsUiTest {
     @get:Rule val compose = createComposeRule()
@@ -78,8 +78,17 @@ class MediaToolsUiTest {
         }
         compose.onNodeWithText("Notification access required for players").assertIsDisplayed()
         compose.onNodeWithText("Grant notification access").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Show tools (3)").performScrollTo().performClick()
+        compose.onNodeWithText("Open music apps, request songs, control playback and adjust media volume.").assertIsDisplayed()
+        val disclosure = "Notification access is a broad Android permission. Mochi uses media sessions only, not message notifications. Track metadata may be sent to your model Provider."
+        compose.onNodeWithText(disclosure).assertDoesNotExist()
+        compose.onNodeWithText("Grant notification access").performClick()
+        compose.onNodeWithText(disclosure).assertIsDisplayed()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText(disclosure).assertDoesNotExist()
+        compose.onNodeWithText("Show tools (5)").performScrollTo().performClick()
         compose.onNodeWithText("media_read").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("media_open").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("media_play_from_search").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("media_control").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("media_volume").performScrollTo().assertIsDisplayed()
         compose.onAllNodes(isToggleable())[1].assertIsNotEnabled()

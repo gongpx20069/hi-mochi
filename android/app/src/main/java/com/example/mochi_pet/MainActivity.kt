@@ -107,6 +107,16 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
+    override fun onResume() {
+        super.onResume()
+        (application as MochiApplication).mediaPlatform.onActivityResumed(this)
+    }
+
+    override fun onPause() {
+        (application as MochiApplication).mediaPlatform.onActivityPaused(this)
+        super.onPause()
+    }
+
     override fun onKeyDown(
         keyCode: Int,
         event: KeyEvent,

@@ -2544,7 +2544,19 @@ val BUILT_IN_TOOLS = listOf(
     BuiltInToolDescriptor(
         name = "media_read",
         displayName = "Read Media",
-        description = "Read active players, tracks and local media volume.",
+        description = "Find music apps, song-request support, tracks and media volume.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "media_open",
+        displayName = "Open Music App",
+        description = "Open a selected music app from a foreground conversation.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "media_play_from_search",
+        displayName = "Request a Song",
+        description = "Play a song by title and artist when the player supports it.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(

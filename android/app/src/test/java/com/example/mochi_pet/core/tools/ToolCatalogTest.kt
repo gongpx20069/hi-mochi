@@ -76,6 +76,7 @@ class ToolCatalogTest {
         assertTrue(initial.builtInTools.none { it.name in names })
         assertTrue(initial.readyToolNames().containsAll(names))
         catalog.setBuiltInEnabled("media_control", false)
+        catalog.setBuiltInEnabled("media_open", false)
         val disabled = catalog.setMediaEnabled(false)
         assertTrue(disabled.readyToolNames().none { it in names })
         names.forEach { assertFalse(catalog.isBuiltInEnabled(it)) }
@@ -83,6 +84,8 @@ class ToolCatalogTest {
         assertFalse(restored.loadSummary().media.enabled)
         restored.setMediaEnabled(true)
         assertFalse(restored.isBuiltInEnabled("media_control"))
+        assertFalse(restored.isBuiltInEnabled("media_open"))
+        assertTrue(restored.isBuiltInEnabled("media_play_from_search"))
         assertTrue(restored.isBuiltInEnabled("media_volume"))
         assertTrue(restored.isBuiltInEnabled("media_read"))
     }

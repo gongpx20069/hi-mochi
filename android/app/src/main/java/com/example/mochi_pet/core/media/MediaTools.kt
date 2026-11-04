@@ -11,6 +11,8 @@ import com.example.mochi_pet.core.agent.tool.optionalInt
 import com.example.mochi_pet.core.agent.tool.requiredEnum
 import com.example.mochi_pet.core.agent.tool.requiredString
 import com.example.mochi_pet.core.extensions.ExtensionToolScope
+import java.text.Normalizer
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -27,7 +29,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 
-val MEDIA_TOOL_NAMES = setOf("media_read", "media_control", "media_volume")
+val MEDIA_TOOL_NAMES = setOf("media_read", "media_open", "media_play_from_search", "media_control", "media_volume")
 
 enum class MediaAction { PLAY, PAUSE, NEXT, PREVIOUS, SEEK }
 enum class MediaVolumeAction { INCREASE, DECREASE, SET, MUTE }
@@ -60,17 +62,30 @@ data class MediaVolume(
 }
 
 @Serializable
+data class MediaPlayerInfo(
+    val id: String,
+    val packageName: String,
+    val appName: String?,
+    val canOpen: Boolean,
+    val searchModes: List<String>,
+)
+
+@Serializable
 data class MediaSnapshot(
     val notificationAccess: Boolean,
     val sessions: List<MediaSessionInfo>,
     val volume: MediaVolume,
     val sessionsTruncated: Boolean = false,
+    val players: List<MediaPlayerInfo> = emptyList(),
+    val playersTruncated: Boolean = false,
 )
 
 interface MediaPlatform {
     suspend fun read(): MediaSnapshot
     suspend fun control(id: String, action: MediaAction, positionMs: Long?)
     suspend fun setVolume(index: Int)
+    suspend fun open(playerId: String)
+    suspend fun playFromSearch(playerId: String, sessionId: String?, title: String, artist: String?)
 }
 
 class MediaFailure(val code: ToolErrorCode, message: String) : Exception(message)
@@ -83,10 +98,11 @@ class MediaToolRuntime(private val platform: MediaPlatform) {
         enabled: suspend (String) -> Boolean,
     ): List<AgentTool> =
         if (scope == ExtensionToolScope.SUBAGENT) emptyList()
-        else MEDIA_TOOL_NAMES.map { name -> MediaTool(name, enabled) }
+        else MEDIA_TOOL_NAMES.map { name -> MediaTool(name, scope, enabled) }
 
     private inner class MediaTool(
         override val name: String,
+        private val scope: ExtensionToolScope,
         private val enabled: suspend (String) -> Boolean,
     ) : AgentTool {
         override val schema = mediaSchema(name)
@@ -111,13 +127,18 @@ class MediaToolRuntime(private val platform: MediaPlatform) {
                             put("volumePercent", snapshot.volume.percent)
                             put("volumeScope", "Local device media stream, shared with music, video and Mochi speech; not cast volume.")
                             if (!snapshot.notificationAccess) {
-                                put("notice", "Player discovery requires notification access in Tools > Media Control. Local volume is still available.")
+                                put("notice", "Active sessions and verified song requests require notification access in Tools > Media Control. Installed player discovery, opening and local volume remain available.")
                             }
                         }
                     }
                     else -> mutationMutex.withLock {
                         checkEnabled()
-                        if (name == "media_control") control(arguments) else volume(arguments)
+                        when (name) {
+                            "media_open" -> open(arguments)
+                            "media_play_from_search" -> playFromSearch(arguments)
+                            "media_control" -> control(arguments)
+                            else -> volume(arguments)
+                        }
                     }
                 }
                 checkEnabled()
@@ -130,6 +151,78 @@ class MediaToolRuntime(private val platform: MediaPlatform) {
                     "Android denied media access. Check notification access and device audio restrictions. Do not retry an uncertain command automatically.",
                 )
             }
+
+        private fun requireForegroundScope() {
+            if (scope != ExtensionToolScope.FOREGROUND_MAIN) {
+                throw MediaFailure(ToolErrorCode.CONFLICT,
+                    "Opening a player requires a foreground conversation. Open Mochi and request it again; scheduled tasks may only search through an existing supported session.")
+            }
+        }
+
+        private suspend fun open(arguments: JsonObject): JsonObject {
+            arguments.onlyFields(setOf("player_id"))
+            val id = arguments.boundedString("player_id", 100)
+            requireForegroundScope()
+            val player = requirePlayer(platform.read(), id)
+            if (!player.canOpen) throw MediaFailure(ToolErrorCode.CONFLICT, "This player has no available launch entry.")
+            checkEnabled()
+            platform.open(id)
+            return buildJsonObject {
+                put("player", AgentToolJson.format.encodeToJsonElement(player))
+                put("outcome", "launch_requested")
+                put("verified", false)
+                put("notice", "Android accepted the launch request. The player screen and playback are not verified; login or user interaction may be required.")
+            }
+        }
+
+        private suspend fun playFromSearch(arguments: JsonObject): JsonObject {
+            arguments.onlyFields(setOf("player_id", "title", "artist"))
+            val id = arguments.boundedString("player_id", 100)
+            val title = arguments.boundedString("title", 200)
+            val artist = if ("artist" in arguments) arguments.boundedString("artist", 200) else null
+            val before = platform.read()
+            val player = requirePlayer(before, id)
+            if (!before.notificationAccess) {
+                throw MediaFailure(ToolErrorCode.PERMISSION_DENIED,
+                    "Grant notification access in Tools > Media Control before requesting a song, so playback can be verified.")
+            }
+            val sessions = before.sessions.filter { it.packageName == player.packageName && "play_from_search" in it.actions }
+            if (sessions.size > 1) {
+                throw MediaFailure(ToolErrorCode.CONFLICT, "This player has several searchable sessions. Close the unused sessions before requesting a song.")
+            }
+            val session = sessions.singleOrNull()
+            if (session == null) {
+                if ("intent" !in player.searchModes) {
+                    throw MediaFailure(ToolErrorCode.CONFLICT,
+                        "This player does not currently expose standard song search playback. Opening its home screen is not a successful song request.")
+                }
+                requireForegroundScope()
+            }
+            checkEnabled()
+            platform.playFromSearch(id, session?.id, title, artist)
+            repeat(40) {
+                checkEnabled()
+                val after = platform.read()
+                if (!after.notificationAccess) {
+                    throw MediaFailure(ToolErrorCode.PERMISSION_DENIED,
+                        "Notification access was lost after the song request; playback is unconfirmed. Do not repeat the request automatically.")
+                }
+                val matches = after.sessions.filter {
+                    it.packageName == player.packageName && (session == null || it.id == session.id) &&
+                        it.state == "playing" && sameMediaText(it.title, title) &&
+                        (artist == null || sameMediaText(it.artist, artist))
+                }
+                if (matches.size == 1) {
+                    return buildJsonObject {
+                        put("verified", true)
+                        put("session", AgentToolJson.format.encodeToJsonElement(matches.single()))
+                    }
+                }
+                delay(200)
+            }
+            throw MediaFailure(ToolErrorCode.TIMEOUT,
+                "Song request sent, but matching title, requested artist and playing state were not confirmed. Login, subscription or manual selection may be needed. Do not automatically repeat it.")
+        }
 
         private suspend fun control(arguments: JsonObject): JsonObject {
             arguments.onlyFields(setOf("session_id", "action", "position_ms"))
@@ -162,6 +255,20 @@ class MediaToolRuntime(private val platform: MediaPlatform) {
             }
             throw MediaFailure(ToolErrorCode.TIMEOUT,
                 "Command sent, but the player's resulting state was not confirmed. Do not automatically repeat it; read state again.")
+        }
+
+        private fun JsonObject.boundedString(key: String, maximum: Int): String =
+            requiredString(key).also {
+                if (it.length > maximum || it.any(Char::isISOControl)) throw ToolInputException("$key is invalid or too long")
+            }
+
+        private fun requirePlayer(snapshot: MediaSnapshot, id: String): MediaPlayerInfo =
+            snapshot.players.firstOrNull { it.id == id }
+                ?: throw MediaFailure(ToolErrorCode.NOT_FOUND, "Player unavailable. Use media_read again; do not guess or substitute another app.")
+
+        private fun sameMediaText(actual: String?, requested: String): Boolean {
+            fun normalized(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKC).trim().lowercase(Locale.ROOT)
+            return actual != null && normalized(actual) == normalized(requested)
         }
 
         private suspend fun volume(arguments: JsonObject): JsonObject {
@@ -234,7 +341,7 @@ private fun JsonObject.onlyFields(allowed: Set<String>) {
     if (values.any { it !is JsonPrimitive }) throw ToolInputException("Arguments must be scalar values")
     for ((key, value) in this) {
         val primitive = value as JsonPrimitive
-        if (primitive.isString != (key == "action" || key == "session_id")) {
+        if (primitive.isString != (key in setOf("action", "session_id", "player_id", "title", "artist"))) {
             throw ToolInputException("$key has an invalid value type")
         }
     }
@@ -243,9 +350,14 @@ private fun JsonObject.onlyFields(allowed: Set<String>) {
 private fun mediaSchema(name: String): JsonObject = functionToolSchema(
     name = name,
     description = when (name) {
-        "media_read" -> "Read active Android media players, tracks, supported actions and local media volume. " +
-            "Use returned session IDs, never guess. If several players match, ask the user. " +
-            "Missing notification access is reported explicitly; it does not prevent local volume reading."
+        "media_read" -> "Discover available Android music apps, player IDs, search modes, active sessions, tracks and local media volume. " +
+            "Use returned player/session IDs, never guess. If the intended app is ambiguous, ask the user. " +
+            "An empty searchModes list means no standard song-request route is currently available."
+        "media_open" -> "Request opening a music app discovered by media_read, without starting music. " +
+            "Foreground conversations only; Mochi must be visible and unlocked. A launch request is not verified playback or a verified screen."
+        "media_play_from_search" -> "Request a song by title and optional artist in a player discovered by media_read. " +
+            "Requires notification access and a supported standard search route. Scheduled tasks can use existing searchable sessions only. " +
+            "Success requires matching track metadata and playing state. Never repeat an unconfirmed request automatically or substitute another app."
         "media_control" -> "Control an existing player discovered by media_read. No song search, app launching, " +
             "account actions or UI automation. Use only reported supported actions and the user's intended player. " +
             "Success requires observed player state; never repeat a next/previous command after an uncertain outcome."
@@ -263,10 +375,19 @@ private fun mediaSchema(name: String): JsonObject = functionToolSchema(
             put("action", enumProperty(MediaVolumeAction.entries.map { it.name.lowercase() }))
             put("percent", buildJsonObject { put("type", "integer"); put("minimum", 0); put("maximum", 100) })
         }
+        if (name == "media_open" || name == "media_play_from_search") {
+            put("player_id", buildJsonObject { put("type", "string"); put("maxLength", 100) })
+        }
+        if (name == "media_play_from_search") {
+            put("title", buildJsonObject { put("type", "string"); put("maxLength", 200) })
+            put("artist", buildJsonObject { put("type", "string"); put("maxLength", 200) })
+        }
     },
     required = when (name) {
         "media_control" -> listOf("session_id", "action")
         "media_volume" -> listOf("action")
+        "media_open" -> listOf("player_id")
+        "media_play_from_search" -> listOf("player_id", "title")
         else -> emptyList()
     },
 )

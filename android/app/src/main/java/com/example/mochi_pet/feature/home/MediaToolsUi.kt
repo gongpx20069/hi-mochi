@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
@@ -37,6 +38,7 @@ internal fun MediaProviderCard(
     var granted by remember { mutableStateOf(mediaNotificationAccessGranted(context)) }
     var error by remember { mutableStateOf<String?>(null) }
     var expanded by rememberSaveable { mutableStateOf(false) }
+    var showAccessDisclosure by remember { mutableStateOf(false) }
     LifecycleResumeEffect(context) {
         granted = mediaNotificationAccessGranted(context)
         onPauseOrDispose { }
@@ -54,30 +56,13 @@ internal fun MediaProviderCard(
             Switch(summary.enabled, onSetEnabled, enabled = !disabled, modifier = Modifier.testTag("media-group-switch"))
         }
         Text(
-            "Controls active players, not song search. Enabled tools may run in conversations and Scheduled Agents, not Subagents.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Text(
-            "Notification access is a broad Android permission. Mochi uses media sessions only, not message notifications. Track metadata may be sent to your model Provider.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Text(
-            "Volume affects this phone's music, video and Mochi speech, not ringtone, alarms or cast devices. It works without notification access.",
+            "Open music apps, request songs, control playback and adjust media volume.",
             style = MaterialTheme.typography.bodySmall,
         )
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Button(
             enabled = !disabled,
-            onClick = {
-                error = null
-                try {
-                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                } catch (_: ActivityNotFoundException) {
-                    error = "Cannot open notification access settings. Open them from Android Settings."
-                } catch (_: SecurityException) {
-                    error = "Cannot open notification access settings. Open them from Android Settings."
-                }
-            },
+            onClick = { showAccessDisclosure = true },
         ) { Text(if (granted) "Manage notification access" else "Grant notification access") }
         TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
             Text(if (expanded) "Hide tools (${summary.tools.size})" else "Show tools (${summary.tools.size})")
@@ -89,5 +74,30 @@ internal fun MediaProviderCard(
                 }
             }
         }
+    }
+    if (showAccessDisclosure) {
+        AlertDialog(
+            onDismissRequest = { showAccessDisclosure = false },
+            title = { Text("Media Control") },
+            text = {
+                Text("Notification access is a broad Android permission. Mochi uses media sessions only, not message notifications. Track metadata may be sent to your model Provider.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showAccessDisclosure = false
+                    error = null
+                    try {
+                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    } catch (_: ActivityNotFoundException) {
+                        error = "Cannot open notification access settings. Open them from Android Settings."
+                    } catch (_: SecurityException) {
+                        error = "Cannot open notification access settings. Open them from Android Settings."
+                    }
+                }) { Text("Open notification settings") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAccessDisclosure = false }) { Text("Cancel") }
+            },
+        )
     }
 }

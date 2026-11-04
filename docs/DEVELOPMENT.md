@@ -107,7 +107,10 @@ Media Control regressions:
 These use fake media state, Robolectric native controllers/audio settings and
 Compose to cover permissions, exact player targeting, self-session exclusion,
 supported actions, single-dispatch/uncertain outcomes, cancellation, local-only
-volume, persistent switches and Browser > Media Control > Amap ordering. They
+volume, installed-player discovery, foreground/unlocked launch guards,
+package-targeted song Intents, exact session/track readback, scheduled launch
+rejection, persistent switches and concise Browser > Media Control > Amap
+presentation with authorization-time disclosure. They
 do not grant notification access on a phone, change real device volume or
 certify a particular QQ Music/NetEase/OEM player version. Real-player acceptance
 requires explicit user authorization and readback on the installed version.

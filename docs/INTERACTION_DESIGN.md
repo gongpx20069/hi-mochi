@@ -266,14 +266,17 @@ and reject late callbacks from superseded checks.
 
 The Tools surface places **Media Control** immediately after **Agent Browser**
 and before **Amap Maps**, outside **Mochi Built-ins**. Its enabled master switch
-and three independent child switches retain their settings; children are
-collapsed initially. The card explains active-player-only control, Main/schedule
-availability, and shared local media-volume scope. A notification-access button
-opens Android settings only after a tap, and authorization status refreshes on
-resume. The disclosure distinguishes this broad special access from ordinary
+and five independent child switches retain their settings; children are
+collapsed initially. The card uses one short capability description: opening
+music apps, requesting supported songs, controlling playback and media volume.
+A notification-access button first shows a disclosure dialog; only its explicit
+confirmation opens Android settings. Authorization status refreshes on resume.
+The disclosure distinguishes this broad special access from ordinary
 notification delivery permission: no message-notification content is read,
-while track metadata can reach the model. Volume remains usable without that
-grant. Disabling the group neither revokes the OS permission nor clears child
+while track metadata can reach the model. Installed-player discovery, opening
+and volume remain usable without that grant. Player launch requires a resumed,
+unlocked foreground conversation; background schedules cannot open an app.
+Disabling the group neither revokes the OS permission nor clears child
 choices; **Manage notification access** remains available.
 
 The Tools surface has a stable **AgentLink** provider card even before connection.

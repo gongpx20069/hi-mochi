@@ -36,7 +36,7 @@ The native `ToolRegistry` currently supports:
 - `run_sandboxed_javascript`;
 - `delegate_agent` in the Main Agent's request-scoped registry;
 - the five grouped Agent Browser Tools;
-- the three grouped Media Control Tools for Main Agent conversations and schedules;
+- the five grouped Media Control Tools for Main Agent conversations and schedules, with foreground-only app launch;
 - configured Amap map and merchant Tools;
 - enabled MCP tools discovered through the Tool catalog;
 - enabled custom REST tools in foreground Main Agent conversations only.
@@ -247,7 +247,7 @@ connection cannot discover/access all requested scopes.
 ### Media Control
 
 Media Control is a separately grouped set of bundled Tools, not part of
-**Mochi Built-ins**. Its master switch and three child switches default to on.
+**Mochi Built-ins**. Its master switch and five child switches default to on.
 Foreground and Scheduled Main Agents receive enabled Tools; Subagents do not.
 Every invocation checks both switches again, including before dispatch and
 during bounded outcome observation. Disabling does not undo a sent command.
@@ -255,25 +255,50 @@ No extra Skill, extension APK, service account, or API key is required.
 
 | Tool | Arguments and result |
 | --- | --- |
-| `media_read` | No arguments. Returns notification-access status, up to 32 active external sessions, a truncation flag, local media volume and its percentage. |
+| `media_read` | No arguments. Returns notification-access status, up to 32 available music apps with ephemeral `player_id` values in `players[].id`, `canOpen` and `searchModes` (`session`/`intent`), up to 32 active external sessions, separate truncation flags, local media volume and its percentage. |
+| `media_open` | Requires a discovered `player_id`. Foreground conversation only, with a resumed Mochi Activity and an unlocked phone. Returns `outcome=launch_requested`, `verified=false`: Android accepted the request, not proof of a visible screen or playback. |
+| `media_play_from_search` | Requires discovered `player_id`, `title` (1-200 characters) and optional nonblank `artist` (1-200). Notification access is required before dispatch for subsequent readback. Uses one advertised searchable session, otherwise the app's standard search/play Intent. Multiple searchable sessions are a conflict; no arbitrary target selection. |
 | `media_control` | Requires a discovered `session_id` and `action`: `play`, `pause`, `next`, `previous`, or `seek`. Only `seek` requires `position_ms` (0 through 2,147,483,647, not beyond a known track duration). |
 | `media_volume` | `action`: `increase`/`decrease` (one hardware step), `set` (requires integer `percent` 0-100), or `mute` (zero). Other argument combinations are rejected. |
 
 Android's notification-listener authorization gates cross-app session discovery
-and control. The listener is an authorization bridge only; it never inspects,
+and control, including song requests. Installed app discovery and opening do not
+require it. The listener is an authorization bridge only; it never inspects,
 stores, or forwards notification contents. Only bounded media metadata enters
 Tool output and may reach the selected model/history. Without authorization,
 read explicitly reports the missing permission and still returns local volume.
 Control returns `PERMISSION_DENIED`. Revocation is checked live. Mochi's own
-wake/voice session is excluded, and commands target a specific MediaController,
-never global media-key broadcasts or arbitrary Intents.
+wake/voice session is excluded. Commands target a specific MediaController or
+native-constructed, package-targeted launcher/search Intent, never global
+media-key broadcasts or model-supplied arbitrary Intents, components or URIs.
 
 Session IDs are ephemeral native references, not package-name guesses. The
 Agent must discover the target and ask when user intent is ambiguous. Missing
-sessions, unsupported actions, or fixed volume fail visibly. The app does not
-launch players, search songs, access accounts/playlists, simulate screen taps,
-or promise compatibility with every version of QQ Music, NetEase Cloud Music,
-or OEM players. Only each active session's advertised actions are available.
+sessions, unsupported actions, or fixed volume fail visibly. Discovery queries
+QQ Music, NetEase Cloud Music, Xiaomi Music, handlers of standard music/search
+Intents and visible active-session apps, not the full installed-app inventory.
+It never treats installation as proof of search support. No private URI schemes,
+account/playlist access or screen-tap simulation is used; compatibility with
+every QQ Music, NetEase or OEM version is not promised.
+
+Song requests prefer `MediaController.TransportControls.playFromSearch` only
+when `ACTION_PLAY_FROM_SEARCH` is advertised. Otherwise a native
+`MEDIA_PLAY_FROM_SEARCH` Intent carries song focus, title, optional artist and
+query, restricted to the discovered package. That route and `media_open` are
+blocked for schedules or when Mochi has no resumed Activity or the phone is
+locked. Schedules can still use supported existing sessions. No background
+launch permission or notification permission is silently granted.
+
+Song dispatch is single-shot and shares the mutation mutex with playback and
+volume. Readback lasts at most about eight seconds and requires `playing` plus
+an exact normalized title and, when supplied, artist from the selected package.
+Session-based requests additionally require the same session ID; no replacement
+session can confirm them. Normalization is Unicode NFKC, trim and root-locale
+case folding, not fuzzy matching. The API does not return search result lists.
+Unconfirmed songs return `TIMEOUT`, without automatic retries, fallback
+launches or claims that a search page means playback. Login/subscription/manual
+selection may still be necessary. Losing notification access after dispatch
+reports an explicit uncertain outcome.
 
 Mutations are serialized and dispatched once. Playback commands observe state
 for at most about 3.2 seconds; skip verification requires a changed, previously

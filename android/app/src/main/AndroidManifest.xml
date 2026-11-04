@@ -22,6 +22,16 @@
         android:protectionLevel="signature" />
 
     <queries>
+        <package android:name="com.tencent.qqmusic" />
+        <package android:name="com.netease.cloudmusic" />
+        <package android:name="com.miui.player" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.APP_MUSIC" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+        </intent>
         <package android:name="com.gongpx.androidacpclient" />
         <package android:name="com.example.mochi_pet.extension.mijia" />
         <package android:name="com.example.mochi_pet.extension.termux" />
