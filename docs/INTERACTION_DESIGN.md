@@ -132,6 +132,16 @@ Back and navigation away from Home also exit. Focus survives device rotation,
 and date-time and weather switch to two-column landscape layouts so their
 primary facts and supporting metrics remain balanced and unclipped.
 
+Mochi Navigation also offers explicit **Enter Focus** and **Exit Focus**
+operations for voice/text requests. These set rather than toggle the mode.
+Entering preserves an existing Home presentation, or opens Home from another
+page; exiting preserves the current page. Focus belongs to the Home ViewModel's
+saved state. Temporarily opening a selected external app does not exit Focus:
+after completing and verifying the app task, App Control returns to the
+existing Mochi screen, still focused if it was focused before. The standby
+idle timer restarts after returning; external navigation is not a request to
+show Face or Conversation.
+
 When enabled, an idle Focus presentation enters low-power standby after 30
 seconds by default. Settings places this low-priority option last and offers
 30-second, 1-minute, 2-minute, 5-minute, and 10-minute delays. Standby never
@@ -264,11 +274,12 @@ subsequent microphone test or voice preview to establish real operation.
 Checks stop on Back/Close, retain explicitly incomplete results after cancellation,
 and reject late callbacks from superseded checks.
 
-The Tools surface places **Media Control** immediately after **Agent Browser**
-and before **Amap Maps**, outside **Mochi Built-ins**. Its enabled master switch
-and five independent child switches retain their settings; children are
-collapsed initially. The card uses one short capability description: opening
-music apps, requesting supported songs, controlling playback and media volume.
+The Tools surface orders **Agent Browser**, **App Control**, **Media Control**,
+then **Amap Maps**, outside **Mochi Built-ins**. App Control has five Tools and
+Media Control has four, each with its own master switch and collapsed child
+switches. Settings survive migration, including old disabled operations.
+Each card has one short capability description: operating allowed apps, or
+controlling playback, requesting supported songs and adjusting media volume.
 A notification-access button first shows a disclosure dialog; only its explicit
 confirmation opens Android settings. Authorization status refreshes on resume.
 The disclosure distinguishes this broad special access from ordinary
@@ -278,6 +289,30 @@ and volume remain usable without that grant. Player launch requires a resumed,
 unlocked foreground conversation; background schedules cannot open an app.
 Disabling the group neither revokes the OS permission nor clears child
 choices; **Manage notification access** remains available.
+
+The cards use consistent rounded settings rows with an icon, current status and
+navigation chevron rather than stacked primary buttons. App Control contains
+**Allowed apps**, **App assistance**, then **Background pop-up permission**.
+The last row explains opening Mochi while another app is in the foreground. Its
+disclosure describes Xiaomi/Redmi's **Other permissions > Display pop-up
+windows while running in the background**, then explicitly opens Mochi's system
+app-info page. It never grants access or shows an inferred granted/not-granted
+state: Android has no reliable cross-vendor status query for this permission.
+Media Control contains **Player access**;
+its disclosure explicitly says app operations and local volume do not require it.
+The app scope is shared by both collections and remains editable even when a
+collection is disabled. Its searchable bottom sheet follows the existing voice
+and browser sheets: title/count, app icons, tappable selection rows and a pinned
+Save/Cancel footer. Package identifiers appear only to disambiguate duplicate
+names; search still matches them. It lists launchable apps, initially selecting music apps only.
+Save persists the exact selection, including an empty selection; Cancel makes
+no change. Users can add non-music apps, but system permission/settings and
+installer surfaces remain excluded. The unselected app inventory stays local.
+**App assistance** separately discloses accessibility's breadth and
+that filtered interface text may reach the selected model/history, then opens
+Android settings for manual authorization. Neither selecting apps nor enabling
+the group silently grants that permission. Removing an app blocks subsequent
+reads/actions; it cannot undo already dispatched actions.
 
 The Tools surface has a stable **AgentLink** provider card even before connection.
 It reuses the same rounded surface, spacing, localized typography, and Tool rows
@@ -433,6 +468,11 @@ Existing built-ins default to enabled; the
 Notion Knowledge, Tencent Docs Knowledge, Feishu Knowledge, Mi Home Smart Home,
 Termux, AgentLink, and WebDAV Files built-ins
 default to disabled.
+**App Assistant** (**应用助手**) defaults to enabled and has no mandatory
+Tool dependency, allowing setup guidance even when App Control is off.
+It explains enabling **App Control**, selecting **Allowed apps** and manually
+granting **App assistance**; actual operation still requires the corresponding
+Tools and permissions.
 Each MCP server's detailed Tool list starts collapsed and can be expanded
 without disabling the server or changing individual Tool selections. Built-in
 knowledge providers enable their core search, listing, and reading Tools on
@@ -492,8 +532,9 @@ Agent Browser uses the same provider-card pattern. Its provider-level enable
 switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
-**Websites and logins** stays outside its collapsed Tool list as a filled button
-matching Connect Feishu. It opens a secure full-screen dialog with only a Bing
+**Websites and logins** stays outside its collapsed Tool list as the same rounded
+settings row used by App Control, with a globe icon, short detail and chevron.
+Only the entry styling changes; it opens the existing secure full-screen dialog with a Bing
 search/address field centered in the page, Mochi's launcher logo above it, and
 an always-visible Close action at the top right. The logo and concise
 "Search the web. Save accounts safely." caption share a softly tinted brand area.

@@ -1,5 +1,6 @@
 package com.example.mochi_pet.feature.home
 
+import androidx.lifecycle.SavedStateHandle
 import com.example.mochi_pet.core.agent.AgentReply
 import com.example.mochi_pet.core.agent.AgentRunner
 import com.example.mochi_pet.core.agent.llm.OpenAiProviderConfig
@@ -64,6 +65,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test fun `focus navigation is idempotent and preserves the current Home view across an Agent turn`() {
+        val saved = SavedStateHandle(mapOf("focus_mode" to true))
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            savedStateHandle = saved, ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+            agentRunnerBuilder = { sink, _, _ -> AgentRunner {
+                sink.apply(NavigationDecision(UiDirective("date_time", focusMode = true), MochiNavigationIntent.SetFocusMode(true)))
+                AgentReply("Done.", "neutral")
+            } },
+        )
+        assertTrue(viewModel.focusMode.value)
+        viewModel.navigate(MochiNavigationIntent.ShowDateTime)
+        viewModel.sendConversation("Enter focus mode")
+        viewModel.navigate(MochiNavigationIntent.SetFocusMode(true))
+        assertEquals(MochiSurface.DateTime, viewModel.surface.value)
+        assertTrue(viewModel.focusMode.value)
+        assertEquals(true, saved.get<Boolean>("focus_mode"))
+        viewModel.navigate(MochiNavigationIntent.SetFocusMode(false))
+        viewModel.navigate(MochiNavigationIntent.SetFocusMode(false))
+        assertEquals(MochiSurface.DateTime, viewModel.surface.value)
+        assertFalse(viewModel.focusMode.value)
+        viewModel.setFocusMode(true)
+        viewModel.navigate(MochiNavigationIntent.ShowSettings)
+        assertFalse(viewModel.focusMode.value)
+        viewModel.navigate(MochiNavigationIntent.SetFocusMode(false))
+        assertEquals(MochiSurface.Settings, viewModel.surface.value)
+        viewModel.navigate(MochiNavigationIntent.SetFocusMode(true))
+        assertEquals(MochiSurface.Face, viewModel.surface.value)
+        assertTrue(viewModel.focusMode.value)
+    }
+
     @Test fun `choosing the current system phrase pins it and permits returning to system`() {
         val wake = WakeRuntimeFake()
         val viewModel = MochiHomeViewModel(
@@ -445,6 +477,7 @@ class MochiHomeViewModelTest {
             },
             clock = fixedClock(),
             ioDispatcher = Dispatchers.Unconfined,
+            mainDispatcher = Dispatchers.Unconfined,
         )
 
         viewModel.sendConversation("What is planned today?")

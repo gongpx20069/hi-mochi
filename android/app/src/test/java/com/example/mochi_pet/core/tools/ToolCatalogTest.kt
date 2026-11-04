@@ -65,6 +65,17 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ToolCatalogTest {
+    @Test fun `app selection preserves explicit empty and non music choices across reload`() = runBlocking {
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        assertNull(catalog.mediaAppPackages())
+        catalog.setMediaAppPackages(setOf("fixture.reader"))
+        val reloaded = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        assertEquals(setOf("fixture.reader"), reloaded.mediaAppPackages())
+        catalog.setMediaAppPackages(emptySet())
+        assertEquals(emptySet<String>(), reloaded.mediaAppPackages())
+        assertEquals(emptySet<String>(), reloaded.loadSummary().appControl.appPackages)
+    }
+
     @Test
     fun `media is a separate default enabled provider with persistent master and child switches`() = runBlocking {
         val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
@@ -76,7 +87,7 @@ class ToolCatalogTest {
         assertTrue(initial.builtInTools.none { it.name in names })
         assertTrue(initial.readyToolNames().containsAll(names))
         catalog.setBuiltInEnabled("media_control", false)
-        catalog.setBuiltInEnabled("media_open", false)
+        catalog.setBuiltInEnabled("app_click", false)
         val disabled = catalog.setMediaEnabled(false)
         assertTrue(disabled.readyToolNames().none { it in names })
         names.forEach { assertFalse(catalog.isBuiltInEnabled(it)) }
@@ -84,10 +95,50 @@ class ToolCatalogTest {
         assertFalse(restored.loadSummary().media.enabled)
         restored.setMediaEnabled(true)
         assertFalse(restored.isBuiltInEnabled("media_control"))
-        assertFalse(restored.isBuiltInEnabled("media_open"))
+        assertFalse(restored.isBuiltInEnabled("app_click"))
         assertTrue(restored.isBuiltInEnabled("media_play_from_search"))
         assertTrue(restored.isBuiltInEnabled("media_volume"))
         assertTrue(restored.isBuiltInEnabled("media_read"))
+    }
+
+    @Test fun `app and media switches migrate once and remain independent`() = runBlocking {
+        dataStore.edit {
+            it[stringPreferencesKey("tools.catalog")] = """{"mediaEnabled":false,"mediaAppPackages":[],"builtInEnabled":{"app_ui":false,"media_open":false,"media_control":false}}"""
+        }
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        val initial = catalog.loadSummary()
+        assertFalse(initial.appControl.enabled)
+        assertEquals(emptySet<String>(), initial.appControl.appPackages)
+        assertTrue(initial.appControl.tools.none { it.enabled })
+        catalog.setAppControlEnabled(true)
+        catalog.setBuiltInEnabled("app_read", true)
+        assertFalse(catalog.isBuiltInEnabled("media_read"))
+        assertFalse(catalog.isBuiltInEnabled("app_navigate"))
+        assertFalse(catalog.isBuiltInEnabled("app_click"))
+        assertTrue(catalog.loadSummary().readyToolNames().contains("app_read"))
+        catalog.setMediaEnabled(true)
+        catalog.setAppControlEnabled(false)
+        val restored = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        assertTrue(restored.isBuiltInEnabled("media_read"))
+        assertFalse(restored.isBuiltInEnabled("media_control"))
+        assertFalse(restored.isBuiltInEnabled("app_read"))
+        assertFalse(restored.isBuiltInEnabled("app_ui"))
+        assertFalse(restored.isBuiltInEnabled("media_open"))
+        val names = com.example.mochi_pet.core.apps.APP_TOOL_NAMES
+        assertEquals(names, restored.loadSummary().appControl.tools.map { it.name }.toSet())
+        assertTrue(restored.loadSummary().builtInTools.none { it.name in names })
+    }
+
+    @Test fun `disabled legacy app launch does not enable new navigation`() = runBlocking {
+        dataStore.edit {
+            it[stringPreferencesKey("tools.catalog")] = """{"builtInEnabled":{"media_open":false}}"""
+        }
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        assertFalse(catalog.isBuiltInEnabled("app_navigate"))
+        assertTrue(catalog.isBuiltInEnabled("app_click"))
+        catalog.setMediaEnabled(false)
+        assertTrue(catalog.isBuiltInEnabled("app_read"))
+        assertTrue(catalog.loadSummary().appControl.enabled)
     }
 
     @Test

@@ -96,12 +96,12 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
-Media Control regressions:
+App Control and Media Control regressions:
 
 ```powershell
-.\gradlew.bat :app:testDebugUnitTest --tests "*MediaToolsTest" `
+.\gradlew.bat :app:testDebugUnitTest --tests "*AppToolsTest" --tests "*MediaToolsTest" `
   --tests "*AndroidMediaPlatformTest" --tests "*MediaToolsUiTest" `
-  --tests "*ToolCatalogTest" --no-daemon
+  --tests "*ToolCatalogTest" --tests "*AppUiPrivacyTest" --no-daemon
 ```
 
 These use fake media state, Robolectric native controllers/audio settings and
@@ -109,11 +109,24 @@ Compose to cover permissions, exact player targeting, self-session exclusion,
 supported actions, single-dispatch/uncertain outcomes, cancellation, local-only
 volume, installed-player discovery, foreground/unlocked launch guards,
 package-targeted song Intents, exact session/track readback, scheduled launch
-rejection, persistent switches and concise Browser > Media Control > Amap
+rejection, independent migrated switches and concise Browser > App Control > Media Control > Amap
 presentation with authorization-time disclosure. They
 do not grant notification access on a phone, change real device volume or
 certify a particular QQ Music/NetEase/OEM player version. Real-player acceptance
 requires explicit user authorization and readback on the installed version.
+App assistance additionally covers persistent explicit app selection, empty
+selection, live app revocation, filtered controls, safe popup-dismiss semantics,
+native close/search icon discovery, rejected ambiguous ad wrappers, shared registry references and
+separate playback verification/navigation results. The opt-in device fixture uses
+`UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES`; it must not suppress the
+user-authorized production service while testing it.
+Do not grant accessibility via ADB; users enable it manually after disclosure.
+Focus navigation regressions are in `NavigationPolicyTest`,
+`MochiNavigationReducerTest` and `MochiHomeViewModelTest`: explicit-intent policy,
+Tool/final-directive parsing, saved Focus state, idempotent enter/exit and
+preserved Home presentation. Real-device return/Focus verification must not
+restart the host with instrumentation while exercising its bound accessibility
+service.
 
 Skill readiness/content regressions:
 

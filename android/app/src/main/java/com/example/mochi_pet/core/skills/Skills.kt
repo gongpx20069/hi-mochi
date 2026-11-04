@@ -559,6 +559,7 @@ private val BUILT_IN_SKILL_TOOLS = mapOf(
 )
 
 private val OPTIONAL_BUILT_IN_SKILL_TOOLS = mapOf(
+    "builtin:app-assistant" to setOf("app_read", "app_navigate", "app_click", "app_input", "app_scroll", "media_read"),
     "builtin:webdav-files" to setOf("webdav_write", "webdav_manage", "webdav_transfer"),
     "builtin:browser" to setOf("browser_click", "browser_input", "request_user_assistance"),
     "builtin:mochi-planner" to setOf("navigate_mochi_ui"),
@@ -593,6 +594,44 @@ fun MochiSkill.readiness(
 }
 
 private val BUILT_IN_SKILLS = listOf(
+    builtInSkill(
+        id = "builtin:app-assistant",
+        name = "App Assistant",
+        description = "Operate user-selected apps, dismiss obstructing ads and popups, and explain how to enable missing app tools.",
+        content = """
+            # App Assistant
+
+            Help with user-requested tasks in any selected Android app, not only music.
+            App operations require an unlocked phone and a foreground Main Agent run.
+            This Skill teaches the workflow; it does not enable Tools or permissions.
+
+            - If app_* Tools are missing, ask the user to open Tools > App Control
+              (应用操作) and enable the group and needed Tools. Use Allowed apps
+              (允许操作的应用) to select the target and App assistance (应用操作辅助)
+              for manual accessibility authorization. Do not invent unavailable calls.
+              Scheduled/child runs cannot use these Tools; resume in a foreground chat.
+            - Discover apps with app_read, open the selected app with app_navigate,
+              then read its current controls. Keep the target foreground while working.
+            - Close obstructing ads or ordinary popups yourself using explicit
+              role=dismiss / Close / Cancel / Not now / Skip ad controls, then read
+              again and continue. Never click ad destinations, rewards, subscriptions,
+              purchases or permission confirmations to get past a blocker.
+            - Use current refs for app_click, app_input and app_scroll. For search,
+              choose role=search, read the input field, enter the query, then inspect
+              the search action/results. After STALE_REF, read again before choosing;
+              stop and explain repeated failures instead of looping or guessing.
+            - Verify the requested result, not just a successful click. For music,
+              use available media_read to confirm exact title, artist and playing state.
+              If missing, explain Tools > Media Control (媒体控制) and Player access
+              (播放器访问); never claim verified playback without evidence.
+            - On success or failure, return with app_navigate action=return unless the
+              user wants to stay in the app. Preserve Mochi's prior page and Focus mode;
+              do not reset them through navigation Tools. If Android blocks the return,
+              point to App Control > Background pop-up permission (后台弹出界面).
+              Unreadable screens or necessary login/payment/authorization need manual
+              handling; report the actual blocker rather than claiming completion.
+        """.trimIndent(),
+    ),
     builtInSkill(
         id = "builtin:webdav-files",
         name = "WebDAV Files",

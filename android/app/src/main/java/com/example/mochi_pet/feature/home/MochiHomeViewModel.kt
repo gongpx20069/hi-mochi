@@ -10,6 +10,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.createSavedStateHandle
+import com.example.mochi_pet.core.model.isHomePresentation
 import com.example.mochi_pet.MochiApplication
 import com.example.mochi_pet.createAgentRunner
 import com.example.mochi_pet.core.agent.AgentOrchestrator
@@ -343,6 +346,8 @@ class MochiHomeViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val wakeAcknowledgement: () -> String =
         ::wakeAcknowledgementText,
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : ViewModel() {
     private val mutableSurface = MutableStateFlow<MochiSurface>(MochiSurface.Face)
     private val mutablePlannerState = MutableStateFlow(PlannerSurfaceState())
@@ -387,6 +392,7 @@ class MochiHomeViewModel(
     val showTermuxTasks = MutableStateFlow(false)
 
     val surface: StateFlow<MochiSurface> = mutableSurface.asStateFlow()
+    val focusMode: StateFlow<Boolean> = savedStateHandle.getStateFlow("focus_mode", false)
     val plannerState: StateFlow<PlannerSurfaceState> =
         mutablePlannerState.asStateFlow()
     val conversationState: StateFlow<ConversationUiState> =
@@ -674,7 +680,12 @@ class MochiHomeViewModel(
     }
 
     fun navigate(intent: MochiNavigationIntent) {
-        val target = MochiNavigationReducer.reduce(intent)
+        if (intent is MochiNavigationIntent.SetFocusMode) {
+            setFocusMode(intent.enabled)
+            return
+        }
+        val target = MochiNavigationReducer.reduce(intent, mutableSurface.value)
+        if (!target.isHomePresentation()) savedStateHandle["focus_mode"] = false
         if (target != MochiSurface.Settings) stopVoicePreview()
         if (
             target == MochiSurface.Face ||
@@ -688,6 +699,11 @@ class MochiHomeViewModel(
         }
         mutableSurface.value = target
         load(target)
+    }
+
+    fun setFocusMode(enabled: Boolean) {
+        if (enabled && !mutableSurface.value.isHomePresentation()) navigate(MochiNavigationIntent.ShowFace)
+        savedStateHandle["focus_mode"] = enabled
     }
 
     fun resolveLocationPermission(granted: Boolean) {
@@ -856,8 +872,10 @@ class MochiHomeViewModel(
                     recentTurns = agentSettings.recentConversationTurns,
                 )
                 val sink = UiDirectiveSink { decision ->
-                    if (version == interactionVersion) {
-                        navigate(decision.intent)
+                    withContext(mainDispatcher) {
+                        if (version == interactionVersion) {
+                            navigate(decision.intent)
+                        }
                     }
                 }
                 val observer = AgentPipelineObserver { stage, detail ->
@@ -2054,6 +2072,14 @@ class MochiHomeViewModel(
         }
     }
 
+    fun setAppControlEnabled(enabled: Boolean) {
+        updateTools { requireRepository().setAppControlEnabled(enabled) }
+    }
+
+    fun setMediaAppPackages(packages: Set<String>) {
+        updateTools { requireRepository().setMediaAppPackages(packages) }
+    }
+
     fun installMijiaExtension() {
         mutableToolsState.update {
             it.copy(
@@ -3030,6 +3056,7 @@ class MochiHomeViewModel(
                         weatherRepository = application.weatherRepository,
                         locationPermissionGate =
                             application.locationPermissionGate,
+                        savedStateHandle = createSavedStateHandle(),
                     )
                 }
             }

@@ -37,17 +37,19 @@ class MediaToolsTest {
         assertTrue(runtime.tools(ExtensionToolScope.SUBAGENT) { true }.isEmpty())
     }
 
-    @Test fun `opening requires a discovered app and foreground scope but not notification access`() = runTest {
-        platform.snapshot = platform.snapshot.copy(notificationAccess = false, sessions = emptyList())
-        assertEquals("NOT_FOUND", registry.execute("media_open", """{"player_id":"guessed"}""", context).code)
-        val scheduled = ToolRegistry(runtime.tools(ExtensionToolScope.SCHEDULED) { true })
-        assertEquals("CONFLICT", scheduled.execute("media_open", """{"player_id":"app-1"}""", context).code)
-        assertTrue(platform.opens.isEmpty())
-        val result = registry.execute("media_open", """{"player_id":"app-1"}""", context)
+    @Test fun `read verifies exact playback without sending commands and requires player access`() = runTest {
+        val args = """{"player_id":"app-1","title":"Track A","artist":"Artist"}"""
+        assertEquals("TIMEOUT", registry.execute("media_read", args, context).code)
+        platform.snapshot = platform.snapshot.copy(sessions = listOf(player.copy(state = "playing")))
+        val result = registry.execute("media_read", args, context)
         assertEquals("ok", result.status)
-        assertEquals("launch_requested", result.data!!.jsonObject.getValue("outcome").jsonPrimitive.content)
-        assertEquals("false", result.data.jsonObject.getValue("verified").jsonPrimitive.content)
-        assertEquals(listOf("app-1"), platform.opens)
+        assertEquals("true", result.data!!.jsonObject.getValue("verified").jsonPrimitive.content)
+        assertTrue(platform.searches.isEmpty())
+        assertTrue(platform.controls.isEmpty())
+        platform.snapshot = platform.snapshot.copy(notificationAccess = false)
+        assertEquals("PERMISSION_DENIED", registry.execute("media_read", args, context).code)
+        enabled = false
+        assertEquals("PERMISSION_DENIED", registry.execute("media_read", args, context).code)
     }
 
     @Test fun `song requests reject invalid inputs missing access and unsupported apps before dispatch`() = runTest {
@@ -64,7 +66,6 @@ class MediaToolsTest {
         platform.snapshot = platform.snapshot.copy(notificationAccess = true, players = listOf(musicApp.copy(searchModes = emptyList())))
         assertEquals("CONFLICT", registry.execute("media_play_from_search", args, context).code)
         assertEquals(0, platform.searches.size)
-        assertTrue(platform.opens.isEmpty())
     }
 
     @Test fun `cold song request requires matching title artist and playing state from the selected app`() = runTest {
@@ -101,7 +102,6 @@ class MediaToolsTest {
         platform.snapshot = platform.snapshot.copy(sessions = listOf(searchable))
         platform.onSearch = { platform.snapshot = platform.snapshot.copy(sessions = listOf(searchable.copy(state = "playing"))) }
         assertEquals("ok", scheduled.execute("media_play_from_search", args, context).status)
-        assertTrue(platform.opens.isEmpty())
     }
 
     @Test fun `song request revocation and cancellation never replay the command`() = runTest {
@@ -223,13 +223,16 @@ class MediaToolsTest {
         var volumeWrites = 0
         var applyVolume = true
         var onControl: () -> Unit = {}
-        val opens = mutableListOf<String>()
         val searches = mutableListOf<List<String?>>()
         var onSearch: () -> Unit = {}
-        override suspend fun open(playerId: String) { opens += playerId }
-        override suspend fun playFromSearch(playerId: String, sessionId: String?, title: String, artist: String?) {
+        var route = MediaSearchRoute.INTENT
+        override suspend fun playFromSearch(
+            playerId: String, sessionId: String?, title: String, artist: String?, checkActive: suspend () -> Unit,
+        ): MediaSearchRoute {
+            checkActive()
             searches += listOf(playerId, sessionId, title, artist)
             onSearch()
+            return route
         }
         override suspend fun read() = snapshot
         override suspend fun control(id: String, action: MediaAction, positionMs: Long?) {

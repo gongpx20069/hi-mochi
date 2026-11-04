@@ -266,8 +266,9 @@ Tool contract table.
 
 Website management is a secure full-screen dialog with a Bing search/address
 field centered beneath the Mochi logo, a top-right Close button, and a separate
-translucent website-list panel, not dashboard cards. Its entry remains a filled
-button matching Connect Feishu. Opening a website row shows a secure second
+translucent website-list panel, not dashboard cards. Its entry is a rounded
+settings row matching App Control, with globe icon, detail and chevron; the
+management dialog and login flow remain unchanged. Opening a website row shows a secure second
 list containing one shared Cookie/site-data entry, when detected, plus its
 password/SMS accounts. Blue data and purple credential badges include text labels.
 Credential swipes reveal Edit/Delete; data swipes reveal only Delete. A shared

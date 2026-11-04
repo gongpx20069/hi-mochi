@@ -22,15 +22,22 @@ import android.provider.MediaStore
 import android.service.notification.NotificationListenerService
 import com.example.mochi_pet.core.agent.tool.ToolErrorCode
 import com.example.mochi_pet.core.media.MediaAction
+import com.example.mochi_pet.core.apps.AppUiAction
+import com.example.mochi_pet.core.apps.AppUiSnapshot
+import com.example.mochi_pet.core.apps.AppPlatform
+import com.example.mochi_pet.core.apps.AppInfo
+import com.example.mochi_pet.core.apps.AppCatalog
 import com.example.mochi_pet.core.media.MediaFailure
 import com.example.mochi_pet.core.media.MediaPlatform
 import com.example.mochi_pet.core.media.MediaPlayerInfo
+import com.example.mochi_pet.core.media.MediaSearchRoute
 import com.example.mochi_pet.core.media.MediaSessionInfo
 import com.example.mochi_pet.core.media.MediaSnapshot
 import com.example.mochi_pet.core.media.MediaVolume
 import java.util.UUID
 import java.lang.ref.WeakReference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 // Authorization bridge only: never inspect, persist, or forward notification contents.
@@ -46,13 +53,17 @@ fun mediaNotificationAccessGranted(context: Context): Boolean {
     }
 }
 
-class AndroidMediaPlatform(context: Context) : MediaPlatform {
+class AndroidMediaPlatform(
+    context: Context,
+    private val allowedPackages: suspend () -> Set<String> = { DEFAULT_MUSIC_APPS },
+) : MediaPlatform, AppPlatform {
     private val application = context.applicationContext
     private val manager = application.getSystemService(MediaSessionManager::class.java)
     private val audio = application.getSystemService(AudioManager::class.java)
     private val ids = mutableMapOf<MediaSession.Token, String>()
     private val playerIds = mutableMapOf<String, String>()
     private var resumedActivity: WeakReference<Activity>? = null
+    private var returnPackage: String? = null
 
     fun onActivityResumed(activity: Activity) {
         resumedActivity = WeakReference(activity)
@@ -93,10 +104,20 @@ class AndroidMediaPlatform(context: Context) : MediaPlatform {
         )
     }
 
-    override suspend fun open(playerId: String): Unit = withContext(Dispatchers.Main.immediate) {
-        val player = requirePlayer(playerId)
+    override suspend fun apps(): AppCatalog = withContext(Dispatchers.Main.immediate) {
+        AppCatalog(discoverApps(),
+            appAssistanceGranted(application), AppAccessibilityService.current() != null)
+    }
+
+    private suspend fun requireApp(id: String): AppInfo =
+        apps().apps.firstOrNull { it.id == id }
+            ?: throw MediaFailure(ToolErrorCode.NOT_FOUND, "App unavailable. Use app_read again.")
+
+    override suspend fun open(appId: String, checkActive: suspend () -> Unit): Unit = withContext(Dispatchers.Main.immediate) {
+        val player = requireApp(appId)
         val intent = application.packageManager.getLaunchIntentForPackage(player.packageName)
             ?: throw MediaFailure(ToolErrorCode.NOT_FOUND, "The player's launch entry is no longer available.")
+        checkActive()
         launch(intent)
     }
 
@@ -105,7 +126,9 @@ class AndroidMediaPlatform(context: Context) : MediaPlatform {
         sessionId: String?,
         title: String,
         artist: String?,
-    ): Unit = withContext(Dispatchers.Main.immediate) {
+        checkActive: suspend () -> Unit,
+    ): MediaSearchRoute = withContext(Dispatchers.Main.immediate) {
+        checkActive()
         val player = requirePlayer(playerId)
         if (!mediaNotificationAccessGranted(application)) {
             throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "Grant notification access in Tools > Media Control.")
@@ -123,13 +146,57 @@ class AndroidMediaPlatform(context: Context) : MediaPlatform {
             if ((controller.playbackState?.actions ?: 0L) and PlaybackState.ACTION_PLAY_FROM_SEARCH == 0L) {
                 throw MediaFailure(ToolErrorCode.CONFLICT, "The selected session no longer supports song requests.")
             }
+            checkActive()
             controller.transportControls.playFromSearch(intent.getStringExtra(SearchManager.QUERY), intent.extras)
+            MediaSearchRoute.SESSION
         } else {
             if (!supportsSearchIntent(player.packageName)) {
                 throw MediaFailure(ToolErrorCode.CONFLICT, "This player no longer exposes a standard search-and-play entry.")
             }
+            checkActive()
             launch(intent)
+            MediaSearchRoute.INTENT
         }
+    }
+
+    override suspend fun appUi(
+        appId: String, action: AppUiAction, ref: String?, text: String?, owner: String,
+        checkActive: suspend () -> Unit,
+    ): AppUiSnapshot? = withContext(Dispatchers.Main.immediate) {
+        checkActive()
+        val player = requireApp(appId)
+        val service = AppAccessibilityService.current()
+            ?: throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "App assistance is not connected. Check App Control accessibility access and reopen Mochi.")
+        checkActive()
+        if (player.packageName !in allowedPackages() || !appCanBeSelected(application, player.packageName)) {
+            throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "App access was removed. No further action was taken.")
+        }
+        service.execute(player.packageName, action, ref, text, owner).also {
+            if (action == AppUiAction.RETURN) returnPackage = player.packageName
+        }
+    }
+
+    override suspend fun returnToMochi(checkActive: suspend () -> Unit): Boolean = withContext(Dispatchers.Main.immediate) {
+        val target = returnPackage
+        returnPackage = null
+        if (target == null || target !in allowedPackages()) return@withContext false
+        checkActive()
+        if (resumedActivity?.get() != null) return@withContext true
+        val requested = try {
+            AppAccessibilityService.current()?.returnToMochi() == true
+        } catch (_: ActivityNotFoundException) {
+            false
+        } catch (_: SecurityException) {
+            false
+        } catch (_: MediaFailure) {
+            false
+        }
+        if (requested) repeat(30) {
+            checkActive()
+            if (resumedActivity?.get() != null) return@withContext true
+            delay(100)
+        }
+        false
     }
 
     private suspend fun requirePlayer(id: String): MediaPlayerInfo =
@@ -149,16 +216,9 @@ class AndroidMediaPlatform(context: Context) : MediaPlatform {
         }
     }
 
-    private fun discoverPlayers(controllers: List<MediaController>): List<MediaPlayerInfo> {
+    private suspend fun discoverApps(): List<AppInfo> {
         val packages = application.packageManager
-        val musicApps = packages.queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_MUSIC), 0,
-        ).filter { it.activityInfo.exported && it.activityInfo.enabled }.map { it.activityInfo.packageName }
-        val searchApps = packages.queryIntentActivities(
-            Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH), PackageManager.MATCH_DEFAULT_ONLY,
-        ).filter { it.activityInfo.exported && it.activityInfo.enabled }.map { it.activityInfo.packageName }
-        val candidates = (listOf("com.tencent.qqmusic", "com.netease.cloudmusic", "com.miui.player") +
-            musicApps + searchApps + controllers.map { it.packageName }).distinct().filter { it != application.packageName }
+        val candidates = allowedPackages().filter { appCanBeSelected(application, it) }
         val players = candidates.mapNotNull { packageName ->
             val info = try {
                 packages.getApplicationInfo(packageName, 0)
@@ -166,23 +226,27 @@ class AndroidMediaPlatform(context: Context) : MediaPlatform {
                 return@mapNotNull null
             }
             if (!info.enabled) return@mapNotNull null
-            MediaPlayerInfo(
+            AppInfo(
                 id = playerIds.getOrPut(packageName) { UUID.randomUUID().toString() },
                 packageName = packageName,
                 appName = info.loadLabel(packages).toString().take(100),
                 canOpen = packages.getLaunchIntentForPackage(packageName) != null,
-                searchModes = buildList {
-                    if (controllers.any {
-                        it.packageName == packageName &&
-                            (it.playbackState?.actions ?: 0L) and PlaybackState.ACTION_PLAY_FROM_SEARCH != 0L
-                    }) add("session")
-                    if (supportsSearchIntent(packageName)) add("intent")
-                },
             )
         }
         playerIds.keys.retainAll(players.map { it.packageName }.toSet())
         return players
     }
+
+    private suspend fun discoverPlayers(controllers: List<MediaController>): List<MediaPlayerInfo> =
+        discoverApps().map { app ->
+            MediaPlayerInfo(app.id, app.packageName, app.appName, app.canOpen, buildList {
+                if (controllers.any {
+                    it.packageName == app.packageName &&
+                        (it.playbackState?.actions ?: 0L) and PlaybackState.ACTION_PLAY_FROM_SEARCH != 0L
+                }) add("session")
+                if (supportsSearchIntent(app.packageName)) add("intent")
+            })
+        }
 
     private fun searchIntent(packageName: String) =
         Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).setPackage(packageName)
@@ -217,9 +281,9 @@ class AndroidMediaPlatform(context: Context) : MediaPlatform {
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
     }
 
-    private fun controllers(): List<MediaController> =
+    private suspend fun controllers(): List<MediaController> =
         manager.getActiveSessions(ComponentName(application, MediaSessionAccessService::class.java))
-            .filter { it.packageName != application.packageName }
+            .filter { it.packageName in allowedPackages() && appCanBeSelected(application, it.packageName) }
 
     private fun MediaController.info(id: String): MediaSessionInfo {
         val playback = playbackState

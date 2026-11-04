@@ -2,6 +2,8 @@
 <resources>
     <string name="app_name">Mochi</string>
     <string name="media_control_access">Mochi media control</string>
+    <string name="app_assistance">Mochi app assistance</string>
+    <string name="app_assistance_description">For your requests, Mochi reads filtered controls in apps you select and lets your model choose actions. Related interface text may be sent to your model Provider and conversation history. Music apps are selected by default. Login, payments and other sensitive operations require your intervention. You can remove apps or disable this access at any time.</string>
     <string name="assistance_notification_channel">Mochi user assistance</string>
     <string name="assistance_notification_title">Mochi needs your help</string>
     <string name="assistance_notification_text">Open Mochi to answer or manage the website login</string>

@@ -104,11 +104,18 @@ data class ToolCatalogSummary(
     val feedback: String? = null,
     val webdav: ExtensionProviderSummary = ExtensionProviderSummary(),
     val media: MediaProviderSummary = MediaProviderSummary(),
+    val appControl: AppControlProviderSummary = AppControlProviderSummary(),
 )
 
 data class MediaProviderSummary(
     val enabled: Boolean = true,
     val tools: List<BuiltInToolSummary> = emptyList(),
+)
+
+data class AppControlProviderSummary(
+    val enabled: Boolean = true,
+    val tools: List<BuiltInToolSummary> = emptyList(),
+    val appPackages: Set<String>? = null,
 )
 
 data class AmapProviderSummary(
@@ -180,6 +187,9 @@ fun ToolCatalogSummary.readyToolNames(): Set<String> =
         if (media.enabled) {
             media.tools.filterToReadyNames(this)
         }
+        if (appControl.enabled) {
+            appControl.tools.filterToReadyNames(this)
+        }
         if (amap.connected && amap.enabled) {
             amap.tools.filterToReadyNames(this)
         }
@@ -230,6 +240,7 @@ private fun ToolCatalogSummary.skillRequirementName(
     when {
         toolName.startsWith("browser_") -> "Agent Browser"
         toolName in com.example.mochi_pet.core.media.MEDIA_TOOL_NAMES -> "Media Control"
+        toolName in com.example.mochi_pet.core.apps.APP_TOOL_NAMES -> "App Control"
         toolName.startsWith("amap_") -> "Amap Maps"
         toolName.startsWith("mijia_") -> "Mi Home extension"
         toolName.startsWith("termux_") -> "Termux extension"
@@ -368,6 +379,14 @@ interface ToolCatalogRepository {
 
     suspend fun setMediaEnabled(enabled: Boolean): ToolCatalogSummary =
         throw UnsupportedOperationException("Media Control is unavailable")
+
+    suspend fun setAppControlEnabled(enabled: Boolean): ToolCatalogSummary =
+        throw UnsupportedOperationException("App Control is unavailable")
+
+    suspend fun mediaAppPackages(): Set<String>? = null
+
+    suspend fun setMediaAppPackages(packages: Set<String>): ToolCatalogSummary =
+        throw UnsupportedOperationException("App selection is unavailable")
 
     suspend fun setMijiaEnabled(enabled: Boolean): ToolCatalogSummary
 
@@ -1345,6 +1364,19 @@ class DataStoreToolCatalogRepository(
         return loadSummary()
     }
 
+    override suspend fun setAppControlEnabled(enabled: Boolean): ToolCatalogSummary {
+        updateCatalog { it.copy(appControlEnabled = enabled) }
+        return loadSummary()
+    }
+
+    override suspend fun mediaAppPackages(): Set<String>? = loadCatalog().mediaAppPackages
+
+    override suspend fun setMediaAppPackages(packages: Set<String>): ToolCatalogSummary {
+        require(packages.size <= 200 && packages.all { it.length <= 200 && it.matches(Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) })
+        updateCatalog { it.copy(mediaAppPackages = packages) }
+        return loadSummary()
+    }
+
     override suspend fun setMijiaEnabled(enabled: Boolean): ToolCatalogSummary {
         if (enabled) {
             require(extensionClient.snapshot().connected) {
@@ -1510,6 +1542,9 @@ class DataStoreToolCatalogRepository(
             return false
         }
         if (descriptor.isMediaTool() && !catalog.mediaEnabled) {
+            return false
+        }
+        if (descriptor.isAppControlTool() && catalog.appControlEnabled != true) {
             return false
         }
         return catalog.builtInEnabled[name] ?: descriptor.defaultEnabled
@@ -1867,7 +1902,7 @@ class DataStoreToolCatalogRepository(
             restConnections = restConnections.map { RestConnectionSummary(it.connection, it.secret != null) },
             builtInTools = BUILT_IN_TOOLS
                 .filterNot {
-                    it.isAmapTool() || it.isAgentBrowserTool() || it.isMediaTool()
+                    it.isAmapTool() || it.isAgentBrowserTool() || it.isMediaTool() || it.isAppControlTool()
                 }
                 .map { descriptor ->
                     toBuiltInToolSummary(descriptor)
@@ -1892,6 +1927,12 @@ class DataStoreToolCatalogRepository(
             media = MediaProviderSummary(
                 enabled = mediaEnabled,
                 tools = BUILT_IN_TOOLS.filter(BuiltInToolDescriptor::isMediaTool)
+                    .map { toBuiltInToolSummary(it) },
+            ),
+            appControl = AppControlProviderSummary(
+                enabled = appControlEnabled == true,
+                appPackages = mediaAppPackages,
+                tools = BUILT_IN_TOOLS.filter(BuiltInToolDescriptor::isAppControlTool)
                     .map { toBuiltInToolSummary(it) },
             ),
             mijia = ExtensionProviderSummary(
@@ -1950,9 +1991,16 @@ class DataStoreToolCatalogRepository(
         val retainedServers = servers.filterNot {
             it.id == LEGACY_DIANPING_SERVER_ID
         }
-        val retainedBuiltIns = builtInEnabled.filterKeys { name ->
+        val migratedBuiltIns = builtInEnabled.toMutableMap()
+        if (appControlEnabled == null) {
+            val uiEnabled = builtInEnabled["app_ui"] ?: true
+            com.example.mochi_pet.core.apps.APP_TOOL_NAMES.forEach { name ->
+                migratedBuiltIns.putIfAbsent(name, uiEnabled && (name != "app_navigate" || builtInEnabled["media_open"] != false))
+            }
+        }
+        val retainedBuiltIns = migratedBuiltIns.filterKeys { name ->
             !name.startsWith("baidu_map_") &&
-                !name.startsWith("dianping_")
+                !name.startsWith("dianping_") && name != "app_ui" && name != "media_open"
         }
         val existingIds = retainedServers.mapTo(
             mutableSetOf(),
@@ -1990,12 +2038,14 @@ class DataStoreToolCatalogRepository(
         if (
             missing.isEmpty() &&
             normalizedServers == servers &&
-            retainedBuiltIns == builtInEnabled
+            retainedBuiltIns == builtInEnabled &&
+            appControlEnabled != null
         ) {
             return this
         }
         return copy(
             builtInEnabled = retainedBuiltIns,
+            appControlEnabled = appControlEnabled ?: mediaEnabled,
             servers = missing + normalizedServers,
         )
     }
@@ -2311,6 +2361,8 @@ private data class PersistedToolCatalog(
     val amapEnabled: Boolean = false,
     val agentBrowserEnabled: Boolean = true,
     val mediaEnabled: Boolean = true,
+    val appControlEnabled: Boolean? = null,
+    val mediaAppPackages: Set<String>? = null,
     val mijiaEnabled: Boolean = false,
     val mijiaToolsEnabled: Map<String, Boolean> = emptyMap(),
     val termuxEnabled: Boolean = false,
@@ -2526,7 +2578,7 @@ val BUILT_IN_TOOLS = listOf(
     BuiltInToolDescriptor(
         name = "navigate_mochi_ui",
         displayName = "Mochi Navigation",
-        description = "Open trusted native Mochi surfaces.",
+        description = "Open Mochi pages or enter and exit Focus mode.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
@@ -2548,12 +2600,6 @@ val BUILT_IN_TOOLS = listOf(
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
-        name = "media_open",
-        displayName = "Open Music App",
-        description = "Open a selected music app from a foreground conversation.",
-        defaultEnabled = true,
-    ),
-    BuiltInToolDescriptor(
         name = "media_play_from_search",
         displayName = "Request a Song",
         description = "Play a song by title and artist when the player supports it.",
@@ -2569,6 +2615,36 @@ val BUILT_IN_TOOLS = listOf(
         name = "media_volume",
         displayName = "Media Volume",
         description = "Adjust the phone's shared media volume, including Mochi speech.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "app_read",
+        displayName = "Read Apps",
+        description = "Discover allowed apps or read the current app controls.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "app_navigate",
+        displayName = "Navigate Apps",
+        description = "Open an app, go back or return to Mochi.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "app_click",
+        displayName = "Click App Controls",
+        description = "Click a currently available app control.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "app_input",
+        displayName = "App Search Input",
+        description = "Enter text into an allowed search field.",
+        defaultEnabled = true,
+    ),
+    BuiltInToolDescriptor(
+        name = "app_scroll",
+        displayName = "Scroll Apps",
+        description = "Scroll a currently available app region.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
@@ -2611,6 +2687,9 @@ private fun BuiltInToolDescriptor.isAgentBrowserTool(): Boolean =
 
 private fun BuiltInToolDescriptor.isMediaTool(): Boolean =
     name in com.example.mochi_pet.core.media.MEDIA_TOOL_NAMES
+
+private fun BuiltInToolDescriptor.isAppControlTool(): Boolean =
+    name in com.example.mochi_pet.core.apps.APP_TOOL_NAMES
 
 private val DEFAULT_NOTION_TOOLS = setOf(
     "notion-search",

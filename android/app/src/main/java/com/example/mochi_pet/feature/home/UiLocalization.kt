@@ -140,6 +140,8 @@ internal fun localizeUiText(
         }
         text.matches(Regex("\\d+ selected devices")) ->
             "${text.substringBefore(' ')} 个已选设备"
+        text.matches(Regex("Selected apps: \\d+")) ->
+            "已选择 ${text.substringAfter(": ")} 个应用"
         text.startsWith("Extension ") ->
             "扩展 ${text.removePrefix("Extension ")}"
         text.matches(Regex(".*\\d+ homes · \\d+ devices")) ->
@@ -258,6 +260,7 @@ private val ZH_UI_TEXT = mapOf(
     "Saved website credentials are invalid. Existing data was not changed." to "账号存储数据异常，原有数据未被修改。",
     "Could not update website data. Try again." to "无法更新网站数据，请重试。",
     "Websites and logins" to "网站与登录管理",
+    "Manage websites and saved logins" to "管理网站与已保存的登录信息",
     "Back to Tools" to "返回工具",
     "Your websites, ready for Mochi." to "管理常用网站，让 Mochi 随时接着用。",
     "Sign in once. Let Mochi continue." to "登录一次，Mochi 接着用",
@@ -930,23 +933,68 @@ private val ZH_UI_TEXT = mapOf(
     "Built-in" to "内置",
     "Mochi Built-ins" to "Mochi 内建能力",
     "Media Control" to "媒体控制",
+    "App Control" to "应用操作",
+    "Read Apps" to "读取应用",
+    "Navigate Apps" to "应用导航",
+    "Click App Controls" to "点击控件",
+    "App Search Input" to "输入搜索内容",
+    "Scroll Apps" to "滚动界面",
+    "Discover allowed apps or read the current app controls." to "查看允许的应用或读取当前界面的控件。",
+    "Open an app, go back or return to Mochi." to "打开应用、返回上页或回到 Mochi。",
+    "Click a currently available app control." to "点击当前可操作的应用控件。",
+    "Enter text into an allowed search field." to "在允许的搜索框中输入文字。",
+    "Scroll a currently available app region." to "滚动当前可操作的应用区域。",
+    "Control playback, request songs and adjust media volume." to "控制播放、点歌和调节媒体音量。",
+    "Enabled · playback control and verification" to "已开启 · 控制播放与验证播放结果",
+    "Not enabled · playback control and verification" to "未开启 · 用于控制播放与验证结果",
+    "Not needed for App Control or local volume. Required for media session control and playback verification." to
+        "应用操作和调节本机音量不需要此权限。控制媒体会话和验证歌曲播放结果时需要开启。",
     "Read Media" to "读取媒体",
-    "Open Music App" to "打开音乐应用",
     "Request a Song" to "点歌",
     "Control Playback" to "控制播放",
     "Media Volume" to "媒体音量",
     "Find music apps, song-request support, tracks and media volume." to "查看音乐应用、点歌支持情况、歌曲和媒体音量。",
-    "Open a selected music app from a foreground conversation." to "在前台对话中打开指定音乐应用。",
     "Play a song by title and artist when the player supports it." to "在支持的播放器中按歌名和歌手点歌。",
     "Play, pause, skip or seek in an authorized media player." to "控制已授权播放器的播放、暂停、切歌或进度。",
     "Adjust the phone's shared media volume, including Mochi speech." to "调整手机共用的媒体音量，包括 Mochi 朗读音量。",
     "Player access granted" to "已授予播放器访问权限",
     "Notification access required for players" to "播放器控制需要通知使用权",
-    "Open music apps, request songs, control playback and adjust media volume." to
-        "打开播放器、点歌、控制播放和调节音量。",
     "Notification access is a broad Android permission. Mochi uses media sessions only, not message notifications. Track metadata may be sent to your model Provider." to
         "通知使用权是范围较广的 Android 授权。Mochi 仅使用媒体会话，不读取消息通知。歌曲信息可能发送给你配置的模型提供商。",
     "Open notification settings" to "打开通知使用权设置",
+    "App assistance" to "应用操作辅助",
+    "Background pop-up permission" to "后台弹出界面",
+    "Open Mochi while another app is in the foreground" to "在其他应用位于前台时打开 Mochi",
+    "Some phones need this permission to open Mochi while another app is in the foreground." to
+        "当其他应用位于前台时，部分手机需要此权限才能打开 Mochi。",
+    "On Xiaomi/Redmi: Mochi app info > Other permissions > Display pop-up windows while running in the background." to
+        "小米／Redmi：Mochi 应用信息 → 其他权限 → 后台弹出界面。",
+    "Grant it manually if your system offers it. Mochi cannot reliably read this permission's status." to
+        "如果系统提供此选项，请手动允许。Mochi 无法可靠读取这项权限的状态。",
+    "Cannot open app settings. Open Mochi's app info from Android Settings." to
+        "无法打开应用设置，请从系统设置进入 Mochi 应用信息。",
+    "Enable app assistance" to "开启应用操作辅助",
+    "Manage app assistance" to "管理应用操作辅助",
+    "Allowed apps" to "允许操作的应用",
+    "Player access" to "播放器访问",
+    "Music apps by default" to "默认仅音乐应用",
+    "No matching apps" to "没有匹配的应用",
+    "Save selection" to "保存选择",
+    "Open settings" to "前往设置",
+    "Accessibility is a broad Android permission." to "无障碍是范围较广的 Android 系统权限。",
+    "Only your selected apps" to "仅操作你选择的应用",
+    "Your model reads filtered controls and chooses actions for your request. Interface text may reach your model Provider and conversation history." to
+        "模型读取经过过滤的控件，按你的请求决定操作。相关界面文字可能发送给模型提供商并进入对话记录。",
+    "You stay in control" to "控制权始终在你手中",
+    "Mochi can close explicit safe popups. Handle login, payments, permission grants and other sensitive steps yourself. Remove apps or disable access at any time." to
+        "Mochi 可以关闭有明确安全关闭入口的弹窗。登录、付款、授权等敏感步骤仍由你自行处理。你可以随时移除应用或关闭权限。",
+    "In Android settings, enable 'Mochi app assistance'." to "请在系统无障碍设置中开启「Mochi 应用操作辅助」。",
+    "Only selected apps can be operated. Interface text may reach your model and history." to
+        "仅允许操作勾选的应用，相关界面文字可能发送给模型并进入对话记录。",
+    "Search apps" to "搜索应用",
+    "Read and operate the apps you explicitly allow." to "读取并操作你明确允许的应用。",
+    "Open accessibility settings" to "打开无障碍设置",
+    "Cannot open accessibility settings. Open them from Android Settings." to "无法打开无障碍设置，请从 Android 系统设置中进入。",
     "Grant notification access" to "授予通知使用权",
     "Manage notification access" to "管理通知使用权",
     "Cannot open notification access settings. Open them from Android Settings." to
@@ -1185,13 +1233,16 @@ private val ZH_UI_TEXT = mapOf(
     "Current Weather" to "当前天气",
     "Read current local weather with device permission." to "在获得设备权限后读取当前本地天气。",
     "Browser" to "网页浏览",
+    "App Assistant" to "应用助手",
+    "Operate user-selected apps, dismiss obstructing ads and popups, and explain how to enable missing app tools." to
+        "操作用户选择的应用、关闭挡路的广告和弹窗，并引导开启缺少的应用工具。",
     "Open websites, search the web or WeChat, read and compare external pages, and reuse existing website sessions." to
         "打开网站、搜索网页或微信内容、阅读与比较外部页面，并复用已有网站会话。",
     "Search current public web information." to "搜索当前公开网页信息。",
     "Web Page Reader" to "网页阅读器",
     "Read bounded text from public HTTPS pages." to "读取公开 HTTPS 页面中的有限文本。",
     "Mochi Navigation" to "Mochi 导航",
-    "Open trusted native Mochi surfaces." to "打开可信的 Mochi 原生页面。",
+    "Open Mochi pages or enter and exit Focus mode." to "打开 Mochi 页面，或进入、退出专注模式。",
     "JavaScript Sandbox" to "JavaScript 沙箱",
     "Run bounded pure JavaScript calculations locally." to "在本地运行受限的纯 JavaScript 计算。",
     "Amap Place Search" to "高德地点搜索",

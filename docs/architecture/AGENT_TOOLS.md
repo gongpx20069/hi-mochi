@@ -36,7 +36,7 @@ The native `ToolRegistry` currently supports:
 - `run_sandboxed_javascript`;
 - `delegate_agent` in the Main Agent's request-scoped registry;
 - the five grouped Agent Browser Tools;
-- the five grouped Media Control Tools for Main Agent conversations and schedules, with foreground-only app launch;
+- five foreground-only App Control Tools and four separate Media Control Tools; schedules receive only the media collection and cannot launch apps;
 - configured Amap map and merchant Tools;
 - enabled MCP tools discovered through the Tool catalog;
 - enabled custom REST tools in foreground Main Agent conversations only.
@@ -244,19 +244,29 @@ targeted readback where possible and never replay solely to check their outcome.
 The Skill cannot grant unavailable APIs or claim full global search when the
 connection cannot discover/access all requested scopes.
 
-### Media Control
+### App Control and Media Control
 
-Media Control is a separately grouped set of bundled Tools, not part of
-**Mochi Built-ins**. Its master switch and five child switches default to on.
-Foreground and Scheduled Main Agents receive enabled Tools; Subagents do not.
+These are two independent bundled collections, not part of **Mochi Built-ins**.
+App Control has five Tools; Media Control has four. Both master switches and
+child switches default to on. Foreground Main Agents receive enabled Tools;
+schedules receive only media Tools, and Subagents receive neither collection.
 Every invocation checks both switches again, including before dispatch and
 during bounded outcome observation. Disabling does not undo a sent command.
 No extra Skill, extension APK, service account, or API key is required.
+Existing combined-group settings migrate once: each master retains its old
+enabled state; disabled UI operations stay disabled, and generic navigation
+stays disabled if either legacy UI operations or app opening was disabled.
+After migration the two masters are independent; app selections, including an
+explicit empty selection, and remaining media switches are preserved.
 
 | Tool | Arguments and result |
 | --- | --- |
-| `media_read` | No arguments. Returns notification-access status, up to 32 available music apps with ephemeral `player_id` values in `players[].id`, `canOpen` and `searchModes` (`session`/`intent`), up to 32 active external sessions, separate truncation flags, local media volume and its percentage. |
-| `media_open` | Requires a discovered `player_id`. Foreground conversation only, with a resumed Mochi Activity and an unlocked phone. Returns `outcome=launch_requested`, `verified=false`: Android accepted the request, not proof of a visible screen or playback. |
+| `app_read` | No arguments: discover selected apps with ephemeral `app_id` values in `apps[].id`, plus accessibility-granted and service-connected status. With `app_id`: read that app's current foreground controls. Neither operation requires player access. |
+| `app_navigate` | Requires discovered `app_id` and `action`: `open`, `back`, `return`. Opening needs an unlocked phone and resumed Mochi Activity, not accessibility or player access; it reports `launch_requested`, `verified=false`. Back requires the selected app's active window and accessibility. Return requires live app/Tool authorization, accessibility and an unlocked phone, but not a readable external window: it only launches Mochi itself. It reports `returnedToMochi`, never song verification. |
+| `app_click` | Requires `app_id` and a current `ref` advertising click. |
+| `app_input` | Requires `app_id`, current input-capable `ref`, and nonblank `text` up to 200 characters. Only recognized search fields are supported. |
+| `app_scroll` | Requires `app_id`, current `ref`, and `direction`: `forward` or `backward`, advertised by that control. |
+| `media_read` | No arguments: notification-access status, up to 32 selected apps with ephemeral `player_id` values in `players[].id`, `canOpen`, standard `searchModes` (`session`/`intent`), up to 32 selected-app sessions, separate truncation flags, local media volume and percentage. Alternatively requires `player_id` and `title`, with optional `artist`, to observe exact playing-song metadata for up to eight seconds without dispatching playback or navigation. |
 | `media_play_from_search` | Requires discovered `player_id`, `title` (1-200 characters) and optional nonblank `artist` (1-200). Notification access is required before dispatch for subsequent readback. Uses one advertised searchable session, otherwise the app's standard search/play Intent. Multiple searchable sessions are a conflict; no arbitrary target selection. |
 | `media_control` | Requires a discovered `session_id` and `action`: `play`, `pause`, `next`, `previous`, or `seek`. Only `seek` requires `position_ms` (0 through 2,147,483,647, not beyond a known track duration). |
 | `media_volume` | `action`: `increase`/`decrease` (one hardware step), `set` (requires integer `percent` 0-100), or `mute` (zero). Other argument combinations are rejected. |
@@ -274,23 +284,68 @@ media-key broadcasts or model-supplied arbitrary Intents, components or URIs.
 
 Session IDs are ephemeral native references, not package-name guesses. The
 Agent must discover the target and ask when user intent is ambiguous. Missing
-sessions, unsupported actions, or fixed volume fail visibly. Discovery queries
-QQ Music, NetEase Cloud Music, Xiaomi Music, handlers of standard music/search
-Intents and visible active-session apps, not the full installed-app inventory.
-It never treats installation as proof of search support. No private URI schemes,
-account/playlist access or screen-tap simulation is used; compatibility with
-every QQ Music, NetEase or OEM version is not promised.
+sessions, unsupported actions, or fixed volume fail visibly. Only user-selected
+packages enter discovery and cross-app control. The native picker may query
+launchable apps, but unselected inventory never enters model output. Defaults
+include the known music packages and apps categorized as audio; an explicit
+empty selection does not restore defaults. Installation never proves search
+support, and compatibility with every selected app/version is not promised.
+
+App UI operations run through a manually enabled accessibility service. Native code
+checks the selected package, active window, unlocked phone and live Tool gate.
+Android interactive-window metadata identifies the focused application window
+after non-touch app launches. Only that window's root is inspected; the legacy
+active-root lookup is used only when no focused application window is reported.
+An unreadable or foreign focused root is never replaced with an underlying app.
+Read traverses at most 1,000 nodes, returning up to 60 actionable and 20 text
+elements with a truncation flag. Password/private-authentication screens,
+WebView subtrees and recognized sensitive controls are withheld; identifiable
+strings, URLs and token-like values are redacted. Filtered text may enter the
+model/history and is untrusted data, never executable instructions. References
+belong to one app Tool registry (shared across its five Tools), expire after 30 seconds, and are invalidated by
+reads, actions or window changes. Actions revalidate the current screen and
+control before a single dispatch; no coordinate fallback or automatic replay.
+Snapshots include optional `role=dismiss` or `role=search` semantics from
+explicit labels and conservatively recognized native resource IDs. Android
+non-important views are included within the same traversal/privacy bounds so
+native search containers and close icons can be exposed. Search inheritance
+crosses at most four noninteractive wrappers to a recognized search-field
+container, not an entire toolbar; labelled adjacent controls such as music
+recognition retain their own meaning. An unlabelled search-entry wrapper uses
+a stable Search label rather than its rotating suggested-query descendants;
+descendant sensitivity checks still run, and actual labelled queries/results
+remain part of control revalidation. A close descendant
+does not make an entire ad container a dismiss action; only a bounded
+single-child, noninteractive wrapper may inherit that label. Explicit safe
+close/cancel/not-now/skip-ad refs should dismiss obstructing popups, followed
+by a fresh read before continuing. Ad destinations, rewards, offers, purchases
+and permission confirmations remain excluded; there is no coordinate fallback.
+Unknown controls and sensitive flows require manual assistance. The service
+does not process event contents or inspect apps while idle.
+If returning does not produce Mochi's resumed-Activity callback, the Tool
+returns `CONFLICT`, not a successful navigation result. Its error points to
+App Control's **Background pop-up permission** entry for systems that block
+background launches. Authorization remains a manual system-settings action.
+
+For UI song selection, the model discovers and opens the selected app, reads its
+controls, searches, inspects results and selects the requested track. With player
+access and Media Control enabled, it uses `media_read` to discover the matching
+player, then verify exact title/artist and playing state before `app_navigate`
+returns to Mochi. Without player access it can still operate and return, but must
+not claim media-session-verified playback. A failed return must not trigger
+another play action. No app Tool accepts arbitrary selectors, coordinates,
+package names, Intents or music-verification arguments.
 
 Song requests prefer `MediaController.TransportControls.playFromSearch` only
 when `ACTION_PLAY_FROM_SEARCH` is advertised. Otherwise a native
 `MEDIA_PLAY_FROM_SEARCH` Intent carries song focus, title, optional artist and
-query, restricted to the discovered package. That route and `media_open` are
+query, restricted to the discovered package. That route and `app_navigate open` are
 blocked for schedules or when Mochi has no resumed Activity or the phone is
 locked. Schedules can still use supported existing sessions. No background
 launch permission or notification permission is silently granted.
 
-Song dispatch is single-shot and shares the mutation mutex with playback and
-volume. Readback lasts at most about eight seconds and requires `playing` plus
+Song dispatch is single-shot and shares the mutation mutex with app operations,
+playback and volume. Readback lasts at most about eight seconds and requires `playing` plus
 an exact normalized title and, when supplied, artist from the selected package.
 Session-based requests additionally require the same session ID; no replacement
 session can confirm them. Normalization is Unicode NFKC, trim and root-locale
@@ -460,6 +515,8 @@ Operations:
 - `show_calendar_month`
 - `show_calendar_day`
 - `show_todo`
+- `enter_focus`
+- `exit_focus`
 
 Optional arguments:
 
@@ -471,6 +528,13 @@ Optional arguments:
 
 This tool does not mutate planner data. The executor applies
 `NavigationPolicy`; invalid or context-inappropriate navigation is rejected.
+Focus operations require `reason=explicit_ui_request` and reject planner
+arguments. They set an explicit boolean, never toggle: entering preserves the
+current Home presentation or opens Face from a non-Home page; exiting preserves
+the current page. The result includes `focus_mode`. The same operation names
+are accepted in final `ui_directive.surface` requests. Returning from a selected
+external app uses `app_navigate return`, not Mochi UI navigation, so the existing
+presentation and Focus state are preserved.
 
 Calls include a required semantic `reason`. Generic calendar/time knowledge is
 rejected, current time/date prefers the Home date-time presentation, current

@@ -171,7 +171,7 @@ class MochiDatabaseTest {
         assertEquals(false, installed.enabled)
         assertEquals(true, edited.modified)
         val skills = repository.listSkills()
-        assertEquals(17, skills.size)
+        assertEquals(18, skills.size)
         assertEquals(
             listOf("Browser"),
             skills.filter { it.id == "builtin:browser" }.map { it.name },
@@ -413,7 +413,7 @@ class MochiDatabaseTest {
             assertFalse(termux.readiness(setOf("termux_exec")).isReady)
             assertTrue(termux.readiness(termux.requiredToolNames).isReady)
             repository.setEnabled("builtin:termux", true)
-            assertEquals(listOf("termux"), repository.listEnabledMetadata(termux.requiredToolNames).map { it.name })
+            assertEquals(listOf("app-assistant", "termux"), repository.listEnabledMetadata(termux.requiredToolNames).map { it.name })
             assertTrue(repository.listEnabledMetadata(setOf("termux_exec")).none { it.name == "termux" })
             assertTrue(termux.content.contains("Scheduled agents and subagents"))
             repository.setEnabled("builtin:termux", false)
@@ -470,11 +470,12 @@ class MochiDatabaseTest {
                 false,
                 skills.any { it.name == "browser" },
             )
-            assertTrue(
-                repository.listEnabledMetadata(emptySet()).isEmpty(),
+            assertEquals(
+                listOf("app-assistant"),
+                repository.listEnabledMetadata(emptySet()).map { it.name },
             )
             assertEquals(
-                listOf("notion-knowledge"),
+                listOf("app-assistant", "notion-knowledge"),
                 repository.listEnabledMetadata(
                     setOf(
                         "notion_search",
@@ -485,7 +486,7 @@ class MochiDatabaseTest {
                 ).map { it.name },
             )
             assertEquals(
-                listOf("us-stock-analysis"),
+                listOf("app-assistant", "us-stock-analysis"),
                 repository.listEnabledMetadata(
                     setOf(
                         "browser_read",
@@ -564,7 +565,7 @@ class MochiDatabaseTest {
             currentSurface = MochiSurface.Conversation,
         )
         assertEquals(
-            listOf("browser"),
+            listOf("app-assistant", "browser"),
             repository.listEnabledMetadata(reads).map { it.name },
         )
         val foreground = reads +
@@ -593,7 +594,7 @@ class MochiDatabaseTest {
             assertTrue(document.contains("Cache improves loading, not information freshness"))
         }
         val missing = reads - "browser_read"
-        assertTrue(repository.listEnabledMetadata(missing).isEmpty())
+        assertFalse(repository.listEnabledMetadata(missing).any { it.name == "browser" })
         assertEquals(
             "error",
             LoadSkillTool(repository, missing).execute(
@@ -601,6 +602,30 @@ class MochiDatabaseTest {
                 context,
             ).status,
         )
+    }
+
+    @Test
+    fun `app assistant remains available for setup without granting tools and preserves opt out`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val context = ToolExecutionContext(LocalDate.of(2026, 11, 4), MochiSurface.Conversation)
+        for (available in listOf(emptySet(), setOf("app_read", "app_click", "media_read", "unrelated_tool"))) {
+            assertTrue(repository.listEnabledMetadata(available).any { it.name == "app-assistant" })
+            val result = LoadSkillTool(repository, available).execute(
+                buildJsonObject { put("skill_name", "app-assistant") }, context,
+            )
+            assertEquals("ok", result.status)
+            val content = checkNotNull(result.data).jsonObject.getValue("content").jsonPrimitive.content
+            val declared = content.lineSequence().firstOrNull { it.startsWith("allowed-tools: ") }
+                ?.removePrefix("allowed-tools: ")?.split(" ")?.toSet().orEmpty()
+            assertEquals(available - "unrelated_tool", declared)
+            assertTrue(content.contains("Tools > App Control"))
+        }
+        repository.setEnabled("builtin:app-assistant", false)
+        val restored = RoomSkillRepository(database.skillDao())
+        assertFalse(restored.listEnabledMetadata().any { it.name == "app-assistant" })
+        assertEquals("NOT_FOUND", LoadSkillTool(restored, emptySet()).execute(
+            buildJsonObject { put("skill_name", "app-assistant") }, context,
+        ).code)
     }
 
     @Test

@@ -191,12 +191,22 @@ class MochiApplication : Application() {
     }
 
     val mediaPlatform by lazy {
-        com.example.mochi_pet.platform.media.AndroidMediaPlatform(this)
+        com.example.mochi_pet.platform.media.AndroidMediaPlatform(this) {
+            toolCatalogRepository.mediaAppPackages() ?:
+                com.example.mochi_pet.platform.media.selectableApps(this).filter { it.music }.map { it.packageName }.toSet()
+        }
+    }
+
+    private val deviceControlMutex = kotlinx.coroutines.sync.Mutex()
+
+    val appToolRuntime by lazy {
+        com.example.mochi_pet.core.apps.AppToolRuntime(mediaPlatform, deviceControlMutex)
     }
 
     val mediaToolRuntime by lazy {
         com.example.mochi_pet.core.media.MediaToolRuntime(
             mediaPlatform,
+            deviceControlMutex,
         )
     }
 

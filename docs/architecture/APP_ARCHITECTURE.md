@@ -60,6 +60,8 @@ run in local JVM tests.
 | `TaskCenterViewModel` | Read-only source aggregation, explicit source-specific actions and cancellable configuration reports |
 | `AgentBrowserRuntime` | per-turn WebView, mode, snapshots, handoff and serialized cleanup/deletion |
 | `MediaToolRuntime` / `AndroidMediaPlatform` | typed media actions, live Tool gates, serialized outcome checks, ephemeral player/session IDs, native discovery and search dispatch, weak resumed-Activity launch ownership and local media volume |
+| `AppToolRuntime` / `AppPlatform` | five foreground-only app Tools, generic app discovery, navigation and control contracts without media access, one shared reference owner per registry; production uses AndroidMediaPlatform with a mutex shared with MediaToolRuntime |
+| `AppAccessibilityService` | selected-package active-window checks, bounded filtered native control snapshots, short-lived single-use references and Android actions; never model planning or persisted screen contents |
 | `UserAssistanceCoordinator` | process-local ID-correlated, cancellable pending question/browser handoff |
 | `BrowserSettings` | visited host/time and last Agent-selected mode in Tool DataStore; no credentials or manual mode overrides |
 | `BrowserWebsite` | transient native UI grouping by registrable domain; exact-origin credentials and a data-presence flag, never Cookie values |
@@ -194,6 +196,11 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   configurable from Settings. DataStore owns this preference.
 - DataStore owns Focus standby enablement and its validated idle-delay choice.
   The default is enabled after 30 seconds; no Room migration is involved.
+- The Home ViewModel owns the active Focus flag in `SavedStateHandle`; UI
+  buttons and typed navigation intents use the same idempotent setter. The
+  Agent navigation sink switches to the main dispatcher before updating it.
+  External-app pause/resume preserves Focus; leaving Home explicitly clears it.
+  Standby remains local presentation state and resets on pause.
 - General backup export/import uses a versioned schema and excludes secrets.
   The separate explicit Provider-share flow may include only user-selected
   LLM, speech, Amap, Tencent Docs, and manual MCP credentials; imported

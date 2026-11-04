@@ -1,11 +1,14 @@
 package com.example.mochi_pet.core.navigation
 
 import com.example.mochi_pet.core.model.MochiSurface
+import com.example.mochi_pet.core.model.isHomePresentation
 import com.example.mochi_pet.core.model.TodoStatus
 import java.time.LocalDate
 import java.time.YearMonth
 
 sealed interface MochiNavigationIntent {
+    data class SetFocusMode(val enabled: Boolean) : MochiNavigationIntent
+
     data object ShowFace : MochiNavigationIntent
 
     data object ShowDateTime : MochiNavigationIntent
@@ -39,8 +42,10 @@ sealed interface MochiNavigationIntent {
 }
 
 object MochiNavigationReducer {
-    fun reduce(intent: MochiNavigationIntent): MochiSurface =
+    fun reduce(intent: MochiNavigationIntent, currentSurface: MochiSurface = MochiSurface.Face): MochiSurface =
         when (intent) {
+            is MochiNavigationIntent.SetFocusMode ->
+                if (intent.enabled && !currentSurface.isHomePresentation()) MochiSurface.Face else currentSurface
             MochiNavigationIntent.ShowFace -> MochiSurface.Face
             MochiNavigationIntent.ShowDateTime -> MochiSurface.DateTime
             MochiNavigationIntent.ShowWeather -> MochiSurface.Weather

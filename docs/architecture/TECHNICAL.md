@@ -488,6 +488,16 @@ Other Skills declare their mandatory Tools plus available, explicitly listed
 optional Tools (for example assistance, location or navigation). The header
 never synthesizes a missing alias or changes Tool enablement.
 
+The default-on `app-assistant` (App Assistant) Skill provides short, generic
+instructions for selected-app operation, safe popup dismissal, verification and
+return with the prior Mochi presentation/Focus preserved. It has no mandatory
+Tool dependency so it remains discoverable when explaining setup. Its optional
+header includes only the five App Control Tools and `media_read` actually present
+in the caller's registry. Missing capabilities point to Tools > App Control,
+app selection and manual accessibility authorization; playback verification
+additionally points to Media Control/player access. The Skill never grants
+foreground app operations to scheduled or child runs or enables any permission.
+
 Installed Skill `allowed-tools` declarations accept whitespace-delimited tool
 names, quoted scalars, folded/literal multiline scalars, and inline/block lists.
 Names must be exact Mochi Tool names; unsupported dependency values, duplicate

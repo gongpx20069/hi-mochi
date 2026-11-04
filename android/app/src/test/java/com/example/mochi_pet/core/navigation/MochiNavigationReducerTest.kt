@@ -8,6 +8,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MochiNavigationReducerTest {
+    @Test fun `focus preserves Home presentation while enter from another page opens Home and exit stays put`() {
+        for (surface in listOf(MochiSurface.Face, MochiSurface.DateTime, MochiSurface.Weather, MochiSurface.Card)) {
+            for (enabled in listOf(true, false)) {
+                assertEquals(surface, MochiNavigationReducer.reduce(MochiNavigationIntent.SetFocusMode(enabled), surface))
+            }
+        }
+        assertEquals(MochiSurface.Face,
+            MochiNavigationReducer.reduce(MochiNavigationIntent.SetFocusMode(true), MochiSurface.Settings))
+        assertEquals(MochiSurface.Settings,
+            MochiNavigationReducer.reduce(MochiNavigationIntent.SetFocusMode(false), MochiSurface.Settings))
+    }
+
     @Test
     fun `show date time keeps presentation on Home`() {
         assertEquals(

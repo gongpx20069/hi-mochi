@@ -213,6 +213,22 @@
                 <span class="tool-pill tool-clock"><i>↕</i> 滚动页面</span>
               </div>
             </article>
+            <article class="feature-card feature-wide reveal" id="app-control" data-app-control-feature>
+              <div>
+                <span class="feature-label">内置应用操作 · 初期体验</span>
+                <h3>你选择的应用，<br>Mochi 帮你操作。</h3>
+                <p>打开你允许操作的应用，读取支持的原生控件，搜索、点击与滚动。遇到普通弹窗或广告，通过明确的关闭、跳过按钮继续任务；不只适用于音乐应用。</p>
+                <blockquote class="example-prompt">“在音乐应用里搜索这首歌，然后回到 Mochi。”</blockquote>
+                <p class="feature-note">音乐只是使用示例，不代表兼容性保证；完整点歌播放流程仍在验证。点击成功不等于任务完成，返回时保留 Mochi 原来的页面与专注模式。</p>
+              </div>
+              <div>
+                <details class="extension-setup">
+                  <summary>选择应用，开启操作辅助</summary>
+                  <ol><li>进入“Tools → 应用操作”，开启需要的工具，在“允许操作的应用”中选择目标。初始选择音乐类应用，也可以添加其他应用或清空选择。</li><li>打开“应用操作辅助”，手动授予 Android 无障碍权限。部分手机还需允许“后台弹出界面”，才能在其他应用位于前台时打开 Mochi。</li><li>从手机已解锁的前台对话发起任务。内置“应用助手”Skill 默认开启，缺少工具时会指引配置，不会自动授权。媒体控制与播放器访问独立，用于核验媒体会话中的播放状态，不是普通应用操作的前提。</li></ol>
+                </details>
+                <p class="feature-note">仅限你选择的应用及其支持的控件，不提供任意坐标点击或无人值守的后台操控，不绕过登录、支付、权限确认或不可读取的界面。供 Agent 使用的过滤后界面文本会发送给你配置的模型服务。</p>
+              </div>
+            </article>
             <article class="feature-card reveal" data-skills-feature>
               <span class="feature-label">Skill Market</span>
               <h3>按需学习，<br>不必一次开启全部能力。</h3>

@@ -276,6 +276,7 @@ once its provider is connected and its Tools are enabled.
 | Voice Navigation | Enabled | Opens the relevant native Mochi surface from conversation intent | None |
 | Scheduled Automations | Enabled | Runs one-time or recurring Agent prompts and writes results to Conversation | Notification permission; exact-alarm access is optional |
 | Browser | Enabled | Opens links, reads/compares web pages, searches Bing or WeChat sources, and reuses website sessions | None; requires Agent Browser read Tools |
+| App Assistant | Enabled | Guides selected-app operation, safe popup dismissal, result verification and return to Mochi; explains setup when Tools are unavailable | None for guidance; operations require App Control and manual accessibility authorization |
 | Product Search | Enabled | Finds and compares public product pages without ordering or payment | None |
 | Douban Ratings | Enabled | Reads public Douban ratings, counts, and review themes | None |
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
@@ -296,7 +297,8 @@ Skills requiring separately installed apps are listed under
 | **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
 | **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Browse public HTTPS websites with reusable local login and Agent-selected mobile/desktop mode. |
-| **Media Control** | `media_read` · `media_open` · `media_play_from_search`<br>`media_control` · `media_volume` | Open music apps, request songs when supported, control playback and adjust local media volume. No extra APK. |
+| **App Control** | `app_read` · `app_navigate` · `app_click`<br>`app_input` · `app_scroll` | Read and operate user-selected apps through optional accessibility assistance. |
+| **Media Control** | `media_read` · `media_play_from_search`<br>`media_control` · `media_volume` | Request supported songs, control playback and adjust local media volume. No extra APK. |
 | **Native UX** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | Open trusted Mochi surfaces or run bounded pure JavaScript calculations locally. |
 | **Amap Maps** | Place search · Merchant details · Routes<br>Geocoding · Reverse geocoding · Weather | Search places and merchants, compare available ratings and average cost, and plan routes with trusted GCJ-02 coordinates. Requires a Web Service Key. |
 | **Connected MCP** | **Notion** · **Tencent Docs** · **Feishu**<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
@@ -307,8 +309,9 @@ Browser subset; foreground conversations may also click and enter page data.
 Provider Tools have independent switches, and provider-backed Tools also require
 their provider switch to be enabled.
 
-**Media Control** appears between Agent Browser and Amap Maps, outside Mochi
-built-ins. Its group and five Tools default to enabled for conversations and
+**App Control** and **Media Control** appear in that order between Agent Browser
+and Amap Maps, outside Mochi built-ins, with independent master and child switches.
+The five app Tools are foreground-only; the four media Tools also support
 Scheduled Agents, not Subagents. App launch requires a foreground conversation
 with Mochi visible and the phone unlocked; schedules can request songs only
 through existing supported sessions. Grant notification access from its card to
@@ -318,6 +321,22 @@ affects Mochi speech, not ringtone, alarms or cast devices. Player compatibility
 depends on the installed app's supported media-session actions and search Intents.
 An accepted app launch is not proof of playback; unconfirmed song requests are
 reported rather than automatically retried.
+
+Use **Allowed apps** in App Control to choose the shared scope.
+Music apps are selected by default; you may explicitly add other launchable
+apps or deselect all. **App assistance** separately opens Android
+accessibility settings after disclosure. It lets the model use filtered
+controls rather than fixed app-specific scripts; related interface text may
+reach your model Provider and conversation history. Explicit safe close/cancel
+controls can dismiss obstructing ads and popups. Sensitive operations
+require manual help, and unsupported interfaces may not be operable.
+App operations do not require player access. With that optional access,
+`media_read` can verify the exact playing song before `app_navigate` returns
+to Mochi, preserving its screen and Focus mode; navigation itself never claims verified playback.
+Mochi Navigation also supports entering and exiting Focus mode by request.
+**App Control > Background pop-up permission** opens Mochi's system app settings
+for manually allowing Mochi to open while another app is in the foreground.
+For UI song requests, playback and return to Mochi are verified separately.
 
 **Tools > Agent Browser > Websites and logins** opens a Bing search/address field
 and website list. Known websites with detected local data or saved accounts appear

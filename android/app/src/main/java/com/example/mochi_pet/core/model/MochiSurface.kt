@@ -40,3 +40,7 @@ enum class TodoStatus {
     ACTIVE,
     COMPLETED,
 }
+
+fun MochiSurface.isHomePresentation(): Boolean =
+    this == MochiSurface.Face || this == MochiSurface.DateTime ||
+        this == MochiSurface.Weather || this == MochiSurface.Card

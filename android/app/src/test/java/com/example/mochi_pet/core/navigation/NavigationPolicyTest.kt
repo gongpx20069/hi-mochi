@@ -4,11 +4,40 @@ import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolInputException
 import com.example.mochi_pet.core.model.MochiSurface
 import java.time.LocalDate
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class NavigationPolicyTest {
+    @Test fun `focus operations parse for Tools and final directives and require explicit UI intent`() = runBlocking {
+        val decisions = mutableListOf<NavigationDecision>()
+        val tool = NavigateMochiUiTool(policy, UiDirectiveSink { decisions += it })
+        for ((operation, enabled) in listOf("enter_focus" to true, "exit_focus" to false)) {
+            val args = buildJsonObject { put("operate", operation); put("reason", "explicit_ui_request") }
+            tool.execute(args, context.copy(currentSurface = MochiSurface.DateTime))
+            val decision = decisions.last()
+            assertEquals(MochiNavigationIntent.SetFocusMode(enabled), decision.intent)
+            assertEquals("date_time", decision.directive.surface)
+            assertEquals(JsonPrimitive(enabled), decision.directive.toJson()["focus_mode"])
+            assertEquals(
+                parseUiDirectiveRequest(args).operation,
+                parseUiDirectiveRequest(buildJsonObject {
+                    put("surface", operation); put("reason", "explicit_ui_request")
+                }, "surface").operation,
+            )
+            assertThrows(ToolInputException::class.java) {
+                policy.decide(parseUiDirectiveRequest(args).copy(reason = NavigationReason.CURRENT_TIME_DATE), context)
+            }
+            assertThrows(ToolInputException::class.java) {
+                policy.decide(parseUiDirectiveRequest(args).copy(date = today), context)
+            }
+        }
+    }
+
     private val today = LocalDate.of(2026, 7, 31)
     private val context = ToolExecutionContext(
         currentDate = today,

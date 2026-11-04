@@ -42,10 +42,34 @@ class AndroidMediaPlatformTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val manager = shadowOf(context.getSystemService(MediaSessionManager::class.java))
     private val notifications = shadowOf(context.getSystemService(NotificationManager::class.java))
-    private val platform = AndroidMediaPlatform(context)
+    private var allowed = DEFAULT_MUSIC_APPS + setOf("fixture.music", "fixture.first", "fixture.second")
+    private val platform = AndroidMediaPlatform(context) { allowed }
     private val sessions = mutableListOf<MediaSession>()
 
     @After fun close() { sessions.forEach { it.release() } }
+
+    @Test fun `generic app discovery includes selected non music apps without player access`(): Unit = runBlocking {
+        installPlayer("fixture.reader")
+        installPlayer("fixture.hidden")
+        allowed = setOf("fixture.reader")
+        assertFalse(mediaNotificationAccessGranted(context))
+        val selected = platform.apps().apps.single()
+        assertEquals("fixture.reader", selected.packageName)
+        assertEquals(selected.id, platform.apps().apps.single().id)
+        allowed = emptySet()
+        assertTrue(platform.apps().apps.isEmpty())
+        assertThrows(MediaFailure::class.java) { runBlocking { platform.open(selected.id) } }
+    }
+
+    @Test fun `removing an app hides its metadata and revokes previously discovered sessions`(): Unit = runBlocking {
+        grant(true)
+        player("fixture.music")
+        val id = platform.read().sessions.single().id
+        allowed = emptySet()
+        assertTrue(platform.read().players.isEmpty())
+        assertTrue(platform.read().sessions.isEmpty())
+        assertThrows(MediaFailure::class.java) { runBlocking { platform.control(id, MediaAction.PLAY, null) } }
+    }
 
     @Test fun `notification access gates discovery and own wake session is excluded`() = runBlocking {
         val other = player("fixture.music")

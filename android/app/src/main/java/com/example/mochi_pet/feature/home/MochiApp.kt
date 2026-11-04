@@ -141,6 +141,7 @@ import com.example.mochi_pet.core.update.AppUpdate
 import com.example.mochi_pet.core.agent.llm.DEFAULT_AZURE_API_VERSION
 import com.example.mochi_pet.core.model.CalendarEvent
 import com.example.mochi_pet.core.model.MochiSurface
+import com.example.mochi_pet.core.model.isHomePresentation
 import com.example.mochi_pet.core.model.MochiTodo
 import com.example.mochi_pet.core.model.TodoStatus
 import com.example.mochi_pet.core.mcp.NOTION_SERVER_ID
@@ -483,7 +484,7 @@ private fun MochiAppContent(
     var showBrowserManager by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(surface) { if (surface != MochiSurface.Tools) showBrowserManager = false }
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
-    var focusMode by rememberSaveable { mutableStateOf(false) }
+    val focusMode by viewModel.focusMode.collectAsStateWithLifecycle()
     var focusStandby by rememberSaveable { mutableStateOf(false) }
     var standbyResetVersion by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
@@ -505,12 +506,12 @@ private fun MochiAppContent(
     val toggleFocusMode: () -> Unit = {
         focusStandby = false
         standbyResetVersion += 1
-        focusMode = focusModeAfterToggle(focusMode)
+        viewModel.setFocusMode(focusModeAfterToggle(focusMode))
     }
 
     LaunchedEffect(homePresentation) {
         if (!homePresentation) {
-            focusMode = false
+            viewModel.setFocusMode(false)
             focusStandby = false
         }
     }
@@ -605,7 +606,7 @@ private fun MochiAppContent(
     }
     BackHandler(enabled = focusMode) {
         focusStandby = false
-        focusMode = false
+        viewModel.setFocusMode(false)
     }
     LaunchedEffect(toolsState.authorizationUrl) {
         val authorizationUrl = toolsState.authorizationUrl ?: return@LaunchedEffect
@@ -794,6 +795,8 @@ private fun MochiAppContent(
             onSetAmapEnabled = viewModel::setAmapEnabled,
             onSetAgentBrowserEnabled = viewModel::setAgentBrowserEnabled,
             onSetMediaEnabled = viewModel::setMediaEnabled,
+            onSetAppControlEnabled = viewModel::setAppControlEnabled,
+            onSetMediaAppPackages = viewModel::setMediaAppPackages,
             onManageBrowser = { showBrowserManager = true },
             onAgentLinkAction = viewModel::onAgentLinkAction,
             onInstallMijia = viewModel::installMijiaExtension,
@@ -879,7 +882,7 @@ private fun MochiAppContent(
                             OutlinedButton(
                                 onClick = {
                                     focusStandby = false
-                                    focusMode = false
+                                    viewModel.setFocusMode(false)
                                 },
                                 shape = RoundedCornerShape(18.dp),
                             ) {
@@ -1366,12 +1369,6 @@ private fun MochiSurface.displayName(): String =
         is MochiSurface.Todo -> "Todo"
     }
 
-private fun MochiSurface.isHomePresentation(): Boolean =
-    this == MochiSurface.Face ||
-        this == MochiSurface.DateTime ||
-        this == MochiSurface.Weather ||
-        this == MochiSurface.Card
-
 @Composable
 private fun FocusStandbyScreen(
     modifier: Modifier = Modifier,
@@ -1476,6 +1473,7 @@ private fun SurfaceContent(
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
     onSetMediaEnabled: (Boolean) -> Unit,
+    onSetAppControlEnabled: (Boolean) -> Unit,
     onManageBrowser: () -> Unit,
     onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
@@ -1499,6 +1497,7 @@ private fun SurfaceContent(
     onDismissCameraSnapshot: () -> Unit,
     onFocus: () -> Unit,
     modifier: Modifier = Modifier,
+    onSetMediaAppPackages: (Set<String>) -> Unit = {},
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
@@ -1591,6 +1590,8 @@ private fun SurfaceContent(
                 onSetAmapEnabled = onSetAmapEnabled,
                 onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
                 onSetMediaEnabled = onSetMediaEnabled,
+                onSetAppControlEnabled = onSetAppControlEnabled,
+                onSetMediaAppPackages = onSetMediaAppPackages,
                 onManageBrowser = onManageBrowser,
                 onAgentLinkAction = onAgentLinkAction,
                 onInstallMijia = onInstallMijia,
@@ -3720,6 +3721,8 @@ internal fun ToolsSurface(
     onSetAmapEnabled: (Boolean) -> Unit,
     onSetAgentBrowserEnabled: (Boolean) -> Unit,
     onSetMediaEnabled: (Boolean) -> Unit,
+    onSetMediaAppPackages: (Set<String>) -> Unit = {},
+    onSetAppControlEnabled: (Boolean) -> Unit = {},
     onManageBrowser: () -> Unit,
     onAgentLinkAction: (AgentLinkUiAction) -> Unit,
     onInstallMijia: () -> Unit,
@@ -3844,9 +3847,14 @@ internal fun ToolsSurface(
                             enabled = !state.isLoading,
                         )
                     }
-                    Button(onClick = onManageBrowser, enabled = !state.isLoading) {
-                        Text("Websites and logins")
-                    }
+                    ToolSettingsRow(
+                        title = "Websites and logins",
+                        detail = "Manage websites and saved logins",
+                        icon = ToolGlyph.WEBSITES,
+                        enabled = !state.isLoading,
+                        tag = "browser-websites-settings",
+                        onClick = onManageBrowser,
+                    )
                     TextButton(
                         onClick = {
                             browserToolsExpanded = !browserToolsExpanded
@@ -3911,6 +3919,15 @@ internal fun ToolsSurface(
                         }
                     }
                 }
+            }
+            item {
+                AppControlProviderCard(
+                    summary = state.catalog.appControl,
+                    disabled = state.isLoading,
+                    onSetEnabled = onSetAppControlEnabled,
+                    onSetAppPackages = onSetMediaAppPackages,
+                    onSetToolEnabled = onSetBuiltInEnabled,
+                )
             }
             item {
                 MediaProviderCard(

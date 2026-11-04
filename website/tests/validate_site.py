@@ -124,7 +124,7 @@ def main() -> None:
             source = page.read_text(encoding="utf-8")
             for feature in (
                 "smart-home", "speech", "documents", "connections", "tasks",
-                "browser", "skills", "api",
+                "browser", "app-control", "skills", "api",
             ):
                 if source.count(f"data-{feature}-feature") != 1:
                     errors.append(

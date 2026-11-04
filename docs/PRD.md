@@ -195,15 +195,18 @@ and credentials are not part of Provider sharing, Scheduled Agents, or Subagent
 registries. Returned selected data may be sent to the model and stored in
 conversation history; authentication material is excluded.
 
-### 3.5.2 Media Control tools
+### 3.5.2 App Control and Media Control tools
 
-The bundled `media_read`, `media_open`, `media_play_from_search`,
-`media_control`, and `media_volume` Tools form a
-separate **Media Control** group between Agent Browser and Amap Maps, not inside
-Mochi Built-ins. The group and individual switches default to enabled. They
-support Main Agent conversations and Scheduled Agents, but not Subagents.
+Two independent bundled groups appear between Agent Browser and Amap Maps,
+outside Mochi Built-ins: **App Control** (`app_read`, `app_navigate`, `app_click`,
+`app_input`, `app_scroll`), then **Media Control** (`media_read`,
+`media_play_from_search`, `media_control`, `media_volume`). Their master and
+individual switches default to enabled, preserve old disabled settings on
+migration, and subsequently operate independently. App Tools support foreground
+Main Agent conversations only; media Tools also support Scheduled Agents.
+Neither collection is exposed to Subagents.
 Android notification access remains an explicit prerequisite for discovering
-and controlling other apps' active players. No message-notification content is
+and controlling selected apps' active players. No message-notification content is
 read or uploaded. Media metadata may be sent to the configured model.
 
 The Tools discover available music apps, open a selected app, request a song by
@@ -213,13 +216,43 @@ media-volume adjustment. Opening apps requires an unlocked phone and a resumed
 Mochi foreground conversation; schedules may request songs only through an
 existing searchable media session. Song requests require notification access
 for readback. Unsupported players fail explicitly, without private URI schemes,
-UI automation, account actions, personal playlists or remote/cast-device volume.
+private API account actions or remote/cast-device volume.
 Authorization and actual player capabilities
 determine availability, not merely installation. Commands report observed
 outcomes; unconfirmed actions must not be presented as completed or retried
 automatically. App opening reports only an accepted launch request, not a
 verified screen or playback. Local media volume also affects Mochi speech, but never changes
 ringtone, notification or alarm streams.
+
+App Control includes a native **Allowed apps** selection sheet shared by both collections. Initially
+only installed music apps are selected; users may explicitly select other
+launchable apps or deselect all. Selection is persisted locally and checked
+again before app/session discovery and operations. The model cannot change it.
+OS settings, permission controllers and installers are not automation targets.
+
+The five generic app Tools provide model-directed, foreground-only accessibility
+inspection, click, search-field input, scrolling, Back and return to Mochi.
+It is not a per-player click script. Users must separately enable Android
+accessibility after a disclosure that filtered interface text can reach the
+model and conversation history. Password/private-authentication screens,
+WebViews and recognized sensitive controls are excluded. Explicit safe Close,
+Cancel, Not now and Skip-ad controls, including recognized native close icons,
+may dismiss obstructing ads/popups before continuing the requested task.
+Activating ads, accepting offers, login, payments, permission grants and other
+sensitive steps require manual help. Unknown or unsupported
+interfaces fail explicitly; selecting an app does not certify compatibility.
+App discovery uses `app_id`, without requiring media discovery or player access.
+Navigation never accepts song-verification arguments. Optional player access
+allows `media_read` to verify exact playing-session title/artist after UI
+selection; `app_navigate` then returns to Mochi separately without changing its
+previous presentation or Focus mode. Without player access,
+UI actions remain available but playback must not be claimed as verified by
+media-session metadata.
+
+App Control also provides **Background pop-up permission** setup for systems
+that restrict opening Mochi while another app is in the foreground. It opens Mochi's system app-info page
+after an explanation; the user grants access manually. The card does not invent
+a permission status, and an unconfirmed return is an explicit Tool error.
 
 ### 3.6 Agent Browser
 
@@ -301,6 +334,11 @@ ringtone, notification or alarm streams.
 
 - Skills has Installed and Explore surfaces.
 - Built-in Mochi skills are visible and read-only.
+- App Assistant is a default-on, generic app-operation Skill: close safe
+  obstructing ads/popups, search and operate selected apps, verify the result,
+  and return without resetting Mochi's page or Focus mode. It remains available
+  without app Tools to explain enabling Tools > App Control, selecting apps and
+  manually granting app assistance. It never grants a Tool or permission.
 - skills.sh market skills can be installed, enabled, edited, updated, and
   removed locally.
 - Installed skills retain source URL, upstream version/digest, local digest,

@@ -2,6 +2,8 @@
 <resources>
     <string name="app_name">Mochi</string>
     <string name="media_control_access">Mochi 媒体控制</string>
+    <string name="app_assistance">Mochi 应用操作辅助</string>
+    <string name="app_assistance_description">按你的请求，Mochi 读取所选应用经过过滤的控件，由模型决定操作。相关界面文字可能发送给模型提供商并进入对话记录。默认选中音乐应用，登录、付款等敏感操作需要你自行完成。你可以随时取消应用授权或关闭此权限。</string>
     <string name="assistance_notification_channel">Mochi 用户协助</string>
     <string name="assistance_notification_title">Mochi 需要你的协助</string>
     <string name="assistance_notification_text">打开 Mochi 回答问题或处理网站登录</string>

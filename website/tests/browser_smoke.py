@@ -119,7 +119,7 @@ def main() -> None:
                         page.locator(".capability-map a[href='#webdav-extension']").click()
                         assert page.url.endswith("#webdav-extension")
                         for disclosure in page.locator(
-                            "[data-connections-feature] details, #webdav-extension details, #install details"
+                            "[data-connections-feature] details, [data-app-control-feature] details, #webdav-extension details, #install details"
                         ).all():
                             summary = disclosure.locator("summary")
                             summary.focus()
@@ -164,7 +164,7 @@ def main() -> None:
                             const cards = document.querySelectorAll(
                                 "[data-speech-feature], [data-documents-feature], " +
                                 "[data-connections-feature], [data-tasks-feature], " +
-                                "[data-browser-feature], [data-skills-feature], [data-api-feature], " +
+                                "[data-browser-feature], [data-app-control-feature], [data-skills-feature], [data-api-feature], " +
                                 "[data-extension-card], .link-benefits article, .link-stage, " +
                                 ".al-agent-card, .al-feature-grid article, .al-setup-grid li"
                             );
@@ -256,7 +256,7 @@ def main() -> None:
                         f"{RELEASE_ROOT}download/{fallback}/Mochi-{fallback}-arm64-v8a.apk"
                     )
                     for disclosure in page.locator(
-                        "[data-connections-feature] details, #webdav-extension details, #install details"
+                        "[data-connections-feature] details, [data-app-control-feature] details, #webdav-extension details, #install details"
                     ).all():
                         disclosure.locator("summary").click()
                         assert disclosure.evaluate("(item) => item.open")

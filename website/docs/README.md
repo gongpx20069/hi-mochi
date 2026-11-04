@@ -66,6 +66,16 @@ configuration-check guidance in the installation disclosure, including its
 possible model-request cost. Skill Market does not auto-enable dependent Tools.
 REST copy must distinguish its public HTTPS JSON scope from MCP support.
 
+The App Control feature is built into Mochi, not an extension or a music-only
+integration. Describe user-selected apps, supported native controls, explicit
+safe popup dismissal and returning with the previous page/Focus mode. Keep
+manual accessibility setup, optional vendor background-launch permission and
+separate media-session authorization clear. App Assistant defaults on without
+granting Tools. Music is an illustrative request; end-to-end exact-song playback
+remains unverified. Do not promise universal compatibility or unattended control.
+Disclose model-provider access to filtered UI text. Both languages use a native
+setup disclosure that remains usable without JavaScript.
+
 ## Capabilities and AgentLink
 
 The homepage groups optional capabilities under `#extensions`: Mi Home and

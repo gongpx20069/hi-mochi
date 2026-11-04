@@ -11,6 +11,7 @@ import com.example.mochi_pet.core.agent.tool.optionalStringList
 import com.example.mochi_pet.core.agent.tool.requiredEnum
 import com.example.mochi_pet.core.agent.tool.requiredString
 import com.example.mochi_pet.core.model.TodoStatus
+import com.example.mochi_pet.core.model.MochiSurface
 import java.time.LocalDate
 import java.time.YearMonth
 import kotlinx.serialization.json.JsonArray
@@ -20,6 +21,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 enum class NavigationOperation {
+    ENTER_FOCUS,
+    EXIT_FOCUS,
     SHOW_FACE,
     SHOW_DATE_TIME,
     SHOW_WEATHER,
@@ -68,6 +71,7 @@ data class UiDirective(
     val section: UiSection? = null,
     val status: TodoStatus? = null,
     val highlightIds: List<String> = emptyList(),
+    val focusMode: Boolean? = null,
 )
 
 data class NavigationDecision(
@@ -100,6 +104,17 @@ class NavigationPolicy {
             }
 
         return when (request.operation) {
+            NavigationOperation.ENTER_FOCUS, NavigationOperation.EXIT_FOCUS -> {
+                request.requireExplicitUiRequest()
+                if (request.date != null || request.month != null || request.section != null ||
+                    request.status != null || request.highlightIds.isNotEmpty()) {
+                    throw ToolInputException("Focus operations do not accept planner arguments")
+                }
+                val enabled = request.operation == NavigationOperation.ENTER_FOCUS
+                val intent = MochiNavigationIntent.SetFocusMode(enabled)
+                val target = MochiNavigationReducer.reduce(intent, context.currentSurface)
+                NavigationDecision(target.toDirective().copy(focusMode = enabled), intent)
+            }
             NavigationOperation.SHOW_FACE -> {
                 request.requireExplicitUiRequest()
                 NavigationDecision(
@@ -289,7 +304,9 @@ class NavigateMochiUiTool(
     override val schema: JsonObject = functionToolSchema(
         name = name,
         description =
-            "Navigate Mochi's own UI after resolving conversational intent.",
+            "Navigate Mochi's own UI after resolving conversational intent. enter_focus and exit_focus explicitly set (never toggle) Focus mode " +
+                "and require reason=explicit_ui_request. Enter preserves the current Home presentation, or opens Home from another page; exit preserves the current page. " +
+                "Returning from an external app uses app_navigate return, not this Tool: preserve Mochi's existing screen and Focus state.",
         properties = buildJsonObject {
             put("operate", stringProperty(NavigationOperation.entries))
             put("reason", stringProperty(NavigationReason.entries))
@@ -329,11 +346,9 @@ fun parseUiDirectiveRequest(
     operationField: String = "operate",
 ): UiDirectiveRequest {
     val rawOperation = arguments.requiredString(operationField)
-    val operationName = rawOperation
-        .uppercase()
-        .let { if (it.startsWith("SHOW_")) it else "SHOW_$it" }
+    val operationName = rawOperation.uppercase()
     val operation = NavigationOperation.entries.firstOrNull {
-        it.name == operationName
+        it.name == operationName || it.name == "SHOW_$operationName"
     } ?: throw ToolInputException(
         "$operationField must be one of: " +
             NavigationOperation.entries.joinToString {
@@ -354,6 +369,7 @@ fun parseUiDirectiveRequest(
 fun UiDirective.toJson(): JsonObject =
     buildJsonObject {
         put("surface", surface)
+        focusMode?.let { put("focus_mode", it) }
         date?.let { put("date", it.toString()) }
         month?.let { put("month", it.toString()) }
         section?.let { put("section", it.name.lowercase()) }
@@ -365,6 +381,21 @@ fun UiDirective.toJson(): JsonObject =
             )
         }
     }
+
+private fun MochiSurface.toDirective(): UiDirective = when (this) {
+    MochiSurface.Face -> UiDirective("face")
+    MochiSurface.DateTime -> UiDirective("date_time")
+    MochiSurface.Weather -> UiDirective("weather")
+    MochiSurface.Card -> UiDirective("card")
+    MochiSurface.Conversation -> UiDirective("conversation")
+    MochiSurface.Settings -> UiDirective("settings")
+    MochiSurface.Skills -> UiDirective("skills")
+    MochiSurface.Tools -> UiDirective("tools")
+    MochiSurface.Today -> UiDirective("today")
+    is MochiSurface.CalendarMonth -> UiDirective("calendar_month", month = month)
+    is MochiSurface.CalendarDay -> UiDirective("calendar_day", date = date)
+    is MochiSurface.Todo -> UiDirective("todo", date = date, status = status)
+}
 
 private fun stringProperty(
     values: List<Enum<*>>? = null,
