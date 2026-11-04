@@ -149,7 +149,7 @@ preserve the matching bundled release as a whole. If the API is unavailable or
 rate-limited, the fallback remains usable. AgentLink pages do not request the
 Mochi release API.
 
-The bundled fallback is **v1.0.16**. After publishing a new release, update
+The bundled fallback is **v1.0.17**. After publishing a new release, update
 both homepages' base/extension download URLs, release-page URLs, and version labels together.
 The static check enforces consistency within and between languages; it does
 not query GitHub or infer an unpublished version. An API outage must not send
