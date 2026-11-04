@@ -624,12 +624,19 @@ private val BUILT_IN_SKILLS = listOf(
               use available media_read to confirm exact title, artist and playing state.
               If missing, explain Tools > Media Control (媒体控制) and Player access
               (播放器访问); never claim verified playback without evidence.
-            - On success or failure, return with app_navigate action=return unless the
-              user wants to stay in the app. Preserve Mochi's prior page and Focus mode;
-              do not reset them through navigation Tools. If Android blocks the return,
-              point to App Control > Background pop-up permission (后台弹出界面).
+            - Before your final reply, attempt app_navigate action=return whether the
+              task succeeded, failed, was blocked, or a Tool returned an error. Return
+              to Mochi as it was immediately before opening the external app: keep its
+              page and Focus mode untouched; do not reset them with navigation Tools.
+              Returning must not pause music or undo changes made in the external app.
+              Respect an explicit request to stay there or the user's manual takeover.
+            - Confirm returnedToMochi=true before claiming you returned. If returning
+              is unavailable or fails, report that separately from the task outcome;
+              do not loop or replay the task. For blocked background launches, point
+              to App Control > Background pop-up permission (后台弹出界面).
               Unreadable screens or necessary login/payment/authorization need manual
-              handling; report the actual blocker rather than claiming completion.
+              handling. These are Agent instructions, not guaranteed runtime cleanup
+              after cancellation, process death, or Android restrictions.
         """.trimIndent(),
     ),
     builtInSkill(

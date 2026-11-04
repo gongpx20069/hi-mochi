@@ -497,6 +497,12 @@ in the caller's registry. Missing capabilities point to Tools > App Control,
 app selection and manual accessibility authorization; playback verification
 additionally points to Media Control/player access. The Skill never grants
 foreground app operations to scheduled or child runs or enables any permission.
+Its return rule is a soft Agent instruction: before the final reply, attempt
+return after success, failure, a blocker or a Tool error, retaining the state
+from immediately before leaving Mochi. Do not pause playback, undo external
+changes or override an explicit stay/manual takeover. Confirm the return result
+and report failure separately without replaying the task. This is not a runtime
+cleanup guarantee on cancellation, process death or Android launch restrictions.
 
 Installed Skill `allowed-tools` declarations accept whitespace-delimited tool
 names, quoted scalars, folded/literal multiline scalars, and inline/block lists.
