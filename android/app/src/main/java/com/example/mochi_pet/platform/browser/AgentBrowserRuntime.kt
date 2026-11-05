@@ -39,6 +39,7 @@ import com.example.mochi_pet.core.browser.UserAssistanceAnswer
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import com.example.mochi_pet.core.web.WebAccessDeniedException
 import java.util.UUID
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -96,6 +97,10 @@ open class AgentBrowserException(message: String) : Exception(message)
 class StaleBrowserReferenceException :
     AgentBrowserException("The page element reference is stale")
 
+class BrowserTimeoutException : AgentBrowserException(
+    "Browser page response timed out. The action may already have run; read the page before retrying.",
+)
+
 class AgentBrowserRuntime(
     private val applicationContext: Context,
     val settings: BrowserSettings? = null,
@@ -114,6 +119,7 @@ class AgentBrowserRuntime(
     @Volatile private var deletionPending = false
     private var actorLabel: String? = null
     private var webView: WebView? = null
+    private val pendingScripts = mutableMapOf<CompletableDeferred<JsonObject>, WebView>()
     private var snapshotVersion = 0L
     private var nextElementRef = 1
     private var refAttributeName = newRefAttributeName()
@@ -171,6 +177,7 @@ class AgentBrowserRuntime(
             allowedRedirectUrl = null
             snapshotVersion += 1
             if (current != null) {
+                failPendingScripts(current, "Browser session ended")
                 (current.parent as? ViewGroup)?.removeView(current)
                 current.stopLoading()
                 CookieManager.getInstance().flush()
@@ -711,9 +718,14 @@ class AgentBrowserRuntime(
         current: WebView,
         script: String,
     ): JsonObject = withContext(Dispatchers.Main.immediate) {
-        suspendCancellableCoroutine { continuation ->
+        if (!turnActive || webView !== current) {
+            throw AgentBrowserException("Browser session ended")
+        }
+        val result = CompletableDeferred<JsonObject>()
+        pendingScripts[result] = current
+        try {
             current.evaluateJavascript(script) { encoded ->
-                if (!continuation.isActive) {
+                if (!result.isActive) {
                     return@evaluateJavascript
                 }
                 val raw = try {
@@ -731,8 +743,24 @@ class AgentBrowserRuntime(
                         put("ok", false)
                     }
                 }
-                continuation.resume(value)
+                result.complete(value)
             }
+            withTimeoutOrNull(SCRIPT_RESPONSE_TIMEOUT_MILLIS) { result.await() }
+                ?: throw BrowserTimeoutException().also { error ->
+                    Log.w(BROWSER_LOG_TAG, "script_response_timeout")
+                    if (webView === current) {
+                        mutableState.value = mutableState.value.copy(loading = false, error = error.message)
+                    }
+                }
+        } finally {
+            pendingScripts.remove(result)
+            result.cancel()
+        }
+    }
+
+    private fun failPendingScripts(current: WebView, message: String) {
+        pendingScripts.filterValues { it === current }.keys.forEach {
+            it.completeExceptionally(AgentBrowserException(message))
         }
     }
 
@@ -997,6 +1025,7 @@ class AgentBrowserRuntime(
             view: WebView,
             detail: RenderProcessGoneDetail,
         ): Boolean {
+            failPendingScripts(view, "Browser renderer stopped")
             assistance.request.value?.let {
                 assistance.respond(it.id, UserAssistanceAnswer("cancelled"))
             }
@@ -1079,6 +1108,7 @@ class AgentBrowserRuntime(
         val REF_PATTERN = Regex("e[0-9]{1,8}")
         const val NAVIGATION_SETTLE_MILLIS = 1_200L
         const val ACTION_SETTLE_MILLIS = 500L
+        const val SCRIPT_RESPONSE_TIMEOUT_MILLIS = 30_000L
         const val BROWSER_LOG_TAG = "MochiBrowser"
         const val SNAPSHOT_FORMAT = "mochi-semantic-v3"
         const val MAX_INTERACTIVE_ELEMENTS = 100

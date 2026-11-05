@@ -25,6 +25,13 @@ Every successful mutation returns a fresh `mochi-semantic-v3` snapshot.
 `browser_read` is needed for the initial observation, recovery after user
 interaction, and pages that change without a preceding Agent action.
 
+Every action/snapshot JavaScript response has a 30-second callback deadline.
+A missing callback returns `TIMEOUT`, rather than indefinitely suspending the
+Main Agent or a delegated child. Renderer termination and session closure fail
+pending scripts immediately; cancelled, timed-out and closed-page callbacks are
+ignored. A timeout does not prove that an action did not run: do not automatically
+replay it; read the page before deciding whether another action is safe.
+
 Agent snapshots combine viewport-scoped Markdown for reading with a separate
 `interactive_elements` list containing roles, accessible names, states, bounds,
 and opaque references. Markdown never becomes the user-facing browser UI and

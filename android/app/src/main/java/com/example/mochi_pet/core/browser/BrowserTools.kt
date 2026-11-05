@@ -10,6 +10,7 @@ import com.example.mochi_pet.core.agent.tool.optionalString
 import com.example.mochi_pet.core.agent.tool.requiredString
 import com.example.mochi_pet.platform.browser.AgentBrowserException
 import com.example.mochi_pet.platform.browser.AgentBrowserRuntime
+import com.example.mochi_pet.platform.browser.BrowserTimeoutException
 import com.example.mochi_pet.platform.browser.StaleBrowserReferenceException
 import com.example.mochi_pet.core.web.WebAccessDeniedException
 import com.example.mochi_pet.core.web.WebContentException
@@ -245,6 +246,11 @@ private suspend fun browserResult(
         ToolResultEnvelope.error(
             ToolErrorCode.STALE_REF,
             error.message ?: "Browser element reference is stale",
+        )
+    } catch (error: BrowserTimeoutException) {
+        ToolResultEnvelope.error(
+            ToolErrorCode.TIMEOUT,
+            error.message ?: "Browser page response timed out",
         )
     } catch (error: AgentBrowserException) {
         ToolResultEnvelope.error(
