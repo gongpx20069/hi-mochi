@@ -84,7 +84,8 @@ the current surface.
 When it is backgrounded or locked, wake detection posts a lock-screen-visible
 notification; tapping it starts the same permission-checked voice path.
 After a confirmed selected wake phrase, Mochi speaks a one-syllable acknowledgement
-("嗯？" in Chinese, "Yes?" in English) before listening. The acknowledgement
+("嗯？" in both Chinese and English) before listening, using the same
+bundled audio cue without waiting for a speech engine. The acknowledgement
 is transient feedback, not a conversation message, and is excluded from
 history and model context. Microphone-button and media-button starts do not add
 this acknowledgement.
@@ -422,8 +423,8 @@ mark newer previews successful. Synthesizing and playing have distinct cancellab
 button states. Errors include safe provider/HTTP codes where available and never
 silently select a different voice.
 
-Wake acknowledgement always requests a local Android voice; a missing local voice
-does not prevent listening. Cloud synthesis errors remain visible as status, preserve
+Wake acknowledgement uses bundled audio and does not require an installed Android
+voice. Playback failure does not prevent listening. Cloud synthesis errors remain visible as status, preserve
 the already accepted reply, and stop the automatic follow-up listening loop. There is
 no silent fallback or automatic retry after partial playback. A new wake or explicit
 microphone action can start another turn.

@@ -93,15 +93,17 @@ outside the audio thread.
 - Bounded chunk cadence and two-second duplicate suppression.
 - Stop wake capture before STT obtains the microphone.
 - Without new task results, after a confirmed selected-keyword detection, speak a fixed one-syllable
-  acknowledgement ("嗯？" in Chinese, "Yes?" in English) before STT starts. This
+  acknowledgement (the same bundled "嗯？" cue in every language) before STT starts. This
   acknowledgement is transient audio only and never enters conversation
   history or model context. Direct microphone and media-button triggers skip it.
 - Android SpeechRecognizer remains the default and requires no cloud setup.
 - Settings may optionally select iFlytek or Azure Speech for STT. A separate,
   default-off synthesis opt-in reuses that Provider's encrypted credentials.
-  Android TextToSpeech remains the default output path. Wake acknowledgements
-  bypass settings and cloud requests and require an installed non-network Android
-  voice; if unavailable, listening still starts without waiting on a cloud voice.
+  Android TextToSpeech remains the default reply output path. Wake acknowledgements
+  play a bundled PCM cue through the existing cancellable audio-focus/playback
+  path, bypassing speech settings, system TTS and cloud requests. Playback failure
+  is explicit but still permits listening; it does not recommend installing TTS.
+  Dynamic next-wake briefings still require an installed offline Android voice.
 - Named saved speech profiles support multiple accounts per provider with
   independent encrypted credentials, voice and synthesis opt-in. The built-in
   Android profile remains selectable and cannot be deleted. Adding a profile
@@ -131,6 +133,15 @@ outside the audio thread.
 - Native initialization errors are visible; no silent slow fallback.
 
 ### Next-wake task briefing
+
+The fixed acknowledgement resource is `res/raw/wake_ack.pcm`: mono 16 kHz
+signed little-endian PCM16, 0.374 s / 11,954 bytes. It is decoded offline from
+the supplied MP3 at its original speed, with only leading and trailing silence
+removed. Trimming retains 20 ms before and 40 ms after samples above -60 dBFS
+to preserve the soft onset and tail. No tempo, pitch or volume adjustment is applied.
+All UI languages and wake keywords use this same clip; no speech model or engine
+is bundled. Completion waits for PCM playback to drain;
+cancellation/focus loss releases playback and stale callbacks cannot start input.
 
 The ViewModel selects one factual, localized sentence from already persisted
 AgentLink receipt metadata. No model, remote read or cloud synthesis is awaited

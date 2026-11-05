@@ -4,6 +4,7 @@ import android.os.Looper
 import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
+import com.example.mochi_pet.R
 import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.SpeechRuntimeConfig
 import com.example.mochi_pet.core.settings.SpeechSettingsInput
@@ -136,15 +137,67 @@ class CloudSpeechRuntimeTest {
     }
 
     @Test
-    fun `wake acknowledgement never reads cloud credentials or synthesizes remotely`() {
+    @Config(qualifiers = "zh-rCN")
+    fun `Chinese wake acknowledgement plays the shared cue without a working TTS engine`() {
+        val drained = CompletableDeferred<Unit>()
+        val played = mutableListOf<ByteArray>()
+        val results = mutableListOf<SpeechPlaybackResult>()
         val voice = runtime(
             synthesizer = SpeechSynthesizer { _, _, _ -> error("Wake must remain local") },
+            player = PcmSpeechPlayer { played += it; drained.await() },
         )
-        voice.speak("Yes?", SpeechPurpose.WAKE_ACKNOWLEDGEMENT)
+        val tts = shadowOf(ShadowTextToSpeech.getLastTextToSpeechInstance())
+        tts.onInitListener.onInit(TextToSpeech.ERROR)
         idle()
+        voice.speak("嗯？", SpeechPurpose.WAKE_ACKNOWLEDGEMENT) { results += it }
+        idle()
+        val expected = RuntimeEnvironment.getApplication().resources.openRawResource(R.raw.wake_ack).use { it.readBytes() }
+        assertTrue(expected.contentEquals(played.single()))
+        val durationSeconds = played.single().size.toDouble() / (SYNTHESIS_SAMPLE_RATE * 2)
+        assertTrue(durationSeconds in 0.3..0.5)
+        assertEquals(0, played.single().size % 2)
+        assertTrue(played.single().any { it != 0.toByte() })
+        assertTrue(results.isEmpty())
+        drained.complete(Unit)
+        idle()
+        assertEquals(listOf(SpeechPlaybackResult.COMPLETED), results)
+        assertEquals(null, tts.lastSpokenText)
         assertEquals(0, settingsReads)
     }
 
+    @Test
+    @Config(qualifiers = "en-rUS")
+    fun `English wake uses the same cue and cancellation suppresses its completion`() {
+        var released = false
+        val played = mutableListOf<ByteArray>()
+        val results = mutableListOf<SpeechPlaybackResult>()
+        val voice = runtime(player = PcmSpeechPlayer {
+            played += it
+            try { awaitCancellation() } finally { released = true }
+        })
+        voice.speak("Yes?", SpeechPurpose.WAKE_ACKNOWLEDGEMENT) { results += it }
+        idle()
+        val expected = RuntimeEnvironment.getApplication().resources.openRawResource(R.raw.wake_ack).use { it.readBytes() }
+        assertTrue(expected.contentEquals(played.single()))
+        assertTrue(played.single().isNotEmpty())
+        voice.stopSpeaking()
+        idle()
+        assertTrue(released)
+        assertTrue(results.isEmpty())
+        assertEquals(0, settingsReads)
+    }
+
+    @Test
+    fun `bundled cue playback failure is explicit without suggesting TTS setup`() {
+        val results = mutableListOf<SpeechPlaybackResult>()
+        val voice = runtime(player = PcmSpeechPlayer { throw SpeechSynthesisException(SynthesisFailure.PLAYBACK) })
+        voice.speak("Yes?", SpeechPurpose.WAKE_ACKNOWLEDGEMENT) { results += it }
+        idle()
+        assertEquals(listOf(SpeechPlaybackResult.FAILED), results)
+        assertEquals(SynthesisFailure.PLAYBACK.message, voice.state.value.errorMessage)
+        assertEquals(false, voice.state.value.offerSpeechSettings)
+        assertEquals(0, settingsReads)
+    }
     @Test
     fun `interruption releases playback without invoking stale completion`() {
         var released = false

@@ -79,7 +79,8 @@ Cloud synthesis is also optional and default-off. iFlytek and Azure Speech
 reuse their recognition credentials through **Also use this provider for
 speech synthesis**, with an optional voice ID. Enabling it sends assistant
 reply text to that Provider; service/voice access and quota must be available.
-Wake acknowledgements remain local Android speech, not cloud synthesis.
+Wake acknowledgements use short bundled audio, independent of system TTS or
+cloud synthesis, so a phone without an installed voice can still respond.
 Voice selection offers named presets/catalogs, custom cloud IDs, and a fixed-text
 preview without involving the Agent or conversation history. Preview does not apply
 the draft voice until settings are saved; catalog entries are not a promise of free

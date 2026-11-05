@@ -13,6 +13,7 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import com.example.mochi_pet.R
 import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.SpeechRuntimeConfig
 import com.example.mochi_pet.core.settings.SpeechProvider
@@ -262,7 +263,7 @@ class AndroidVoiceRuntime internal constructor(
                 failSpeech("Speech audio focus is unavailable")
                 return@post
             }
-            if (purpose == SpeechPurpose.WAKE_ACKNOWLEDGEMENT || purpose == SpeechPurpose.WAKE_BRIEFING) {
+            if (purpose == SpeechPurpose.WAKE_BRIEFING) {
                 speakSystem(bounded, utteranceId, localOnly = true)
                 return@post
             }
@@ -270,41 +271,51 @@ class AndroidVoiceRuntime internal constructor(
             synthesisJob = scope.launch {
                 var provider = "settings"
                 val failure = try {
-                    val savedConfig = if (purpose == SpeechPurpose.PREVIEW) {
-                        if (previewProfileId == null) speechSettingsRepository.loadRuntimeConfig()
-                        else speechSettingsRepository.loadProfileRuntimeConfig(previewProfileId)
-                    } else {
-                        speechSettingsRepository.loadSynthesisConfig()
-                    }
-                    val config = if (purpose == SpeechPurpose.PREVIEW && previewVoiceId != null) {
-                        when (savedConfig) {
-                            is SpeechRuntimeConfig.System -> savedConfig.copy(voice = previewVoiceId)
-                            is SpeechRuntimeConfig.IFlytek -> savedConfig.copy(voice = previewVoiceId)
-                            is SpeechRuntimeConfig.Azure -> savedConfig.copy(voice = previewVoiceId)
+                    if (purpose == SpeechPurpose.WAKE_ACKNOWLEDGEMENT) {
+                        provider = "bundled"
+                        val audio = applicationContext.resources.openRawResource(R.raw.wake_ack).use { it.readBytes() }
+                        ensureActive()
+                        mainHandler.post {
+                            if (utteranceId == activeUtteranceId) dispatch(VoiceRuntimeEvent.PlaybackStarted)
                         }
+                        pcmPlayer.play(audio)
                     } else {
-                        savedConfig
-                    }
-                    provider = config.synthesisProviderName()
-                    Log.i(SPEECH_LOG_TAG, "synthesis_started provider=$provider")
-                    when (config) {
-                        is SpeechRuntimeConfig.System -> {
-                            mainHandler.post {
-                                if (utteranceId == activeUtteranceId) {
-                                    speakSystem(bounded, utteranceId, localOnly = true, voiceId = config.voice)
-                                }
+                        val savedConfig = if (purpose == SpeechPurpose.PREVIEW) {
+                            if (previewProfileId == null) speechSettingsRepository.loadRuntimeConfig()
+                            else speechSettingsRepository.loadProfileRuntimeConfig(previewProfileId)
+                        } else {
+                            speechSettingsRepository.loadSynthesisConfig()
+                        }
+                        val config = if (purpose == SpeechPurpose.PREVIEW && previewVoiceId != null) {
+                            when (savedConfig) {
+                                is SpeechRuntimeConfig.System -> savedConfig.copy(voice = previewVoiceId)
+                                is SpeechRuntimeConfig.IFlytek -> savedConfig.copy(voice = previewVoiceId)
+                                is SpeechRuntimeConfig.Azure -> savedConfig.copy(voice = previewVoiceId)
                             }
-                            return@launch
+                        } else {
+                            savedConfig
                         }
-                        else -> synthesisChunks(bounded).forEach { chunk ->
-                            ensureActive()
-                            if (chunk.isNotBlank()) {
-                                val audio = synthesizer.synthesize(config, chunk, locale)
-                                ensureActive()
+                        provider = config.synthesisProviderName()
+                        Log.i(SPEECH_LOG_TAG, "synthesis_started provider=$provider")
+                        when (config) {
+                            is SpeechRuntimeConfig.System -> {
                                 mainHandler.post {
-                                    if (utteranceId == activeUtteranceId) dispatch(VoiceRuntimeEvent.PlaybackStarted)
+                                    if (utteranceId == activeUtteranceId) {
+                                        speakSystem(bounded, utteranceId, localOnly = true, voiceId = config.voice)
+                                    }
                                 }
-                                pcmPlayer.play(audio)
+                                return@launch
+                            }
+                            else -> synthesisChunks(bounded).forEach { chunk ->
+                                ensureActive()
+                                if (chunk.isNotBlank()) {
+                                    val audio = synthesizer.synthesize(config, chunk, locale)
+                                    ensureActive()
+                                    mainHandler.post {
+                                        if (utteranceId == activeUtteranceId) dispatch(VoiceRuntimeEvent.PlaybackStarted)
+                                    }
+                                    pcmPlayer.play(audio)
+                                }
                             }
                         }
                     }
@@ -314,7 +325,7 @@ class AndroidVoiceRuntime internal constructor(
                 } catch (error: SpeechSynthesisException) {
                     error
                 } catch (_: IOException) {
-                    SpeechSynthesisException(SynthesisFailure.NETWORK)
+                    SpeechSynthesisException(if (provider == "bundled") SynthesisFailure.PLAYBACK else SynthesisFailure.NETWORK)
                 } catch (_: GeneralSecurityException) {
                     SpeechSynthesisException(SynthesisFailure.SETTINGS)
                 } catch (_: IllegalStateException) {
@@ -852,7 +863,11 @@ class AndroidVoiceRuntime internal constructor(
     private fun failSpeech(message: String, diagnosticCode: String? = null) {
         if (activeSpeechPurpose == SpeechPurpose.WAKE_BRIEFING) {
             mutableState.update { it.copy(errorMessage = message, offerSpeechSettings = true, diagnosticCode = diagnosticCode) }
-        } else dispatch(VoiceRuntimeEvent.Failed(message, offerSpeechSettings = true, diagnosticCode = diagnosticCode))
+        } else dispatch(VoiceRuntimeEvent.Failed(
+            message,
+            offerSpeechSettings = activeSpeechPurpose != SpeechPurpose.WAKE_ACKNOWLEDGEMENT,
+            diagnosticCode = diagnosticCode,
+        ))
         finishSpeech(result = SpeechPlaybackResult.FAILED)
     }
 

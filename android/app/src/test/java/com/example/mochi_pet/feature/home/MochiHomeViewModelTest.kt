@@ -739,13 +739,6 @@ class MochiHomeViewModelTest {
     }
 
     @Test
-    fun `wake acknowledgement is one syllable in either language`() {
-        assertEquals("嗯？", wakeAcknowledgementText(Locale.SIMPLIFIED_CHINESE))
-        assertEquals("嗯？", wakeAcknowledgementText(Locale.TRADITIONAL_CHINESE))
-        assertEquals("Yes?", wakeAcknowledgementText(Locale.ENGLISH))
-    }
-
-    @Test
     fun `wake word acknowledgement is spoken but not added to history`() {
         val voiceRuntime = VoiceRuntimeFake("Turn on the light")
         val viewModel = MochiHomeViewModel(
@@ -758,9 +751,6 @@ class MochiHomeViewModelTest {
             wakeRuntime = WakeRuntimeFake(),
             clock = fixedClock(),
             ioDispatcher = Dispatchers.Unconfined,
-            wakeAcknowledgement = {
-                wakeAcknowledgementText(Locale.SIMPLIFIED_CHINESE)
-            },
         )
 
         viewModel.startVoiceInput(acknowledgeWake = true)

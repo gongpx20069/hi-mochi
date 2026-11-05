@@ -344,8 +344,6 @@ class MochiHomeViewModel(
     private val locationPermissionGate: LocationPermissionGate? = null,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val wakeAcknowledgement: () -> String =
-        ::wakeAcknowledgementText,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
     private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : ViewModel() {
@@ -1130,7 +1128,7 @@ class MochiHomeViewModel(
                     stage = ChatPipelineStage.SPEAKING,
                 )
                 runtime.speak(
-                    wakeAcknowledgement(),
+                    "嗯？",
                     purpose = SpeechPurpose.WAKE_ACKNOWLEDGEMENT,
                 ) {
                     startListening()
@@ -3063,19 +3061,6 @@ class MochiHomeViewModel(
 
     }
 }
-
-internal fun wakeAcknowledgementText(
-    locale: Locale = when (AppLanguage.current()) {
-        AppLanguage.SYSTEM -> AppLanguage.resolveContentLocale()
-        AppLanguage.CHINESE -> Locale.SIMPLIFIED_CHINESE
-        AppLanguage.ENGLISH -> Locale.ENGLISH
-    },
-): String =
-    if (locale.language == Locale.CHINESE.language) {
-        "嗯？"
-    } else {
-        "Yes?"
-    }
 
 private fun AgentPipelineStage.toUiStage(): ChatPipelineStage =
     when (this) {
