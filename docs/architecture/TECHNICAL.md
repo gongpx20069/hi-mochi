@@ -318,6 +318,9 @@ evidence; it is never added wholesale to the system prompt.
 validates enum values, ISO dates, referenced IDs, and transition policy before
 changing the UI.
 
+The system prompt asks `reply` prose to use Markdown links with short, non-URL
+labels. This is output guidance, not a parser restriction or a change to Tool URL fields.
+
 ## 3.1 Native agent loop
 
 The native implementation now includes:

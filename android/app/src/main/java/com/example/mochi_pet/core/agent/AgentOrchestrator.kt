@@ -181,6 +181,7 @@ class AgentPromptBuilder(
                 "Return only JSON: " +
                     """{"reply":"...","emotion":"neutral","ui_directive":null,"card_directive":null}""",
             )
+            appendLine("In reply prose, use [short label](URL) for links; never use a URL as the label.")
             appendLine(
                 "Optional ui_directive fields: surface, reason, date, month, " +
                     "section, status, highlight_ids.",
