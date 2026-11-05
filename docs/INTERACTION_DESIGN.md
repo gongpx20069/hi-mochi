@@ -697,11 +697,17 @@ When a Browser Tool runs while Home is selected, Home transforms into a trusted
 Agent action, and Stop Agent. This runtime card is not a
 model `card_directive` and is not persisted.
 
+Browser observation windows default to 30 seconds per call and may be changed
+by the Agent. An expired window is not a failed page load: keep the live page
+and actual loading state while the Agent decides to read again, wait longer,
+navigate elsewhere or finish. Partial readable content may return before the
+page finishes. Stop Agent still cancels immediately.
+
 When Talk, Planner, Settings, Skills, or Tools is selected, Browser Tools keep
 the current surface unchanged. No Browser Card or automatic Home navigation is
 shown; the existing global pipeline indicator reports Tool progress. The
 browser closes after the final model response and before TTS, and also closes
-on cancellation, timeout, or failure.
+on Agent-run cancellation, timeout, or failure, not observation-window expiry.
 
 Moving Mochi to the background does not itself pause Browser Tools. Ordinary
 actions need no approval. Main can explicitly request user assistance: its

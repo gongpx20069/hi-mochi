@@ -107,10 +107,16 @@ proof of failed login: verify the requested destination in the same session,
 without resubmitting login or clearing data. Valid sessions are reused
 without repeated permission prompts. Never request credentials in chat.
 
+All five Browser Tools accept `wait_seconds` (default 30 per call, 0 for an
+immediate observation, no policy upper limit). Waiting expiry returns current
+page state, not a Tool timeout or a stopped page. Use `browser_read` to continue
+observing without replaying navigation/actions; cached/unavailable snapshots
+and unconfirmed actions are explicitly identified.
+
 They operate one visible, per-turn Android WebView and return bounded
 agent-only snapshots containing viewport Markdown plus a separate interactive
-element list with temporary references. Every successful action returns a fresh
-snapshot. Browser details and lifecycle are defined in `AGENT_BROWSER.md`.
+element list with temporary references when available, or an explicit waiting
+observation. Browser details and lifecycle are defined in `AGENT_BROWSER.md`.
 
 ### `delegate_agent`
 

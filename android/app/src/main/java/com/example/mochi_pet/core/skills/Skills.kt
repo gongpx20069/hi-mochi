@@ -937,6 +937,24 @@ private val BUILT_IN_SKILLS = listOf(
             4. Stop once the request is verified. Cite useful URLs and disclose
                missing, blocked, stale or truncated evidence. A click is not success.
 
+            ## Observe without replaying
+
+            - Browser Tools accept `wait_seconds`: each call defaults to 30,
+              0 checks immediately, and you may choose a longer or shorter wait.
+              New readable content can return early even while the page is loading.
+            - `observation_status=waiting` ends only this observation window, not
+              the page load or Agent task. Use `browser_read` to keep observing
+              the same page; do not reopen it or repeat clicks, typing or submits.
+            - Check `snapshot_available` and `snapshot_fresh`. Missing/cached
+              snapshots are not fresh evidence or proof that the renderer responds.
+              `action_outcome=unconfirmed` does not mean an action failed;
+              `acknowledged` does not prove the website completed the user's goal.
+            - A pending observation must be read before another click/input/scroll.
+              Explicit navigation abandons the old observation without undoing
+              any submitted action. Renderer/session failures are errors, not loading.
+            - Choose another source or report the blocker when observations stop
+              making progress; do not keep spending model calls on unchanged pages.
+
             ## Sessions, cache and credentials
 
             - WebView reuses cookies, website storage and resource cache automatically.

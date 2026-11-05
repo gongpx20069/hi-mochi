@@ -21,16 +21,37 @@ The initial Tool set is intentionally small:
 | `browser_input` | Type text, select an option, or send a supported key |
 | `browser_scroll` | Scroll the page or a referenced scrollable element |
 
-Every successful mutation returns a fresh `mochi-semantic-v3` snapshot.
+Each Tool returns a fresh `mochi-semantic-v3` snapshot when available, or an
+explicit current-page observation with `snapshot_available=false`. Cached
+snapshots are marked `snapshot_fresh=false`; they are not fresh evidence.
 `browser_read` is needed for the initial observation, recovery after user
 interaction, and pages that change without a preceding Agent action.
 
-Every action/snapshot JavaScript response has a 30-second callback deadline.
-A missing callback returns `TIMEOUT`, rather than indefinitely suspending the
-Main Agent or a delegated child. Renderer termination and session closure fail
-pending scripts immediately; cancelled, timed-out and closed-page callbacks are
-ignored. A timeout does not prove that an action did not run: do not automatically
-replay it; read the page before deciding whether another action is safe.
+All five Tools accept an optional integer `wait_seconds`, defaulting to 30 on
+every call. Zero returns immediately with available state. There is no policy
+upper limit; values must be non-negative and representable in milliseconds.
+The observation returns early when bounded readable content or page state
+changes, including partial content while loading. An unchanged page is sampled
+locally without model polling, with at most one outstanding page operation.
+
+Expiry returns `observation_status=waiting`, not `TIMEOUT`. It does not stop
+loading, destroy the page, cancel the pending read, or replay a submitted action.
+`browser_read` continues observing that same page, including a response arriving
+after a previous observation window. Native URL/title/loading metadata remains
+available when no snapshot responds; unavailable/cached snapshots are explicitly
+not proof that the renderer is responsive. The browser card retains the actual
+loading state instead of reporting load completion after a partial snapshot.
+
+`action_pending` and `action_outcome=unconfirmed/acknowledged` distinguish a
+dispatched operation from its acknowledgement, not business success. A pending
+observation must be consumed by `browser_read` before another click/input/scroll;
+none is automatically replayed. Explicit navigation abandons the old observation
+without undoing submitted actions. Document changes discard old snapshots;
+late callbacks cannot overwrite a new document. User cancellation/turn closure
+release pending observations and renderer termination fails them immediately.
+Human assistance cancels background observations and drops cached snapshots.
+Browser handoff requires first observing a pending mutation, so a queued action
+cannot overlap user control; an answered handoff always requires a fresh read.
 
 Agent snapshots combine viewport-scoped Markdown for reading with a separate
 `interactive_elements` list containing roles, accessible names, states, bounds,
@@ -43,7 +64,7 @@ keeps its reference across reads and scrolls. A replaced or removed node becomes
 stale, navigation starts a new document generation, and an old reference is
 never reassigned to a different element during the turn.
 
-The MVP does not expose tabs, screenshots, file upload, arbitrary waits,
+The MVP does not expose tabs, screenshots, file upload, standalone sleep Tools,
 schema extraction, JavaScript evaluation, CSS/XPath selectors, or coordinate
 input.
 

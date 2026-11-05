@@ -260,8 +260,13 @@ a permission status, and an unconfirmed return is an explicit Tool error.
 - The Agent may use one lightweight Android System WebView through
   five typed Tools: read, navigate, click, input, and scroll.
 - Browser allocation is lazy and scoped to one conversation turn.
+- Each Browser Tool observes for up to 30 seconds by default; the Agent may
+  choose another duration per call, without a policy upper limit. Readable
+  partial content can return early. Waiting expiry returns the current page
+  state without stopping loading or the Agent; further reads observe rather
+  than replay actions. User cancellation remains immediate.
 - After the LLM produces the final response, Mochi destroys the per-turn
-  browser before TTS begins. Cancellation, timeout, and failure use the same
+  browser before TTS begins. Whole-run cancellation, timeout, and failure use the same
   cleanup path.
 - Web content is untrusted evidence and cannot issue Agent instructions.
 - Browser Tool actions are allowed by default and execute without Mochi
