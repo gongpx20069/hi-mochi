@@ -96,41 +96,9 @@ That Linux-only task is skipped on Windows; CI must pass it before delivery.
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
-Memory retrieval device latency:
-
-```powershell
-.\gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest `
-  "-PmochiVersionName=<installed-1.0.x-version>" --no-daemon
-adb -s <serial> install -r app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
-adb -s <serial> install -r app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
-adb -s <serial> shell am instrument -w `
-  -e class com.example.mochi_pet.core.memory.AgentMemoryLatencyTest `
-  -e mochiMemoryLatency true `
-  com.example.mochi_pet.test/androidx.test.runner.AndroidJUnitRunner
-```
-
-Choose the device's ABI and preserve the installed version code and signer;
-the default development version can be older than an installed release.
-Never uninstall, clear data, or force a downgrade to run this diagnostic.
-The opt-in test uses a uniquely named disk-backed synthetic Room database,
-deleted in `finally`, with 1,000/10,000/100,000 messages and 20 recent turns.
-It measures the production `loadContext` path for joint, broad, fallback and
-no-match queries, with five warmups and 50 serial samples per case.
-JSON output reports wall-clock P50/P95/max, reopen-first lookup, serial throughput,
-returned history bytes, per-stage mean time, and process PSS/Java heap/thread
-samples outside timing. DAO stage timings include scheduling and row mapping;
-the remainder includes query preparation, ranking and prompt-line assembly.
-It also reports the recent-message query plan on each synthetic dataset.
-Use `-e mochiMemoryLatencyMessages 100000` to repeat just one supported size.
-Record whether the phone remains interactive: before/after flags accompany
-each result, and sleeping-device results must not be presented as foreground
-voice latency. Do not change power settings without authorization.
-Reopen-first is not an OS-cache-cold or process-cold measurement. Memory and
-thread samples describe the entire instrumented process, not the memory
-repository alone, and are not instantaneous peaks. Throughput excludes fixture
-setup but includes per-request result checks. No model is called and no real
-conversation or Provider configuration is accessed by the test body.
-Require `OK (1 test)`; an instrumentation crash can still return exit code zero.
+Memory retrieval regression sources, device results, measurement definitions
+and reproduction commands are owned by
+[Memory design](architecture/MEMORY_DESIGN.md#2-device-measurements-and-diagnostics).
 
 App Control and Media Control regressions:
 

@@ -36,16 +36,10 @@ Build on existing Scheduled Agents and Skills rather than another executor.
 
 ## Memory management and local backup
 
-Keep conversation history separate from durable, user-reviewable preferences.
+Future memory goals are owned by
+[Memory design](architecture/MEMORY_DESIGN.md#4-future-event-based-memory).
+Local backup remains a separate deferred idea:
 
-The [event memory proposal](architecture/EVENT_MEMORY_DESIGN.md) develops the
-single-chat organization and recall design, including consistency, Provider
-cost, Android scheduling and latency gates. It remains proposed; local backup
-and the broader ideas below are not implied delivery commitments.
-
-- Let users inspect, correct and delete saved memories with clear provenance.
-- Resolve outdated or contradictory preferences rather than accumulating
-  competing instructions indefinitely.
 - Offer versioned local export/import for persona, conversation and planner
   data with preview and explicit merge/replace behavior.
 - Exclude API keys, extension sessions, camera images and command output by

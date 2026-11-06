@@ -10,7 +10,8 @@ smallest relevant authoritative documents before changing the repository.
 | Product behavior or scope | `docs/PRD.md` |
 | Screens, navigation, or voice UX | `docs/INTERACTION_DESIGN.md` |
 | Modules, state, storage, or dependencies | `docs/architecture/APP_ARCHITECTURE.md` |
-| Runtime, providers, memory, or Skills | `docs/architecture/TECHNICAL.md` |
+| Runtime, providers, or Skills | `docs/architecture/TECHNICAL.md` |
+| Memory, retrieval, latency, or event-based evolution | `docs/architecture/MEMORY_DESIGN.md` |
 | Tools, MCP, navigation directives | `docs/architecture/AGENT_TOOLS.md` |
 | Optional signed extension APKs | `docs/architecture/EXTENSIONS.md` |
 | Trusted cards | `docs/architecture/CARD_PRESENTATION.md` |

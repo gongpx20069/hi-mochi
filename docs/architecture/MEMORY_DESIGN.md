@@ -1,16 +1,351 @@
-# Event memory for one continuous conversation
+# Memory design
 
-Status: **Proposed design, not implemented or approved for rollout.**
-Updated: 2026-09-27.
+Updated: 2026-11-06.
 
-This document owns the proposed event-memory design. Current behavior remains
-defined by [TECHNICAL.md](TECHNICAL.md), [APP_ARCHITECTURE.md](APP_ARCHITECTURE.md)
-and [AGENT_TOOLS.md](AGENT_TOOLS.md). It does not change product requirements,
-Provider permissions, task execution, or release commitments. Numerical
-budgets below are initial engineering limits and acceptance targets, not
-measurements or claims about the installed application.
+This is the single owner of conversation-memory behavior, retrieval algorithms,
+memory-specific diagnostics and measured results, and the future event-based
+design. Other documents link here rather than repeating these contracts.
+Product, interaction, Tool permission and general architecture authority still
+follow [the documentation ownership rules](../README.md#authority).
 
-## 1. Decision
+| Part | Status |
+| --- | --- |
+| [1. Current design](#1-current-design) | Implemented; runtime baseline `aa92ae5` |
+| [2. Device measurements and diagnostics](#2-device-measurements-and-diagnostics) | Physical-device results from 2026-11-06; diagnostic source `77ff1c4` |
+| [3. Near-term optimization goals](#3-near-term-optimization-goals) | Identified work, not yet implemented |
+| [4. Future event-based memory](#4-future-event-based-memory) | Consolidated proposal originally dated 2026-09-27; not implemented or approved for rollout |
+
+Measured values, current limits and future targets are different things.
+In particular, the future payload budgets and recall Tool are not current
+runtime behavior, and reorganizing this document does not authorize rollout.
+
+## 1. Current design
+
+### 1.1 Ownership and persistence
+
+There is one chronological conversation store, not separate short-term and
+long-term databases. Recent history and recalled history are two read strategies
+over the same Room records. There are no event/claim tables, embeddings,
+automatic organizers or dedicated memory Tools in the current implementation.
+
+| Source | Responsibility |
+| --- | --- |
+| [AgentMemoryRepository.kt](../../android/app/src/main/java/com/example/mochi_pet/core/memory/AgentMemoryRepository.kt) | `loadContext`, successful-turn persistence and recalled-line formatting |
+| [AgentMemoryDao.kt](../../android/app/src/main/java/com/example/mochi_pet/core/database/dao/AgentMemoryDao.kt) | Recent reads, bounded FTS candidates and batched neighbors |
+| [MemoryLexicalSearch.kt](../../android/app/src/main/java/com/example/mochi_pet/core/memory/MemoryLexicalSearch.kt) | ICU tokenization, FTS query construction and lexical ranking |
+| [MochiDatabase.kt](../../android/app/src/main/java/com/example/mochi_pet/core/database/MochiDatabase.kt) | Schema version 5 and migrations, including the FTS index |
+| [AgentOrchestrator.kt](../../android/app/src/main/java/com/example/mochi_pet/core/agent/AgentOrchestrator.kt) | Recent message roles, recalled system context and normal Agent execution |
+| [MochiHomeViewModel.kt](../../android/app/src/main/java/com/example/mochi_pet/feature/home/MochiHomeViewModel.kt) | Foreground recall/save flow and chronological history display |
+| [MochiApplication.kt](../../android/app/src/main/java/com/example/mochi_pet/MochiApplication.kt) | Scheduled Agents use the same repository, including failure descriptions |
+
+`AgentMemoryRepository` owns conversation persistence and recall; DataStore owns
+the recent-turn setting. The default is 20 turns, configurable from 1 to 50.
+The current reader loads the latest `2 * N` messages and reverses them into
+chronological order. The UI renders each stored timestamp beside its sender.
+Settings are independent of Provider configuration.
+
+Stored messages already have IDs, `turn_id`, role, content, pre-tokenized
+`search_text`, and an original timestamp. `saveTurn` trims both strings, skips an
+empty pair, assigns a shared turn ID, and writes both messages and their FTS rows
+in one transaction. It keeps the existing 20,000-character cap per stored
+message. This is not a new runtime excerpt budget, and text beyond that existing
+cap cannot be recovered by recall.
+
+Foreground persistence currently saves successful user/final-assistant pairs;
+failed foreground completion does not durably capture the accepted input.
+Intermediate Tool traces remain run-local. Scheduled callers share the store,
+so foreground-only successful-pair behavior must not be generalized to every
+caller. History display currently reuses `loadContext` with an empty query.
+
+### 1.2 End-to-end flow
+
+```mermaid
+flowchart TD
+    Input["Current user input"] --> Recent["Read latest 2 x N messages"]
+    Input --> Terms["Tokenize current input with ICU"]
+    Recent --> IDs["Recent message IDs"]
+    Recent --> History["Chronological user / assistant history"]
+    IDs --> Candidates["FTS: exclude recent IDs before LIMIT"]
+    Terms --> Candidates
+    Candidates --> Tiers["Joint primary terms first; OR fills remaining slots"]
+    Tiers --> Pool["At most 150 distinct candidates"]
+    Pool --> Rank["Lexical scoring; select up to 5 hits"]
+    Rank --> Neighbors["One batched read: one earlier and one later neighbor per hit"]
+    Neighbors --> Merge["Merge hits and neighbors by message ID"]
+    IDs --> Merge
+    Merge --> Order["Remove recent IDs; sort oldest to newest"]
+    Order --> Recall["Relevant memories: original time, speaker and text"]
+    History --> Request["Normal Agent request"]
+    Recall --> Request
+    Input --> Request
+    Request --> Agent["Existing model / Tool loop"]
+    Agent --> Save["On foreground success: save user and final reply atomically"]
+    Save --> Store["Same Room message store and FTS index"]
+```
+
+The three request components remain distinct: recent messages retain their
+`user`/`assistant` roles, older evidence is in `Relevant memories`, and the
+current user request is appended once. Excluding recent IDs from recall does
+not remove those messages from the model request; they are already in history.
+No extra model request precedes normal answering.
+
+### 1.3 Candidate selection
+
+1. Tokenize only the current query. Split mixed Latin/Han runs, normalize case,
+   use Android ICU word boundaries, retain numeric runs, and add Han bigrams
+   and unigrams as lexical fallbacks.
+2. Prefer lookup terms of at least two code points; use single-code-point
+   terms only when no specific terms exist. Index text has at most 256 terms;
+   a search uses at most 16 terms.
+3. If multiple primary lookup terms exist, first search for their conjunction.
+   Generated Han fallback fragments are not extra conjunction requirements.
+   Use quoted terms separated by spaces: explicit `AND` is not portable to
+   FTS4 builds without enhanced query syntax.
+4. Exclude the recent IDs in SQL **before** ordering and limiting candidates.
+   Within this preferred tier, take the newest matches.
+5. If fewer than 150 candidates were found, run the broad OR query for the
+   remaining slots, excluding both recent IDs and already selected IDs.
+   A full preferred pool skips OR; a single-term query needs only OR.
+
+The search can reach the entire eligible older history. It does **not** first
+take the newest 150 old messages and then search only that slice. Dates order
+matches inside each tier; there is no natural-language date-range planner.
+The candidate cap bounds returned rows, not all rows SQLite might visit or sort.
+An older relevant record can still fall outside a full tier's cap.
+
+### 1.4 Lexical relevance
+
+Ranking is deterministic lexical scoring, not an LLM judgment, embedding
+similarity, or a probability of belonging to the same event.
+
+```text
+score =
+  sum(matched term weight * inverse candidate frequency)
+  + 2.0 * weighted query coverage
+  + 1.5 if the normalized full query phrase occurs
+  + a recency bonus in [0, 0.1]
+
+inverse candidate frequency(t) =
+  ln((candidate count + 1) / (candidates containing t + 1)) + 1
+```
+
+A Han unigram weighs 0.25; another single-code-point term weighs 0.6.
+Longer terms weigh `1 + 0.1 * min(length - 2, 4)`. Phrase comparison removes
+non-letter/digit characters and normalizes case. Frequency is measured inside
+the current candidate set, not over the full database.
+
+Ranking reads the already persisted lexical terms instead of re-running ICU
+segmentation for every candidate, retains only query-relevant terms in its
+working sets, and computes shared term weights once per query. Migration 4-to-5
+rebuilt existing search text with the same tokenizer; message/index consistency
+is required for this reuse.
+
+### 1.5 Expansion, deduplication and presentation
+
+Select at most five messages by relevance. A single DAO query uses the timestamp
+index to read at most one earlier and one later neighbor for each hit. This is
+one **message** per side, not one complete turn, and no additional turn completion
+is performed. The windows contain at most 15 messages before deduplication.
+
+Merge by message ID, covering overlapping windows and neighbors that are already
+hits. Remove recent IDs again because expansion can cross the recent-window
+boundary. Do not deduplicate by text: the same words at different times can be
+distinct evidence. Finally sort all recalled messages by original time,
+oldest to newest, **not by relevance score**.
+
+The recalled section declares the device timezone once as `NOTE:<timezone ID>`.
+Each line retains its original instant rendered with the UTC offset, speaker
+(`User` or `Mochi`) and stored text. Recent messages retain role information but
+do not receive this per-message timestamp prefix in the model request.
+No matches means no unrelated recency filler.
+
+For a populated query the repository needs at most four DAO reads: recent
+history, preferred candidates, optional OR candidates and optional neighbors.
+This is not a bound on the underlying SQLite execution work or latency.
+
+### 1.6 Current boundaries
+
+- No unified byte/token cap over recent history and recall has been introduced.
+  Recent-turn, candidate and hit counts do not bound total model-input bytes.
+- No new excerpt truncation, generated event conclusion, query-rewriting model,
+  `recall_memory` Tool or background model call has been added.
+- Chronological neighbors can cross topics or split a question/answer pair.
+  Short references and paraphrases remain weaknesses of lexical retrieval.
+- Source roles/timestamps are not a complete provenance or freshness model.
+  Scheduled text can affect foreground recency; derived corrections, deletion
+  generations and event membership are not current features.
+
+## 2. Device measurements and diagnostics
+
+### 2.1 Method and scope
+
+Measured on 2026-11-06 using runtime commit `aa92ae5` and the diagnostic in
+commit `77ff1c4`. The ARM64 Debug APK kept version name `1.0.18` / code `10018`
+for a same-signer in-place update. Its verified installed SHA-256 was
+`6c188005a06b0064223e21b0e36b24685f7bfe242684e9b7e8c08a933b7d9e67`.
+
+| Setting | Actual configuration |
+| --- | --- |
+| Device | Physical M2012K11AC (`alioth`), Android 13 / API 33, ARM64 |
+| Backend | Production `RoomAgentMemoryRepository.loadContext`, Android SQLite/FTS4 |
+| Data | Unique disk-backed synthetic database; 1,000, 10,000 or 100,000 messages, not turns |
+| Text | Ten synthetic Chinese templates; mean 80.6 characters / 241.8 UTF-8 bytes per message |
+| Context | Current limits from section 1; recent setting fixed at 20 turns |
+| Sampling | Five warmups, then 50 serial requests per case; concurrency 1 |
+| Included latency | Recent read, query preparation, candidate retrieval/ranking, neighbor read, deduplication and recalled-line assembly |
+| Excluded latency | Fixture creation, cloud model calls, network, STT, TTS and end-to-end voice interaction |
+| Power control | Controlled repeat had `interactive=true` before and after every case; connected to power, no power-setting changes |
+| Data isolation | No real chat/configuration used by the test body; temporary database deleted in `finally` |
+
+The four fixed queries are joint terms (`杭州 酒店`), a broadly matching word
+(`安排`), an empty conjunction with OR fallback (`杭州 航班`), and no match
+(`quasarxylophone`). They exercise retrieval mechanics, not open-domain recall
+quality. Messages are not sampled from real user history.
+
+P50 is the median-like nearest-rank sample; P95 is the 95th percentile.
+For 50 samples, the implementation selects the 25th and 48th sorted values.
+Serial requests/second is `50 / measured loop seconds`, approximately the inverse
+of **mean** latency, not the inverse of P95. Its loop also includes result
+checks and byte counting. No model tokens are generated, so tokens/second and
+LLM-backend comparisons are not applicable.
+
+### 2.2 Controlled interactive results
+
+The final repeat used **100,000 messages** with interactive state recorded
+before and after every case. All latency columns are milliseconds.
+
+| Case | P50 | P95 | Maximum | Serial requests/s | Reopen-first |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Joint terms | 455.4 | 479.4 | 487.4 | 2.21 | 436.3 |
+| Broad word | 1,051.7 | 1,060.4 | 1,070.0 | 0.96 | 979.6 |
+| OR fallback | 527.5 | 543.6 | 554.0 | 1.92 | 485.7 |
+| No match | 283.3 | 291.9 | 292.8 | 3.53 | 300.8 |
+
+Reopen-first includes the first lookup after reopening Room. The fixture was
+already written and Android's OS cache was not cleared: this is **not** a
+process-cold, OS-cache-cold or device-reboot measurement.
+
+Mean stage times from the same controlled run:
+
+| Case | Recent read | FTS candidate reads | Neighbors | Other work |
+| --- | ---: | ---: | ---: | ---: |
+| Joint terms | 276.2 | 104.1 | 2.6 | 69.3 |
+| Broad word | 276.7 | 693.0 | 2.4 | 68.4 |
+| OR fallback | 277.9 | 169.2 | 2.4 | 72.4 |
+| No match | 273.7 | 6.3 | 0.0 | 3.2 |
+
+DAO times include dispatch and row mapping. Other work includes preparation,
+ranking and output assembly; it is not a pure CPU-time measurement. These are
+means, so they must not be added to reconstruct P95.
+
+The entire instrumented process had 30 threads in the before/after samples,
+approximately 125-149 MiB PSS and 5.8-28.7 MiB live Java heap. These are not
+repository-only allocations, active-worker counts or instantaneous peaks.
+Returned recent text plus recalled lines occupied 9,672-13,937 UTF-8 bytes;
+this excludes the rest of the model request and is not a new enforced budget.
+
+### 2.3 Preliminary scale check and power-state limitation
+
+The first complete run did not record interactive state for each case.
+Keep its scale results as reference, not as controlled foreground acceptance.
+Cells below are P50 / P95 in milliseconds.
+
+| Messages | Joint terms | Broad word | OR fallback | No match |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 121.4 / 142.0 | 161.7 / 187.5 | 121.7 / 141.4 | 29.5 / 35.2 |
+| 10,000 | 144.3 / 206.4 | 192.4 / 209.1 | 145.5 / 205.8 | 47.3 / 62.9 |
+| 100,000 | 478.6 / 489.1 | 1,064.1 / 1,072.3 | 539.6 / 555.3 | 287.7 / 294.1 |
+
+A subsequent stage-instrumented run ended with the phone asleep. At 100,000
+messages its P95 rose to 2,531.6 / 7,004.8 / 3,036.4 / 1,788.4 ms for the same
+four cases. Per-case interactive flags were not yet recorded, so that run
+cannot establish foreground latency or isolate the causal effect of sleep.
+It motivated the explicitly interactive repeat above; do not pool these runs.
+
+### 2.4 Findings and limits
+
+The physical-device recent-query plan was:
+
+```text
+SEARCH TABLE agent_memories USING INDEX index_agent_memories_type (type=?)
+USE TEMP B-TREE FOR ORDER BY
+```
+
+Reading only the latest 40 messages still became expensive as history grew.
+Even no-match recall pays that cost. Broad FTS was the other major measured
+stage, whereas the batched neighbor read was small. A 150-row output limit
+does not imply 150-row database work.
+
+These results do not establish an optimal algorithm or low latency at large
+history sizes. There was no old-version/device A/B baseline, release-build
+comparison, true cold-start test, concurrent-writer test or end-to-end speech
+measurement. Fewer calls and reused tokenization are implementation properties,
+not proof of a particular percentage speedup.
+
+### 2.5 Reproduce the diagnostic
+
+Source:
+[AgentMemoryLatencyTest.kt](../../android/app/src/androidTest/java/com/example/mochi_pet/core/memory/AgentMemoryLatencyTest.kt).
+Deterministic retrieval regressions:
+[AgentMemoryRepositoryTest.kt](../../android/app/src/test/java/com/example/mochi_pet/core/memory/AgentMemoryRepositoryTest.kt).
+General SDK/JDK, build and verification setup remains in
+[DEVELOPMENT.md](../DEVELOPMENT.md#build-and-verify).
+
+From `android/`, using a matching signer and the device's ABI:
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest `
+  "-PmochiVersionName=<installed-1.0.x-version>" --no-daemon
+adb -s <serial> install -r app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
+adb -s <serial> install -r app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+adb -s <serial> shell am instrument -w `
+  -e class com.example.mochi_pet.core.memory.AgentMemoryLatencyTest `
+  -e mochiMemoryLatency true `
+  com.example.mochi_pet.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The default development version may be older than the installed app; preserve
+the version code and signer rather than forcing a downgrade. Never uninstall
+or clear user data. Add `-e mochiMemoryLatencyMessages 100000` to repeat one size;
+the supported sizes are the three in the method table.
+
+The opt-in test emits `MEMORY_LATENCY` JSON, uses no real history or model calls,
+and cleans its unique synthetic database. Require `OK (1 test)` because an
+instrumentation crash can still return shell exit code zero. Check interactive
+flags and record power/thermal conditions. Do not change power settings without
+authorization or describe sleeping-device results as foreground voice latency.
+
+## 3. Near-term optimization goals
+
+Keep the implemented FTS architecture before introducing a new memory system.
+The following work is identified, **not implemented or a measured improvement**:
+
+1. Remove the recent-query ordering bottleneck while preserving message
+   eligibility and recent-window semantics. Compare query plans on device;
+   any schema/index change requires migration, snapshot and migration coverage.
+2. Reduce broad FTS selection/sort work while preserving joint-term priority,
+   recent-ID exclusion and reachability across older history. Taking only a
+   recent slice before matching is not an equivalent optimization.
+3. Profile preparation, ranking and formatting separately before adding caches
+   or complexity. Compare useful evidence and returned IDs, not latency alone.
+4. Repeat controlled interactive, cold-start, long-text and concurrent-write
+   measurements. Keep isolated component latency separate from first-audio time.
+
+Do not add embeddings, model-based query routing, automatic event organization
+or a hard 32 KiB context cap as a shortcut. A byte budget and its evidence
+selection policy require a separate decision; reducing candidate count is not
+a substitute for fixing database work. The event proposal below is a later
+direction, not a prerequisite for these optimizations.
+
+## 4. Future event-based memory
+
+**Everything in this section is proposed, not implemented or approved for
+rollout.** Its numerical limits are initial hypotheses, not current settings or
+device results. The September draft's 100-raw-candidate and 32 KiB payload
+budgets must be re-evaluated against the current design and measurements rather
+than silently replacing them.
+
+### 4.1 Design direction
 
 Keep one visible conversation. Organize its history into evidence-backed
 events, maintain a small conversational focus, and retrieve relevant evidence
@@ -32,7 +367,21 @@ retrieval over semantically organized material, **not dense semantic search**.
 Paraphrase recall is a release gate; if it fails, revise the design or add a
 separately measured multilingual embedding adapter rather than relabeling FTS.
 
-### Intended experience
+```mermaid
+flowchart TD
+    Input["Accepted foreground input"] --> Raw["Durable raw evidence and outbox"]
+    Raw --> Prefetch["Bounded local FTS prefetch"]
+    Prefetch --> Agent["Normal Agent: interpret and answer"]
+    Agent --> Deep["Optional read-only recall Tool"]
+    Deep --> Agent
+    Raw --> Queue["Idle, consented, budgeted maintenance"]
+    Queue --> Model["One Tool-disabled model request per batch"]
+    Model --> Patch["Validate source spans, revisions and generations"]
+    Patch --> Projection["Revisable events, claims and synopses"]
+    Projection --> Prefetch
+```
+
+#### Intended experience
 
 - Continue a discussion after a brief interruption or a long absence.
 - Interpret referential input using its actual context, not the last label.
@@ -41,44 +390,14 @@ separately measured multilingual embedding adapter rather than relabeling FTS.
 - Use no old memory when it is unnecessary.
 - Clarify genuine ambiguity rather than confidently recalling the wrong object.
 
-### Non-goals
+#### Non-goals
 
 No conversation folders, automatic task resumption, autonomous memory-driven
 actions, full knowledge graph, deep summary tree, inferred personality profile,
 or prediction-based collection of personal information. An event is not a
 Planner calendar event, Agent runtime, execution queue, or permission scope.
 
-## 2. Current implementation and concrete gaps
-
-The inspected implementation is:
-
-- `core/memory/AgentMemoryRepository.kt`: `loadContext(query, recentTurns)`
-  and `saveTurn(userText, assistantText)`. Foreground successful pairs are
-  saved together. Retrieval uses global recent messages, excludes their IDs
-  before selecting up to 150 FTS candidates with joint-term priority and OR
-  fallback, and expands five hits by one chronological neighbor on either side.
-- `core/database/MochiDatabase.kt`: Room schema version 5, message and FTS
-  entities, and existing migrations.
-- `core/agent/AgentOrchestrator.kt`: `AgentRunRequest.history`,
-  `recalledMemories`, `AgentPromptBuilder`, structured final responses and
-  bounded Tool rounds. Historical messages only accept user/assistant roles.
-- `feature/home/MochiHomeViewModel.kt`: foreground recall and persistence;
-  history display currently also calls `loadContext` with an empty query.
-- `MochiApplication.kt`: Scheduled Agents read and write the same memory
-  repository, including failure descriptions.
-- `core/agent/llm/OpenAiModels.kt` and `OkHttpOpenAiChatClient.kt`: non-streaming
-  completion, configurable HTTP timeouts, no embedding interface, no modeled
-  token-usage response and no output-token limit in the request DTO.
-
-Paths above are relative to `android/app/src/main/java/com/example/mochi_pet/`.
-
-Consequences: chronological neighbors can introduce unrelated material;
-short references have weak search terms; a failed answer can lose foreground
-user input; background text can influence foreground recency; and there is
-no derived-state freshness contract. Existing context limits count messages,
-lines or characters, not an aggregate memory budget.
-
-## 3. Invariants
+### 4.2 Invariants
 
 1. Original accepted messages are the evidence source, not guaranteed truth.
    Model summaries and inferred relations are revisable projections.
@@ -97,7 +416,7 @@ lines or characters, not an aggregate memory budget.
 8. Recall failure, partial coverage and maintenance failure are explicit
    states, not successful empty results.
 
-## 4. Storage and ownership
+### 4.3 Storage and ownership
 
 Names below are proposed domain concepts; final Room naming belongs to the
 implementation. Domain interfaces return immutable models, not Room entities.
@@ -111,7 +430,7 @@ implementation. Domain interfaces return immutable models, not Room entities.
 | Focus | Foreground generation, reference candidates, focused/interrupted event IDs and source sequence | Focus reducer |
 | Maintenance job | Source range, schema version, attempt state, lease, retry time and configuration/deletion generation | Room outbox/coordinator |
 
-### Messages
+#### Messages
 
 Evolve the existing table rather than copying chat history into another store.
 Allocate a monotonically increasing database sequence transactionally; wall
@@ -137,7 +456,7 @@ before indexing/organization; a heuristic detector is not a guarantee that
 arbitrary user-pasted secrets can be recognized. A user must be able to exclude
 or delete a message before permitting historical organization.
 
-### Events and claims
+#### Events and claims
 
 An event describes a concrete discussion or experience, such as selecting
 commuting headphones, not a broad category such as technology. Discussion
@@ -159,7 +478,7 @@ It records exact dependency IDs/revisions. Membership corrections and claim
 updates invalidate affected synopsis sections; never let stale summary prose
 reintroduce a superseded requirement.
 
-### Focus
+#### Focus
 
 Keep at most one primary and two interrupted/reference candidates initially.
 These are small hints backed by messages, not hard routing gates. Unlinked
@@ -186,9 +505,9 @@ otherwise valid answer. This requires a tolerant optional-field boundary
 around the strict answer contract, with dedicated malformed-field tests.
 Its small output overhead still contributes to non-streaming speech latency.
 
-## 5. Foreground read path
+### 4.4 Foreground read path
 
-### 5.1 Capture and consistent snapshot
+#### Capture and consistent snapshot
 
 Accept final text, commit it and its outbox work, then read a bounded snapshot.
 The snapshot includes the source sequence and relevant event revisions.
@@ -205,7 +524,7 @@ current in-memory context only when it is sufficient. If the answer depends
 on inaccessible history, explain the limitation rather than guessing. A
 performance target is not permission to silently discard necessary evidence.
 
-### 5.2 Local prefetch
+#### Local prefetch
 
 Search raw messages plus event titles, supported keywords and synopses using
 the existing ICU tokenizer and FTS4. Query text itself has priority. A short
@@ -227,7 +546,7 @@ Replace arbitrary chronological-neighbor expansion with event evidence.
 For unorganized legacy messages, a source-labelled bounded raw excerpt is
 allowed, but cannot be described as a verified event boundary.
 
-### 5.3 Main-model interpretation and optional deeper recall
+#### Main-model interpretation and optional deeper recall
 
 The normal Agent request receives current text, bounded recent messages,
 focus hints and a small evidence pack. The main model performs semantic
@@ -255,7 +574,7 @@ Adding the Tool requires normal catalog/registry controls. Disabled recall
 must not be bypassed through Browser, JavaScript or another provider. Separate
 the recall switch from maintenance consent, and disclose their consequences.
 
-### 5.4 Context packing
+#### Context packing
 
 Carry typed evidence until final serialization. Mark source role, original
 time, validity, covered-through revision and omissions. Memory is untrusted
@@ -271,7 +590,7 @@ truncated to the model's budget. If evidence is cut, do so at valid text
 boundaries, label the omission and provide a read handle. Never silently cut
 JSON or a claim's provenance fields.
 
-## 6. Freshness and correction protocol
+### 4.5 Freshness and correction protocol
 
 Asynchronous organization means "current" cannot be a boolean on an old
 summary. Track source processing coverage and outstanding gaps, not just the
@@ -320,9 +639,9 @@ Immediately reject syntactically invalid changes, nonexistent IDs, out-of-range
 evidence and stale revisions. Semantic correctness still needs evaluation;
 JSON validation alone cannot establish that a quoted sentence supports a claim.
 
-## 7. Maintenance algorithm and bounded scheduling
+### 4.6 Maintenance algorithm and bounded scheduling
 
-### One batch, one model request
+#### One batch, one model request
 
 The coordinator leases a bounded pending batch and snapshots candidate event
 revisions. FTS finds possible existing events. A Tool-disabled request to the
@@ -346,7 +665,7 @@ requires an explicit, independently validated reorganization operation and is
 deferred. Duplicate candidate events are safer than irreversible conflation.
 Retrieval can present both with their distinct evidence.
 
-### Scheduling policy
+#### Scheduling policy
 
 Initial proposed policy, adjustable only after measurements:
 
@@ -383,9 +702,9 @@ Provider/auth/schema failures pause the affected queue with a visible status
 and repair action. Budget exhaustion leaves records searchable as raw history.
 No maintenance means reduced organization, not loss of original messages.
 
-## 8. Latency, memory and cost feasibility
+### 4.7 Latency, memory and cost feasibility
 
-### Critical path
+#### Critical path
 
 ```text
 ordinary:
@@ -416,7 +735,7 @@ Do not describe a local Tool taking 50 ms as a 50 ms deep-recall experience.
 TiMem's reported recall P50 of 1.76-2.35 seconds, under its own experiment
 configuration, illustrates model-call overhead, not an Android prediction.
 
-### Initial budgets and targets
+#### Initial budgets and targets
 
 These are proposed limits/acceptance criteria. They require representative
 Android device measurements before rollout.
@@ -469,7 +788,7 @@ Do not estimate battery improvement from fewer tokens. Maintain no active
 maintenance wakeups when the queue is empty. Historical evidence is not silently
 evicted to make a benchmark pass.
 
-## 9. Privacy, cancellation and user controls
+### 4.8 Privacy, cancellation and user controls
 
 Event-memory maintenance is an explicit opt-in during rollout, with a short
 disclosure: selected conversation excerpts are sent to the configured Provider
@@ -534,7 +853,7 @@ transient leases/focus/caches and secrets, and define restore/import eligibility
 Never restore a deleted projection from an old index or silently schedule an
 upload of imported history.
 
-## 10. Integration and migration
+### 4.9 Integration and migration
 
 | Surface | Required change |
 | --- | --- |
@@ -550,10 +869,8 @@ upload of imported history.
 | Provider adapter | Dedicated Tool-free organizer contract, cancellation/deadline controls and usage instrumentation |
 | Settings | Consent, maintenance status and source-backed correction/forget controls |
 
-The existing architecture table calls the conversation owner
-`ConversationRepository`; implementation currently exposes
-`AgentMemoryRepository`. Implementation should reconcile the naming in the
-authoritative ownership document rather than creating two competing owners.
+Evolve the existing `AgentMemoryRepository` ownership rather than introducing
+a second competing conversation store or repository.
 
 Use the next schema version available at implementation time, with a checked-in
 schema and migration coverage. Do not assume version 6 remains unclaimed.
@@ -571,14 +888,14 @@ Before implementing each behavioral change, update PRD, interaction, technical,
 Tool and ownership contracts as applicable. This proposal alone does not
 override current successful-turn persistence or registry contracts.
 
-## 11. Evaluation and release gates
+### 4.10 Evaluation and release gates
 
 Use synthetic fixtures, never private chat exports or credentials. Compare
 the current recent-window/FTS baseline, event prefetch alone, and event
 prefetch plus bounded deeper recall. Keep answering models and useful evidence
 coverage comparable; report results separately per Provider/model.
 
-### Behavioral cases
+#### Behavioral cases
 
 | Case | Required observable outcome |
 | --- | --- |
@@ -624,7 +941,7 @@ Normal-path and deep-recall timings are separate distributions. Measure long
 questions, output-heavy answers and preempted maintenance; a fast short-answer
 average does not prove voice latency is acceptable.
 
-## 12. Delivery sequence and remaining decisions
+### 4.11 Delivery sequence and remaining decisions
 
 1. **Durability and provenance:** message lifecycle, outbox, generation guards,
    separate history display, source exclusions and mechanical migration.
@@ -650,7 +967,7 @@ Decisions requiring measured evidence before wider rollout:
 - Whether initial byte/candidate/focus limits meet the device and quality gates.
   Changing these requires rerunning both, not tuning for latency alone.
 
-## 13. Research basis and limits
+### 4.12 Research basis and limits
 
 - [SeCom, ICLR 2025](https://arxiv.org/abs/2502.05589v3): coherent conversational
   segments and denoising motivate event-level recall. Historical QA does not
@@ -669,3 +986,15 @@ Decisions requiring measured evidence before wider rollout:
 
 This is a Mochi-specific synthesis, not a reproduced paper system or a claim
 that the cited methods' benchmark scores transfer to Android voice chat.
+
+Later research reviewed in November does not change the rollout status:
+
+- [KITE, October 2026 preprint](https://arxiv.org/abs/2610.41521): source-linked,
+  typed, vector-free retrieval is relevant to inspectable indexing. Its
+  experiment still generates three candidate query plans with an LLM.
+  Reader-context token counts are not total pipeline cost or Android latency.
+- [RecMem, May 2026](https://arxiv.org/abs/2605.16045): raw evidence and selective
+  consolidation inform maintenance policy, but the method uses embeddings,
+  and its construction-cost savings are not response-latency measurements.
+
+These are research inputs, not dependencies selected for the application.

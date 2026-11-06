@@ -206,7 +206,7 @@ Android 系统权限不会被分享。
 
 | 语音优先 | 记住重要信息 | 真正处理工作 |
 | --- | --- | --- |
-| 可切换中英文唤醒词，支持连续语音对话 | 在本地保存对话历史，并通过 ICU 分词的词法检索召回相关长期记忆 | 内置计划、定时任务、定位、天气、网页、地图、文档和本地计算 Tools |
+| 可切换中英文唤醒词，支持连续语音对话 | [本地对话历史与记忆检索](docs/architecture/MEMORY_DESIGN.md) | 内置计划、定时任务、定位、天气、网页、地图、文档和本地计算 Tools |
 | 默认使用 Android 语音，也可选配讯飞/Azure 识别与合成，并支持文字输入 | 可直接编辑 `SOUL`、`USER` 和 `AGENTS` Persona 文件 | 通过可信卡片、原生导航以及串行 Researcher/Analyst Subagent 呈现有用结果 |
 
 | 与 **Notion** 和 **腾讯文档** Cowork | 通过 Skill Market 持续扩展 |

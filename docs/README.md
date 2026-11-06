@@ -16,14 +16,14 @@ contains the product and engineering source of truth.
 
 | Document | Purpose |
 | --- | --- |
-| [`architecture/TECHNICAL.md`](architecture/TECHNICAL.md) | Runtime, providers, memory, Skills, and platform design |
+| [`architecture/TECHNICAL.md`](architecture/TECHNICAL.md) | Runtime, providers, Skills, and platform design |
 | [`architecture/APP_ARCHITECTURE.md`](architecture/APP_ARCHITECTURE.md) | Modules, state ownership, persistence, and dependencies |
 | [`architecture/AGENT_TOOLS.md`](architecture/AGENT_TOOLS.md) | Tool schemas, MCP, safety, and UI directives |
 | [`architecture/EXTENSIONS.md`](architecture/EXTENSIONS.md) | Signed optional APK extensions, Binder contracts, and attachment safety |
 | [`architecture/AGENT_BROWSER.md`](architecture/AGENT_BROWSER.md) | Visible per-turn browser Tools, lifecycle, and safety |
 | [`architecture/CARD_PRESENTATION.md`](architecture/CARD_PRESENTATION.md) | Trusted Agent card evidence and rendering |
 | [`architecture/VOICE_RUNTIME.md`](architecture/VOICE_RUNTIME.md) | Wake word, recognition, audio focus, and speech runtime |
-| [`architecture/EVENT_MEMORY_DESIGN.md`](architecture/EVENT_MEMORY_DESIGN.md) | Proposed single-chat event memory, consistency, latency budgets, and evaluation; not shipped behavior |
+| [`architecture/MEMORY_DESIGN.md`](architecture/MEMORY_DESIGN.md) | Sole memory reference: current design, device results and diagnostics, optimization goals, and proposed event-based evolution |
 
 ## Delivery
 
@@ -59,6 +59,7 @@ adding an exception.
 - Keep one authoritative definition and link to it elsewhere.
 - Separate current behavior from planned behavior.
 - Update the relevant contract in the same change as behavior.
-- Keep setup and verification commands in `DEVELOPMENT.md`.
+- Keep general setup and verification commands in `DEVELOPMENT.md`, linking
+  to domain-owned diagnostic details instead of copying them.
 - Delete obsolete documents and code; do not retain in-tree archives.
 - Every path, command, and status claim must be verifiable from the repository.

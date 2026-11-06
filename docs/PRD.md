@@ -534,8 +534,8 @@ Raw Provider errors and secrets never enter the report, logs or exports.
 The agent uses:
 
 - app-private SOUL, USER, and AGENTS files;
-- configurable recent local conversation, default 20 complete turns;
-- direct SQLite memory recall with neighboring context;
+- local conversation context and recall as defined in
+  [Memory design](architecture/MEMORY_DESIGN.md#1-current-design);
 - current local date, time, locale, and timezone;
 - explicit tool schemas;
 - structured final output containing reply, emotion, and optional UI directive.

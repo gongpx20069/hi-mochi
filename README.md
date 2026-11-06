@@ -234,7 +234,7 @@ microphone test and voice preview.
 
 | Voice first | Remember what matters | Get real work done |
 | --- | --- | --- |
-| Selectable English/Chinese wake phrase and continuous voice conversation | Local conversation history and ICU-tokenized lexical memory recall | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
+| Selectable English/Chinese wake phrase and continuous voice conversation | [Local conversation history and memory recall](docs/architecture/MEMORY_DESIGN.md) | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
 | Android speech by default, with optional iFlytek/Azure recognition and synthesis; text input remains available | Editable `SOUL`, `USER`, and `AGENTS` persona files | Trusted cards, native navigation, and serial Researcher/Analyst Subagents surface useful results |
 
 | Cowork with **Notion** and **Tencent Docs** | Expand through the Skill Market |

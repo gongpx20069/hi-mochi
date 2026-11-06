@@ -42,8 +42,7 @@ or verification in earlier phases.
 - [x] Built-in/skills.sh management.
 - [x] Agent Skills metadata discovery and on-demand activation.
 - [x] App-private SOUL/USER/AGENTS files.
-- [x] Configurable recent conversation context, default 20 turns.
-- [x] SQLite conversation persistence and ICU-tokenized FTS4 memory recall.
+- [x] [Local conversation context and memory retrieval](architecture/MEMORY_DESIGN.md#1-current-design).
 - [x] Typed ToolRegistry, JSON schemas, and result envelopes.
 - [x] Mochi calendar/todo CRUD tools with destructive confirmation.
 - [x] Permission-gated current-location and weather Tools with explicit

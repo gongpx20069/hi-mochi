@@ -42,7 +42,7 @@ run in local JVM tests.
 | `SerialSubagentCoordinator` | one active child, per-run delegation count, cancellation propagation |
 | `PromptBuilder` | persona files, memory recall, skill catalog, time context |
 | `PersonaRepository` | app-private SOUL/USER/AGENTS files and atomic updates |
-| `ConversationRepository` | persisted turns and SQLite memory retrieval |
+| `AgentMemoryRepository` | [Conversation persistence and recall](MEMORY_DESIGN.md#1-current-design) |
 | `SkillRepository` | Agent Skills metadata, resources, and enablement |
 | `ToolRegistry` | schema registration, validation, dispatch |
 | `ToolCatalogRepository` | built-in enablement, MCP/OAuth, REST definitions and encrypted credentials, selected schemas |
@@ -181,20 +181,11 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 - Room stores editable market skills and their upstream/local digests; built-in
   skills remain read-only application resources while Room stores their local
   enable/disable overrides.
-- Room stores successful conversation messages and a dedicated FTS4 index of
-  normalized terms produced by the shared ICU-based tokenizer. Message and FTS
-  rows are written in one transaction; schema migration rebuilds existing
-  indexes with the current tokenizer. FTS excludes the configurable recent
-  window before selecting up to 150 candidates, prioritizing joint primary-term
-  matches before OR fallback. The repository ranks persisted lexical terms,
-  selects up to five hits, batch-loads one neighboring message on each side, deduplicates, and
-  restores chronological order. The Conversation UI renders each stored
-  message timestamp in the device timezone beside its sender label.
+- Conversation storage, memory retrieval and their settings follow
+  [Memory design](MEMORY_DESIGN.md#1-current-design).
 - App-private `files/persona/SOUL.md`, `USER.md`, and `AGENTS.md` are seeded
   from bundled assets and updated atomically. Persona is intentionally not a
   Room model, and there is no HEARTBEAT file.
-- Recent conversation context defaults to 20 user/assistant turns and is
-  configurable from Settings. DataStore owns this preference.
 - DataStore owns Focus standby enablement and its validated idle-delay choice.
   The default is enabled after 30 seconds; no Room migration is involved.
 - The Home ViewModel owns the active Focus flag in `SavedStateHandle`; UI
