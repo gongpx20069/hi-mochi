@@ -426,20 +426,32 @@ bigrams and unigrams as recall fallbacks, while numeric runs remain searchable.
 Room FTS4 stores the pre-tokenized terms in a dedicated index; each successful
 turn writes message and FTS rows in one transaction. Database migration 4-to-5
 creates the FTS table and rebuilds every existing message with the current ICU
-tokenizer rather than copying stale normalized text. FTS selects a bounded
-candidate set, which is retokenized consistently and ranked in Kotlin by query
-coverage, term specificity, inverse candidate frequency, exact-phrase matches,
-and a deliberately small recency boost that cannot override a materially
-stronger lexical match.
+tokenizer rather than copying stale normalized text. Retrieval excludes recent
+message IDs inside the FTS query before applying its limit. A conjunction of
+multiple primary query terms gets first access to the 150-candidate pool;
+synthetic Han bigrams/unigrams do not become extra conjunction requirements.
+A broad OR lookup fills any remaining slots, excluding both recent and already
+selected IDs. Each lookup selects newest matches within its tier, across the
+eligible history rather than a preselected recent slice. Single-term queries
+need only the broad lookup; a full preferred pool skips the second lookup.
 
-Retrieval excludes IDs in the recent message window, selects up to four
-matching memories, includes up to three neighbors on either side, deduplicates,
-and returns chronological context. The Relevant memories section declares the
+Kotlin ranks candidates using their already persisted pre-tokenized search text,
+avoiding repeated ICU segmentation. Scoring retains query coverage, term
+specificity, inverse candidate frequency, exact-phrase matches, and a deliberately
+small recency boost that cannot override a materially stronger lexical match.
+Candidate-dependent term weights are calculated once per query.
+
+Retrieval selects up to five matching messages. One batched database query
+uses indexed timestamp lookups to fetch at most one earlier and one later
+neighbor for each hit. The combined windows contain at most 15 messages before
+deduplication and removal of recent IDs, then return chronological context.
+There is no additional turn completion, model call, context byte cap, or event
+classification. The Relevant memories section declares the
 device timezone once as `NOTE:<timezone ID>`. Every recalled line then includes
 its original instant rendered as local time with only the UTC offset, avoiding
 repeated timezone IDs while still distinguishing historical context from the
-current conversation. If no conversation match exists, only explicit
-fact/summary memories are eligible for recency fallback.
+current conversation. No-match retrieval does not fill the result with unrelated
+recent records.
 
 The proposed replacement for chronological-neighbor recall is documented in
 [Event memory design](EVENT_MEMORY_DESIGN.md). It defines evidence-backed

@@ -54,8 +54,9 @@ The inspected implementation is:
 
 - `core/memory/AgentMemoryRepository.kt`: `loadContext(query, recentTurns)`
   and `saveTurn(userText, assistantText)`. Foreground successful pairs are
-  saved together. Retrieval uses global recent messages, up to 100 FTS
-  candidates, four hits and three chronological neighbors on either side.
+  saved together. Retrieval uses global recent messages, excludes their IDs
+  before selecting up to 150 FTS candidates with joint-term priority and OR
+  fallback, and expands five hits by one chronological neighbor on either side.
 - `core/database/MochiDatabase.kt`: Room schema version 5, message and FTS
   entities, and existing migrations.
 - `core/agent/AgentOrchestrator.kt`: `AgentRunRequest.history`,

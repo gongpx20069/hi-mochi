@@ -48,37 +48,34 @@ class RoomAgentMemoryRepository(
         val recent = dao.listRecentMessages(recentTurns * 2)
             .asReversed()
         val recentIds = recent.mapTo(mutableSetOf(), AgentMemoryEntity::id)
-        val terms = MemoryLexicalSearch.terms(query)
-        val hits = if (terms.isEmpty()) {
+        val search = MemoryLexicalSearch.prepareQuery(query)
+        val hits = if (search.terms.isEmpty()) {
             emptyList()
         } else {
-            val lookupTerms = MemoryLexicalSearch.candidateLookupTerms(terms)
-            MemoryLexicalSearch.rank(
-                query = query,
-                queryTerms = terms,
-                candidates = dao.search(
-                    matchQuery = MemoryLexicalSearch.matchQuery(lookupTerms),
+            val candidates = search.preferredMatchQuery?.let { matchQuery ->
+                dao.search(
+                    matchQuery = matchQuery,
+                    excludedIds = recentIds,
                     limit = MAX_SEARCH_CANDIDATES,
                 )
-                    .asSequence()
-                    .filterNot { it.id in recentIds }
-                    .toList(),
+            }.orEmpty().toMutableList()
+            if (candidates.size < MAX_SEARCH_CANDIDATES) {
+                candidates += dao.search(
+                    matchQuery = search.matchQuery,
+                    excludedIds = recentIds + candidates.map(AgentMemoryEntity::id),
+                    limit = MAX_SEARCH_CANDIDATES - candidates.size,
+                )
+            }
+            MemoryLexicalSearch.rank(
+                query = query,
+                queryTerms = search.terms,
+                candidates = candidates,
             )
-                .asSequence()
                 .take(MAX_MEMORY_HITS)
-                .toList()
         }
         val recalled = linkedMapOf<String, AgentMemoryEntity>()
-        hits.forEach { hit ->
-            dao.listBefore(hit.createdAtEpochMillis, MEMORY_CONTEXT_RADIUS)
-                .asReversed()
-                .plus(hit)
-                .plus(
-                    dao.listAfter(
-                        hit.createdAtEpochMillis,
-                        MEMORY_CONTEXT_RADIUS,
-                    ),
-                )
+        if (hits.isNotEmpty()) {
+            (hits + dao.listNeighbors(hits.map(AgentMemoryEntity::id)))
                 .filterNot { it.id in recentIds }
                 .forEach { recalled[it.id] = it }
         }
@@ -178,6 +175,5 @@ private fun AgentMemoryEntity.toPromptLine(zoneId: ZoneId): String {
 }
 
 private const val MAX_MEMORY_CONTENT_CHARS = 20_000
-private const val MAX_SEARCH_CANDIDATES = 100
-private const val MAX_MEMORY_HITS = 4
-private const val MEMORY_CONTEXT_RADIUS = 3
+private const val MAX_SEARCH_CANDIDATES = 150
+private const val MAX_MEMORY_HITS = 5

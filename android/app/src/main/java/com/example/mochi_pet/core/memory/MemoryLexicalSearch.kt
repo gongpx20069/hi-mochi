@@ -9,7 +9,23 @@ internal object MemoryLexicalSearch {
     fun terms(
         value: String,
         limit: Int = MAX_INDEX_TERMS,
-    ): List<String> {
+    ): List<String> = tokenize(value, limit).terms
+
+    fun prepareQuery(value: String): SearchQuery {
+        val tokenized = tokenize(value, MAX_INDEX_TERMS)
+        val preferredTerms = candidateLookupTerms(tokenized.primaryTerms)
+        return SearchQuery(
+            terms = tokenized.terms,
+            matchQuery = matchQuery(candidateLookupTerms(tokenized.terms)),
+            preferredMatchQuery = preferredTerms.takeIf { it.size > 1 }
+                ?.let { matchQuery(it, matchAll = true) },
+        )
+    }
+
+    private fun tokenize(
+        value: String,
+        limit: Int,
+    ): TokenizedTerms {
         val primary = linkedSetOf<String>()
         val bigrams = linkedSetOf<String>()
         val unigrams = linkedSetOf<String>()
@@ -24,11 +40,14 @@ internal object MemoryLexicalSearch {
                         .forEach(primary::add)
                 }
             }
-        return sequenceOf(primary, bigrams, unigrams)
-            .flatten()
-            .distinct()
-            .take(limit)
-            .toList()
+        return TokenizedTerms(
+            primaryTerms = primary.take(limit),
+            terms = sequenceOf(primary, bigrams, unigrams)
+                .flatten()
+                .distinct()
+                .take(limit)
+                .toList(),
+        )
     }
 
     fun searchableText(value: String): String =
@@ -43,8 +62,12 @@ internal object MemoryLexicalSearch {
             .take(MAX_SEARCH_TERMS)
     }
 
-    fun matchQuery(terms: List<String>): String =
-        terms.joinToString(" OR ") { term ->
+    // Implicit AND also works on FTS4 builds without enhanced query syntax.
+    private fun matchQuery(
+        terms: List<String>,
+        matchAll: Boolean = false,
+    ): String =
+        terms.joinToString(if (matchAll) " " else " OR ") { term ->
             """"${term.replace("\"", "\"\"")}""""
         }
 
@@ -62,14 +85,23 @@ internal object MemoryLexicalSearch {
         val documents = candidates.map { memory ->
             RankedDocument(
                 memory = memory,
-                terms = terms(memory.content).toSet(),
+                terms = memory.searchText.splitToSequence(' ')
+                    .filter { it in selectedTerms }
+                    .toSet(),
                 comparableText = comparableText(memory.content),
             )
         }
         val documentFrequency = selectedTerms.associateWith { term ->
             documents.count { term in it.terms }
         }
-        val queryWeight = selectedTerms.sumOf(::termWeight)
+        val termWeights = selectedTerms.associateWith(::termWeight)
+        val matchWeights = selectedTerms.associateWith { term ->
+            termWeights.getValue(term) * inverseDocumentFrequency(
+                documentCount = documents.size,
+                matchingDocumentCount = documentFrequency.getValue(term),
+            )
+        }
+        val queryWeight = termWeights.values.sum()
         val queryPhrase = comparableText(query)
             .takeIf { it.codePointCount() >= MIN_PHRASE_CODE_POINTS }
         val oldestTimestamp = candidates.minOf(
@@ -84,13 +116,8 @@ internal object MemoryLexicalSearch {
             if (matchedTerms.isEmpty()) {
                 return@mapNotNull null
             }
-            val weightedMatches = matchedTerms.sumOf { term ->
-                termWeight(term) * inverseDocumentFrequency(
-                    documentCount = documents.size,
-                    matchingDocumentCount = documentFrequency.getValue(term),
-                )
-            }
-            val coverage = matchedTerms.sumOf(::termWeight) / queryWeight
+            val weightedMatches = matchedTerms.sumOf(matchWeights::getValue)
+            val coverage = matchedTerms.sumOf(termWeights::getValue) / queryWeight
             val phraseBoost = if (
                 queryPhrase != null &&
                 queryPhrase in document.comparableText
@@ -248,6 +275,17 @@ internal object MemoryLexicalSearch {
 
     private fun Int.isHan(): Boolean =
         Character.UnicodeScript.of(this) == Character.UnicodeScript.HAN
+
+    data class SearchQuery(
+        val terms: List<String>,
+        val matchQuery: String,
+        val preferredMatchQuery: String?,
+    )
+
+    private data class TokenizedTerms(
+        val primaryTerms: List<String>,
+        val terms: List<String>,
+    )
 
     private data class ScriptRun(
         val value: String,

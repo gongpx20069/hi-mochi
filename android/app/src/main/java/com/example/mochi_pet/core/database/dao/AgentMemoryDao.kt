@@ -28,39 +28,41 @@ interface AgentMemoryDao {
         INNER JOIN agent_memory_fts
             ON agent_memory_fts.memory_id = memories.id
         WHERE agent_memory_fts.search_text MATCH :matchQuery
+            AND memories.id NOT IN (:excludedIds)
         ORDER BY memories.created_at_epoch_millis DESC
         LIMIT :limit
         """,
     )
     suspend fun search(
         matchQuery: String,
+        excludedIds: Collection<String>,
         limit: Int,
     ): List<AgentMemoryEntity>
 
     @Query(
         """
         SELECT * FROM agent_memories
-        WHERE created_at_epoch_millis < :createdAtEpochMillis
-        ORDER BY created_at_epoch_millis DESC
-        LIMIT :limit
+        WHERE id IN (
+            SELECT (
+                SELECT neighbor.id FROM agent_memories AS neighbor
+                WHERE neighbor.created_at_epoch_millis < hit.created_at_epoch_millis
+                ORDER BY neighbor.created_at_epoch_millis DESC
+                LIMIT 1
+            )
+            FROM agent_memories AS hit WHERE hit.id IN (:hitIds)
+            UNION ALL
+            SELECT (
+                SELECT neighbor.id FROM agent_memories AS neighbor
+                WHERE neighbor.created_at_epoch_millis > hit.created_at_epoch_millis
+                ORDER BY neighbor.created_at_epoch_millis ASC
+                LIMIT 1
+            )
+            FROM agent_memories AS hit WHERE hit.id IN (:hitIds)
+        )
         """,
     )
-    suspend fun listBefore(
-        createdAtEpochMillis: Long,
-        limit: Int,
-    ): List<AgentMemoryEntity>
-
-    @Query(
-        """
-        SELECT * FROM agent_memories
-        WHERE created_at_epoch_millis > :createdAtEpochMillis
-        ORDER BY created_at_epoch_millis ASC
-        LIMIT :limit
-        """,
-    )
-    suspend fun listAfter(
-        createdAtEpochMillis: Long,
-        limit: Int,
+    suspend fun listNeighbors(
+        hitIds: List<String>,
     ): List<AgentMemoryEntity>
 
     @Insert

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.mochi_pet.core.database.MochiDatabase
+import com.example.mochi_pet.core.database.dao.AgentMemoryDao
 import com.example.mochi_pet.core.database.entity.AgentMemoryEntity
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
@@ -128,6 +129,184 @@ class AgentMemoryRepositoryTest {
             assertTrue(
                 context.recalledLines.any { it.contains("Mochi上海旅行") },
             )
+        }
+
+    @Test
+    fun `FTS excludes recent IDs before filling the candidate limit`() =
+        runBlocking {
+            val dao = database.agentMemoryDao()
+            dao.insertAll(
+                (1..260).map {
+                    memory("$it", "user", "hotel reservation $it", it.toLong())
+                },
+            )
+            val excluded = (161..260).map(Int::toString)
+
+            val candidates = dao.search(
+                matchQuery = "\"hotel\"",
+                excludedIds = excluded,
+                limit = 150,
+            )
+
+            assertEquals((160 downTo 11).map(Int::toString), candidates.map { it.id })
+        }
+
+    @Test
+    fun `old joint matches survive more than 150 newer partial matches`() =
+        runBlocking {
+            val dao = database.agentMemoryDao()
+            dao.insertAll(
+                listOf(memory("old", "user", "hotel reservation confirmed", 1)) +
+                    (2..172).map {
+                        memory("$it", "user", "train reservation $it", it.toLong())
+                    } +
+                    listOf(
+                        memory("recent-user", "user", "dinner", 200),
+                        memory("recent-assistant", "assistant", "noodles", 201),
+                    ),
+            )
+            val recordingDao = RecordingMemoryDao(dao)
+
+            val context = RoomAgentMemoryRepository(recordingDao).loadContext(
+                query = "hotel reservation",
+                recentTurns = 1,
+            )
+
+            assertTrue(context.recalledLines.any { it.contains("hotel reservation confirmed") })
+            assertEquals(listOf(1, 149), recordingDao.searchResults.map { it.size })
+            assertEquals(
+                150,
+                recordingDao.searchResults.flatten().map { it.id }.distinct().size,
+            )
+            assertEquals("172", recordingDao.searchResults.last().first().id)
+            assertEquals(1, recordingDao.neighborReads)
+        }
+
+    @Test
+    fun `joint Chinese lookup does not require synthetic cross word bigrams`() =
+        runBlocking {
+            val dao = database.agentMemoryDao()
+            dao.insertAll(
+                listOf(memory("old", "user", "酒店靠近杭州西湖", 1)) +
+                    (2..172).map {
+                        memory("$it", "user", "杭州天气晴朗", it.toLong())
+                    } +
+                    listOf(
+                        memory("recent-user", "user", "晚饭吃什么", 200),
+                        memory("recent-assistant", "assistant", "吃面条", 201),
+                    ),
+            )
+            val recordingDao = RecordingMemoryDao(dao)
+
+            val context = RoomAgentMemoryRepository(recordingDao).loadContext(
+                query = "杭州酒店",
+                recentTurns = 1,
+            )
+
+            assertEquals(listOf("old"), recordingDao.searchResults.first().map { it.id })
+            assertTrue(context.recalledLines.any { it.contains("酒店靠近杭州西湖") })
+        }
+
+    @Test
+    fun `full preferred pool skips broad lookup`() =
+        runBlocking {
+            val dao = database.agentMemoryDao()
+            dao.insertAll(
+                (1..170).map {
+                    memory("$it", "user", "hotel reservation $it", it.toLong())
+                },
+            )
+            val recordingDao = RecordingMemoryDao(dao)
+
+            RoomAgentMemoryRepository(recordingDao).loadContext(
+                query = "hotel reservation",
+                recentTurns = 1,
+            )
+
+            assertEquals(1, recordingDao.searchResults.size)
+            assertEquals(
+                (168 downTo 19).map(Int::toString),
+                recordingDao.searchResults.single().map { it.id },
+            )
+        }
+
+    @Test
+    fun `five hits expand only one neighbor each side in one read`() =
+        runBlocking {
+            val dao = database.agentMemoryDao()
+            dao.insertAll(
+                (0..5).flatMap { block ->
+                    (0..4).map { offset ->
+                        memory(
+                            id = "$block-$offset",
+                            role = if (offset % 2 == 0) "user" else "assistant",
+                            content = if (offset == 2) "needle $block" else "context $block-$offset",
+                            timestamp = (block * 5 + offset).toLong(),
+                        )
+                    }
+                } +
+                    listOf(
+                        memory("recent-user", "user", "dinner", 100),
+                        memory("recent-assistant", "assistant", "noodles", 101),
+                    ),
+            )
+            val recordingDao = RecordingMemoryDao(dao)
+
+            val context = RoomAgentMemoryRepository(recordingDao).loadContext(
+                query = "needle",
+                recentTurns = 1,
+            )
+
+            assertEquals(
+                (1..5).flatMap { block ->
+                    listOf("context $block-1", "needle $block", "context $block-3")
+                },
+                context.recalledLines.map { it.substringAfter(": ", "") },
+            )
+            assertEquals(1, recordingDao.searchResults.size)
+            assertEquals(1, recordingDao.neighborReads)
+        }
+
+    @Test
+    fun `overlapping windows deduplicate and do not repeat recent boundary`() =
+        runBlocking {
+            val dao = database.agentMemoryDao()
+            dao.insertAll(
+                listOf(
+                    memory("1", "user", "context", 1),
+                    memory("2", "assistant", "hotel first", 2),
+                    memory("3", "user", "hotel second", 3),
+                    memory("4", "user", "hotel recent", 4),
+                    memory("5", "assistant", "recent response", 5),
+                ),
+            )
+
+            val context = RoomAgentMemoryRepository(dao).loadContext(
+                query = "hotel",
+                recentTurns = 1,
+            )
+
+            assertEquals(
+                listOf("context", "hotel first", "hotel second"),
+                context.recalledLines.map { it.substringAfter(": ", "") },
+            )
+            assertEquals(
+                listOf("hotel recent", "recent response"),
+                context.recentMessages.map { it.content },
+            )
+        }
+
+    @Test
+    fun `empty query and no matches do not read neighbors`() =
+        runBlocking {
+            val recordingDao = RecordingMemoryDao(database.agentMemoryDao())
+            val repository = RoomAgentMemoryRepository(recordingDao)
+
+            assertTrue(repository.loadContext("?!", 1).recalledLines.isEmpty())
+            assertTrue(recordingDao.searchResults.isEmpty())
+            assertTrue(repository.loadContext("hotel reservation", 1).recalledLines.isEmpty())
+            assertEquals(listOf(0, 0), recordingDao.searchResults.map { it.size })
+            assertEquals(0, recordingDao.neighborReads)
         }
 
     @Test
@@ -257,4 +436,24 @@ class AgentMemoryRepositoryTest {
         val expectedId: String,
         val candidates: List<AgentMemoryEntity>,
     )
+
+    private class RecordingMemoryDao(
+        private val delegate: AgentMemoryDao,
+    ) : AgentMemoryDao by delegate {
+        val searchResults = mutableListOf<List<AgentMemoryEntity>>()
+        var neighborReads = 0
+            private set
+
+        override suspend fun search(
+            matchQuery: String,
+            excludedIds: Collection<String>,
+            limit: Int,
+        ): List<AgentMemoryEntity> =
+            delegate.search(matchQuery, excludedIds, limit).also(searchResults::add)
+
+        override suspend fun listNeighbors(hitIds: List<String>): List<AgentMemoryEntity> {
+            neighborReads++
+            return delegate.listNeighbors(hitIds)
+        }
+    }
 }

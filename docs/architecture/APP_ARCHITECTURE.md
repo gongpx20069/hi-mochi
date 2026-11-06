@@ -184,9 +184,10 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 - Room stores successful conversation messages and a dedicated FTS4 index of
   normalized terms produced by the shared ICU-based tokenizer. Message and FTS
   rows are written in one transaction; schema migration rebuilds existing
-  indexes with the current tokenizer. The repository ranks bounded FTS
-  candidates and excludes the configurable recent window, selects up to four
-  hits, includes three neighboring messages on each side, deduplicates, and
+  indexes with the current tokenizer. FTS excludes the configurable recent
+  window before selecting up to 150 candidates, prioritizing joint primary-term
+  matches before OR fallback. The repository ranks persisted lexical terms,
+  selects up to five hits, batch-loads one neighboring message on each side, deduplicates, and
   restores chronological order. The Conversation UI renders each stored
   message timestamp in the device timezone beside its sender label.
 - App-private `files/persona/SOUL.md`, `USER.md`, and `AGENTS.md` are seeded
