@@ -21,7 +21,7 @@ SHA-256 before use. Settings > Speech > Wake word defaults to **Follow system**:
 Chinese device locales use `老莫老莫`; English and other locales use `Hi Mochi`.
 Users may pin either phrase or return to Follow system, independently of the
 Mochi interface language. The existing wake preference stores only an explicit
-override; absence means Follow system. Previously saved overrides are preserved.
+override; absence means Follow system. Saved overrides take precedence.
 `WakeRuntimeState.keyword` is the resolved phrase and `keywordOverride` is the
 nullable manual choice. The runtime observes system locale changes; service
 notifications refresh even without a visible Activity. Only the resolved phrase
@@ -53,8 +53,8 @@ interruption accept only the selected phrase from the shared bilingual keyword
 graph; upstream custom streams append to, rather than replace, its defaults.
 Switching resets capture without reloading the model weights. CPU threads: 1;
 active paths: 4; keyword score: 1.5; threshold: 0.25; trailing blanks: 1.
-New weights install under `wake-model-v2`; only the known obsolete model files
-are removed from `wake-model-v1` after the replacement files are copied.
+Weights install under `wake-model-v2`. Model-file cleanup is restricted to
+known superseded assets and runs only after the active files are copied.
 
 The official release archive SHA-256 is
 `68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6`.

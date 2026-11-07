@@ -361,13 +361,13 @@ a permission status, and an unconfirmed return is an explicit Tool error.
   dependency later becomes unavailable, the saved Skill preference remains but
   the Skill is suspended from Agent discovery until readiness is restored.
 - Bundled scripts and dependencies are never executed automatically.
-- Browser replaces Web Search as the general web Skill: supplied links open
+- Browser is the general web Skill: supplied links open
   directly, search retains Bing/Sogou Weixin source guidance, and valid website
   sessions are reused. Cache is not proof of freshness; saved credentials stay
   native-only and cannot be selected or filled by the model.
 - Browser requires navigate/read/scroll; click, input and human assistance are
-  optional and usable only in registries that expose them. The old Web Search
-  enablement is preserved without showing a duplicate Skill.
+  optional and usable only in registries that expose them. Saved enablement
+  is preserved across upgrades without showing duplicate Skills.
 - Specialized Skills retain separate provider and action boundaries. Product
   Search opens supplied product links before searching; stock analysis collects
   only requested companies/fields. Planner records and their reminders, future

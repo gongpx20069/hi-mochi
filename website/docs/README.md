@@ -80,7 +80,7 @@ setup disclosure that remains usable without JavaScript.
 
 The homepage groups optional capabilities under `#extensions`: Mi Home and
 Termux are released same-signer extension APKs; WebDAV Files is a downloadable
-extension preview since v1.0.15; AgentLink is an independent Android app with a computer-side
+extension preview; AgentLink is an independent Android app with a computer-side
 Bridge. Keep all four discoverable through the capability map and feature
 cards, using installation links only for released packages. Show benefits first,
 then setup and permissions; basic Mochi use does not require any of them.

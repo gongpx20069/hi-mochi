@@ -1,6 +1,6 @@
 # Memory design
 
-Updated: 2026-11-06.
+Updated: 2026-11-07.
 
 This is the single owner of conversation-memory behavior, retrieval algorithms,
 memory-specific diagnostics and measured results, and the future event-based
@@ -13,7 +13,7 @@ follow [the documentation ownership rules](../README.md#authority).
 | [1. Current design](#1-current-design) | Implemented; runtime baseline `aa92ae5` |
 | [2. Device measurements and diagnostics](#2-device-measurements-and-diagnostics) | Physical-device results from 2026-11-06; diagnostic source `77ff1c4` |
 | [3. Near-term optimization goals](#3-near-term-optimization-goals) | Identified work, not yet implemented |
-| [4. Future event-based memory](#4-future-event-based-memory) | Consolidated proposal originally dated 2026-09-27; not implemented or approved for rollout |
+| [4. Future event-based memory](#4-future-event-based-memory) | Proposed direction; not implemented or approved for rollout |
 
 Measured values, current limits and future targets are different things.
 In particular, the future payload budgets and recall Tool are not current
@@ -165,10 +165,10 @@ This is not a bound on the underlying SQLite execution work or latency.
 
 ### 1.6 Current boundaries
 
-- No unified byte/token cap over recent history and recall has been introduced.
+- There is no unified byte/token cap over recent history and recall.
   Recent-turn, candidate and hit counts do not bound total model-input bytes.
-- No new excerpt truncation, generated event conclusion, query-rewriting model,
-  `recall_memory` Tool or background model call has been added.
+- Recall does not add excerpt truncation, generated event conclusions,
+  query-rewriting models, a `recall_memory` Tool or background model calls.
 - Chronological neighbors can cross topics or split a question/answer pair.
   Short references and paraphrases remain weaknesses of lexical retrieval.
 - Source roles/timestamps are not a complete provenance or freshness model.
@@ -341,8 +341,8 @@ direction, not a prerequisite for these optimizations.
 
 **Everything in this section is proposed, not implemented or approved for
 rollout.** Its numerical limits are initial hypotheses, not current settings or
-device results. The September draft's 100-raw-candidate and 32 KiB payload
-budgets must be re-evaluated against the current design and measurements rather
+device results. The proposed 100-raw-candidate and 32 KiB payload
+budgets must be evaluated against the current design and measurements rather
 than silently replacing them.
 
 ### 4.1 Design direction

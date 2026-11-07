@@ -122,7 +122,7 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 - Room transactions own planner consistency.
 - DataStore owns non-relational preferences.
 - The Tool catalog stores REST connections and endpoint definitions alongside
-  existing settings with a default-empty field for older catalogs. Tokens use
+  existing settings; an absent REST field decodes as empty. Tokens use
   the existing Keystore cipher; summaries exclude plaintext credentials.
   Revision checks reject stale edits and calls, including results arriving after
   disable/delete. Catalog decode failures block updates rather than replacing
@@ -158,7 +158,7 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   `mochi_browser_credentials_v1` Keystore key. At most 100 accounts are stored,
   with no silent eviction. Native summaries omit passwords; edits/deletes reject
   stale revisions. Cookies and this catalog have independent deletion controls.
-  Login kind separates password and SMS accounts; absent legacy kinds default
+  Login kind separates password and SMS accounts; absent kinds default
   to password. SMS records store only origin and phone, never a verification code.
   Website grouping is derived, not a second persistent account store.
   The runtime inspects local data presence; the Home ViewModel owns confirmed
@@ -173,8 +173,8 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   output and the versioned helper live in Termux's private storage. Neither is
   exported or backed up by Mochi. Provider and individual Tool settings govern
   automatic execution in foreground, scheduled, and subagent registries.
-  The obsolete `termuxBackgroundEnabled` JSON field is ignored and removed
-  on the next catalog write; existing provider/Tool selections are preserved.
+  Provider/Tool selections survive upgrades; there is no separate background
+  authorization switch.
 - The same Tool DataStore stores the encrypted Amap Web Service Key, optional
   Security Key, and provider enablement. Six native Tools call fixed official
   HTTPS REST endpoints; they are not represented as a remote MCP server.

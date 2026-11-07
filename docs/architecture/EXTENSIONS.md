@@ -197,10 +197,9 @@ connected trusted extension. They expose the dependent Skill only if enabled
 and its required Tools are present. Every execution rechecks the switches;
 `TermuxRuntimeState` invalidates already assembled registries even after
 re-enablement and tracks task views without approval state. None of these
-switch changes terminate submitted shell jobs. The obsolete
-`termuxBackgroundEnabled` JSON field is ignored on read and removed by the next
-catalog write; no provider or individual Tool preference is automatically
-enabled during this upgrade.
+switch changes terminate submitted shell jobs. There is no separate background
+authorization switch, and upgrades do not automatically enable a provider or
+individual Tool preference.
 
 The host binds an `ExtensionToolScope` to each adapter and sends the actual
 `foreground_main`, `scheduled`, or `subagent` execution context over Binder.

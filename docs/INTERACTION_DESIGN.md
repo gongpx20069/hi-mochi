@@ -166,9 +166,8 @@ Date text is deliberately less prominent. Fit the complete pair without
 clipping at large font scales.
 The palette is neutral gray/white only, never peach/purple. A small dark-gray
 face fill, restrained highlights and generous black space limit illuminated
-pixel area. Bold type and the larger date intentionally light more pixels
-than the former thin-clock design; readability takes priority over that
-design's stricter pixel budget.
+pixel area. Readable bold numerals and date text take priority over minimizing
+the illuminated pixel count.
 Portrait stacks Mochi, time, and date vertically; landscape places Mochi beside
 the time/date column. Typography fits the available width rather than clipping
 large numerals on small screens. No breathing, blinking, particles, glow,
@@ -485,7 +484,7 @@ without disabling the server or changing individual Tool selections. Built-in
 knowledge providers enable their core search, listing, and reading Tools on
 first connection.
 
-The former **Add MCP** action is **Add tool**, opening a choice between
+**Add tool** opens a choice between
 **Connect MCP service** and **Connect REST API**. REST cards follow MCP cards
 and precede Extensions. Save a named HTTPS origin and masked Token first;
 the connection starts disabled. Its card offers **Add API tool**, shared

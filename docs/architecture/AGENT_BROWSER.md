@@ -64,15 +64,14 @@ keeps its reference across reads and scrolls. A replaced or removed node becomes
 stale, navigation starts a new document generation, and an old reference is
 never reassigned to a different element during the turn.
 
-The MVP does not expose tabs, screenshots, file upload, standalone sleep Tools,
+The browser does not expose tabs, screenshots, file upload, standalone sleep Tools,
 schema extraction, JavaScript evaluation, CSS/XPath selectors, or coordinate
 input.
 
 `auto` uses the exact host's remembered mode, otherwise desktop, for both Agent
-and manual browsing. Explicit mobile/desktop choices still win; legacy catalog
-entries with an omitted `lastMode` keep their former mobile meaning. Mochi chooses
-the presentation without asking users to configure it; legacy manual mode
-preferences are ignored and dropped on the next catalog write. Desktop
+and manual browsing. Explicit mobile/desktop choices still win; saved catalog
+entries with an omitted `lastMode` decode as mobile. Mochi chooses
+the presentation without asking users to configure it. Desktop
 mode derives its UA from the installed Chromium version, requests a wide
 viewport (980 CSS pixels), and sets desktop client hints when supported.
 It remains Android WebView, not desktop Chrome or an anti-detection bypass.
@@ -99,10 +98,9 @@ native search providers. The Agent uses `browser_navigate`, `browser_input`,
 `browser_click`, `browser_read`, and `browser_scroll` to search results and
 selected source pages.
 
-The legacy `search_web` and `fetch_web_page` Tools are removed. The built-in
-Browser Skill covers direct website access, reading, comparison, session reuse
+The built-in Browser Skill covers direct website access, reading, comparison, session reuse
 and search-engine selection, without special network or parsing capabilities.
-It replaces Web Search while preserving its saved enabled/disabled preference.
+Its saved enabled/disabled preference is preserved across upgrades.
 Navigate/read/scroll are its prerequisites; click/input/assistance are optional,
 registry-scoped capabilities. Its instructions distinguish automatic WebView
 cache/session reuse from native-only saved credentials. It cannot read, select

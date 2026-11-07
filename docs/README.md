@@ -58,6 +58,9 @@ adding an exception.
 
 - Keep one authoritative definition and link to it elsewhere.
 - Separate current behavior from planned behavior.
+- Describe current contracts and proposed future design, not changelogs or
+  superseded-version comparisons. Retain compatibility requirements and
+  measurement provenance where they are needed to interpret current behavior.
 - Update the relevant contract in the same change as behavior.
 - Keep general setup and verification commands in `DEVELOPMENT.md`, linking
   to domain-owned diagnostic details instead of copying them.

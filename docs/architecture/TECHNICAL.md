@@ -52,15 +52,15 @@ default unselected every time. MCP shares contain endpoint,
 credential, and enabled remote Tool names rather than cached schemas. Mochi
 encrypts the bundle with a fresh AES-256-GCM key and places ciphertext and key
 in a `mochi://provider/import#v5` link, with version-specific authenticated data.
-V5 includes each AI connection's API protocol; older bundles default to Chat
-Completions. Older apps reject v5 instead of silently dropping Responses selection.
+V5 includes each AI connection's API protocol; bundles without a protocol field
+default to Chat Completions. Receivers must support v5 to import these links.
 The envelope and payload versions must match. No password or backend is required, but
 possession of the complete link grants the selected API access and quota.
 Import requires confirmation, rediscovers shared MCP schemas, writes secrets
 through the receiver's Keystore-backed repositories, appends LLM and cloud speech
 profiles with fresh local IDs, and selects their respective shared active indices.
 When the sender excludes an active profile, index zero is used for that kind.
-Legacy v2/v3 single-speech fields append one cloud account; system speech selects
+Supported v2/v3 single-speech fields append one cloud account; system speech selects
 the existing built-in profile without replacing its local voice.
 Included Tool settings are replaced and selected Tools enabled.
 Input validation and MCP preparation precede writes; separate repositories are
@@ -364,11 +364,11 @@ continuations, not persisted as conversation text or shown as a reply.
 - Custom providers use the OpenAI-compatible bearer flow.
 
 Authentication/provider type and `ApiProtocol` are separate. The saved protocol
-defaults to `CHAT_COMPLETIONS` when absent, including legacy profiles and imports.
+defaults to `CHAT_COMPLETIONS` when absent from profiles or imports.
 The new-connection editor recommends `RESPONSES` for OpenAI/Azure and Chat
 Completions for other presets. Switching protocol alone preserves the encrypted
 key and follows normal active-run cancellation; no model-name heuristics,
-automatic fallback, disabled reasoning, or application retries are introduced.
+automatic fallback, disabled reasoning, or application retries are used.
 
 Responses uses the same resource/key and puts the deployment/model in the body.
 Azure uses `/openai/v1/responses` without a dated API-version query; other
@@ -403,9 +403,8 @@ The prompt builder assembles, in order: app-private `SOUL.md`, `USER.md`, and
 enabled Skill metadata; compact Tool/navigation/Card policy; and the final
 structured-response contract. It does not inject synthetic emotion, current
 surface, owner name, affinity, interaction count, or unlocked abilities.
-Provider Settings contain connection details only; the former optional system
-prompt is removed because `AGENTS.md` is the editable operational-instruction
-source.
+Provider Settings contain connection details only; `AGENTS.md` is the editable
+operational-instruction source.
 
 AppCompat application locales provide Follow system, Chinese, and English
 selection. Empty application locales follow Android resources: Chinese system
@@ -453,9 +452,8 @@ the extension and native file-picker flow; it is not an image attachment or
 an automatic upload to the model Provider.
 
 The Browser Skill has the stable discovery name `browser` and storage ID
-`builtin:browser`. Existing `builtin:web-search` enablement is read through
-the built-in alias mechanism; a new-ID override takes precedence. The legacy
-record is not a second installed Skill, and no database schema changes.
+`builtin:browser`. Saved enablement resolves through the built-in alias
+mechanism, with the canonical ID taking precedence and no duplicate Skill.
 Its minimum prerequisite is navigate/read/scroll. `load_skill` includes optional
 click/input/assistance in its `allowed-tools` header only when available in the
 calling registry; loading cannot grant a foreground capability to a background

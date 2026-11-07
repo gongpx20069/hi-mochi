@@ -206,9 +206,8 @@ Recursive `delete_space_node(remove_type=all)` requires explicit recursive
 intent; a request to delete one document must not expand to its descendants.
 
 Smart Canvas creation and body editing are core default-on capabilities.
-The current service advertises `create_smartcanvas_by_mdx`, `smartcanvas.read`
-and `smartcanvas.edit`; an allowlist containing only the older Markdown/element
-names silently excludes the real writing APIs. Preserve discovered schemas.
+The selected catalog includes `create_smartcanvas_by_mdx`, `smartcanvas.read`
+and `smartcanvas.edit`. Preserve discovered schemas.
 For creation, pass a nonempty body in `mdx` and explicitly set
 `content_format=markdown` for Markdown. For editing, `content` is Tencent MDX:
 `INSERT_BEFORE`/`INSERT_AFTER` insert beside a block (no `id` appends),
@@ -219,17 +218,16 @@ does not fulfill a request to create a populated document.
 
 Default policy version 3 resets existing connected built-in providers' child
 switches once, preserving credentials and master switches. Tencent catalog
-selection version 2 rediscovers enabled older connections once to include the
+selection version 2 rediscovers eligible enabled connections once to include the
 available subset of these 54 candidates, including the current Smart Canvas
-APIs. Version 1 fixed the old truncated catalog but lacked these three names.
-Version 2 enables newly discovered document Tools by default without resetting
+APIs. Newly discovered document Tools are enabled by default without resetting
 existing individual switches, credentials, or the master switch.
 Disabled connections wait until enabled. Failed discovery keeps cached Tools,
 shows a localized Tools notice, and can be retried by reopening Tools.
 Cancellation propagates; stale discovery cannot restore a disconnected or
 reconfigured connection. This migration never reads or writes user documents.
 Subsequent individual switch changes persist across reloads and master toggles.
-Explicit shared-provider imports retain their selected switches. These expanded
+Explicit shared-provider imports retain their selected switches. These
 defaults do not expand the read-only Subagent allowlists or enable any Skill.
 
 The concise Tencent Docs Skill covers search/browsing, a complete Smart Canvas
@@ -992,16 +990,9 @@ scenes, and retrieves an event image only when the user explicitly asks to view,
 describe, or analyze it. It must not perform face identification or infer
 sensitive personal attributes from an image.
 
-## 8. Previously proposed tool groups
+## 8. Proposed opt-in Android tools
 
-- `trigger_haptic`
-- `show_notification`
-- `load_skill`
-- `persona`
-- `http_fetch`
-- `script_execute`
-
-## 9. Opt-in Android tools
+These are future candidates, not implemented Tool names:
 
 - `manage_alarm`
 - `manage_timer`
@@ -1010,10 +1001,11 @@ sensitive personal attributes from an image.
 - `open_maps`
 - `share_text`
 
-Calls and SMS open system UI; Mochi does not silently place calls or send
-messages. Contact mutation requires explicit permission and confirmation.
+Proposed calls and SMS must open system UI rather than silently placing calls
+or sending messages. Contact mutation would require explicit permission and
+confirmation.
 
-## 10. Agent loop
+## 9. Agent loop
 
 1. Send schemas allowed by current settings and permissions.
 2. Execute tool calls through typed Kotlin executors.

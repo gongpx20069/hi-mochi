@@ -108,8 +108,8 @@ the endpoint and model; Mochi never switches automatically after an error.
 Settings starts with **Share/import**, followed by AI connections, Speech/wake,
 Conversation/persona, and Display/language. Sharing can include multiple checked
 LLM and speech connections. Import adds them instead of overwriting saved accounts
-and selects each shared active connection. New v5 links include API protocol and
-require an updated receiver; existing v2/v3/v4 links remain importable. Anyone holding a full link can use the
+and selects each shared active connection. Shared v5 links include API protocol
+and require a v5-compatible receiver; import accepts v2/v3/v4/v5 links. Anyone holding a full link can use the
 included API credentials.
 
 ### Supported Speech Providers
@@ -422,7 +422,7 @@ and enabled. Installation alone never enables its provider.
 | Mi Home | Mi Home Smart Home — disabled | Selected device state/control, manual scenes, latest camera event images | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Mijia-Extension` |
 | [AgentLink](https://github.com/gongpx20069/android-agent-link) | AgentLink — disabled | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` for shared remote coding chats | [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases) |
 | Termux | Termux — disabled | `termux_exec` · `termux_task` for unrestricted local shell and task management | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Termux-Extension`, plus [official Termux](https://github.com/termux/termux-app#installation) |
-| WebDAV Files (preview) | WebDAV Files — disabled | Scoped file listing/search, text editing, conditional copy/move/delete and native binary transfer | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): matching Mochi + `Mochi-WebDAV-Extension`, available since v1.0.15 |
+| WebDAV Files (preview) | WebDAV Files — disabled | Scoped file listing/search, text editing, conditional copy/move/delete and native binary transfer | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): matching Mochi + `Mochi-WebDAV-Extension` |
 
 ### WebDAV files: Nutstore, compatible clouds and NAS
 

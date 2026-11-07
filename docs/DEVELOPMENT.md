@@ -31,12 +31,12 @@ android/
 - An Android 8.0 or newer device or emulator
 
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
-The wrapper pins Gradle 9.8.2 with its official distribution SHA-256.
+The wrapper pins Gradle 9.9.0 with its official distribution SHA-256.
 The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
 and serialization 1.12.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply
 `org.jetbrains.kotlin.android` in modules. Serialization 1.12.0 uses Kotlin 2.4
-metadata and cannot compile with the former Kotlin 2.2.20 toolchain.
+metadata and requires a compatible Kotlin compiler.
 The host and all three extensions compile against and target Android 17 (API 37);
 the shared libraries also compile against API 37. Android 8.0 (API 26) remains
 the minimum supported version. Keep Lint warnings fatal, including target-SDK
@@ -505,7 +505,7 @@ GitHub CLI with `gh auth login`, then run:
 ```powershell
 .\scripts\Build-LocalAndroidRelease.ps1
 .\scripts\Publish-LocalAndroidRelease.ps1 `
-  -ReleaseDirectory .\dist\android-release\Mochi-v1.0.3
+  -ReleaseDirectory '<release-directory-printed-by-build>'
 ```
 
 The build script calculates the next remote version and embeds it in five
@@ -566,12 +566,12 @@ automatic execution without native/voice confirmation, normal/nonzero exit,
 large stdout/stderr, timeout, Stop, process death, reconnect and retained task
 inspection. Verify connected, enabled Termux works for foreground conversations,
 Scheduled Agents and both Subagent roles with no separate background switch.
-Check upgrades preserve provider/Tool selections and ignore/remove the old
-background flag. Skill readiness follows each registry; permission/provider/
+Check upgrades preserve provider/Tool selections. Skill readiness follows each
+registry; permission/provider/
 individual Tool revocation blocks subsequent calls, including stale registries
 after re-enabling, without claiming to stop submitted work.
 Mi Home and AgentLink must remain excluded from scheduled/subagent registries.
-Update both base and Termux extension APKs for background-context support.
+Use matching base and Termux extension APKs.
 JVM and Linux tests do not establish real-device cross-App or
 OEM background behavior. No connected Android device means that acceptance is
 blocked, not passed.

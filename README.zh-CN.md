@@ -90,7 +90,7 @@ LLM Provider 是必需配置。未配置时，首次启动会打开设置；之�
 MiniMax（国内）和 Agnes-AI 会自动填入可编辑的官方地址；根据内置官方指南填写
 自己的 API Key 和支持工具调用的模型。这些是普通按量付费 API，不是 Coding Plan
 专用地址。新增连接不会切换当前选择；点击**使用**才切换，并取消正在运行的本地
-Agent 任务，未来的定时计划仍保留。旧版单连接配置及密钥自动迁移，无需重填。
+Agent 任务，未来的定时计划仍保留。更新应用时保留已有配置及密钥。
 
 每个连接可在**高级连接设置 > API 协议**中选择 Responses 或 Chat Completions。
 新建 OpenAI/Azure 连接默认使用 Responses，其他预设及旧连接保留 Chat Completions，
@@ -99,7 +99,7 @@ Mochi 不会在报错后自动切换。
 
 设置依次分为**分享与导入 → AI 连接 → 语音与唤醒 → 对话与人格 → 显示与语言**。
 分享时可勾选多个 LLM 和语音连接；导入会新增而非覆盖已有账号，并分别切换到分享
-中的选中连接。新 v5 链接包含 API 协议，需要新版接收端，旧 v2/v3/v4 链接仍可导入。持有完整链接的人可以使用
+中的选中连接。分享的 v5 链接包含 API 协议，接收端需支持 v5；导入支持 v2/v3/v4/v5 链接。持有完整链接的人可以使用
 其中的 API 凭据，请仅发给可信的人。
 
 ### 支持的 Speech Provider
@@ -365,7 +365,7 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 | 米家 | Mi Home Smart Home——禁用 | 查询/控制选定设备、执行手动场景、查看最新摄像头事件图片 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：`Mochi-Mijia-Extension` |
 | [AgentLink](https://github.com/gongpx20069/android-agent-link) | AgentLink——禁用 | 通过 `agentlink_workspace`、`agentlink_chat`、`agentlink_control` 控制远程共享编程聊天 | [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases) |
 | Termux | Termux——禁用 | 通过 `termux_exec`、`termux_task` 运行完整本机 Shell 并管理任务 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：`Mochi-Termux-Extension`，另需[官方 Termux](https://github.com/termux/termux-app#installation) |
-| WebDAV 文件（预览） | WebDAV Files——禁用 | 授权目录内列举/查找文件、编辑文本、条件复制/移动/删除、原生二进制传输 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：同版本 Mochi 与 `Mochi-WebDAV-Extension`，自 v1.0.15 起提供 |
+| WebDAV 文件（预览） | WebDAV Files——禁用 | 授权目录内列举/查找文件、编辑文本、条件复制/移动/删除、原生二进制传输 | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases)：同版本 Mochi 与 `Mochi-WebDAV-Extension` |
 
 ### WebDAV 文件：坚果云、兼容私有云与 NAS
 
