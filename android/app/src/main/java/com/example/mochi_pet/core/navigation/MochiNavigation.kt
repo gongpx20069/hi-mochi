@@ -7,6 +7,8 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 sealed interface MochiNavigationIntent {
+    data object EndVoiceSession : MochiNavigationIntent
+
     data class SetFocusMode(val enabled: Boolean) : MochiNavigationIntent
 
     data object ShowFace : MochiNavigationIntent
@@ -44,6 +46,7 @@ sealed interface MochiNavigationIntent {
 object MochiNavigationReducer {
     fun reduce(intent: MochiNavigationIntent, currentSurface: MochiSurface = MochiSurface.Face): MochiSurface =
         when (intent) {
+            MochiNavigationIntent.EndVoiceSession -> currentSurface
             is MochiNavigationIntent.SetFocusMode ->
                 if (intent.enabled && !currentSurface.isHomePresentation()) MochiSurface.Face else currentSurface
             MochiNavigationIntent.ShowFace -> MochiSurface.Face

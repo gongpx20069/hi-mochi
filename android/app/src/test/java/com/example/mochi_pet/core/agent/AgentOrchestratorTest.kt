@@ -591,6 +591,39 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    fun `final voice exit applies without replacing earlier navigation or card precedence`() = runBlocking {
+        val applied = NavigationDecision(
+            com.example.mochi_pet.core.navigation.UiDirective("today"),
+            com.example.mochi_pet.core.navigation.MochiNavigationIntent.ShowToday,
+        )
+        val decisions = mutableListOf<NavigationDecision>()
+        val client = QueueChatClient(finalResponse(
+            """
+            {
+              "reply":"Your plan is ready. Call me when you need me.",
+              "emotion":"neutral",
+              "ui_directive":{"surface":"end_voice_session","reason":"explicit_ui_request"},
+              "card_directive":{"type":"insight","placement":"home"}
+            }
+            """.trimIndent(),
+        ))
+
+        val result = orchestrator(
+            client,
+            sink = { decisions += it },
+            appliedDecision = { applied },
+        ).run(request())
+
+        assertEquals(
+            com.example.mochi_pet.core.navigation.MochiNavigationIntent.EndVoiceSession,
+            decisions.single().intent,
+        )
+        assertEquals(false, decisions.single().directive.followUpListening)
+        assertEquals(applied.directive, result.uiDirective)
+        assertEquals(CardPlacement.DEFERRED, result.card?.placement)
+    }
+
+    @Test
     fun `repairs one malformed final response without tools`() = runBlocking {
         val client = QueueChatClient(
             finalResponse("not-json"),

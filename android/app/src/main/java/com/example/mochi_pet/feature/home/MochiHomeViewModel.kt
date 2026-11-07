@@ -376,6 +376,7 @@ class MochiHomeViewModel(
     private var loadVersion = 0L
     @Volatile private var activeBriefing: AgentLinkBriefing? = null
     private var interactionVersion = 0L
+    private var endedVoiceInteractionVersion: Long? = null
     private var voiceInteraction = false
     private var agentJob: Job? = null
     private val mutableSpeechVoiceState = MutableStateFlow(SpeechVoiceUiState())
@@ -678,6 +679,10 @@ class MochiHomeViewModel(
     }
 
     fun navigate(intent: MochiNavigationIntent) {
+        if (intent == MochiNavigationIntent.EndVoiceSession) {
+            endedVoiceInteractionVersion = interactionVersion
+            return
+        }
         if (intent is MochiNavigationIntent.SetFocusMode) {
             setFocusMode(intent.enabled)
             return
@@ -1051,6 +1056,7 @@ class MochiHomeViewModel(
             }
             if (
                 continueListeningAfterReply &&
+                endedVoiceInteractionVersion != version &&
                 result == SpeechPlaybackResult.COMPLETED
             ) {
                 startFollowUpListening(version)

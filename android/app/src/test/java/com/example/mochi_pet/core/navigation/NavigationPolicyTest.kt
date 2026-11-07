@@ -13,6 +13,46 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class NavigationPolicyTest {
+    @Test
+    fun `voice exit preserves presentation and requires an explicit request without planner arguments`() = runBlocking {
+        val decisions = mutableListOf<NavigationDecision>()
+        val tool = NavigateMochiUiTool(policy, UiDirectiveSink { decisions += it })
+        val args = buildJsonObject {
+            put("operate", "end_voice_session")
+            put("reason", "explicit_ui_request")
+        }
+        val request = parseUiDirectiveRequest(args)
+        tool.execute(args, context.copy(currentSurface = MochiSurface.DateTime))
+
+        val decision = decisions.single()
+        assertEquals(MochiNavigationIntent.EndVoiceSession, decision.intent)
+        assertEquals("end_voice_session", decision.directive.surface)
+        assertEquals(JsonPrimitive(false), decision.directive.toJson()["follow_up_listening"])
+        assertEquals(
+            MochiSurface.DateTime,
+            MochiNavigationReducer.reduce(decision.intent, MochiSurface.DateTime),
+        )
+        assertEquals(
+            request,
+            parseUiDirectiveRequest(buildJsonObject {
+                put("surface", "end_voice_session")
+                put("reason", "explicit_ui_request")
+            }, "surface"),
+        )
+        for (invalid in listOf(
+            request.copy(reason = NavigationReason.CURRENT_TIME_DATE),
+            request.copy(date = today),
+            request.copy(month = java.time.YearMonth.from(today)),
+            request.copy(section = UiSection.TIME),
+            request.copy(status = com.example.mochi_pet.core.model.TodoStatus.ACTIVE),
+            request.copy(highlightIds = listOf("item")),
+        )) {
+            assertThrows(ToolInputException::class.java) {
+                policy.decide(invalid, context)
+            }
+        }
+    }
+
     @Test fun `focus operations parse for Tools and final directives and require explicit UI intent`() = runBlocking {
         val decisions = mutableListOf<NavigationDecision>()
         val tool = NavigateMochiUiTool(policy, UiDirectiveSink { decisions += it })

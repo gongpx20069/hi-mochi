@@ -90,6 +90,12 @@ is transient feedback, not a conversation message, and is excluded from
 history and model context. Microphone-button and media-button starts do not add
 this acknowledgement.
 
+An explicit request to finish talking uses Mochi Navigation's
+`end_voice_session`. The current response finishes without automatic follow-up
+STT; the screen and Focus state remain unchanged. The user can start another
+session with the wake phrase, microphone or media button. Lifecycle details
+are owned by [Voice runtime](architecture/VOICE_RUNTIME.md#ending-continuous-voice-input).
+
 New AgentLink outcomes replace the acknowledgement with a short conversational
 briefing, not logs or remote identifiers. Multiple updates are combined and
 needed approval/failure takes precedence. Wording says the remote run ended,

@@ -16,6 +16,9 @@ import com.example.mochi_pet.core.model.TodoStatus
 import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import com.example.mochi_pet.core.navigation.NavigationDecision
 import com.example.mochi_pet.core.navigation.UiDirective
+import com.example.mochi_pet.core.navigation.UiDirectiveSink
+import com.example.mochi_pet.core.navigation.NavigateMochiUiTool
+import com.example.mochi_pet.core.navigation.NavigationPolicy
 import com.example.mochi_pet.core.presentation.CardAction
 import com.example.mochi_pet.core.presentation.CardActionType
 import com.example.mochi_pet.core.presentation.CardItem
@@ -59,6 +62,8 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -712,6 +717,71 @@ class MochiHomeViewModelTest {
     }
 
     @Test
+    fun `voice exit finishes reply without follow up and stale requests cannot affect a new session`() {
+        for (voiceInput in listOf(true, false)) {
+            val voice = VoiceRuntimeFake("That's all", autoCompleteSpeech = false)
+            val wake = WakeRuntimeFake()
+            var oldSink: UiDirectiveSink? = null
+            val viewModel = MochiHomeViewModel(
+                plannerStore = PlannerStoreFake(),
+                providerSettingsRepository = ProviderSettingsRepositoryFake(),
+                voiceRuntime = voice,
+                wakeRuntime = wake,
+                clock = fixedClock(),
+                ioDispatcher = Dispatchers.Unconfined,
+                mainDispatcher = Dispatchers.Unconfined,
+                agentRunnerBuilder = { sink, _, _ -> AgentRunner { request ->
+                    if (request.query == "That's all") {
+                        oldSink = sink
+                        val tool = NavigateMochiUiTool(NavigationPolicy(), sink)
+                        repeat(2) {
+                            tool.execute(buildJsonObject {
+                                put("operate", "end_voice_session")
+                                put("reason", "explicit_ui_request")
+                            }, request.context)
+                        }
+                        sink.apply(NavigationDecision(UiDirective("date_time"), MochiNavigationIntent.ShowDateTime))
+                    }
+                    AgentReply("Call me when you need me.", "neutral")
+                } },
+            )
+            viewModel.navigate(MochiNavigationIntent.ShowDateTime)
+            viewModel.setFocusMode(true)
+            if (voiceInput) viewModel.startVoiceInput() else viewModel.sendConversation("That's all")
+
+            val firstListenCount = if (voiceInput) 1 else 0
+            assertEquals(firstListenCount, voice.listenCount)
+            assertEquals(ChatPipelineStage.SPEAKING, viewModel.pipelineState.value.stage)
+            assertEquals("Call me when you need me.", voice.spokenText)
+            assertEquals("Call me when you need me.", viewModel.conversationState.value.messages.last().text)
+            assertEquals(MochiSurface.DateTime, viewModel.surface.value)
+            assertTrue(viewModel.focusMode.value)
+            val oldPlayback = voice.speechCallbacks.single()
+            oldPlayback(SpeechPlaybackResult.COMPLETED)
+            assertEquals(firstListenCount, voice.listenCount)
+            assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+            assertTrue(wake.resumeCount > 0)
+
+            voice.transcripts.clear()
+            voice.transcripts.addLast("Another request")
+            viewModel.startVoiceInput(acknowledgeWake = voiceInput)
+            if (voiceInput) voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+            assertEquals(firstListenCount + 1, voice.listenCount)
+            kotlinx.coroutines.runBlocking {
+                checkNotNull(oldSink).apply(NavigationDecision(
+                    UiDirective("end_voice_session", followUpListening = false),
+                    MochiNavigationIntent.EndVoiceSession,
+                ))
+            }
+            oldPlayback(SpeechPlaybackResult.COMPLETED)
+            assertEquals(ChatPipelineStage.SPEAKING, viewModel.pipelineState.value.stage)
+            voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+            assertEquals(firstListenCount + 2, voice.listenCount)
+            assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+        }
+    }
+
+    @Test
     fun `failed synthesis preserves reply without opening follow up microphone`() {
         val voiceRuntime = VoiceRuntimeFake(
             "Turn off the television",
@@ -835,38 +905,47 @@ class MochiHomeViewModelTest {
     }
 
     @Test
-    fun `weather tool result is spoken and resumes listening after agent failure`() {
-        val voiceRuntime = VoiceRuntimeFake("How is the weather?")
-        val wakeRuntime = WakeRuntimeFake()
-        val weather = CurrentWeather(
-            temperatureC = 29.0,
-            apparentTemperatureC = 33.0,
-            humidityPercent = 74,
-            weatherCode = 2,
-            observedAt = "2026-07-31T18:00",
-            timezone = "Asia/Shanghai",
-        )
-        val viewModel = MochiHomeViewModel(
-            plannerStore = PlannerStoreFake(),
-            providerSettingsRepository = ProviderSettingsRepositoryFake(),
-            agentRunnerBuilder = { _, _, onWeatherLoaded ->
-                AgentRunner {
-                    onWeatherLoaded(weather)
-                    error("Agent failed after weather tool")
-                }
-            },
-            voiceRuntime = voiceRuntime,
-            wakeRuntime = wakeRuntime,
-            clock = fixedClock(),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+    fun `weather fallback respects voice session exit after agent failure`() {
+        for (endVoiceSession in listOf(false, true)) {
+            val voiceRuntime = VoiceRuntimeFake("How is the weather?")
+            val wakeRuntime = WakeRuntimeFake()
+            val weather = CurrentWeather(
+                temperatureC = 29.0,
+                apparentTemperatureC = 33.0,
+                humidityPercent = 74,
+                weatherCode = 2,
+                observedAt = "2026-07-31T18:00",
+                timezone = "Asia/Shanghai",
+            )
+            val viewModel = MochiHomeViewModel(
+                plannerStore = PlannerStoreFake(),
+                providerSettingsRepository = ProviderSettingsRepositoryFake(),
+                agentRunnerBuilder = { sink, _, onWeatherLoaded ->
+                    AgentRunner {
+                        onWeatherLoaded(weather)
+                        if (endVoiceSession) {
+                            sink.apply(NavigationDecision(
+                                UiDirective("end_voice_session", followUpListening = false),
+                                MochiNavigationIntent.EndVoiceSession,
+                            ))
+                        }
+                        error("Agent failed after weather tool")
+                    }
+                },
+                voiceRuntime = voiceRuntime,
+                wakeRuntime = wakeRuntime,
+                clock = fixedClock(),
+                ioDispatcher = Dispatchers.Unconfined,
+                mainDispatcher = Dispatchers.Unconfined,
+            )
 
-        viewModel.startVoiceInput()
+            viewModel.startVoiceInput()
 
-        assertTrue(voiceRuntime.spokenText?.contains("29") == true)
-        assertTrue(voiceRuntime.spokenText?.contains("74") == true)
-        assertEquals(2, voiceRuntime.listenCount)
-        assertEquals(null, viewModel.conversationState.value.errorMessage)
+            assertTrue(voiceRuntime.spokenText?.contains("29") == true)
+            assertTrue(voiceRuntime.spokenText?.contains("74") == true)
+            assertEquals(if (endVoiceSession) 1 else 2, voiceRuntime.listenCount)
+            assertEquals(null, viewModel.conversationState.value.errorMessage)
+        }
     }
 
     @Test
@@ -1055,7 +1134,7 @@ private class VoiceRuntimeFake(
     private val speechResult: SpeechPlaybackResult = SpeechPlaybackResult.COMPLETED,
     private val autoCompleteSpeech: Boolean = true,
 ) : VoiceRuntime {
-    private val transcripts = ArrayDeque(listOf(transcript))
+    val transcripts = ArrayDeque(listOf(transcript))
     override val state = MutableStateFlow(
         VoiceRuntimeState(recognitionAvailable = true, ttsReady = true),
     )

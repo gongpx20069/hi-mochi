@@ -21,6 +21,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 enum class NavigationOperation {
+    END_VOICE_SESSION,
     ENTER_FOCUS,
     EXIT_FOCUS,
     SHOW_FACE,
@@ -72,6 +73,7 @@ data class UiDirective(
     val status: TodoStatus? = null,
     val highlightIds: List<String> = emptyList(),
     val focusMode: Boolean? = null,
+    val followUpListening: Boolean? = null,
 )
 
 data class NavigationDecision(
@@ -104,11 +106,20 @@ class NavigationPolicy {
             }
 
         return when (request.operation) {
-            NavigationOperation.ENTER_FOCUS, NavigationOperation.EXIT_FOCUS -> {
+            NavigationOperation.ENTER_FOCUS,
+            NavigationOperation.EXIT_FOCUS,
+            NavigationOperation.END_VOICE_SESSION,
+            -> {
                 request.requireExplicitUiRequest()
                 if (request.date != null || request.month != null || request.section != null ||
                     request.status != null || request.highlightIds.isNotEmpty()) {
-                    throw ToolInputException("Focus operations do not accept planner arguments")
+                    throw ToolInputException("${request.operation.name.lowercase()} does not accept planner arguments")
+                }
+                if (request.operation == NavigationOperation.END_VOICE_SESSION) {
+                    return NavigationDecision(
+                        directive = UiDirective(surface = "end_voice_session", followUpListening = false),
+                        intent = MochiNavigationIntent.EndVoiceSession,
+                    )
                 }
                 val enabled = request.operation == NavigationOperation.ENTER_FOCUS
                 val intent = MochiNavigationIntent.SetFocusMode(enabled)
@@ -306,6 +317,9 @@ class NavigateMochiUiTool(
         description =
             "Navigate Mochi's own UI after resolving conversational intent. enter_focus and exit_focus explicitly set (never toggle) Focus mode " +
                 "and require reason=explicit_ui_request. Enter preserves the current Home presentation, or opens Home from another page; exit preserves the current page. " +
+                "end_voice_session also requires reason=explicit_ui_request and accepts no planner arguments. " +
+                "Use it when the user asks to finish talking or stop follow-up listening, not for quoted or negated requests. " +
+                "It lets the current reply finish but prevents automatic follow-up STT for this interaction only, without changing the screen, Focus or wake-word settings. " +
                 "Returning from an external app uses app_navigate return, not this Tool: preserve Mochi's existing screen and Focus state.",
         properties = buildJsonObject {
             put("operate", stringProperty(NavigationOperation.entries))
@@ -370,6 +384,7 @@ fun UiDirective.toJson(): JsonObject =
     buildJsonObject {
         put("surface", surface)
         focusMode?.let { put("focus_mode", it) }
+        followUpListening?.let { put("follow_up_listening", it) }
         date?.let { put("date", it.toString()) }
         month?.let { put("month", it.toString()) }
         section?.let { put("section", it.name.lowercase()) }

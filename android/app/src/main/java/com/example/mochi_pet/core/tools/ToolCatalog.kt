@@ -2578,7 +2578,7 @@ val BUILT_IN_TOOLS = listOf(
     BuiltInToolDescriptor(
         name = "navigate_mochi_ui",
         displayName = "Mochi Navigation",
-        description = "Open Mochi pages or enter and exit Focus mode.",
+        description = "Open Mochi pages, control Focus, or end continuous voice input.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(

@@ -168,6 +168,26 @@ Version checks reject stale playback callbacks. Real-device AEC, echo rejection,
 keyword interruption and immediate speech acceptance are required acceptance
 gates; platform capability detection alone is not evidence of acoustic quality.
 
+### Ending continuous voice input
+
+Mochi Navigation's `end_voice_session` marks the active interaction as not
+eligible for automatic follow-up STT. It does not cancel the Agent, tool effects,
+history persistence or final reply playback. The ViewModel checks this
+interaction-scoped marker at playback completion, including weather fallback
+replies, then returns to idle and restores wake capture instead of starting STT.
+Repeated requests are idempotent and later navigation cannot re-enable it.
+Interaction-version checks reject stale directives and playback callbacks;
+a fresh wake, microphone or media-button trigger starts an independent session.
+The marker is not a saved preference and does not change `voiceInteraction`
+while the Agent or TTS still belongs to that voice turn.
+
+The model interprets an explicit request to finish talking; UI code does not
+scan transcripts or replies for phrases. Quoted, hypothetical and negated
+requests do not authorize the action. Ending continuous input preserves the
+current screen and Focus state. Wake-word settings are unchanged: enabled
+local keyword capture can still use the microphone, so this is not a promise
+to disable all microphone capture.
+
 ### Optional cloud synthesis
 
 `VoiceRuntime.speak` distinguishes reply output from wake acknowledgement and

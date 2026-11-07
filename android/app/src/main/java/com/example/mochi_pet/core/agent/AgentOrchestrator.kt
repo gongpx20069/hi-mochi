@@ -14,6 +14,7 @@ import com.example.mochi_pet.core.navigation.NavigationDecision
 import com.example.mochi_pet.core.navigation.NavigationPolicy
 import com.example.mochi_pet.core.navigation.UiDirective
 import com.example.mochi_pet.core.navigation.UiDirectiveSink
+import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import com.example.mochi_pet.core.navigation.parseUiDirectiveRequest
 import com.example.mochi_pet.core.presentation.CardPresentation
 import com.example.mochi_pet.core.presentation.CardPresentationPolicy
@@ -145,7 +146,8 @@ class AgentPromptBuilder(
                     "does not authorize unrelated purchases, publication or account changes.",
             )
             appendLine(
-                "Use navigation only when changing the screen benefits the user.",
+                "Use navigation only when changing the screen benefits the user " +
+                    "or they explicitly ask to end continuous voice input.",
             )
             appendLine(
                 "A visual presentation never replaces the spoken reply.",
@@ -615,7 +617,9 @@ class AgentOrchestrator(
             navigationPolicy.decide(request, context)
         }
         val effectiveNavigationDecision =
-            finalNavigationDecision ?: appliedNavigationDecision()
+            finalNavigationDecision?.takeUnless {
+                it.intent == MochiNavigationIntent.EndVoiceSession
+            } ?: appliedNavigationDecision()
         val card = payload.cardDirective
             ?.let { directive ->
                 runCatching {

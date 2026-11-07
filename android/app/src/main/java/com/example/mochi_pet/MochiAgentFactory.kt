@@ -29,6 +29,7 @@ import com.example.mochi_pet.core.browser.readOnlyAgentBrowserTools
 import com.example.mochi_pet.core.extensions.ExtensionToolScope
 import com.example.mochi_pet.core.maps.amapMapTools
 import com.example.mochi_pet.core.navigation.NavigateMochiUiTool
+import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import com.example.mochi_pet.core.navigation.NavigationDecision
 import com.example.mochi_pet.core.navigation.NavigationPolicy
 import com.example.mochi_pet.core.navigation.UiDirectiveSink
@@ -58,7 +59,9 @@ suspend fun MochiApplication.createAgentRunner(
     val navigationPolicy = NavigationPolicy()
     var appliedNavigation: NavigationDecision? = null
     val recordingSink = UiDirectiveSink { decision ->
-        appliedNavigation = decision
+        if (decision.intent != MochiNavigationIntent.EndVoiceSession) {
+            appliedNavigation = decision
+        }
         sink.apply(decision)
     }
     val builtInTools = mutableListOf(

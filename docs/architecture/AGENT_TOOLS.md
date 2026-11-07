@@ -517,12 +517,14 @@ Operations:
 - `show_date_time`
 - `show_weather`
 - `show_conversation`
+- `show_settings`
 - `show_today`
 - `show_calendar_month`
 - `show_calendar_day`
 - `show_todo`
 - `enter_focus`
 - `exit_focus`
+- `end_voice_session`
 
 Optional arguments:
 
@@ -541,6 +543,14 @@ the current page. The result includes `focus_mode`. The same operation names
 are accepted in final `ui_directive.surface` requests. Returning from a selected
 external app uses `app_navigate return`, not Mochi UI navigation, so the existing
 presentation and Focus state are preserved.
+
+`end_voice_session` requires `reason=explicit_ui_request` and rejects planner
+arguments. It returns `follow_up_listening=false`: the current reply still
+finishes, but automatic follow-up STT is suppressed for that interaction.
+It preserves the screen, Focus and earlier navigation decisions. The same
+operation is accepted in final `ui_directive.surface`; it is a session control,
+not a new surface. See [Voice runtime](VOICE_RUNTIME.md#ending-continuous-voice-input)
+for lifecycle and wake behavior.
 
 Calls include a required semantic `reason`. Generic calendar/time knowledge is
 rejected, current time/date prefers the Home date-time presentation, current

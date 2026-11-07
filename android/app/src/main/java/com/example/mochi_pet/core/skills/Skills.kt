@@ -816,7 +816,7 @@ private val BUILT_IN_SKILLS = listOf(
     builtInSkill(
         id = "builtin:voice-navigation",
         name = "Voice Navigation",
-        description = "Navigate to the relevant native surface by intent.",
+        description = "Navigate Mochi pages, control Focus, or end continuous voice input.",
         content = """
             # Voice Navigation
 
@@ -831,11 +831,20 @@ private val BUILT_IN_SKILLS = listOf(
             | Current weather | Home weather |
             | Today's plan | Planner > Today |
             | Another date | Planner > Calendar Day |
+            | Explicit page request | Face, Conversation, Settings, month calendar or dated todos |
+            | Enter or exit Focus | `enter_focus` / `exit_focus`, preserving the Home presentation |
+            | Finish talking or stop follow-up listening | `end_voice_session`, keeping the current screen |
             | Generic calendar knowledge | Keep current surface |
+
+            Focus and voice-session operations require `reason=explicit_ui_request`
+            and no planner arguments. Ending voice input lets the current reply
+            finish without opening the next STT window; wake-word settings stay
+            unchanged and a fresh wake or microphone action starts another session.
+            Interpret the user's intent, not quoted, hypothetical or negated commands.
 
             Navigation is optional. Do not change surfaces when the conversation
             does not benefit from a visual transition.
-            Only navigate: Mochi Planner changes records; Scheduled Automations
+            Do not mutate planner data: Mochi Planner changes records; Scheduled Automations
             creates future Agent runs. Opening a page does not create an item.
         """.trimIndent(),
     ),
