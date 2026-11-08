@@ -420,6 +420,11 @@ Conversation persistence, recent-context settings, retrieval and prompt evidence
 are defined in [Memory design](MEMORY_DESIGN.md), together with device results,
 diagnostic instructions and the separately marked event-based proposal.
 
+Daily journal uses that document's [independent summary pipeline](MEMORY_DESIGN.md#17-daily-journal),
+not `AgentOrchestrator`, `PromptBuilder`, memory recall or a Tool/Skill.
+Its Worker shares only the configured Provider transport and cancellation
+coordinator; midnight processing never opens UI, emits speech or runs actions.
+
 Skills follow the Agent Skills format: a root `SKILL.md` with required `name`
 and `description` frontmatter plus optional `license`, `compatibility`,
 `metadata`, and experimental `allowed-tools`. The initial prompt contains only

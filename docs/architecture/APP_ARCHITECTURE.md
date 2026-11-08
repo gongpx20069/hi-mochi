@@ -74,6 +74,9 @@ run in local JVM tests.
 | `NavigationPolicy` | intent/date-to-surface rules |
 | `AndroidUserReminderController` | opt-in local notifications, permission readiness and AlarmManager/WorkManager reconciliation |
 | `RoomAgentScheduleRepository` | finite Agent plans, transactional run reservation, versioned configuration snapshots and durable results |
+| `core/journal` | date-bounded saved evidence, journal lifecycle and independent typed summary requests |
+| `platform/journal` | quiet midnight WorkManager reconciliation, per-date workers and Provider-change cancellation |
+| `JournalViewModel` / `feature/journal` | independent opt-in settings, past-day cards and detail actions; composition slots in Settings/Planner |
 | Feature ViewModels | screen state and user events |
 
 No Composable may call the LLM, database DAO, SpeechRecognizer, TextToSpeech,
@@ -121,6 +124,11 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 ## 5. Persistence
 
 - Room transactions own planner consistency.
+- Schema 7 also owns `daily_journals` and singleton `journal_settings`.
+  Opt-in and claim invalidation share a transaction; date uniqueness and
+  claim-checked publication prevent duplicates and late disable/delete writes.
+  Journal content is not inserted into conversation memory. Scheduled chat
+  copies carry nullable `source_run_id` for evidence deduplication.
 - DataStore owns non-relational preferences.
 - The Tool catalog stores REST connections and endpoint definitions alongside
   existing settings; an absent REST field decodes as empty. Tokens use

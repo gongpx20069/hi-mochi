@@ -37,6 +37,8 @@ or verification in earlier phases.
   shared UI/Agent operations and two-category Planner presentation.
 - [x] Todo scheduled date, due time, completion, priority, and filters.
 - [x] Unified day agenda showing events and dated todos.
+- [x] Opt-in Daily journal: independent midnight summaries, past-day cards,
+  consent, bounded recovery and claim-fenced retry/delete in Room schema 7.
 - [ ] Local export/import.
 
 ## P1 - Agent

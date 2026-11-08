@@ -356,6 +356,20 @@ configured, first launch opens a guided connection screen before normal use.
 The Settings groups are ordered **Share/import**, **AI connections**,
 **Speech/wake**, **Conversation/persona**, **Display/language**, with visible
 section headings and descriptions. Share/import precedes every other group.
+
+**Conversation/persona** includes a rounded **Daily journal / 每日小记** card.
+The switch defaults off; enabling first explains use of saved records, the
+selected AI service and model credits. Disabling retains earlier journals.
+Past-date Planner pages show one matching rounded journal card, with a small
+type badge, generated title and short preview, or an explicit waiting, writing,
+empty or failed state. Today and future dates never show a journal. Month dates
+with nondeleted journal entries are marked even without schedules.
+Opening a card reveals a scrollable bottom sheet with the date, selectable
+body, AI-generated label and confirmed regenerate/delete actions. Failed retries
+retain the last successful text. Retry requires the switch to be enabled;
+deletion explains that automatic processing will not recreate that date.
+These controls do not complete schedules or execute Mochi tasks.
+
 AI connections shows named saved cards with current selection and Use/Edit/Delete.
 Add opens a screenshot-protected editor; OpenAI is prefilled, and presets also
 include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Azure, and custom. Each
@@ -370,7 +384,7 @@ Keys are masked and never loaded into the editor. Blank preserves only that
 profile's encrypted key; changing provider authentication type or endpoint host requires
 replacement. Each profile independently stores timeout and image-input policy.
 First save activates; subsequent additions do not switch. Use cancels running
-local Agents, children and current scheduled runs before the new configuration
+local Agents, children, current scheduled runs and journal generation before the new configuration
 is selected. Editing active runtime settings has the same effect; renaming
 or editing an inactive connection does not. Future schedules remain enabled.
 Remote AgentLink tasks and submitted Termux processes are not stopped by this

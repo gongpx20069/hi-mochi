@@ -95,6 +95,14 @@ class MochiApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         applicationScope.launch {
+            try {
+                journalController.reconcile()
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                android.util.Log.e("DailyJournal", "Could not schedule daily journals", error)
+            }
+        }
+        applicationScope.launch {
             agentScheduleController.syncAll()
         }
         applicationScope.launch {
@@ -139,6 +147,14 @@ class MochiApplication : Application() {
     }
 
     val providerRuns = com.example.mochi_pet.core.settings.ProviderRunCoordinator()
+
+    val journalRepository by lazy {
+        com.example.mochi_pet.core.journal.JournalRepository(database, plannerStore)
+    }
+
+    val journalController by lazy {
+        com.example.mochi_pet.platform.journal.AndroidJournalController(this, journalRepository)
+    }
 
     val providerSettingsRepository: ProviderSettingsRepository by lazy {
         DataStoreProviderSettingsRepository(
@@ -397,7 +413,7 @@ class MochiApplication : Application() {
                     agentBrowserRuntime.closeTurn()
                 }
             }
-            agentMemoryRepository.saveTurn(userText, reply.reply)
+            agentMemoryRepository.saveScheduledTurn(schedule.id, userText, reply.reply)
             val updated = agentScheduleStore.finishRun(
                 id = id,
                 state = com.example.mochi_pet.core.schedule.ScheduleRunState.SUCCESS,
@@ -427,7 +443,8 @@ class MochiApplication : Application() {
                 error,
             )
             val message = error.message ?: "Mochi could not complete this request"
-            agentMemoryRepository.saveTurn(
+            agentMemoryRepository.saveScheduledTurn(
+                schedule.id,
                 userText,
                 "Scheduled task failed: $message",
             )

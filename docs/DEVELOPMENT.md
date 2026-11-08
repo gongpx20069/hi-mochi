@@ -174,6 +174,19 @@ records, Room and Robolectric, not real provider or personal-device operations.
 Device force-stop, OEM delivery restrictions and real voice parsing still need
 separately authorized device acceptance.
 
+Daily journal regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*Journal*Test" `
+  --tests "*MochiDatabaseMigrationTest" --tests "*AgentMemoryRepositoryTest" --no-daemon
+```
+
+These use synthetic records and fake model replies to verify whole-day paging,
+DST windows, source deduplication, cutoff states, bounded prompt assembly,
+claim fencing, deletion tombstones, default-off migration, consent and
+large-text journal controls. They do not invoke a live Provider or establish
+OEM midnight delivery guarantees.
+
 Skill readiness/content regressions:
 
 ```powershell

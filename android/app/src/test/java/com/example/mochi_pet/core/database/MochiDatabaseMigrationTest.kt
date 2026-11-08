@@ -68,7 +68,7 @@ class MochiDatabaseMigrationTest {
             MochiDatabase::class.java,
             DATABASE_NAME,
         )
-            .addMigrations(MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6)
+            .addMigrations(MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7)
             .allowMainThreadQueries()
             .build()
         try {
@@ -83,6 +83,11 @@ class MochiDatabaseMigrationTest {
                 assertEquals("legacy-memory", cursor.getString(0))
                 assertTrue(cursor.getString(1).contains(" mochi "))
             }
+            database.openHelper.writableDatabase.query("SELECT content, source_run_id FROM agent_memories").use {
+                assertTrue(it.moveToFirst())
+                assertEquals("Mochi上海旅行", it.getString(0))
+                assertTrue(it.isNull(1))
+            }
         } finally {
             database.close()
         }
@@ -90,7 +95,7 @@ class MochiDatabaseMigrationTest {
 
     @Test
     fun `all released schemas migrate with planner records and indefinite schedules preserved`() {
-        for (version in 1..5) {
+        for (version in 1..6) {
             context.deleteDatabase(DATABASE_NAME)
             createDatabaseFromSchema(version).apply {
                 execSQL("""INSERT INTO calendar_events
@@ -106,10 +111,18 @@ class MochiDatabaseMigrationTest {
             }
             val database = Room.databaseBuilder(context, MochiDatabase::class.java, DATABASE_NAME)
                 .addMigrations(MochiDatabase.MIGRATION_1_2, MochiDatabase.MIGRATION_2_3,
-                    MochiDatabase.MIGRATION_3_4, MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6)
+                    MochiDatabase.MIGRATION_3_4, MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7)
                 .allowMainThreadQueries().build()
             try {
                 val db = database.openHelper.writableDatabase
+                db.query("SELECT COUNT(*) FROM daily_journals").use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(0, it.getInt(0))
+                }
+                db.query("SELECT COUNT(*) FROM journal_settings WHERE enabled = 1").use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(0, it.getInt(0))
+                }
                 db.query("SELECT recurrence_rule, revision, series_id FROM calendar_events WHERE id='event'").use {
                     assertTrue(it.moveToFirst())
                     assertEquals("FREQ=DAILY", it.getString(0))
@@ -126,7 +139,7 @@ class MochiDatabaseMigrationTest {
                     assertTrue(it.moveToFirst())
                     assertTrue(it.isNull(0))
                     assertEquals(1, it.getInt(1))
-                    assertEquals("INTERRUPTED", it.getString(2))
+                    assertEquals(if (version < 6) "INTERRUPTED" else null, it.getString(2))
                 }
             } finally { database.close() }
         }

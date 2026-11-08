@@ -251,6 +251,11 @@ fun MochiApp(
         MochiHomeViewModel.factory(application, voiceRuntime, wakeRuntime)
     }
     val viewModel: MochiHomeViewModel = viewModel(factory = factory)
+    val journal: com.example.mochi_pet.feature.journal.JournalViewModel = viewModel(factory = remember(application) {
+        viewModelFactory { initializer {
+            com.example.mochi_pet.feature.journal.JournalViewModel(application.journalRepository, application.journalController)
+        } }
+    })
     LaunchedEffect(plannerDates) {
         plannerDates.collect(viewModel::openPlannerDestination)
     }
@@ -274,6 +279,7 @@ fun MochiApp(
     val showTermuxTasks by viewModel.showTermuxTasks.collectAsStateWithLifecycle()
     LifecycleResumeEffect(Unit) {
         viewModel.refreshTools()
+        journal.refresh()
         onPauseOrDispose { }
     }
     LaunchedEffect(agentLinkResults) {
@@ -448,6 +454,7 @@ fun MochiApp(
 
     MochiAppContent(
         viewModel = viewModel,
+        journal = journal,
         taskCenter = taskCenter,
         onStartVoice = { startVoice(VoiceInputTrigger.DIRECT) },
         onEnableWake = enableWake,
@@ -458,12 +465,17 @@ fun MochiApp(
 @Composable
 private fun MochiAppContent(
     viewModel: MochiHomeViewModel,
+    journal: com.example.mochi_pet.feature.journal.JournalViewModel,
     taskCenter: TaskCenterViewModel,
     onStartVoice: () -> Unit,
     onEnableWake: () -> Unit,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
     val surface by viewModel.surface.collectAsStateWithLifecycle()
+    val journalDates by remember(surface, journal) {
+        (surface as? MochiSurface.CalendarMonth)?.let { journal.markers(it.month) }
+            ?: kotlinx.coroutines.flow.flowOf(emptySet<LocalDate>())
+    }.collectAsStateWithLifecycle(emptySet())
     val plannerState by viewModel.plannerState.collectAsStateWithLifecycle()
     val conversationState by
         viewModel.conversationState.collectAsStateWithLifecycle()
@@ -741,7 +753,9 @@ private fun MochiAppContent(
         }
         SurfaceContent(
             surface = surface,
-            plannerState = plannerState,
+            plannerState = plannerState.copy(occupiedDates = plannerState.occupiedDates + journalDates),
+            journalSettings = { com.example.mochi_pet.feature.journal.JournalSettings(journal) },
+            journalDay = { date -> com.example.mochi_pet.feature.journal.JournalDay(journal, date) },
             conversationState = conversationState,
             providerSettingsState = providerSettingsState,
             speechSettingsState = speechSettingsState,
@@ -1423,6 +1437,8 @@ private fun FocusStandbyScreen(
 
 @Composable
 private fun SurfaceContent(
+    journalSettings: @Composable () -> Unit,
+    journalDay: @Composable (LocalDate) -> Unit,
     surface: MochiSurface,
     plannerState: PlannerSurfaceState,
     conversationState: ConversationUiState,
@@ -1544,6 +1560,7 @@ private fun SurfaceContent(
                 onRemoteTask = { onAgentLinkAction(AgentLinkUiAction.OpenChat(it.link)) },
             )
             MochiSurface.Settings -> ProviderSettingsSurface(
+                journalSettings = journalSettings,
                 state = providerSettingsState,
                 speechState = speechSettingsState,
                 speechVoiceState = speechVoiceState,
@@ -1618,6 +1635,7 @@ private fun SurfaceContent(
                 onSetToolEnabled = onSetMcpToolEnabled,
             )
             MochiSurface.Today -> DaySurface(
+                journalDay = journalDay,
                 title = "Today",
                 state = plannerState,
                 plannerSection = PlannerSection.TODAY,
@@ -1645,6 +1663,7 @@ private fun SurfaceContent(
                 occupiedDates = plannerState.occupiedDates,
             )
             is MochiSurface.CalendarDay -> DaySurface(
+                journalDay = journalDay,
                 title = surface.date.format(
                     uiDateFormatter("EEEE, MMMM d", "M月d日 EEEE"),
                 ),
@@ -3084,6 +3103,7 @@ private fun MochiExpression(stage: ChatPipelineStage) {
 
 @Composable
 private fun DaySurface(
+    journalDay: @Composable (LocalDate) -> Unit,
     title: String,
     state: PlannerSurfaceState,
     plannerSection: PlannerSection,
@@ -3143,6 +3163,7 @@ private fun DaySurface(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                item("daily-journal") { date?.let { journalDay(it) } }
                 if (state.schedules.isNotEmpty()) {
                     item { SectionTitle("Mochi scheduled tasks") }
                     items(
@@ -6028,6 +6049,7 @@ internal fun ProviderSettingsSurface(
     onPreviewSpeechVoice: (SpeechProvider, String, String?) -> Unit = { _, _, _ -> },
     onStopVoicePreview: () -> Unit = {},
     onSelectWakeKeyword: (WakeKeyword?) -> Unit = {},
+    journalSettings: @Composable () -> Unit = {},
 ) {
     var recentTurns by remember(agentSettingsState.settings) {
         mutableStateOf(
@@ -6360,6 +6382,7 @@ internal fun ProviderSettingsSurface(
             }
         }
         val conversationSection: LazyListScope.() -> Unit = {
+            item { journalSettings() }
             item {
                 Text(
                     text = "Conversation context",

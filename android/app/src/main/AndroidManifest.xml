@@ -133,6 +133,15 @@
             android:name=".platform.schedule.UserReminderReceiver"
             android:exported="false" />
         <receiver
+            android:name=".platform.journal.JournalSystemReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".platform.schedule.AgentScheduleSystemReceiver"
             android:exported="false">
             <intent-filter>

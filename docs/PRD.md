@@ -123,6 +123,30 @@ Mochi owns its calendar and todo data in Room.
 Android Calendar Provider is not the source of truth. Future system-calendar
 support is an optional import/export adapter.
 
+#### Daily journal
+
+**Daily journal / 每日小记** is an independent, default-off Settings option.
+After local midnight, it quietly summarizes the previous natural day's saved
+conversations, user schedules and Mochi execution results through the selected
+AI connection. Enabling explicitly discloses sending these records to that
+service and consuming model credits. There are no notifications or speech.
+
+Each past date has at most one journal with a short title and natural paragraph.
+There is no minimum length or filler. Routine recurring events and unchanged
+results are omitted unless meaningful progress occurred; plans are not treated
+as completed events. With nothing important, the native UI displays
+**Nothing important to record / 无重要记录**.
+
+Past-day cards and month markers share Planner styling without becoming a third
+task category. Users can inspect, explicitly regenerate or delete an entry.
+Turning off cancels pending generation but retains existing text. Deleted dates
+are not automatically recreated. Scheduling is best effort under Android
+background/network restrictions; recovery covers the latest seven enabled days,
+never dates before enabling. Older existing entries require manual retry.
+Journals remain separate local derived records, not chat messages, recalled
+memories, new Tools or Skills. Saved-source limits and the independent generation
+contract are defined in [Memory design](architecture/MEMORY_DESIGN.md#17-daily-journal).
+
 ### 3.4 Voice-driven surfaces
 
 - Questions about the current time/date transform Home into a live clock/date.

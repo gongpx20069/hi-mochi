@@ -10,7 +10,7 @@ follow [the documentation ownership rules](../README.md#authority).
 
 | Part | Status |
 | --- | --- |
-| [1. Current design](#1-current-design) | Implemented; runtime baseline `aa92ae5` |
+| [1. Current design](#1-current-design) | Implemented |
 | [2. Device measurements and diagnostics](#2-device-measurements-and-diagnostics) | Physical-device results from 2026-11-06; diagnostic source `77ff1c4` |
 | [3. Near-term optimization goals](#3-near-term-optimization-goals) | Identified work, not yet implemented |
 | [4. Future event-based memory](#4-future-event-based-memory) | Proposed direction; not implemented or approved for rollout |
@@ -26,14 +26,16 @@ runtime behavior, and reorganizing this document does not authorize rollout.
 There is one chronological conversation store, not separate short-term and
 long-term databases. Recent history and recalled history are two read strategies
 over the same Room records. There are no event/claim tables, embeddings,
-automatic organizers or dedicated memory Tools in the current implementation.
+automatic recall organizers or dedicated memory Tools in the current implementation.
+The opt-in [Daily journal](#17-daily-journal) is separate derived storage, not a
+replacement for this conversation store or an input to automatic recall.
 
 | Source | Responsibility |
 | --- | --- |
 | [AgentMemoryRepository.kt](../../android/app/src/main/java/com/example/mochi_pet/core/memory/AgentMemoryRepository.kt) | `loadContext`, successful-turn persistence and recalled-line formatting |
 | [AgentMemoryDao.kt](../../android/app/src/main/java/com/example/mochi_pet/core/database/dao/AgentMemoryDao.kt) | Recent reads, bounded FTS candidates and batched neighbors |
 | [MemoryLexicalSearch.kt](../../android/app/src/main/java/com/example/mochi_pet/core/memory/MemoryLexicalSearch.kt) | ICU tokenization, FTS query construction and lexical ranking |
-| [MochiDatabase.kt](../../android/app/src/main/java/com/example/mochi_pet/core/database/MochiDatabase.kt) | Schema version 5 and migrations, including the FTS index |
+| [MochiDatabase.kt](../../android/app/src/main/java/com/example/mochi_pet/core/database/MochiDatabase.kt) | Schema version 7 and migrations, including the FTS index and independent journals |
 | [AgentOrchestrator.kt](../../android/app/src/main/java/com/example/mochi_pet/core/agent/AgentOrchestrator.kt) | Recent message roles, recalled system context and normal Agent execution |
 | [MochiHomeViewModel.kt](../../android/app/src/main/java/com/example/mochi_pet/feature/home/MochiHomeViewModel.kt) | Foreground recall/save flow and chronological history display |
 | [MochiApplication.kt](../../android/app/src/main/java/com/example/mochi_pet/MochiApplication.kt) | Scheduled Agents use the same repository, including failure descriptions |
@@ -174,6 +176,75 @@ This is not a bound on the underlying SQLite execution work or latency.
 - Source roles/timestamps are not a complete provenance or freshness model.
   Scheduled text can affect foreground recency; derived corrections, deletion
   generations and event membership are not current features.
+
+### 1.7 Daily journal
+
+Daily journal is an independent opt-in read-only summarizer in `core/journal`,
+with WorkManager adapters in `platform/journal` and its own ViewModel/UI in
+`feature/journal`. It does not run the Main Agent, load persona, recall old
+memories, enumerate Skills or expose Tools. It uses the selected Provider and
+its existing cancellation coordinator; changing the active connection interrupts
+generation. Results are not inserted into chat, FTS or future Agent context.
+
+After midnight, native code selects a closed local date, freezes its timezone,
+and reads a transactionally consistent snapshot:
+
+- `conversation_history`: all saved user/assistant messages in the half-open
+  natural-day window, paged independently of the recent-turn setting.
+  Scheduled chat copies with `source_run_id` are excluded because run records
+  supply the evidence. Legacy untagged copies may overlap.
+- `user_schedules`: expanded calendar occurrences and dated todos, with native
+  recurrence flags and completion timestamps interpreted at day end.
+- `mochi_tasks`: persisted run names/prompts/results and known due plans.
+  Results after the cutoff are withheld; queued/running/planned are not success.
+
+Only saved data is available. Failed unsaved foreground turns, content beyond
+the existing per-message storage cap, deleted schedules and prior versions of
+edited plans cannot be reconstructed. This is not a complete historical audit.
+Scheduled run results remain separate from any later plan edits.
+
+Every model request has exactly two messages. The fixed English `system`
+instructions add the native date, timezone, UTC window and output language.
+The `user` message is JSON with the three sections above, not replayed chat
+turns. Instructions treat all supplied text as untrusted evidence, merge
+duplicate event mentions, distinguish plans from outcomes, omit routine
+repetition and require a short natural title and paragraph without filler.
+The only accepted responses are:
+
+```json
+{"status":"written","title":"A short event title","text":"A concise diary paragraph."}
+```
+
+```json
+{"status":"empty","title":"","text":""}
+```
+
+There are no source IDs in the response. Native validation rejects malformed
+JSON, Tool calls, inconsistent status/content, titles over 80 characters or
+paragraphs over 1,600 characters; there is no minimum length. An empty source
+day requires no Provider call. Empty results use the localized native label.
+
+Large days are partitioned into bounded material batches, preserving source
+sections, timestamps, speakers and fragment order. Intermediate short journals
+are recursively consolidated as `chunk_summaries`. Generation is limited to
+512,000 serialized source characters, 64 calls and eight minutes; over-budget
+input fails explicitly rather than silently dropping the rest of the day.
+Intermediate summarization is lossy, not a verbatim archive.
+
+Room schema 7 owns the opt-in row and date-keyed journal lifecycle:
+`WAITING -> GENERATING -> READY / EMPTY / FAILED`. Enabling starts at the current
+date; missed processing creates at most the latest seven past dates since
+enabling. Older queued automatic work expires without model calls, while users
+may explicitly retry existing older entries. Per-date unique work and claim
+tokens prevent concurrent/stale publication. A restarted Worker may resume its
+own claim; abandoned work becomes an explicit interrupted failure.
+Turning off atomically invalidates pending claims before cancellation.
+Regeneration preserves existing text until successful replacement.
+Deletion clears content and retains a `DELETED` tombstone to prevent automatic
+recreation. Existing journals survive disabling; only past, nondeleted dates
+are visible in Planner. Network/background restrictions may delay midnight work;
+boot, clock/timezone changes and app resume reconcile it without exact alarms,
+notifications or speech.
 
 ## 2. Device measurements and diagnostics
 

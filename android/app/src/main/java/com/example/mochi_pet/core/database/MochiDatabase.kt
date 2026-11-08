@@ -20,6 +20,9 @@ import com.example.mochi_pet.core.database.entity.AgentScheduleEntity
 import com.example.mochi_pet.core.database.entity.AgentScheduleRunEntity
 import com.example.mochi_pet.core.database.entity.PlannerReminderReceiptEntity
 import com.example.mochi_pet.core.memory.MemoryLexicalSearch
+import com.example.mochi_pet.core.database.dao.JournalDao
+import com.example.mochi_pet.core.database.entity.DailyJournalEntity
+import com.example.mochi_pet.core.database.entity.JournalSettingsEntity
 
 @Database(
     entities = [
@@ -31,8 +34,10 @@ import com.example.mochi_pet.core.memory.MemoryLexicalSearch
         AgentScheduleEntity::class,
         AgentScheduleRunEntity::class,
         PlannerReminderReceiptEntity::class,
+        DailyJournalEntity::class,
+        JournalSettingsEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class MochiDatabase : RoomDatabase() {
@@ -45,6 +50,8 @@ abstract class MochiDatabase : RoomDatabase() {
     abstract fun agentMemoryDao(): AgentMemoryDao
 
     abstract fun agentScheduleDao(): AgentScheduleDao
+
+    abstract fun journalDao(): JournalDao
 
     companion object {
         const val DATABASE_NAME = "mochi.db"
@@ -61,8 +68,22 @@ abstract class MochiDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
+                    MIGRATION_6_7,
                 )
                 .build()
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE agent_memories ADD COLUMN source_run_id TEXT")
+                db.execSQL("""
+                    CREATE TABLE daily_journals (
+                        date TEXT NOT NULL PRIMARY KEY, timezone TEXT NOT NULL, status TEXT NOT NULL,
+                        title TEXT NOT NULL, text TEXT NOT NULL, error TEXT, updatedAt INTEGER NOT NULL, claim TEXT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE TABLE journal_settings (id INTEGER NOT NULL PRIMARY KEY, enabled INTEGER NOT NULL, since TEXT)")
+            }
+        }
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
