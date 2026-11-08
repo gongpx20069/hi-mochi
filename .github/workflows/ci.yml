@@ -77,9 +77,8 @@ jobs:
           curl --fail --location --retry 3 --connect-timeout 20 --max-time 180 \
             'https://storage.googleapis.com/chromium-browser-snapshots/AndroidDesktop_x64/1333730/chrome-android-desktop.zip?generation=1722027086209912' \
             --output "$RUNNER_TEMP/ci-webview.zip"
-          echo "0bcd6b55861ee05a9c31698bafd00210  $RUNNER_TEMP/ci-webview.zip" | md5sum --check
           unzip -p "$RUNNER_TEMP/ci-webview.zip" chrome-android-desktop/apks/SystemWebView.apk > "$RUNNER_TEMP/SystemWebView.apk"
-          sha256sum "$RUNNER_TEMP/SystemWebView.apk"
+          echo "11764ef321b2d50305b84dd1e7d6e85cacafa6b589b34f21dabac6425fbcaa8f  $RUNNER_TEMP/SystemWebView.apk" | sha256sum --check
 
       - name: Run Android smoke suite
         uses: reactivecircus/android-emulator-runner@v2

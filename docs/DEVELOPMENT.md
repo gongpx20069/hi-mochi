@@ -105,10 +105,10 @@ CI emulators, not a connected personal phone.
 
 The API 29 job installs a pinned official Chromium x86_64 WebView snapshot
 because the image's factory WebView does not support the browser's JavaScript.
-It verifies the downloaded artifact and requires successful provider selection;
-API 35 uses its bundled WebView. Semantic snapshot fixtures request explicit
-two-second observation windows, including unchanged snapshots, within a
-separate sixty-second test deadline.
+It verifies the APK's SHA-256 and requires successful provider selection;
+API 35 uses its bundled WebView. Semantic snapshot fixtures poll zero-second
+observation windows until a fresh snapshot is available, without replaying
+actions, within a separate sixty-second test deadline.
 
 The instrumentation job fails for missing, skipped, or failing test results
 and retains reports for seven days, including on failure. Credential-dependent

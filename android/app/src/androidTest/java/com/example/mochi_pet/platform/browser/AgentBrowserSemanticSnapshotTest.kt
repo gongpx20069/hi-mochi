@@ -10,6 +10,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -25,7 +26,7 @@ import kotlin.coroutines.resume
 class AgentBrowserSemanticSnapshotTest {
     @Test
     fun readsUnmarkedStatisticsAndKeepsReferencesBoundToNodes() = fixture { runtime, page ->
-        val initial = runtime.read(waitSeconds = 2)
+        val initial = runtime.snapshot()
         assertEquals("mochi-semantic-v3", initial["format"]?.jsonPrimitive?.content)
         val markdown = initial.getValue("markdown").jsonPrimitive.content
         assertTrue(markdown, markdown.contains("点赞（Q）: 364"))
@@ -37,30 +38,34 @@ class AgentBrowserSemanticSnapshotTest {
         assertEquals(100, initial.getValue("interactive_elements").jsonArray.size)
         assertEquals("true", initial.getValue("truncation").jsonObject.getValue("interactive_elements").jsonPrimitive.content)
         val like = ref(initial, "点赞（Q）")
-        assertEquals(like, ref(runtime.read(waitSeconds = 2), "点赞（Q）"))
-        val clicked = runtime.click(like, waitSeconds = 2)
+        assertEquals(like, ref(runtime.snapshot(), "点赞（Q）"))
+        runtime.click(like, waitSeconds = 0)
+        val clicked = runtime.snapshot()
         assertTrue(clicked.getValue("markdown").jsonPrimitive.content.contains("点赞（Q）: 365"))
         assertEquals(like, ref(clicked, "点赞（Q）"))
 
         script(page, "document.querySelector('.video-like').replaceWith(document.querySelector('.video-like').cloneNode(true))")
-        val replacement = ref(runtime.read(waitSeconds = 2), "点赞（Q）")
+        val replacement = ref(runtime.snapshot(), "点赞（Q）")
         assertFalse(like == replacement)
-        assertRejected { runtime.click(like, waitSeconds = 2) }
-        assertEquals("mochi-semantic-v3", runtime.scroll("down", "half_page", null, waitSeconds = 2)["format"]?.jsonPrimitive?.content)
+        assertRejected { runtime.click(like, waitSeconds = 0); runtime.snapshot() }
+        runtime.scroll("down", "half_page", null, waitSeconds = 0)
+        assertEquals("mochi-semantic-v3", runtime.snapshot()["format"]?.jsonPrimitive?.content)
     }
 
     @Test
     fun typingActivatesShadowCommentEditorAndRevealsPublishControl() = fixture { runtime, page ->
         installCommentEditor(page)
-        val editor = ref(runtime.read(waitSeconds = 2), "Comment fixture")
-        val result = runtime.input("type", editor, "Synthetic comment, never submitted", null, null, true, waitSeconds = 2)
+        val editor = ref(runtime.snapshot(), "Comment fixture")
+        runtime.input("type", editor, "Synthetic comment, never submitted", null, null, true, waitSeconds = 0)
+        val result = runtime.snapshot()
         assertCommentPublishVisible(page, result)
     }
 
     @Test
     fun clickingActivatesShadowReplyEditorWithoutPublishing() = fixture { runtime, page ->
         installCommentEditor(page)
-        val result = runtime.click(ref(runtime.read(waitSeconds = 2), "Reply fixture"), waitSeconds = 2)
+        runtime.click(ref(runtime.snapshot(), "Reply fixture"), waitSeconds = 0)
+        val result = runtime.snapshot()
         assertCommentPublishVisible(page, result)
     }
 
@@ -93,7 +98,7 @@ class AgentBrowserSemanticSnapshotTest {
 
     @Test
     fun exposesSafeControlsWithoutEditableValuesAndRejectsCoveredClicks() = fixture { runtime, page ->
-        val initial = runtime.read(waitSeconds = 2)
+        val initial = runtime.snapshot()
         for (secret in listOf("fixture-password", "fixture-account", "fixture-editor", "fixture-hidden", "fixture-script")) {
             assertFalse(secret, initial.toString().contains(secret))
         }
@@ -102,29 +107,33 @@ class AgentBrowserSemanticSnapshotTest {
             .filter { it["options"] != null }
         assertTrue(choices.flatMap { it.getValue("options").jsonArray }.sumOf { it.jsonPrimitive.content.length } <= 2000)
         assertTrue(choices.any { it["options_truncated"]?.jsonPrimitive?.content == "true" })
-        runtime.input(operation = "type", ref = input, text = "new-private-query", value = null, key = null, clear = true, waitSeconds = 2)
+        runtime.input(operation = "type", ref = input, text = "new-private-query", value = null, key = null, clear = true, waitSeconds = 0)
+        val typed = runtime.snapshot()
         assertEquals("\"new-private-query\"", script(page, "document.querySelector('input[type=text]').value"))
-        assertFalse(runtime.read(waitSeconds = 2).toString().contains("new-private-query"))
-        val editor = ref(runtime.read(waitSeconds = 2), "Editor fixture")
-        runtime.input(operation = "type", ref = editor, text = "private editor content", value = null, key = null, clear = true, waitSeconds = 2)
+        assertFalse(typed.toString().contains("new-private-query"))
+        val editor = ref(runtime.snapshot(), "Editor fixture")
+        runtime.input(operation = "type", ref = editor, text = "private editor content", value = null, key = null, clear = true, waitSeconds = 0)
+        val edited = runtime.snapshot()
         assertEquals("\"private editor content\"", script(page, "document.querySelector('[contenteditable]').textContent"))
-        assertFalse(runtime.read(waitSeconds = 2).toString().contains("private editor content"))
-        val select = ref(runtime.read(waitSeconds = 2), "Sort fixture")
-        runtime.input(operation = "select", ref = select, text = null, value = "Newest first", key = null, clear = true, waitSeconds = 2)
+        assertFalse(edited.toString().contains("private editor content"))
+        val select = ref(runtime.snapshot(), "Sort fixture")
+        runtime.input(operation = "select", ref = select, text = null, value = "Newest first", key = null, clear = true, waitSeconds = 0)
+        runtime.snapshot()
         assertEquals("\"newest\"", script(page, "document.querySelector('select').value"))
-        val shadow = ref(runtime.read(waitSeconds = 2), "Shadow action")
-        runtime.click(shadow, waitSeconds = 2)
+        val shadow = ref(runtime.snapshot(), "Shadow action")
+        runtime.click(shadow, waitSeconds = 0)
+        runtime.snapshot()
         assertEquals("\"done\"", script(page, "document.getElementById('shadow').dataset.result"))
-        val like = ref(runtime.read(waitSeconds = 2), "点赞（Q）")
+        val like = ref(runtime.snapshot(), "点赞（Q）")
         script(page, """
             const cover = document.createElement('div');
             cover.id = 'cover';
             cover.style.cssText = 'position:fixed;inset:0;z-index:99999;background:white';
             document.body.append(cover);
         """.trimIndent())
-        assertRejected { runtime.click(like, waitSeconds = 2) }
+        assertRejected { runtime.click(like, waitSeconds = 0); runtime.snapshot() }
         script(page, "document.getElementById('cover').remove(); document.querySelector('.video-like').style.opacity='0'")
-        assertRejected { runtime.click(like, waitSeconds = 2) }
+        assertRejected { runtime.click(like, waitSeconds = 0); runtime.snapshot() }
     }
 
     private fun fixture(block: suspend (AgentBrowserRuntime, WebView) -> Unit) = runBlocking {
@@ -148,6 +157,15 @@ class AgentBrowserSemanticSnapshotTest {
             runtime.closeTurn()
         }
         assertFalse(runtime.state.value.active)
+    }
+
+    private suspend fun AgentBrowserRuntime.snapshot(): JsonObject {
+        while (true) {
+            // Finish the pending observation without opening another long-poll window.
+            val result = read(waitSeconds = 0)
+            if (result.getValue("snapshot_fresh").jsonPrimitive.boolean) return result
+            delay(50)
+        }
     }
 
     private fun ref(snapshot: JsonObject, name: String): String =
