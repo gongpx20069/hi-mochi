@@ -93,6 +93,24 @@ on Linux: Python standard-library acceptance tests exercise the exact bundled
 Bash supervisor, deadlines, output caps, exit status and process-group stop.
 That Linux-only task is skipped on Windows; CI must pass it before delivery.
 
+CI also runs `:app:connectedDebugAndroidTest` on fresh x86_64 Google APIs
+emulators for API 29 (Android 10) and API 35 (Android 15). The explicit
+[`CiSmokeTestSuite`](../android/app/src/androidTest/java/com/example/mochi_pet/CiSmokeTestSuite.kt)
+allowlist covers connection/settings screens, REST/MCP editors, task-center
+navigation, local WebView semantic snapshots, and bundled synthetic wake-word
+audio. The emulator grants the app's requested runtime permissions at install,
+disables animations, and disconnects Wi-Fi/mobile data before execution to
+avoid live services and release-update dialogs. This setup is for disposable
+CI emulators, not a connected personal phone.
+
+The instrumentation job fails for missing, skipped, or failing test results
+and retains reports for seven days, including on failure. Credential-dependent
+diagnostics, real account/device operations, and opt-in memory benchmarks are
+not part of this suite. Emulator success does not establish real microphone/AEC
+quality, OEM background behavior, or process-death recovery; those remain
+separate acceptance work. The workflow and its emulator setup are in
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 

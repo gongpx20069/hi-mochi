@@ -34,3 +34,87 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew verifyNative verifyRelease --no-daemon
+
+  android-instrumentation:
+    name: Android Smoke (API ${{ matrix.api-level }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 35]
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: ./.github/actions/prepare-sherpa
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Build instrumentation APKs
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Android smoke suite
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 2048M
+          disable-animations: true
+          working-directory: android
+          script: |
+            adb install -r -g app/build/outputs/apk/debug/app-x86_64-debug.apk
+            adb shell svc wifi disable
+            adb shell svc data disable
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.mochi_pet.CiSmokeTestSuite -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000 --no-daemon
+
+      - name: Require executed smoke tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          reports = Path("app/build/outputs/androidTest-results/connected")
+          cases = [
+              case
+              for report in reports.rglob("TEST-*.xml")
+              for case in ElementTree.parse(report).getroot().iter("testcase")
+          ]
+          assert cases, "No Android smoke tests were executed"
+          assert all(
+              case.find(status) is None
+              for case in cases
+              for status in ("failure", "error", "skipped")
+          ), "Android smoke tests must all execute and pass"
+          print(f"Verified {len(cases)} passing Android smoke tests")
+          PY
+
+      - name: Upload instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-smoke-api-${{ matrix.api-level }}
+          path: |
+            android/app/build/reports/androidTests/connected/
+            android/app/build/outputs/androidTest-results/connected/
+          if-no-files-found: warn
+          retention-days: 7

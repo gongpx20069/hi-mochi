@@ -11,8 +11,8 @@ or verification in earlier phases.
 - [x] Create `android/` Gradle project and wrapper.
 - [x] Add format, lint, unit-test, and release tasks.
 - [x] Add CI and initial architecture dependency checks.
-- [ ] Add instrumentation/Compose test execution after the first interactive
-  feature is implemented.
+- [x] Run the explicit instrumentation/Compose smoke suite on API 29 and API 35
+  emulators in CI; see [Development](DEVELOPMENT.md#build-and-verify) for scope.
 
 ## P1 - Native shell and surfaces
 

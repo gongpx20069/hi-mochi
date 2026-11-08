@@ -171,76 +171,76 @@ class AgentScheduleTest {
         } finally {
             database.close()
         }
-
-        @Test
-        fun `schedule tool supports concise set list run and remove operations`() =
-            runBlocking {
-                val database = androidx.room.Room.inMemoryDatabaseBuilder(
-                    androidx.test.core.app.ApplicationProvider
-                        .getApplicationContext(),
-                    MochiDatabase::class.java,
-                ).build()
-                try {
-                    val repository = RoomAgentScheduleRepository(
-                        database.agentScheduleDao(),
-                        Clock.fixed(
-                            Instant.parse("2026-08-07T00:00:00Z"),
-                            ZoneOffset.UTC,
-                        ),
-                    )
-                    val controller = RecordingScheduleController()
-                    val tool = ManageMochiScheduleTool(repository, controller)
-                    val context = com.example.mochi_pet.core.agent.tool
-                        .ToolExecutionContext(
-                            currentDate = LocalDate.of(2026, 8, 7),
-                            currentSurface =
-                                com.example.mochi_pet.core.model.MochiSurface.Today,
-                        )
-                    val created = tool.execute(
-                        buildJsonObject {
-                            put("operation", "set")
-                            put("name", "Morning brief")
-                            put("prompt", "Summarize the morning")
-                            put("schedule_type", "daily")
-                            put("local_time", "08:00")
-                            put("timezone", "Asia/Shanghai")
-                        },
-                        context,
-                    )
-                    val id = created.data!!.jsonObject["id"]!!
-                        .jsonPrimitive.content
-
-                    val listed = tool.execute(
-                        buildJsonObject { put("operation", "list") },
-                        context,
-                    )
-                    assertEquals(
-                        1,
-                        listed.data!!.jsonObject["schedules"]!!.jsonArray.size,
-                    )
-                    tool.execute(
-                        buildJsonObject {
-                            put("operation", "run")
-                            put("id", id)
-                        },
-                        context,
-                    )
-                    tool.execute(
-                        buildJsonObject {
-                            put("operation", "remove")
-                            put("id", id)
-                        },
-                        context,
-                    )
-
-                    assertEquals(listOf(id), controller.ran)
-                    assertEquals(listOf(id), controller.cancelled)
-                    assertEquals(1, controller.synced.size)
-                } finally {
-                    database.close()
-                }
-            }
     }
+
+    @Test
+    fun `schedule tool supports concise set list run and remove operations`() =
+        runBlocking {
+            val database = androidx.room.Room.inMemoryDatabaseBuilder(
+                androidx.test.core.app.ApplicationProvider
+                    .getApplicationContext(),
+                MochiDatabase::class.java,
+            ).build()
+            try {
+                val repository = RoomAgentScheduleRepository(
+                    database.agentScheduleDao(),
+                    Clock.fixed(
+                        Instant.parse("2026-08-07T00:00:00Z"),
+                        ZoneOffset.UTC,
+                    ),
+                )
+                val controller = RecordingScheduleController()
+                val tool = ManageMochiScheduleTool(repository, controller)
+                val context = com.example.mochi_pet.core.agent.tool
+                    .ToolExecutionContext(
+                        currentDate = LocalDate.of(2026, 8, 7),
+                        currentSurface =
+                            com.example.mochi_pet.core.model.MochiSurface.Today,
+                    )
+                val created = tool.execute(
+                    buildJsonObject {
+                        put("operation", "set")
+                        put("name", "Morning brief")
+                        put("prompt", "Summarize the morning")
+                        put("schedule_type", "daily")
+                        put("local_time", "08:00")
+                        put("timezone", "Asia/Shanghai")
+                    },
+                    context,
+                )
+                val id = created.data!!.jsonObject["id"]!!
+                    .jsonPrimitive.content
+
+                val listed = tool.execute(
+                    buildJsonObject { put("operation", "list") },
+                    context,
+                )
+                assertEquals(
+                    1,
+                    listed.data!!.jsonObject["schedules"]!!.jsonArray.size,
+                )
+                tool.execute(
+                    buildJsonObject {
+                        put("operation", "run")
+                        put("id", id)
+                    },
+                    context,
+                )
+                tool.execute(
+                    buildJsonObject {
+                        put("operation", "remove")
+                        put("id", id)
+                    },
+                    context,
+                )
+
+                assertEquals(listOf(id), controller.ran)
+                assertEquals(listOf(id), controller.cancelled)
+                assertEquals(1, controller.synced.size)
+            } finally {
+                database.close()
+            }
+        }
 
     private class RecordingScheduleController : AgentScheduleController {
         val synced = mutableListOf<AgentSchedule>()
