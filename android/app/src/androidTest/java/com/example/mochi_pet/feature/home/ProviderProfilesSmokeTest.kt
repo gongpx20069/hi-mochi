@@ -2,11 +2,14 @@ package com.example.mochi_pet.feature.home
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -15,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.mochi_pet.MainActivity
 import com.example.mochi_pet.MochiApplication
 import kotlinx.coroutines.Dispatchers
@@ -74,8 +78,15 @@ class ProviderProfilesSmokeTest {
             compose.onAllNodes(editSpeech and isEnabled()).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNode(editSpeech).performScrollTo().assertIsEnabled().performClick()
-        compose.waitUntil(timeoutMillis = 10_000) {
-            compose.onNodeWithText(localizeUiText("Edit speech connection")).isDisplayed()
+        try {
+            compose.waitUntil(timeoutMillis = 10_000) {
+                compose.onNodeWithText(localizeUiText("Edit speech connection")).isDisplayed()
+            }
+        } catch (error: ComposeTimeoutException) {
+            if (InstrumentationRegistry.getArguments().getString("mochiCiDiagnostics") == "true") {
+                println(compose.onAllNodes(isRoot()).printToString(maxDepth = 16))
+            }
+            throw error
         }
         compose.onNodeWithText(localizeUiText("Edit speech connection")).assertIsDisplayed()
         compose.onNodeWithText(localizeUiText("Cancel")).performClick()

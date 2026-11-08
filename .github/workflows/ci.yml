@@ -96,7 +96,7 @@ jobs:
             adb install -r -g app/build/outputs/apk/debug/app-x86_64-debug.apk
             adb shell svc wifi disable
             adb shell svc data disable
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.mochi_pet.CiSmokeTestSuite -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000 --no-daemon
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.mochi_pet.CiSmokeTestSuite -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000 -Pandroid.testInstrumentationRunnerArguments.mochiCiDiagnostics=true --no-daemon
 
       - name: Require executed smoke tests
         run: |
