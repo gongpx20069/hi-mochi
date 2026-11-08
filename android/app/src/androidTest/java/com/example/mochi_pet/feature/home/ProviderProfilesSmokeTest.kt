@@ -1,13 +1,12 @@
 package com.example.mochi_pet.feature.home
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.isDisplayed
-import androidx.compose.ui.test.isDialog
-import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -69,20 +68,14 @@ class ProviderProfilesSmokeTest {
         compose.onNodeWithText(localizeUiText("AI connections")).assertIsDisplayed()
         compose.onNodeWithTag("settings-parts")
             .performScrollToNode(hasTestTag("settings-part-Speech and wake"))
-        compose.onNode(hasText(localizeUiText("Edit")) and
-            hasAnyAncestor(hasTestTag("speech-profile-${speechBefore.activeId}"))).performScrollTo().performClick()
-        try {
-            compose.waitUntil(timeoutMillis = 10_000) {
-                compose.onNodeWithText(localizeUiText("Edit speech connection")).isDisplayed()
-            }
-        } catch (error: ComposeTimeoutException) {
-            val title = compose.onNodeWithText(localizeUiText("Edit speech connection"))
-            throw AssertionError(
-                "Speech dialog title window bounds: ${title.fetchSemanticsNode().boundsInWindow}\n" +
-                    title.printToString(maxDepth = 0) + "\n" +
-                    compose.onNode(isDialog()).printToString(maxDepth = 0),
-                error,
-            )
+        val editSpeech = hasText(localizeUiText("Edit")) and
+            hasAnyAncestor(hasTestTag("speech-profile-${speechBefore.activeId}"))
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodes(editSpeech and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(editSpeech).performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onNodeWithText(localizeUiText("Edit speech connection")).isDisplayed()
         }
         compose.onNodeWithText(localizeUiText("Edit speech connection")).assertIsDisplayed()
         compose.onNodeWithText(localizeUiText("Cancel")).performClick()
