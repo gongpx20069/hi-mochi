@@ -1,16 +1,18 @@
 package com.example.mochi_pet.feature.home
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isDisplayed
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.mochi_pet.MainActivity
 import com.example.mochi_pet.MochiApplication
@@ -65,8 +67,16 @@ class ProviderProfilesSmokeTest {
         compose.onNodeWithText(localizeUiText("AI connections")).assertIsDisplayed()
         compose.onNodeWithTag("settings-parts")
             .performScrollToNode(hasTestTag("settings-part-Speech and wake"))
-        compose.onNode(hasText(localizeUiText("Edit")) and
-            hasAnyAncestor(hasTestTag("speech-profile-${speechBefore.activeId}"))).performScrollTo().performClick()
+        val editSpeech = hasText(localizeUiText("Edit")) and
+            hasAnyAncestor(hasTestTag("speech-profile-${speechBefore.activeId}"))
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodes(editSpeech and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("settings-parts").performScrollToNode(editSpeech)
+        compose.onNode(editSpeech).assertIsDisplayed().assertIsEnabled().performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onNodeWithText(localizeUiText("Edit speech connection")).isDisplayed()
+        }
         compose.onNodeWithText(localizeUiText("Edit speech connection")).assertIsDisplayed()
         compose.onNodeWithText(localizeUiText("Cancel")).performClick()
         assertEquals(before, runBlocking(Dispatchers.IO) { repo.loadProfiles() })
