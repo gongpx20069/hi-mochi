@@ -71,7 +71,7 @@ Supported evidence sources:
 
 - `weather` -> `get_current_weather`
 - `calendar` -> `manage_mochi_calendar`
-- `todos` -> `manage_mochi_todo`
+- `todos` -> `manage_mochi_calendar` (the same receipt may contain both events and dated items)
 - `browser` -> successful same-run Agent Browser evidence
 
 `content` is the general external-content card for web, Notion, Tencent Docs,

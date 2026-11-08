@@ -260,7 +260,7 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 
 | 分组 | 包含的 Tools | 能力与配置 |
 | --- | --- | --- |
-| **计划** | `manage_mochi_calendar`<br>`manage_mochi_todo` | 读取和更新 Mochi 自己的日历事件与带日期待办，无需额外配置。 |
+| **计划** | `manage_mochi_calendar` | 创建、编辑和完成用户日程，展开重复规则，并按需开启本地提醒，无需配置额外服务。 |
 | **自动化** | `manage_mochi_schedule` | 管理一次性与周期 Agent 任务；需要通知权限，精确闹钟权限可选。 |
 | **设备上下文** | `get_current_location`<br>`get_current_weather` | 在权限允许时读取当前位置或本地天气；定位返回 WGS-84，并在中国境内同时返回 GCJ-02 坐标。 |
 | **智能体浏览器（Agent Browser）** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | 浏览公网 HTTPS 网站，复用本地登录状态，由 Agent 选择手机或桌面模式。 |

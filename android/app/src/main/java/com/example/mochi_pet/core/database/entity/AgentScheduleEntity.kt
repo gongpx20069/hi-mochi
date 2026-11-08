@@ -36,4 +36,12 @@ data class AgentScheduleEntity(
     val createdAtEpochMillis: Long,
     @ColumnInfo(name = "updated_at_epoch_millis")
     val updatedAtEpochMillis: Long,
+    @ColumnInfo(name = "ends_at_epoch_millis")
+    val endsAtEpochMillis: Long? = null,
+    @ColumnInfo(name = "max_runs")
+    val maxRuns: Int? = null,
+    @ColumnInfo(name = "planned_runs", defaultValue = "0")
+    val plannedRuns: Int = 0,
+    @ColumnInfo(defaultValue = "0")
+    val revision: Long = 0,
 )

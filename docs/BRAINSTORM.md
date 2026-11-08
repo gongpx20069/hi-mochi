@@ -47,17 +47,6 @@ Local backup remains a separate deferred idea:
 - Test restoration to a fresh installation and recovery from interrupted
   imports. Define schema migration and secret reconfiguration requirements.
 
-## Recurring calendar events and local reminders
-
-Complete the planner's recurrence expansion and notification behavior.
-
-- Define timezone, daylight-saving, all-day and recurrence-exception behavior.
-- Support editing one occurrence versus the whole series without duplicates.
-- Distinguish planner reminders from Agent schedules: a reminder should not
-  need a model call, network access or a running Termux process.
-- Test notification denial, exact-alarm restrictions, reboot reconciliation
-  and duplicate suppression.
-
 ## Prioritization
 
 Favor repeatable daily usefulness and reliability over the number of optional

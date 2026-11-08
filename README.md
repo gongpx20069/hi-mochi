@@ -293,7 +293,7 @@ Skills requiring separately installed apps are listed under
 
 | Group | Included Tools | Purpose and setup |
 | --- | --- | --- |
-| **Planner** | `manage_mochi_calendar`<br>`manage_mochi_todo` | Read and update Mochi-owned events and dated todos. No additional setup. |
+| **Planner** | `manage_mochi_calendar` | Create, edit and complete user schedules, expand recurrence and enable opt-in local reminders. No additional service setup. |
 | **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
 | **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
 | **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Browse public HTTPS websites with reusable local login and Agent-selected mobile/desktop mode. |

@@ -1992,6 +1992,11 @@ class DataStoreToolCatalogRepository(
             it.id == LEGACY_DIANPING_SERVER_ID
         }
         val migratedBuiltIns = builtInEnabled.toMutableMap()
+        if ("manage_mochi_todo" in migratedBuiltIns) {
+            migratedBuiltIns["manage_mochi_calendar"] = migratedBuiltIns["manage_mochi_calendar"] != false &&
+                migratedBuiltIns["manage_mochi_todo"] != false
+            migratedBuiltIns.remove("manage_mochi_todo")
+        }
         if (appControlEnabled == null) {
             val uiEnabled = builtInEnabled["app_ui"] ?: true
             com.example.mochi_pet.core.apps.APP_TOOL_NAMES.forEach { name ->
@@ -2517,19 +2522,13 @@ private fun sha256UrlSafe(value: String): String =
 val BUILT_IN_TOOLS = listOf(
     BuiltInToolDescriptor(
         name = "manage_mochi_calendar",
-        displayName = "Mochi Calendar",
-        description = "Read and update Mochi calendar events.",
-        defaultEnabled = true,
-    ),
-    BuiltInToolDescriptor(
-        name = "manage_mochi_todo",
-        displayName = "Mochi Todo",
-        description = "Read and update Mochi todos.",
+        displayName = "User schedules",
+        description = "Create, edit and complete user schedules and their reminders.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
         name = "manage_mochi_schedule",
-        displayName = "Agent Schedules",
+        displayName = "Mochi scheduled tasks",
         description = "Create and manage scheduled Mochi Agent prompts.",
         defaultEnabled = true,
     ),

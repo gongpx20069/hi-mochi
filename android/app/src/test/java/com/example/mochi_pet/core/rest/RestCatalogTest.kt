@@ -63,12 +63,12 @@ class RestCatalogTest {
     }
 
     @Test fun `save encrypts credentials and preserves unrelated settings across reloads`() = runBlocking {
-        repo.setBuiltInEnabled("manage_mochi_todo", false)
+        repo.setBuiltInEnabled("manage_mochi_calendar", false)
         val saved = saveConnection()
         assertFalse(saved.enabled)
         assertTrue(seenSecrets.isEmpty())
         assertFalse(store.data.first()[catalogKey]!!.contains("fixture-key"))
-        assertFalse(repository().isBuiltInEnabled("manage_mochi_todo"))
+        assertFalse(repository().isBuiltInEnabled("manage_mochi_calendar"))
         val edited = repo.changeRestApi(RestApiChange.SaveConnection(RestConnectionInput(saved.copy(name = "Renamed"))))
             .restConnections.single().connection
         repo.testRestApi(RestConnectionInput(edited), tool, json("{}"))
@@ -147,7 +147,7 @@ class RestCatalogTest {
 
     @Test fun `corrupt stored catalog cannot be silently reset by updates`() = runBlocking {
         store.edit { it[catalogKey] = "{broken" }
-        assertThrows(IllegalStateException::class.java) { runBlocking { repo.setBuiltInEnabled("manage_mochi_todo", false) } }
+        assertThrows(IllegalStateException::class.java) { runBlocking { repo.setBuiltInEnabled("manage_mochi_calendar", false) } }
         assertEquals("{broken", store.data.first()[catalogKey])
     }
 

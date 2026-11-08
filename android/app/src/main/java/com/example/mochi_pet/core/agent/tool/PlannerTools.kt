@@ -8,6 +8,7 @@ import com.example.mochi_pet.core.model.MochiTodo
 import com.example.mochi_pet.core.model.MochiTodoDraft
 import com.example.mochi_pet.core.model.TodoPriority
 import com.example.mochi_pet.core.model.TodoStatus
+import com.example.mochi_pet.core.model.OccurrenceScope
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -20,13 +21,7 @@ import kotlinx.serialization.json.put
 private enum class CalendarOperation {
     CREATE,
     LIST,
-    UPDATE,
-    DELETE,
-}
-
-private enum class TodoOperation {
-    CREATE,
-    LIST,
+    GET,
     UPDATE,
     COMPLETE,
     DELETE,
@@ -34,6 +29,7 @@ private enum class TodoOperation {
 
 class ManageMochiCalendarTool(
     private val plannerStore: PlannerStore,
+    private val reminders: com.example.mochi_pet.core.model.UserReminderController? = null,
 ) : AgentTool {
     override val name: String = "manage_mochi_calendar"
 
@@ -41,9 +37,16 @@ class ManageMochiCalendarTool(
         name = name,
         description = "Manage events in Mochi's local calendar.",
         properties = buildJsonObject {
-            put("operate", enumProperty(CalendarOperation.entries))
-            put("event_id", stringProperty())
+            put("operation", enumProperty(CalendarOperation.entries))
+            put("id", stringProperty())
+            put("scope", enumProperty(OccurrenceScope.entries))
+            put("revision", buildJsonObject { put("type", "integer") })
+            put("scheduled_date", stringProperty())
+            put("indefinite", booleanProperty())
+            put("offset", buildJsonObject { put("type", "integer"); put("minimum", 0) })
             put("title", stringProperty())
+            put("priority", enumProperty(TodoPriority.entries))
+            put("status", enumProperty(TodoStatus.entries))
             put("description", stringProperty())
             put("start_iso", stringProperty())
             put("end_iso", stringProperty())
@@ -57,74 +60,152 @@ class ManageMochiCalendarTool(
             put("limit", integerProperty())
             put("confirmed", booleanProperty())
         },
-        required = listOf("operate"),
+        required = listOf("operation"),
     )
 
     override suspend fun execute(
         arguments: JsonObject,
         context: ToolExecutionContext,
-    ): ToolResultEnvelope =
-        when (arguments.requiredEnum<CalendarOperation>("operate")) {
-            CalendarOperation.CREATE -> create(arguments)
-            CalendarOperation.LIST -> list(arguments)
+    ): ToolResultEnvelope {
+        val operation = arguments.requiredEnum<CalendarOperation>("operation")
+        val result = when (operation) {
+            CalendarOperation.CREATE -> create(arguments, context)
+            CalendarOperation.LIST -> list(arguments, context)
+            CalendarOperation.GET -> get(arguments)
             CalendarOperation.UPDATE -> update(arguments)
+            CalendarOperation.COMPLETE -> complete(arguments)
             CalendarOperation.DELETE -> delete(arguments)
         }
+        val readiness = try {
+            if (operation in setOf(CalendarOperation.GET, CalendarOperation.LIST)) reminders?.readiness() else reminders?.sync()
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            return ToolResultEnvelope(
+                status = "error", code = ToolErrorCode.INTERNAL_ERROR.name,
+                message = "Record saved, but reminder registration failed. Query the saved record before retrying.",
+                data = result.data,
+            )
+        }
+        val data = result.data as? JsonObject ?: return result
+        return result.copy(data = JsonObject(data + ("reminder_capability" to JsonPrimitive(readiness?.name?.lowercase() ?: "unavailable"))))
+    }
 
-    private suspend fun create(arguments: JsonObject): ToolResultEnvelope {
+    private suspend fun create(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
+        require(arguments.optionalString("id") == null) { "create must not include an id" }
+        val zone = arguments.optionalString("timezone")?.let(ZoneId::of) ?: ZoneId.systemDefault()
+        val requestedDate = arguments.optionalString("scheduled_date")?.let(LocalDate::parse)
+        val start = arguments.optionalString("start_iso")?.let(Instant::parse)
+        require(start != null || arguments.optionalBoolean("all_day") != false) { "A timed schedule requires start_iso" }
+        if (start == null && arguments.optionalString("recurrence_rule") == null &&
+            listOf("description", "location", "end_iso").none { arguments.optionalString(it) != null }) {
+            val todo = plannerStore.createTodo(MochiTodoDraft(
+                content = arguments.requiredString("title"),
+                priority = arguments.optionalEnum<TodoPriority>("priority") ?: TodoPriority.NORMAL,
+                scheduledDate = requestedDate ?: context.currentDate,
+                reminderAt = arguments.optionalString("reminder_iso")?.let(Instant::parse),
+            ))
+            return ToolResultEnvelope.success(buildJsonObject {
+                put("todo", todo.toJson())
+                put("scheduled_date_defaulted", requestedDate == null)
+            })
+        }
         val event = plannerStore.createCalendarEvent(
             CalendarEventDraft(
                 title = arguments.requiredString("title"),
                 description = arguments.optionalString("description"),
-                startAt = Instant.parse(arguments.requiredString("start_iso")),
+                startAt = start ?: (requestedDate ?: context.currentDate).atStartOfDay(zone).toInstant(),
                 endAt = arguments.optionalString("end_iso")?.let(Instant::parse),
-                allDay = arguments.optionalBoolean("all_day") ?: false,
-                timezone = ZoneId.of(arguments.requiredString("timezone")),
+                allDay = arguments.optionalBoolean("all_day") ?: (start == null),
+                timezone = zone,
                 recurrenceRule = arguments.optionalString("recurrence_rule"),
                 location = arguments.optionalString("location"),
                 reminderAt =
                     arguments.optionalString("reminder_iso")?.let(Instant::parse),
+                indefiniteRecurrence = arguments.optionalBoolean("indefinite") ?: false,
+                priority = arguments.optionalEnum<TodoPriority>("priority") ?: TodoPriority.NORMAL,
             ),
         )
         return ToolResultEnvelope.success(event.toJson())
     }
 
-    private suspend fun list(arguments: JsonObject): ToolResultEnvelope {
+    private suspend fun list(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
+        val zone = arguments.optionalString("timezone")?.let(ZoneId::of) ?: ZoneId.systemDefault()
+        val date = arguments.optionalString("scheduled_date")?.let(LocalDate::parse) ?: context.currentDate
+        val start = arguments.optionalString("range_start_iso")?.let(Instant::parse) ?: date.atStartOfDay(zone).toInstant()
+        val end = arguments.optionalString("range_end_iso")?.let(Instant::parse) ?: date.plusDays(1).atStartOfDay(zone).toInstant()
+        val status = arguments.optionalEnum<TodoStatus>("status")
+        val priority = arguments.optionalEnum<TodoPriority>("priority")
         val allEvents = plannerStore.listCalendarEvents(
-            rangeStart = Instant.parse(
-                arguments.requiredString("range_start_iso"),
-            ),
-            rangeEnd = Instant.parse(
-                arguments.requiredString("range_end_iso"),
-            ),
-        )
+            rangeStart = start,
+            rangeEnd = end,
+        ).filter { (status == null || (it.completedAt != null) == (status == TodoStatus.COMPLETED)) &&
+            (priority == null || it.priority == priority) }
         val limit = arguments.listLimit()
-        val events = allEvents.take(limit)
+        val offset = arguments.optionalInt("offset") ?: 0
+        require(offset >= 0) { "offset must not be negative" }
+        val firstDate = start.atZone(zone).toLocalDate()
+        val matchingTodos = if (firstDate == context.currentDate &&
+            start == firstDate.atStartOfDay(zone).toInstant() && end == firstDate.plusDays(1).atStartOfDay(zone).toInstant()) {
+            plannerStore.listAgendaTodos(firstDate, context.currentDate)
+        } else {
+            plannerStore.listTodosInRange(firstDate, end.minusNanos(1).atZone(zone).toLocalDate().plusDays(1))
+        }
+        val allTodos = matchingTodos.filter { (status == null || it.status == status) && (priority == null || it.priority == priority) }
+        val events = allEvents.drop(offset).take(limit)
+        val todos = allTodos.drop((offset - allEvents.size).coerceAtLeast(0)).take(limit - events.size)
+        val total = allEvents.size + allTodos.size
         return ToolResultEnvelope.success(
             buildJsonObject {
                 put("events", JsonArray(events.map(CalendarEvent::toJson)))
-                put("count", events.size)
-                put("total_count", allEvents.size)
-                put("has_more", allEvents.size > events.size)
+                put("todos", JsonArray(todos.map(MochiTodo::toJson)))
+                put("count", events.size + todos.size)
+                put("total_count", total)
+                put("has_more", total > offset + limit)
+                if (total > offset + limit) put("next_offset", offset + limit)
             },
         )
     }
 
     private suspend fun update(arguments: JsonObject): ToolResultEnvelope {
-        val id = arguments.requiredString("event_id")
+        val id = arguments.requiredString("id")
+        val todo = plannerStore.getTodo(id)
+        if (todo != null) {
+            require(arguments.requiredRevision() == todo.revision) { "Schedule changed; read it again" }
+            val start = arguments.optionalString("start_iso")?.let(Instant::parse)
+            if (arguments.optionalString("recurrence_rule") != null) {
+                val zone = arguments.optionalString("timezone")?.let(ZoneId::of) ?: ZoneId.systemDefault()
+                return ToolResultEnvelope.success(plannerStore.promoteTodo(todo, CalendarEventDraft(
+                    title = arguments.optionalString("title") ?: todo.content,
+                    startAt = start ?: todo.dueAt ?: requireNotNull(todo.scheduledDate).atStartOfDay(zone).toInstant(),
+                    allDay = start == null && todo.dueAt == null, timezone = zone,
+                    recurrenceRule = arguments.optionalString("recurrence_rule"),
+                    reminderAt = arguments.updatedInstant("reminder_iso", todo.reminderAt),
+                    indefiniteRecurrence = arguments.optionalBoolean("indefinite") ?: false,
+                )).toJson())
+            }
+            return ToolResultEnvelope.success(plannerStore.updateTodo(todo.copy(
+                content = arguments.optionalString("title") ?: todo.content,
+                priority = arguments.optionalEnum<TodoPriority>("priority") ?: todo.priority,
+                scheduledDate = arguments.optionalString("scheduled_date")?.let(LocalDate::parse)
+                    ?: start?.atZone(ZoneId.systemDefault())?.toLocalDate() ?: todo.scheduledDate,
+                dueAt = start ?: todo.dueAt,
+                reminderAt = arguments.updatedInstant("reminder_iso", todo.reminderAt),
+            )).toJson())
+        }
         val existing = plannerStore.getCalendarEvent(id)
             ?: throw PlannerNotFoundException("Calendar event not found: $id")
-        val updated = plannerStore.updateCalendarEvent(
+        val start = arguments.optionalString("start_iso")?.let(Instant::parse) ?: existing.startAt
+        val shift = java.time.Duration.between(existing.startAt, start)
+        val updated = plannerStore.updateCalendarOccurrence(
             existing.copy(
                 title = arguments.optionalString("title") ?: existing.title,
+                priority = arguments.optionalEnum<TodoPriority>("priority") ?: existing.priority,
                 description = arguments.updatedString(
                     "description",
                     existing.description,
                 ),
-                startAt = arguments.optionalString("start_iso")
-                    ?.let(Instant::parse)
-                    ?: existing.startAt,
-                endAt = arguments.updatedInstant("end_iso", existing.endAt),
+                startAt = start,
+                endAt = arguments.updatedInstant("end_iso", existing.endAt?.plus(shift)),
                 allDay = arguments.optionalBoolean("all_day") ?: existing.allDay,
                 timezone = arguments.optionalString("timezone")
                     ?.let(ZoneId::of)
@@ -139,9 +220,12 @@ class ManageMochiCalendarTool(
                 ),
                 reminderAt = arguments.updatedInstant(
                     "reminder_iso",
-                    existing.reminderAt,
+                    existing.reminderAt?.plus(shift),
                 ),
+                revision = arguments.requiredRevision(),
             ),
+            arguments.optionalEnum<OccurrenceScope>("scope") ?: OccurrenceScope.THIS,
+            indefiniteRecurrence = arguments.optionalBoolean("indefinite") ?: false,
         )
         return ToolResultEnvelope.success(updated.toJson())
     }
@@ -152,164 +236,48 @@ class ManageMochiCalendarTool(
                 "Calendar deletion requires confirmed=true",
             )
         }
-        val id = arguments.requiredString("event_id")
-        plannerStore.deleteCalendarEvent(id)
+        val id = arguments.requiredString("id")
+        val todo = plannerStore.getTodo(id)
+        if (todo != null) {
+            require(arguments.requiredRevision() == todo.revision) { "Schedule changed; read it again" }
+            plannerStore.deleteTodo(id, todo.revision)
+        } else {
+            plannerStore.deleteCalendarOccurrence(id, arguments.requiredRevision(),
+                arguments.optionalEnum<OccurrenceScope>("scope") ?: OccurrenceScope.THIS)
+        }
         return ToolResultEnvelope.success(
             buildJsonObject {
-                put("event_id", id)
+                put("id", id)
                 put("deleted", true)
             },
         )
     }
-}
 
-class ManageMochiTodoTool(
-    private val plannerStore: PlannerStore,
-) : AgentTool {
-    override val name: String = "manage_mochi_todo"
-
-    override val schema: JsonObject = functionToolSchema(
-        name = name,
-        description =
-            "Manage explicit todo requests in Mochi's local planner.",
-        properties = buildJsonObject {
-            put("operate", enumProperty(TodoOperation.entries))
-            put("todo_id", stringProperty())
-            put("content", stringProperty())
-            put("priority", enumProperty(TodoPriority.entries))
-            put("scheduled_date", stringProperty())
-            put("due_iso", stringProperty())
-            put("reminder_iso", stringProperty())
-            put("status", enumProperty(TodoStatus.entries))
-            put("undated_only", booleanProperty())
-            put("limit", integerProperty())
-            put("confirmed", booleanProperty())
-        },
-        required = listOf("operate"),
-    )
-
-    override suspend fun execute(
-        arguments: JsonObject,
-        context: ToolExecutionContext,
-    ): ToolResultEnvelope =
-        when (arguments.requiredEnum<TodoOperation>("operate")) {
-            TodoOperation.CREATE -> create(arguments, context)
-            TodoOperation.LIST -> list(arguments)
-            TodoOperation.UPDATE -> update(arguments)
-            TodoOperation.COMPLETE -> complete(arguments)
-            TodoOperation.DELETE -> delete(arguments)
-        }
-
-    private suspend fun create(
-        arguments: JsonObject,
-        context: ToolExecutionContext,
-    ): ToolResultEnvelope {
-        val requestedDate = arguments.optionalString("scheduled_date")
-            ?.let(LocalDate::parse)
-        val scheduledDate = requestedDate ?: context.currentDate
-        val todo = plannerStore.createTodo(
-            MochiTodoDraft(
-                content = arguments.requiredString("content"),
-                priority = arguments.optionalEnum<TodoPriority>("priority")
-                    ?: TodoPriority.NORMAL,
-                scheduledDate = scheduledDate,
-                dueAt = arguments.optionalString("due_iso")?.let(Instant::parse),
-                reminderAt =
-                    arguments.optionalString("reminder_iso")?.let(Instant::parse),
-            ),
-        )
-        return ToolResultEnvelope.success(
-            buildJsonObject {
-                put("todo", todo.toJson())
-                put("scheduled_date", scheduledDate.toString())
-                put("scheduled_date_defaulted", requestedDate == null)
-                if (requestedDate == null) {
-                    put(
-                        "user_notice",
-                        "No date was provided, so this todo was scheduled today.",
-                    )
-                }
-            },
-        )
-    }
-
-    private suspend fun list(arguments: JsonObject): ToolResultEnvelope {
-        val status = arguments.optionalEnum<TodoStatus>("status")
-            ?: TodoStatus.ACTIVE
-        val scheduledDate = arguments.optionalString("scheduled_date")
-            ?.let(LocalDate::parse)
-        val allTodos = when {
-            scheduledDate != null ->
-                plannerStore.listTodosForDate(scheduledDate)
-                    .filter { it.status == status }
-            arguments.optionalBoolean("undated_only") == true ->
-                plannerStore.listUndatedTodos(status)
-            else -> plannerStore.listTodosByStatus(status)
-        }
-        val todos = allTodos.take(arguments.listLimit())
-        return ToolResultEnvelope.success(
-            buildJsonObject {
-                put("todos", JsonArray(todos.map(MochiTodo::toJson)))
-                put("count", todos.size)
-                put("total_count", allTodos.size)
-                put("has_more", allTodos.size > todos.size)
-            },
-        )
-    }
-
-    private suspend fun update(arguments: JsonObject): ToolResultEnvelope {
-        val id = arguments.requiredString("todo_id")
-        val existing = plannerStore.getTodo(id)
-            ?: throw PlannerNotFoundException("Todo not found: $id")
-        if (arguments.containsKey("status")) {
-            throw ToolInputException(
-                "Use operate=complete to complete a todo",
-            )
-        }
-        val updated = plannerStore.updateTodo(
-            existing.copy(
-                content = arguments.optionalString("content") ?: existing.content,
-                priority = arguments.optionalEnum<TodoPriority>("priority")
-                    ?: existing.priority,
-                scheduledDate = arguments.updatedDate(
-                    "scheduled_date",
-                    existing.scheduledDate,
-                ),
-                dueAt = arguments.updatedInstant("due_iso", existing.dueAt),
-                reminderAt = arguments.updatedInstant(
-                    "reminder_iso",
-                    existing.reminderAt,
-                ),
-            ),
-        )
-        return ToolResultEnvelope.success(updated.toJson())
+    private suspend fun get(arguments: JsonObject): ToolResultEnvelope {
+        val id = arguments.requiredString("id")
+        return ToolResultEnvelope.success(plannerStore.getCalendarEvent(id)?.toJson()
+            ?: plannerStore.getTodo(id)?.toJson() ?: throw PlannerNotFoundException("User schedule not found: $id"))
     }
 
     private suspend fun complete(arguments: JsonObject): ToolResultEnvelope {
-        val completed = plannerStore.completeTodo(
-            arguments.requiredString("todo_id"),
-        )
-        return ToolResultEnvelope.success(completed.toJson())
-    }
-
-    private suspend fun delete(arguments: JsonObject): ToolResultEnvelope {
-        if (arguments.optionalBoolean("confirmed") != true) {
-            throw ToolInputException("Todo deletion requires confirmed=true")
+        val id = arguments.requiredString("id")
+        val todo = plannerStore.getTodo(id)
+        if (todo != null) {
+            require(todo.completedAt != null || arguments.requiredRevision() == todo.revision) { "Schedule changed; read it again" }
+            return ToolResultEnvelope.success(plannerStore.completeTodo(id, todo.revision).toJson())
         }
-        val id = arguments.requiredString("todo_id")
-        plannerStore.deleteTodo(id)
-        return ToolResultEnvelope.success(
-            buildJsonObject {
-                put("todo_id", id)
-                put("deleted", true)
-            },
-        )
+        return ToolResultEnvelope.success(plannerStore.completeCalendarOccurrence(id, arguments.requiredRevision()).toJson())
     }
 }
 
 private fun CalendarEvent.toJson(): JsonObject =
     buildJsonObject {
         put("id", id)
+        put("series_id", rootId)
+        put("occurrence_id", occurrenceId)
+        put("revision", revision)
+        put("status", if (completedAt == null) "active" else "completed")
+        put("priority", priority.name.lowercase())
         put("title", title)
         description?.let { put("description", it) }
         put("start_iso", startAt.toString())
@@ -326,6 +294,8 @@ private fun CalendarEvent.toJson(): JsonObject =
 private fun MochiTodo.toJson(): JsonObject =
     buildJsonObject {
         put("id", id)
+        put("revision", revision)
+        put("title", content)
         put("content", content)
         put("status", status.name.lowercase())
         put("priority", priority.name.lowercase())
@@ -353,16 +323,6 @@ private fun JsonObject.updatedInstant(
 ): Instant? =
     if (containsKey(name)) {
         optionalString(name)?.let(Instant::parse)
-    } else {
-        current
-    }
-
-private fun JsonObject.updatedDate(
-    name: String,
-    current: LocalDate?,
-): LocalDate? =
-    if (containsKey(name)) {
-        optionalString(name)?.let(LocalDate::parse)
     } else {
         current
     }
@@ -405,3 +365,6 @@ private fun JsonObject.listLimit(): Int {
 
 private const val DEFAULT_LIST_ITEMS = 50
 private const val MAX_LIST_ITEMS = 200
+
+private fun JsonObject.requiredRevision(): Long =
+    this["revision"]?.toString()?.toLongOrNull() ?: throw ToolInputException("Current revision is required; query get/list first")

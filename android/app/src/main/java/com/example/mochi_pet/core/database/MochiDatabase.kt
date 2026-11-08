@@ -17,6 +17,8 @@ import com.example.mochi_pet.core.database.entity.AgentMemoryEntity
 import com.example.mochi_pet.core.database.entity.TodoEntity
 import com.example.mochi_pet.core.database.entity.SkillEntity
 import com.example.mochi_pet.core.database.entity.AgentScheduleEntity
+import com.example.mochi_pet.core.database.entity.AgentScheduleRunEntity
+import com.example.mochi_pet.core.database.entity.PlannerReminderReceiptEntity
 import com.example.mochi_pet.core.memory.MemoryLexicalSearch
 
 @Database(
@@ -27,8 +29,10 @@ import com.example.mochi_pet.core.memory.MemoryLexicalSearch
         AgentMemoryEntity::class,
         AgentMemoryFtsEntity::class,
         AgentScheduleEntity::class,
+        AgentScheduleRunEntity::class,
+        PlannerReminderReceiptEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class MochiDatabase : RoomDatabase() {
@@ -56,6 +60,7 @@ abstract class MochiDatabase : RoomDatabase() {
                     MIGRATION_2_3,
                     MIGRATION_3_4,
                     MIGRATION_4_5,
+                    MIGRATION_5_6,
                 )
                 .build()
 
@@ -202,10 +207,48 @@ abstract class MochiDatabase : RoomDatabase() {
                             )
                             insert.executeInsert()
                         }
+
                     }
                 } finally {
                     insert.close()
                 }
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE calendar_events ADD COLUMN completed_at_epoch_millis INTEGER")
+                db.execSQL("ALTER TABLE calendar_events ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE calendar_events ADD COLUMN series_id TEXT REFERENCES calendar_events(id) ON DELETE CASCADE")
+                db.execSQL("ALTER TABLE calendar_events ADD COLUMN occurrence_start_at_epoch_millis INTEGER")
+                db.execSQL("ALTER TABLE calendar_events ADD COLUMN cancelled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE calendar_events ADD COLUMN priority TEXT NOT NULL DEFAULT 'NORMAL'")
+                db.execSQL("ALTER TABLE todos ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE INDEX index_calendar_events_series_id ON calendar_events(series_id)")
+                db.execSQL("ALTER TABLE agent_schedules ADD COLUMN ends_at_epoch_millis INTEGER")
+                db.execSQL("ALTER TABLE agent_schedules ADD COLUMN max_runs INTEGER")
+                db.execSQL("ALTER TABLE agent_schedules ADD COLUMN planned_runs INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE agent_schedules ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    """
+                    UPDATE agent_schedules SET last_result = 'INTERRUPTED',
+                        enabled = CASE WHEN type = 'ONCE' THEN 0 ELSE enabled END
+                    WHERE enabled = 1 AND next_run_at_epoch_millis IS NULL
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE agent_schedule_runs (
+                        id TEXT NOT NULL PRIMARY KEY, schedule_id TEXT NOT NULL,
+                        revision INTEGER NOT NULL, name TEXT NOT NULL, prompt TEXT NOT NULL,
+                        manual INTEGER NOT NULL, planned_at INTEGER, state TEXT NOT NULL,
+                        created_at INTEGER NOT NULL, started_at INTEGER, finished_at INTEGER,
+                        output TEXT, error TEXT
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX index_agent_schedule_runs_schedule_id_created_at ON agent_schedule_runs(schedule_id, created_at)")
+                db.execSQL("CREATE TABLE planner_reminder_receipts (id TEXT NOT NULL PRIMARY KEY, deliveredAt INTEGER NOT NULL)")
             }
         }
     }

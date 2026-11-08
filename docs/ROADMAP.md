@@ -31,7 +31,10 @@ or verification in earlier phases.
 - [x] Room Schema v2 for calendar, todo, and editable market skills.
 - [x] Event CRUD, overlap queries, timezone, recurrence-rule persistence, and
   validation.
-- [ ] Recurrence expansion and Android reminder scheduling.
+- [x] Bounded recurrence expansion, per-occurrence completion and revision-checked
+  edits, with opt-in Android notifications and persisted delivery receipts.
+- [x] Finite Mochi plans, durable execution results and interrupted-run recovery;
+  shared UI/Agent operations and two-category Planner presentation.
 - [x] Todo scheduled date, due time, completion, priority, and filters.
 - [x] Unified day agenda showing events and dated todos.
 - [ ] Local export/import.
@@ -85,7 +88,7 @@ or verification in earlier phases.
   direct repair paths and safe localized errors.
 - [ ] Complete the multi-device and real companion-service acceptance matrix.
 
-Deferred reliability, scenario-template, memory/backup and recurring-calendar
+Deferred reliability, scenario-template and memory/backup
 ideas are recorded in [`BRAINSTORM.md`](BRAINSTORM.md), not promised as shipped.
 
 ## P2 - Agent Browser

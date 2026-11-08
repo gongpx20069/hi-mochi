@@ -748,14 +748,23 @@ without individual borders.
 
 ```text
 Date header
-Mochi compact state
-All-day events
-Timed agenda
-Dated todos
-Add action
+Mochi scheduled tasks: run now / edit / results
+User schedules: edit / complete this occurrence
+Add schedule / new Mochi task
 ```
 
 Events and todos remain distinct domain objects but share the day timeline.
+Use restrained rounded cards, readable content hierarchy and explicit status
+labels. Editing opens a scrollable bottom sheet with native date/time pickers;
+recurring user edits select this occurrence or this and future. Saving is
+single-dispatch, with inline validation and permission warnings. Delete remains
+secondary and requires native confirmation. Result sheets show persisted
+execution outcomes and support history paging; queued is never labeled complete.
+An explicit Agent navigation request can open a plan's results or a specific run.
+Month markers come from the same expanded user occurrences as the day view.
+Reminders start off. Enabling one uses a system notification, not automatic TTS;
+timed items initially use ten minutes before, date-only items 09:00 on that date.
+Existing custom reminder offsets are preserved while editing.
 Overdue todos are visible without being silently moved to today.
 Active todos are listed before completed todos. New todos always receive an
 explicit date; when no date is supplied, the current local date is used and the

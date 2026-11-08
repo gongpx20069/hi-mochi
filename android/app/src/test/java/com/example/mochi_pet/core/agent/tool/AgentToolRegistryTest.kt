@@ -46,13 +46,13 @@ class AgentToolRegistryTest {
     @Test
     fun `todo tool creates dated local todo`() = runBlocking {
         val store = RecordingPlannerStore()
-        val registry = ToolRegistry(listOf(ManageMochiTodoTool(store)))
+        val registry = ToolRegistry(listOf(ManageMochiCalendarTool(store)))
 
         val result = registry.execute(
-            name = "manage_mochi_todo",
+            name = "manage_mochi_calendar",
             arguments = buildJsonObject {
-                put("operate", "create")
-                put("content", "Buy milk")
+                put("operation", "create")
+                put("title", "Buy milk")
                 put("scheduled_date", "2026-08-01")
                 put("priority", "high")
             },
@@ -78,13 +78,13 @@ class AgentToolRegistryTest {
     fun `todo tool defaults missing date to today and returns notice`() =
         runBlocking {
             val store = RecordingPlannerStore()
-            val registry = ToolRegistry(listOf(ManageMochiTodoTool(store)))
+            val registry = ToolRegistry(listOf(ManageMochiCalendarTool(store)))
 
             val result = registry.execute(
-                name = "manage_mochi_todo",
+                name = "manage_mochi_calendar",
                 arguments = buildJsonObject {
-                    put("operate", "create")
-                    put("content", "Review notes")
+                    put("operation", "create")
+                    put("title", "Review notes")
                 },
                 context = context,
             )
@@ -105,13 +105,14 @@ class AgentToolRegistryTest {
         val store = RecordingPlannerStore().apply {
             createTodo(MochiTodoDraft(content = "Keep me"))
         }
-        val registry = ToolRegistry(listOf(ManageMochiTodoTool(store)))
+        val registry = ToolRegistry(listOf(ManageMochiCalendarTool(store)))
 
         val rejected = registry.execute(
-            name = "manage_mochi_todo",
+            name = "manage_mochi_calendar",
             arguments = buildJsonObject {
-                put("operate", "delete")
-                put("todo_id", "todo_1")
+                put("operation", "delete")
+                put("id", "todo_1")
+                put("revision", 0)
             },
             context = context,
         )
@@ -120,10 +121,11 @@ class AgentToolRegistryTest {
         assertFalse(store.todos.isEmpty())
 
         val accepted = registry.execute(
-            name = "manage_mochi_todo",
+            name = "manage_mochi_calendar",
             arguments = buildJsonObject {
-                put("operate", "delete")
-                put("todo_id", "todo_1")
+                put("operation", "delete")
+                put("id", "todo_1")
+                put("revision", 0)
                 put("confirmed", true)
             },
             context = context,
@@ -141,7 +143,7 @@ class AgentToolRegistryTest {
         val created = registry.execute(
             name = "manage_mochi_calendar",
             arguments = buildJsonObject {
-                put("operate", "create")
+                put("operation", "create")
                 put("title", "Project review")
                 put("start_iso", "2026-08-01T01:00:00Z")
                 put("end_iso", "2026-08-01T02:00:00Z")
@@ -152,7 +154,7 @@ class AgentToolRegistryTest {
         val listed = registry.execute(
             name = "manage_mochi_calendar",
             arguments = buildJsonObject {
-                put("operate", "list")
+                put("operation", "list")
                 put("range_start_iso", "2026-08-01T00:00:00Z")
                 put("range_end_iso", "2026-08-02T00:00:00Z")
             },
@@ -208,7 +210,7 @@ class AgentToolRegistryTest {
     }
 }
 
-private class RecordingPlannerStore : PlannerStore {
+private class RecordingPlannerStore : com.example.mochi_pet.core.database.TestPlannerStore() {
     val todos = mutableListOf<MochiTodo>()
     val events = mutableListOf<CalendarEvent>()
     private var nextTodoId = 1
@@ -238,7 +240,7 @@ private class RecordingPlannerStore : PlannerStore {
         return todo
     }
 
-    override suspend fun completeTodo(id: String): MochiTodo {
+    override suspend fun completeTodo(id: String, expectedRevision: Long?): MochiTodo {
         val existing = requireNotNull(getTodo(id))
         val completed = existing.copy(
             status = TodoStatus.COMPLETED,
@@ -265,7 +267,7 @@ private class RecordingPlannerStore : PlannerStore {
     override suspend fun listTodosByStatus(status: TodoStatus): List<MochiTodo> =
         todos.filter { it.status == status }
 
-    override suspend fun deleteTodo(id: String) {
+    override suspend fun deleteTodo(id: String, expectedRevision: Long?) {
         todos.removeAll { it.id == id }
     }
 
@@ -289,7 +291,7 @@ private class RecordingPlannerStore : PlannerStore {
         ).also(events::add)
     }
 
-    override suspend fun updateCalendarEvent(event: CalendarEvent): CalendarEvent {
+    override suspend fun updateCalendarEvent(event: CalendarEvent, indefiniteRecurrence: Boolean): CalendarEvent {
         events.replaceAll { if (it.id == event.id) event else it }
         return event
     }

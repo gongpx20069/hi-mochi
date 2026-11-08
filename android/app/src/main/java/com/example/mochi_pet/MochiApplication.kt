@@ -98,6 +98,17 @@ class MochiApplication : Application() {
             agentScheduleController.syncAll()
         }
         applicationScope.launch {
+            userReminderController.registerReconciliation()
+            plannerStore.changes.collect {
+                try {
+                    userReminderController.sync()
+                } catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    android.util.Log.e("MochiReminder", "Could not reconcile user reminders", error)
+                }
+            }
+        }
+        applicationScope.launch {
             var collectionScheduled = false
             while (true) {
                 agentLinkResultMonitor.refresh()
@@ -176,6 +187,10 @@ class MochiApplication : Application() {
 
     val agentScheduleController: AndroidAgentScheduleController by lazy {
         AndroidAgentScheduleController(this)
+    }
+
+    val userReminderController by lazy {
+        com.example.mochi_pet.platform.schedule.AndroidUserReminderController(this, plannerStore)
     }
 
     val mcpClient: McpStreamableHttpClient by lazy {
@@ -326,14 +341,21 @@ class MochiApplication : Application() {
 
     suspend fun executeAgentSchedule(
         id: String,
-        manual: Boolean,
     ): Boolean {
         providerRuns.register(requireNotNull(currentCoroutineContext()[kotlinx.coroutines.Job]))
-        val now = Instant.now()
-        // Finish the claim before observing cancellation so a claimed alarm is always reconciled.
+        // A persisted RUNNING receipt must never replay uncertain external side effects.
         val schedule = withContext(NonCancellable) {
-            if (manual) agentScheduleStore.get(id) else agentScheduleStore.claimDue(id, now)
-        } ?: return false
+            agentScheduleStore.startRun(id)
+        }
+        if (schedule == null) {
+            if (agentScheduleStore.run(id)?.state == com.example.mochi_pet.core.schedule.ScheduleRunState.RUNNING) {
+                agentScheduleStore.finishRun(
+                    id, com.example.mochi_pet.core.schedule.ScheduleRunState.INTERRUPTED,
+                    error = "Previous execution was interrupted; it was not replayed",
+                )?.let { agentScheduleController.sync(it) }
+            }
+            return false
+        }
         val userText = "[Scheduled Agent · ${schedule.name}]\n${schedule.prompt}"
         return try {
             currentCoroutineContext().ensureActive()
@@ -354,7 +376,7 @@ class MochiApplication : Application() {
                     includeBrowserInteractions = false,
                     extensionScope = ExtensionToolScope.SCHEDULED,
                     includeAgentLink = false,
-                    taskScheduleId = id,
+                    taskScheduleId = schedule.scheduleId,
                     taskTitle = schedule.name,
                 ).run(
                     AgentRunRequest(
@@ -376,27 +398,24 @@ class MochiApplication : Application() {
                 }
             }
             agentMemoryRepository.saveTurn(userText, reply.reply)
-            val updated = agentScheduleStore.recordResult(
+            val updated = agentScheduleStore.finishRun(
                 id = id,
-                result = AgentScheduleResult.SUCCESS,
-                completedAt = Instant.now(),
-                advanceSchedule = !manual,
+                state = com.example.mochi_pet.core.schedule.ScheduleRunState.SUCCESS,
+                output = reply.reply,
             )
-            agentScheduleController.sync(updated)
+            updated?.let { agentScheduleController.sync(it) }
             showAgentScheduleNotification(
                 scheduleName = schedule.name,
+                scheduleId = schedule.scheduleId,
+                runId = schedule.id,
                 text = reply.reply,
                 success = true,
             )
             true
         } catch (error: kotlinx.coroutines.CancellationException) {
             withContext(NonCancellable) {
-                if (agentScheduleStore.get(id) != null) {
-                    val updated = agentScheduleStore.recordResult(
-                        id, AgentScheduleResult.CANCELLED, Instant.now(), advanceSchedule = !manual,
-                    )
-                    agentScheduleController.sync(updated)
-                }
+                agentScheduleStore.finishRun(id, com.example.mochi_pet.core.schedule.ScheduleRunState.CANCELLED)
+                    ?.let { agentScheduleController.sync(it) }
             }
             throw error
         } catch (error: Exception) {
@@ -412,15 +431,16 @@ class MochiApplication : Application() {
                 userText,
                 "Scheduled task failed: $message",
             )
-            val updated = agentScheduleStore.recordResult(
+            val updated = agentScheduleStore.finishRun(
                 id = id,
-                result = AgentScheduleResult.FAILED,
-                completedAt = Instant.now(),
-                advanceSchedule = !manual,
+                state = com.example.mochi_pet.core.schedule.ScheduleRunState.FAILED,
+                error = message,
             )
-            agentScheduleController.sync(updated)
+            updated?.let { agentScheduleController.sync(it) }
             showAgentScheduleNotification(
                 scheduleName = schedule.name,
+                scheduleId = schedule.scheduleId,
+                runId = schedule.id,
                 text = message,
                 success = false,
             )

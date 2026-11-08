@@ -489,6 +489,7 @@ private fun TaskDetails(
                             AgentScheduleResult.SUCCESS -> "Completed"
                             AgentScheduleResult.FAILED -> "Failed"
                             AgentScheduleResult.CANCELLED -> "Cancelled"
+                            AgentScheduleResult.INTERRUPTED -> "Interrupted"
                         }))
                     }
                     if (task.active) {

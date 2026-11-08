@@ -69,10 +69,11 @@ run in local JVM tests.
 | `BrowserCredentialCapture` | source-validated top-level form submissions, transient save requests and turn-local password redaction |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
 | `AndroidJavaScriptExecutor` | bounded JavaScript in an isolated process |
-| `PlannerRepository` | calendar/todo transactions and queries |
+| `PlannerRepository` | revision-checked calendar/todo commands, recurrence instances, completion, exceptions and reminder receipts |
 | `SurfaceNavigator` | validated app-surface transitions |
 | `NavigationPolicy` | intent/date-to-surface rules |
-| `ReminderScheduler` | WorkManager/AlarmManager scheduling |
+| `AndroidUserReminderController` | opt-in local notifications, permission readiness and AlarmManager/WorkManager reconciliation |
+| `RoomAgentScheduleRepository` | finite Agent plans, transactional run reservation, versioned configuration snapshots and durable results |
 | Feature ViewModels | screen state and user events |
 
 No Composable may call the LLM, database DAO, SpeechRecognizer, TextToSpeech,

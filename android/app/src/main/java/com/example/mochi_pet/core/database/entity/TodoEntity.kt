@@ -31,4 +31,6 @@ data class TodoEntity(
     val createdAtEpochMillis: Long,
     @ColumnInfo(name = "updated_at_epoch_millis")
     val updatedAtEpochMillis: Long,
+    @ColumnInfo(defaultValue = "0")
+    val revision: Long = 0,
 )

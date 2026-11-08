@@ -242,6 +242,7 @@ fun MochiApp(
     providerShareCallbacks: Flow<String>,
     agentLinkResults: Flow<AgentLinkAuthorizationResult>,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
+    plannerDates: Flow<com.example.mochi_pet.core.model.PlannerDestination> = kotlinx.coroutines.flow.emptyFlow(),
 ) {
     val context = LocalContext.current
     val application = context.applicationContext as MochiApplication
@@ -250,6 +251,9 @@ fun MochiApp(
         MochiHomeViewModel.factory(application, voiceRuntime, wakeRuntime)
     }
     val viewModel: MochiHomeViewModel = viewModel(factory = factory)
+    LaunchedEffect(plannerDates) {
+        plannerDates.collect(viewModel::openPlannerDestination)
+    }
     val taskCenter: TaskCenterViewModel = viewModel(factory = remember(application) {
         viewModelFactory { initializer { TaskCenterViewModel(application) } }
     })
@@ -309,6 +313,10 @@ fun MochiApp(
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
                 grants[Manifest.permission.ACCESS_FINE_LOCATION] == true,
         )
+    }
+    val plannerResult by viewModel.plannerResults.collectAsStateWithLifecycle()
+    plannerResult?.let {
+        ScheduleResultsSheet(it, viewModel.plannerActions, viewModel::dismissPlannerResults)
     }
     val startVoice = { trigger: VoiceInputTrigger ->
         if (
@@ -815,6 +823,7 @@ private fun MochiAppContent(
                 addTodoRequest = AddTodoRequest(date)
             },
             onCompleteTodo = viewModel::completeTodo,
+            plannerActions = viewModel.plannerActions,
             onSetScheduleEnabled = viewModel::setScheduleEnabled,
             onRunSchedule = viewModel::runSchedule,
             onRemoveSchedule = viewModel::removeSchedule,
@@ -1490,6 +1499,7 @@ private fun SurfaceContent(
     onSetMcpToolEnabled: (String, String, Boolean) -> Unit,
     onAddTodo: (LocalDate?) -> Unit,
     onCompleteTodo: (String) -> Unit,
+    plannerActions: PlannerUiActions,
     onSetScheduleEnabled: (String, Boolean) -> Unit,
     onRunSchedule: (String) -> Unit,
     onRemoveSchedule: (String) -> Unit,
@@ -1624,6 +1634,7 @@ private fun SurfaceContent(
                 onBackToMonth = null,
                 onAddTodo = onAddTodo,
                 onCompleteTodo = onCompleteTodo,
+                actions = plannerActions,
                 onSetScheduleEnabled = onSetScheduleEnabled,
                 onRunSchedule = onRunSchedule,
                 onRemoveSchedule = onRemoveSchedule,
@@ -1631,6 +1642,7 @@ private fun SurfaceContent(
             is MochiSurface.CalendarMonth -> CalendarMonthSurface(
                 month = surface.month,
                 onNavigate = onNavigate,
+                occupiedDates = plannerState.occupiedDates,
             )
             is MochiSurface.CalendarDay -> DaySurface(
                 title = surface.date.format(
@@ -1657,6 +1669,7 @@ private fun SurfaceContent(
                 },
                 onAddTodo = onAddTodo,
                 onCompleteTodo = onCompleteTodo,
+                actions = plannerActions,
                 onSetScheduleEnabled = onSetScheduleEnabled,
                 onRunSchedule = onRunSchedule,
                 onRemoveSchedule = onRemoveSchedule,
@@ -3079,19 +3092,25 @@ private fun DaySurface(
     onBackToMonth: (() -> Unit)?,
     onAddTodo: (LocalDate?) -> Unit,
     onCompleteTodo: (String) -> Unit,
+    actions: PlannerUiActions,
     onSetScheduleEnabled: (String, Boolean) -> Unit,
     onRunSchedule: (String) -> Unit,
     onRemoveSchedule: (String) -> Unit,
 ) {
     val date = state.date
+    var editEvent by remember { mutableStateOf<CalendarEvent?>(null) }
+    var editTodo by remember { mutableStateOf<MochiTodo?>(null) }
+    var editTask by remember { mutableStateOf<AgentSchedule?>(null) }
+    var showUserEditor by remember { mutableStateOf(false) }
+    var showTaskEditor by remember { mutableStateOf(false) }
+    if (showUserEditor) UserScheduleEditor(date ?: LocalDate.now(), editEvent, editTodo, actions) {
+        showUserEditor = false
+    }
+    if (showTaskEditor) ScheduledTaskEditor(editTask, date ?: LocalDate.now(), actions,
+        onRemove = { editTask?.let { onRemoveSchedule(it.id) } }, onDismiss = { showTaskEditor = false })
     val activeTodos = state.todos.filter { it.status == TodoStatus.ACTIVE }
     val completedTodos = state.todos.filter {
         it.status == TodoStatus.COMPLETED
-    }
-    val hasCarriedTodos = activeTodos.any {
-        it.scheduledDate != null &&
-            date != null &&
-            it.scheduledDate < date
     }
     Column(modifier = Modifier.fillMaxSize()) {
         PlannerSectionTabs(
@@ -3125,63 +3144,43 @@ private fun DaySurface(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (state.schedules.isNotEmpty()) {
-                    item { SectionTitle("Agent schedules") }
+                    item { SectionTitle("Mochi scheduled tasks") }
                     items(
                         state.schedules,
                         key = AgentSchedule::id,
                     ) { schedule ->
-                        AgentScheduleRow(
-                            schedule = schedule,
-                            onSetEnabled = onSetScheduleEnabled,
-                            onRun = onRunSchedule,
-                            onRemove = onRemoveSchedule,
+                        ScheduledTaskCard(
+                            task = schedule,
+                            onRun = { onRunSchedule(schedule.id) },
+                            onEdit = { editTask = schedule; showTaskEditor = true },
+                            onResults = { actions.showResults(schedule) },
                         )
                     }
                 }
-                if (state.events.isNotEmpty()) {
-                    item { SectionTitle("Events") }
-                    items(state.events, key = CalendarEvent::id) { event ->
-                        EventRow(event)
-                    }
+                item { SectionTitle("User schedules") }
+                if (state.events.isEmpty() && state.todos.isEmpty()) item { EmptyRow("No user schedules") }
+                items(state.events.sortedBy { it.completedAt != null }, key = CalendarEvent::occurrenceId) { event ->
+                    UserScheduleCard(event.title,
+                        if (event.allDay) localizeUiText("All day") else plannerTime(event.startAt, event.timezone),
+                        event.completedAt != null, event.recurrenceRule != null,
+                        onEdit = { editEvent = event; editTodo = null; showUserEditor = true },
+                        highlighted = event.id in state.highlightIds || event.occurrenceId in state.highlightIds,
+                        onComplete = { actions.completeUser(event) })
                 }
-                item {
-                    SectionTitle(
-                        if (hasCarriedTodos) {
-                            "Active · includes carry-over"
-                        } else {
-                            "Active"
-                        },
-                    )
-                }
-                if (activeTodos.isEmpty()) {
-                    item { EmptyRow("No active todos") }
-                } else {
-                    items(activeTodos, key = MochiTodo::id) { todo ->
-                        TodoRow(
-                            todo = todo,
-                            displayDate = date,
-                            onCompleteTodo = onCompleteTodo,
-                        )
-                    }
-                }
-                if (completedTodos.isNotEmpty()) {
-                    item { SectionTitle("Completed") }
-                    items(completedTodos, key = MochiTodo::id) { todo ->
-                        TodoRow(
-                            todo = todo,
-                            displayDate = date,
-                            onCompleteTodo = onCompleteTodo,
-                        )
-                    }
+                items(activeTodos + completedTodos, key = MochiTodo::id) { todo ->
+                    UserScheduleCard(todo.content, todo.dueAt?.let { plannerTime(it, ZoneId.systemDefault()) }
+                        ?: todo.scheduledDate?.toString().orEmpty(), todo.status == TodoStatus.COMPLETED, false,
+                        onEdit = { editTodo = todo; editEvent = null; showUserEditor = true },
+                        highlighted = todo.id in state.highlightIds,
+                        onComplete = { onCompleteTodo(todo.id) })
                 }
             }
         }
-        Button(
-            onClick = { onAddTodo(date) },
-            enabled = date != null,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Add todo")
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { editEvent = null; editTodo = null; showUserEditor = true }, enabled = date != null,
+                modifier = Modifier.weight(1f)) { Text("Add schedule") }
+            OutlinedButton(onClick = { editTask = null; showTaskEditor = true }, enabled = date != null,
+                modifier = Modifier.weight(1f)) { Text("New Mochi task") }
         }
     }
 }
@@ -3190,6 +3189,7 @@ private fun DaySurface(
 private fun CalendarMonthSurface(
     month: YearMonth,
     onNavigate: (MochiNavigationIntent) -> Unit,
+    occupiedDates: Set<LocalDate>,
 ) {
     val firstDayOffset = month.atDay(1).dayOfWeek.value - 1
     val cells = buildList<LocalDate?> {
@@ -3295,7 +3295,7 @@ private fun CalendarMonthSurface(
                             },
                             shape = RoundedCornerShape(10.dp),
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                 Text(
                                     text = date.dayOfMonth.toString(),
                                     color = if (date == LocalDate.now()) {
@@ -3304,6 +3304,11 @@ private fun CalendarMonthSurface(
                                         Color.White
                                     },
                                 )
+                                if (date in occupiedDates) Surface(
+                                    modifier = Modifier.size(4.dp),
+                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                    color = if (date == LocalDate.now()) Color.Black else MaterialTheme.colorScheme.primary,
+                                ) { }
                             }
                         }
                     }
@@ -3599,7 +3604,6 @@ private fun SkillsSurface(
 
 private val MOCHI_BUILT_IN_TOOL_NAMES = setOf(
     "manage_mochi_calendar",
-    "manage_mochi_todo",
     "manage_mochi_schedule",
     "get_current_location",
     "get_current_weather",
@@ -5432,118 +5436,6 @@ private fun PlannerStatus(state: PlannerSurfaceState) {
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(vertical = 12.dp),
         )
-    }
-}
-
-@Composable
-private fun AgentScheduleRow(
-    schedule: AgentSchedule,
-    onSetEnabled: (String, Boolean) -> Unit,
-    onRun: (String) -> Unit,
-    onRemove: (String) -> Unit,
-) {
-    val nextRun = schedule.nextRunAt?.let { instant ->
-        DateTimeFormatter.ofPattern("MMM d · HH:mm")
-            .withZone(schedule.timezone)
-            .format(instant)
-    }
-    PlannerCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Surface(
-                    color = Color(0xFF8C6CE8).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Text(
-                        text = "AGENT",
-                        color = Color(0xFFB9A4FF),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(
-                            horizontal = 8.dp,
-                            vertical = 3.dp,
-                        ),
-                    )
-                }
-                MaterialText(
-                    text = schedule.name,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                )
-                MaterialText(
-                    text = schedule.prompt,
-                    color = Color.LightGray,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                )
-                Text(
-                    text = when {
-                        !schedule.enabled -> "Paused"
-                        schedule.lastResult == AgentScheduleResult.FAILED ->
-                            "Last run failed · Next ${nextRun ?: "pending"}"
-                        schedule.lastResult == AgentScheduleResult.CANCELLED ->
-                            localizeUiText("Last run cancelled") + " · " + (nextRun ?: localizeUiText("Not scheduled"))
-                        else -> "Next ${nextRun ?: "pending"}"
-                    },
-                    color = if (
-                        schedule.lastResult == AgentScheduleResult.FAILED
-                    ) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        Color(0xFFB9A4FF)
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-            Switch(
-                checked = schedule.enabled,
-                onCheckedChange = {
-                    onSetEnabled(schedule.id, it)
-                },
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            TextButton(onClick = { onRun(schedule.id) }) {
-                Text("Run now")
-            }
-            TextButton(onClick = { onRemove(schedule.id) }) {
-                Text("Delete")
-            }
-        }
-    }
-}
-
-@Composable
-private fun EventRow(event: CalendarEvent) {
-    val formatter = DateTimeFormatter.ofPattern("HH:mm")
-        .withZone(event.timezone)
-    PlannerCard {
-        MaterialText(
-            text = event.title,
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = if (event.allDay) {
-                "All day"
-            } else {
-                formatter.format(event.startAt)
-            },
-            color = Color.LightGray,
-        )
-        event.location?.let {
-            MaterialText(text = it, color = Color.Gray)
-        }
     }
 }
 

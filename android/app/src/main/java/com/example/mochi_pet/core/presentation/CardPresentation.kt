@@ -40,7 +40,7 @@ enum class CardSource(
 ) {
     WEATHER("weather", "get_current_weather"),
     CALENDAR("calendar", "manage_mochi_calendar"),
-    TODOS("todos", "manage_mochi_todo"),
+    TODOS("todos", "manage_mochi_calendar"),
     WEB_SEARCH("web_search", "browser_navigate"),
     WEB_PAGE("web_page", "browser_read"),
 }
@@ -530,7 +530,7 @@ private fun JsonObject.toEventItems(): List<CardItem> {
     return objects.mapNotNull { event ->
         event.string("title")?.let {
             CardItem(
-                id = event.string("id"),
+                id = event.string("occurrence_id") ?: event.string("id"),
                 title = it,
                 detail = event.string("start_iso"),
             )

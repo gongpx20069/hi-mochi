@@ -545,6 +545,37 @@ Store instants in UTC and preserve timezone IDs for display and recurrence.
 Date-only values use ISO `LocalDate`. Room migrations must be tested from every
 released schema version.
 
+Schema 6 adds revision-checked planner changes, completion and recurrence
+exceptions, durable `agent_schedule_runs` and `planner_reminder_receipts`.
+Existing events, todos, priority, completion and indefinite rules are preserved.
+Occurrence IDs combine the series ID and original scheduled instant; moving a
+single occurrence retains its identity. Query expansion is bounded to 367 days.
+The supported RRULE subset is DAILY/WEEKLY/MONTHLY/YEARLY, INTERVAL, plain BYDAY,
+one BYMONTHDAY (including negative month-end offsets), and COUNT or UNTIL.
+Unsupported clauses are explicit errors, not silently approximated. Invalid
+dates and DST gaps are skipped; date-only duration follows local date boundaries.
+Future edits split a series transactionally, retaining previous occurrences,
+completed exceptions and the remaining count. Occurrence overrides cascade on
+series deletion.
+
+UI and Tools share planner/schedule repositories. Native defaults, optimistic
+revisions, completion and recurrence calculation do not depend on Skill prose.
+Run reservation and advancement of the future plan are transactional. A manual
+run consumes no scheduled quota; an overlapping planned slot is recorded as
+skipped-busy. Interval cadence remains completion-relative. Durable queued
+receipts reconcile with unique WorkManager jobs; a restarted RUNNING receipt
+becomes interrupted rather than replaying uncertain side effects. Results retain
+the start configuration and survive deletion of the plan.
+
+User reminder reconciliation reads persisted unfinished occurrences, posts due
+notifications and arms the next AlarmManager alarm. A daily WorkManager sweep,
+database invalidation, app startup and system time/boot/permission reconciliation
+refresh the window. Only explicitly configured reminders participate. Delivery
+receipts and stable notification tags suppress repeat announcements; missing
+notification permission blocks delivery and unavailable exact-alarm permission
+uses an explicitly reported approximate alarm. A bounded one-day catch-up window
+avoids flooding the user after long inactivity. No LLM or network is involved.
+
 The day planner is shared by Today and calendar-date navigation. Todo queries
 order active rows before completed rows. Creation normalizes a missing
 `scheduledDate` to `LocalDate.now(clock)`; the Agent tool also returns

@@ -93,13 +93,32 @@ Mochi owns its calendar and todo data in Room.
 - Home can transform into current date-time or local weather presentations.
 - Trusted Agent cards can transform Home or render inline in Talk without
   allowing model-generated code or arbitrary UI components.
-- Today view: events and todos for the current date.
+- Planner has two visible categories: **User schedules** and **Mochi scheduled
+  tasks**. The executor, not the creator, determines the category.
 - Month view: dates containing events or todos are visibly marked.
-- Day view: reusable Today/selected-date agenda with events, active todos, then
-  completed todos.
+- Day view: reusable Today/selected-date agenda with expanded user occurrences,
+  active dated items and completed items, plus Mochi plans.
+- User schedule primary actions are edit time/content and complete this
+  occurrence. Repeating edits explicitly target one occurrence or this and
+  future occurrences; completion never completes the series.
+- Mochi task primary actions are run now, edit future time/content, and view
+  results. Manual runs preserve the planned next time, expiry and occurrence
+  quota. Concurrent requests for the same task reuse its active execution.
+- New user recurrence defaults to a 90-day cutoff, extended to include the next
+  low-frequency occurrence. Mochi intervals default to one week; daily/weekly
+  tasks default to 30 days from the first run. Explicit count, end date and
+  indefinite repetition are supported. Edits do not reset expiry. Existing
+  indefinite plans remain indefinite.
+- Each Mochi execution has a durable ID, configuration snapshot, status and
+  result, independent of chat history. Interrupted work is reported, not blindly
+  replayed. Editing future work cannot overwrite running or historical results.
 - Todos always have a scheduled date. Missing dates default to today with an
   explicit notice to the user.
-- Reminders: local notifications and exact alarms where permitted.
+- User reminders are off by default and enabled only on an explicit request.
+  Delivery uses local system notifications, without a model, network or speech.
+  Permission denial and approximate-alarm fallback are visible rather than
+  presented as guaranteed delivery. Device force-stop and OEM restrictions may
+  delay delivery; opening the app reconciles persisted plans.
 
 Android Calendar Provider is not the source of truth. Future system-calendar
 support is an optional import/export adapter.

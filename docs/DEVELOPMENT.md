@@ -157,6 +157,23 @@ preserved Home presentation. Real-device return/Focus verification must not
 restart the host with instrumentation while exercising its bound accessibility
 service.
 
+Planner/Agent integration regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*PlannerRepositoryTest" `
+  --tests "*AgentScheduleTest" --tests "*MochiDatabaseMigrationTest" `
+  --tests "*AgentToolRegistryTest" --tests "*PlannerUiTest" `
+  --tests "*UserReminderTest" --tests "*NavigationPolicyTest" --no-daemon
+```
+
+These cover native recurrence expansion and per-occurrence changes, finite
+defaults, revision conflicts, durable manual/scheduled runs, migration from
+every released schema, opt-in reminders and notification denial, large-text
+editor behavior and exact execution-result presentation. They use synthetic
+records, Room and Robolectric, not real provider or personal-device operations.
+Device force-stop, OEM delivery restrictions and real voice parsing still need
+separately authorized device acceptance.
+
 Skill readiness/content regressions:
 
 ```powershell

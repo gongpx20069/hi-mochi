@@ -186,7 +186,8 @@ class AgentPromptBuilder(
             appendLine("In reply prose, use [short label](URL) for links; never use a URL as the label.")
             appendLine(
                 "Optional ui_directive fields: surface, reason, date, month, " +
-                    "section, status, highlight_ids.",
+                    "section, status, highlight_ids, schedule_id, run_id. " +
+                    "Use surface=schedule_results with explicit_ui_request and a verified schedule_id to open execution results.",
             )
             appendLine(
                 "Valid ui_directive reasons: current_time_date, current_weather, " +

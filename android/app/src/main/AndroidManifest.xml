@@ -130,6 +130,9 @@
             android:name=".platform.schedule.AgentScheduleAlarmReceiver"
             android:exported="false" />
         <receiver
+            android:name=".platform.schedule.UserReminderReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".platform.schedule.AgentScheduleSystemReceiver"
             android:exported="false">
             <intent-filter>

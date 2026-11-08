@@ -525,7 +525,6 @@ private val BUILT_IN_SKILL_TOOLS = mapOf(
     "builtin:termux" to setOf("termux_exec", "termux_task"),
     "builtin:mochi-planner" to setOf(
         "manage_mochi_calendar",
-        "manage_mochi_todo",
     ),
     "builtin:voice-navigation" to setOf("navigate_mochi_ui"),
     "builtin:scheduled-automations" to setOf("manage_mochi_schedule"),
@@ -785,32 +784,27 @@ private val BUILT_IN_SKILLS = listOf(
     builtInSkill(
         id = "builtin:mochi-planner",
         name = "Mochi Planner",
-        description = "Manage Mochi calendar events and dated todos.",
+        description = "Create, edit and complete user schedules and their reminders.",
         content = """
             # Mochi Planner
 
-            Manage Mochi-owned calendar events and dated todos.
+            Use `manage_mochi_calendar` for work the user will do, including
+            reminders. Future work performed by Mochi belongs to Scheduled Automations.
 
-            ## Routing
-
-            - Events/todos are local records. Use `reminder_iso` for an attached
-              reminder; use Scheduled Automations for future Agent work instead.
-              Do not create both unless the user explicitly requests both.
-            - UI-only requests belong to Voice Navigation. If `navigate_mochi_ui`
-              is available, show Today or the requested Calendar Day and highlight
-              a changed item. Never create an item merely to open its page.
-
-            ## Todo rules
-
-            - Every todo must have a scheduled date.
-            - If the user omits the date, use today.
-            - Explicitly tell the user when today was used as the default.
-            - Show active todos before completed todos.
-
-            ## Safety
-
-            Use Mochi's local planner tools for reads and writes. Never claim
-            that a mutation succeeded unless the tool returned success.
+            - `operation`: create, list, get, update, complete, delete.
+            - Use title and start_iso/timezone, or scheduled_date for a date-only item.
+              A missing date defaults to today; disclose that default.
+            - Query before edits. Use the returned id (occurrence_id for a repeating
+              instance) and revision. Clarify ambiguous matches instead of guessing.
+            - Recurrence supports DAILY/WEEKLY/MONTHLY/YEARLY rules. Disclose the
+              returned end condition; never silently request indefinite repetition.
+            - update/delete scope is this, future, or all. Confirm the intended
+              scope when unclear. complete affects only the selected occurrence.
+            - Set reminder_iso only when the user requests a reminder. Report
+              permission/delivery limitations, not a promise of guaranteed delivery.
+            - delete requires confirmed=true for explicit user intent.
+              Do not claim a mutation succeeded without its Tool receipt.
+            - Opening a page uses Voice Navigation, not create.
         """.trimIndent(),
     ),
     builtInSkill(
@@ -831,6 +825,7 @@ private val BUILT_IN_SKILLS = listOf(
             | Current weather | Home weather |
             | Today's plan | Planner > Today |
             | Another date | Planner > Calendar Day |
+            | View Mochi execution results | show_schedule_results with schedule_id and optional run_id |
             | Explicit page request | Face, Conversation, Settings, month calendar or dated todos |
             | Enter or exit Focus | `enter_focus` / `exit_focus`, preserving the Home presentation |
             | Finish talking or stop follow-up listening | `end_voice_session`, keeping the current screen |
@@ -852,61 +847,30 @@ private val BUILT_IN_SKILLS = listOf(
         id = "builtin:scheduled-automations",
         name = "Scheduled Automations",
         description =
-            "Create and manage reminders or recurring prompts executed by " +
-                "the main Mochi Agent and shown in Planner.",
+            "Manage future Mochi Agent work, immediate runs and execution results.",
         content = """
             # Scheduled Automations
 
-            Use `manage_mochi_schedule` for user-requested future or recurring
-            Agent prompts. Scheduled runs use the main Mochi Agent, save the
-            prompt and final response to Conversation, appear in Planner with
-            an Agent marker, and send a notification when complete.
+            Use `manage_mochi_schedule` for work Mochi will perform. User reminders
+            belong to Mochi Planner; do not create both for one request.
+            Runs use the same provider, persona and enabled background-safe Tools.
 
-            ## When to use
-
-            Load this Skill when the user asks Mochi to do something once at a
-            future time, every day, on selected weekdays, or at a repeating
-            interval. Also use it to list, pause, resume, edit, delete, or run a
-            scheduled Agent task now.
-            Attached event/todo reminders use Mochi Planner's `reminder_iso`;
-            do not duplicate them as Agent schedules.
-
-            ## Tool workflow
-
-            - `set`: create a schedule or update one by `id`.
-            - `list`: inspect schedules before changing an ambiguous task.
-            - `remove`: delete an identified schedule.
-            - `run`: execute an identified schedule immediately.
-
-            Supported schedule types:
-
-            - `once`: requires an absolute ISO-8601 `run_at`.
-            - `daily`: requires `local_time` and an IANA `timezone`.
-            - `weekly`: requires `local_time`, `timezone`, and comma-separated
-              English weekday names in `days`.
-            - `every`: requires `interval_minutes` of at least 15.
-
-            For requests like "tomorrow at eight", resolve the exact instant
-            from runtime date and timezone before calling the Tool. Ask one
-            concise clarification if the time, timezone, task, or recurrence
-            cannot be determined safely. After setting a task, state its name
-            and exact next execution time.
-
-            ## Background constraints
-
-            Scheduled runs use the same provider, persona, memory, Skills, and
-            enabled background-safe Tools as the main Agent. They may use the
-            read-only Browser subset to navigate, read, and scroll public
-            pages. Clicking controls, entering page data, and automatic UI
-            navigation remain unavailable in the background. Browser turns
-            are serialized with foreground conversations.
-
-            ## Safety
-
-            Do not schedule unattended purchases, payments, account changes,
-            messages to third parties, destructive operations, or other
-            high-impact actions. Never silently broaden the prompt beyond what
-            the user requested.
+            - `operation`: create, list, get, update, delete, run, results.
+            - once uses run_at; daily uses local_time/timezone; weekly also uses
+              days (MONDAY,FRIDAY); every uses interval_minutes (at least 15).
+            - Resolve relative times using runtime date/timezone; clarify ambiguity.
+              Report the returned next_run_at and end condition.
+            - Repetition defaults to one week for intervals and 30 days for daily/
+              weekly tasks. Use ends_at or max_runs, or explicitly requested indefinite.
+            - Query before update; include id and revision. Edits affect future runs,
+              not running work or historical results. Preserve expiry unless asked.
+            - run adds one immediate execution without changing the plan. A queued
+              or running receipt is not completion. Keep run_id for results.
+            - results with id lists history; with run_id reads that exact outcome.
+              Do not infer success from chat history or repeatedly poll.
+            - delete requires confirmed=true. Background work cannot manage plans,
+              navigate the UI, click or type in Browser. Do not schedule unattended
+              purchases, payments, destructive actions or messages to third parties.
         """.trimIndent(),
     ),
     builtInSkill(
