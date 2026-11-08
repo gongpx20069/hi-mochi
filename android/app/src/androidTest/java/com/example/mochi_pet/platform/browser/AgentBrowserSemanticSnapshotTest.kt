@@ -25,7 +25,7 @@ import kotlin.coroutines.resume
 class AgentBrowserSemanticSnapshotTest {
     @Test
     fun readsUnmarkedStatisticsAndKeepsReferencesBoundToNodes() = fixture { runtime, page ->
-        val initial = runtime.read()
+        val initial = runtime.read(waitSeconds = 2)
         assertEquals("mochi-semantic-v3", initial["format"]?.jsonPrimitive?.content)
         val markdown = initial.getValue("markdown").jsonPrimitive.content
         assertTrue(markdown, markdown.contains("点赞（Q）: 364"))
@@ -37,30 +37,30 @@ class AgentBrowserSemanticSnapshotTest {
         assertEquals(100, initial.getValue("interactive_elements").jsonArray.size)
         assertEquals("true", initial.getValue("truncation").jsonObject.getValue("interactive_elements").jsonPrimitive.content)
         val like = ref(initial, "点赞（Q）")
-        assertEquals(like, ref(runtime.read(), "点赞（Q）"))
-        val clicked = runtime.click(like)
+        assertEquals(like, ref(runtime.read(waitSeconds = 2), "点赞（Q）"))
+        val clicked = runtime.click(like, waitSeconds = 2)
         assertTrue(clicked.getValue("markdown").jsonPrimitive.content.contains("点赞（Q）: 365"))
         assertEquals(like, ref(clicked, "点赞（Q）"))
 
         script(page, "document.querySelector('.video-like').replaceWith(document.querySelector('.video-like').cloneNode(true))")
-        val replacement = ref(runtime.read(), "点赞（Q）")
+        val replacement = ref(runtime.read(waitSeconds = 2), "点赞（Q）")
         assertFalse(like == replacement)
-        assertRejected { runtime.click(like) }
-        assertEquals("mochi-semantic-v3", runtime.scroll("down", "half_page", null)["format"]?.jsonPrimitive?.content)
+        assertRejected { runtime.click(like, waitSeconds = 2) }
+        assertEquals("mochi-semantic-v3", runtime.scroll("down", "half_page", null, waitSeconds = 2)["format"]?.jsonPrimitive?.content)
     }
 
     @Test
     fun typingActivatesShadowCommentEditorAndRevealsPublishControl() = fixture { runtime, page ->
         installCommentEditor(page)
-        val editor = ref(runtime.read(), "Comment fixture")
-        val result = runtime.input("type", editor, "Synthetic comment, never submitted", null, null, true)
+        val editor = ref(runtime.read(waitSeconds = 2), "Comment fixture")
+        val result = runtime.input("type", editor, "Synthetic comment, never submitted", null, null, true, waitSeconds = 2)
         assertCommentPublishVisible(page, result)
     }
 
     @Test
     fun clickingActivatesShadowReplyEditorWithoutPublishing() = fixture { runtime, page ->
         installCommentEditor(page)
-        val result = runtime.click(ref(runtime.read(), "Reply fixture"))
+        val result = runtime.click(ref(runtime.read(waitSeconds = 2), "Reply fixture"), waitSeconds = 2)
         assertCommentPublishVisible(page, result)
     }
 
@@ -93,7 +93,7 @@ class AgentBrowserSemanticSnapshotTest {
 
     @Test
     fun exposesSafeControlsWithoutEditableValuesAndRejectsCoveredClicks() = fixture { runtime, page ->
-        val initial = runtime.read()
+        val initial = runtime.read(waitSeconds = 2)
         for (secret in listOf("fixture-password", "fixture-account", "fixture-editor", "fixture-hidden", "fixture-script")) {
             assertFalse(secret, initial.toString().contains(secret))
         }
@@ -102,29 +102,29 @@ class AgentBrowserSemanticSnapshotTest {
             .filter { it["options"] != null }
         assertTrue(choices.flatMap { it.getValue("options").jsonArray }.sumOf { it.jsonPrimitive.content.length } <= 2000)
         assertTrue(choices.any { it["options_truncated"]?.jsonPrimitive?.content == "true" })
-        runtime.input(operation = "type", ref = input, text = "new-private-query", value = null, key = null, clear = true)
+        runtime.input(operation = "type", ref = input, text = "new-private-query", value = null, key = null, clear = true, waitSeconds = 2)
         assertEquals("\"new-private-query\"", script(page, "document.querySelector('input[type=text]').value"))
-        assertFalse(runtime.read().toString().contains("new-private-query"))
-        val editor = ref(runtime.read(), "Editor fixture")
-        runtime.input(operation = "type", ref = editor, text = "private editor content", value = null, key = null, clear = true)
+        assertFalse(runtime.read(waitSeconds = 2).toString().contains("new-private-query"))
+        val editor = ref(runtime.read(waitSeconds = 2), "Editor fixture")
+        runtime.input(operation = "type", ref = editor, text = "private editor content", value = null, key = null, clear = true, waitSeconds = 2)
         assertEquals("\"private editor content\"", script(page, "document.querySelector('[contenteditable]').textContent"))
-        assertFalse(runtime.read().toString().contains("private editor content"))
-        val select = ref(runtime.read(), "Sort fixture")
-        runtime.input(operation = "select", ref = select, text = null, value = "Newest first", key = null, clear = true)
+        assertFalse(runtime.read(waitSeconds = 2).toString().contains("private editor content"))
+        val select = ref(runtime.read(waitSeconds = 2), "Sort fixture")
+        runtime.input(operation = "select", ref = select, text = null, value = "Newest first", key = null, clear = true, waitSeconds = 2)
         assertEquals("\"newest\"", script(page, "document.querySelector('select').value"))
-        val shadow = ref(runtime.read(), "Shadow action")
-        runtime.click(shadow)
+        val shadow = ref(runtime.read(waitSeconds = 2), "Shadow action")
+        runtime.click(shadow, waitSeconds = 2)
         assertEquals("\"done\"", script(page, "document.getElementById('shadow').dataset.result"))
-        val like = ref(runtime.read(), "点赞（Q）")
+        val like = ref(runtime.read(waitSeconds = 2), "点赞（Q）")
         script(page, """
             const cover = document.createElement('div');
             cover.id = 'cover';
             cover.style.cssText = 'position:fixed;inset:0;z-index:99999;background:white';
             document.body.append(cover);
         """.trimIndent())
-        assertRejected { runtime.click(like) }
+        assertRejected { runtime.click(like, waitSeconds = 2) }
         script(page, "document.getElementById('cover').remove(); document.querySelector('.video-like').style.opacity='0'")
-        assertRejected { runtime.click(like) }
+        assertRejected { runtime.click(like, waitSeconds = 2) }
     }
 
     private fun fixture(block: suspend (AgentBrowserRuntime, WebView) -> Unit) = runBlocking {
@@ -140,6 +140,8 @@ class AgentBrowserSemanticSnapshotTest {
             }
             withTimeout(15_000) {
                 while (script(page, "document.body?.dataset.ready") != "\"yes\"") delay(50)
+            }
+            withTimeout(60_000) {
                 block(runtime, page)
             }
         } finally {

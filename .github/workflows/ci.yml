@@ -71,6 +71,16 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Prepare pinned WebView for Android 10
+        if: matrix.api-level == 29
+        run: |
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 180 \
+            'https://storage.googleapis.com/chromium-browser-snapshots/AndroidDesktop_x64/1333730/chrome-android-desktop.zip?generation=1722027086209912' \
+            --output "$RUNNER_TEMP/ci-webview.zip"
+          echo "0bcd6b55861ee05a9c31698bafd00210  $RUNNER_TEMP/ci-webview.zip" | md5sum --check
+          unzip -p "$RUNNER_TEMP/ci-webview.zip" chrome-android-desktop/apks/SystemWebView.apk > "$RUNNER_TEMP/SystemWebView.apk"
+          sha256sum "$RUNNER_TEMP/SystemWebView.apk"
+
       - name: Run Android smoke suite
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -82,6 +92,8 @@ jobs:
           disable-animations: true
           working-directory: android
           script: |
+            if [ "${{ matrix.api-level }}" = "29" ]; then adb install -r "$RUNNER_TEMP/SystemWebView.apk" && adb shell cmd webviewupdate set-webview-implementation com.android.webview | grep -Fx Success; fi
+            adb shell dumpsys webviewupdate
             adb install -r -g app/build/outputs/apk/debug/app-x86_64-debug.apk
             adb shell svc wifi disable
             adb shell svc data disable

@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -67,6 +68,9 @@ class ProviderProfilesSmokeTest {
             .performScrollToNode(hasTestTag("settings-part-Speech and wake"))
         compose.onNode(hasText(localizeUiText("Edit")) and
             hasAnyAncestor(hasTestTag("speech-profile-${speechBefore.activeId}"))).performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onNodeWithText(localizeUiText("Edit speech connection")).isDisplayed()
+        }
         compose.onNodeWithText(localizeUiText("Edit speech connection")).assertIsDisplayed()
         compose.onNodeWithText(localizeUiText("Cancel")).performClick()
         assertEquals(before, runBlocking(Dispatchers.IO) { repo.loadProfiles() })
