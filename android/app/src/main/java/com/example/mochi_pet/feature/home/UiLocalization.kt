@@ -183,6 +183,8 @@ internal fun localizeUiText(
 
 private val ZH_UI_TEXT = mapOf(
     "Agenda" to "日程",
+    "All" to "全部",
+    "Success" to "成功",
     "Back to today" to "回到今天",
     "+ New" to "＋ 新增",
     "My schedule" to "我的日程",
