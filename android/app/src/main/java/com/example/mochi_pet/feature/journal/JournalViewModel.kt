@@ -39,7 +39,10 @@ class JournalViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), repository.today())
 
     fun observe(date: LocalDate) = repository.observe(date).catch { report(it) }
-    fun markers(month: YearMonth) = combine(repository.observeMonth(month), today) { dates, current ->
+    fun markers(month: YearMonth) = combine(combine(repository.observeMonth(month.minusMonths(1)),
+        repository.observeMonth(month), repository.observeMonth(month.plusMonths(1))) { previous, current, next ->
+        previous + current + next
+    }, today) { dates, current ->
         dates.filterTo(mutableSetOf()) { it < current }
     }.catch { report(it) }
 

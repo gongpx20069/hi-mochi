@@ -202,10 +202,6 @@ private data class AddTodoRequest(
     val scheduledDate: LocalDate?,
 )
 
-private enum class PlannerSection {
-    TODAY,
-    CALENDAR,
-}
 
 private sealed interface MarkdownBlock {
     data class Heading(
@@ -472,8 +468,18 @@ private fun MochiAppContent(
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
     val surface by viewModel.surface.collectAsStateWithLifecycle()
-    val journalDates by remember(surface, journal) {
-        (surface as? MochiSurface.CalendarMonth)?.let { journal.markers(it.month) }
+    val plannerToday by journal.today.collectAsStateWithLifecycle()
+    LaunchedEffect(plannerToday) {
+        if (surface == MochiSurface.Today) viewModel.navigate(MochiNavigationIntent.ShowToday)
+    }
+    val journalDates by remember(surface, journal, plannerToday) {
+        val month = when (surface) {
+            MochiSurface.Today -> YearMonth.from(plannerToday)
+            is MochiSurface.CalendarDay -> YearMonth.from((surface as MochiSurface.CalendarDay).date)
+            is MochiSurface.CalendarMonth -> (surface as MochiSurface.CalendarMonth).month
+            else -> null
+        }
+        month?.let { journal.markers(it) }
             ?: kotlinx.coroutines.flow.flowOf(emptySet<LocalDate>())
     }.collectAsStateWithLifecycle(emptySet())
     val plannerState by viewModel.plannerState.collectAsStateWithLifecycle()
@@ -752,8 +758,9 @@ private fun MochiAppContent(
             }
         }
         SurfaceContent(
+            plannerToday = plannerToday,
             surface = surface,
-            plannerState = plannerState.copy(occupiedDates = plannerState.occupiedDates + journalDates),
+            plannerState = plannerState.copy(occupiedDates = plannerState.occupiedDates + journalDates, journalDates = journalDates),
             journalSettings = { com.example.mochi_pet.feature.journal.JournalSettings(journal) },
             journalDay = { date -> com.example.mochi_pet.feature.journal.JournalDay(journal, date) },
             conversationState = conversationState,
@@ -1437,6 +1444,7 @@ private fun FocusStandbyScreen(
 
 @Composable
 private fun SurfaceContent(
+    plannerToday: LocalDate,
     journalSettings: @Composable () -> Unit,
     journalDay: @Composable (LocalDate) -> Unit,
     surface: MochiSurface,
@@ -1634,64 +1642,23 @@ private fun SurfaceContent(
                 onSetServerEnabled = onSetMcpServerEnabled,
                 onSetToolEnabled = onSetMcpToolEnabled,
             )
-            MochiSurface.Today -> DaySurface(
+            MochiSurface.Today, is MochiSurface.CalendarMonth, is MochiSurface.CalendarDay -> PlannerAgenda(
                 journalDay = journalDay,
-                title = "Today",
                 state = plannerState,
-                plannerSection = PlannerSection.TODAY,
-                onShowToday = {
-                    onNavigate(MochiNavigationIntent.ShowToday)
+                date = when (surface) {
+                    is MochiSurface.CalendarDay -> surface.date
+                    is MochiSurface.CalendarMonth -> plannerState.date ?: surface.month.atDay(1)
+                    else -> plannerToday
                 },
-                onShowCalendar = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            YearMonth.now(),
-                        ),
-                    )
-                },
-                onBackToMonth = null,
-                onAddTodo = onAddTodo,
+                today = plannerToday,
+                monthMode = surface is MochiSurface.CalendarMonth,
+                onDate = { onNavigate(MochiNavigationIntent.ShowCalendarDay(it)) },
+                onMonth = { onNavigate(MochiNavigationIntent.ShowCalendarMonth(it)) },
+                onToday = { onNavigate(MochiNavigationIntent.ShowToday) },
                 onCompleteTodo = onCompleteTodo,
                 actions = plannerActions,
-                onSetScheduleEnabled = onSetScheduleEnabled,
-                onRunSchedule = onRunSchedule,
-                onRemoveSchedule = onRemoveSchedule,
-            )
-            is MochiSurface.CalendarMonth -> CalendarMonthSurface(
-                month = surface.month,
-                onNavigate = onNavigate,
-                occupiedDates = plannerState.occupiedDates,
-            )
-            is MochiSurface.CalendarDay -> DaySurface(
-                journalDay = journalDay,
-                title = surface.date.format(
-                    uiDateFormatter("EEEE, MMMM d", "M月d日 EEEE"),
-                ),
-                state = plannerState,
-                plannerSection = PlannerSection.CALENDAR,
-                onShowToday = {
-                    onNavigate(MochiNavigationIntent.ShowToday)
-                },
-                onShowCalendar = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            YearMonth.from(surface.date),
-                        ),
-                    )
-                },
-                onBackToMonth = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            YearMonth.from(surface.date),
-                        ),
-                    )
-                },
-                onAddTodo = onAddTodo,
-                onCompleteTodo = onCompleteTodo,
-                actions = plannerActions,
-                onSetScheduleEnabled = onSetScheduleEnabled,
-                onRunSchedule = onRunSchedule,
-                onRemoveSchedule = onRemoveSchedule,
+                onRun = onRunSchedule,
+                onRemove = onRemoveSchedule,
             )
             is MochiSurface.Todo -> TodoSurface(
                 state = plannerState,
@@ -3098,270 +3065,6 @@ private fun MochiExpression(stage: ChatPipelineStage) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun DaySurface(
-    journalDay: @Composable (LocalDate) -> Unit,
-    title: String,
-    state: PlannerSurfaceState,
-    plannerSection: PlannerSection,
-    onShowToday: () -> Unit,
-    onShowCalendar: () -> Unit,
-    onBackToMonth: (() -> Unit)?,
-    onAddTodo: (LocalDate?) -> Unit,
-    onCompleteTodo: (String) -> Unit,
-    actions: PlannerUiActions,
-    onSetScheduleEnabled: (String, Boolean) -> Unit,
-    onRunSchedule: (String) -> Unit,
-    onRemoveSchedule: (String) -> Unit,
-) {
-    val date = state.date
-    var editEvent by remember { mutableStateOf<CalendarEvent?>(null) }
-    var editTodo by remember { mutableStateOf<MochiTodo?>(null) }
-    var editTask by remember { mutableStateOf<AgentSchedule?>(null) }
-    var showUserEditor by remember { mutableStateOf(false) }
-    var showTaskEditor by remember { mutableStateOf(false) }
-    if (showUserEditor) UserScheduleEditor(date ?: LocalDate.now(), editEvent, editTodo, actions) {
-        showUserEditor = false
-    }
-    if (showTaskEditor) ScheduledTaskEditor(editTask, date ?: LocalDate.now(), actions,
-        onRemove = { editTask?.let { onRemoveSchedule(it.id) } }, onDismiss = { showTaskEditor = false })
-    val activeTodos = state.todos.filter { it.status == TodoStatus.ACTIVE }
-    val completedTodos = state.todos.filter {
-        it.status == TodoStatus.COMPLETED
-    }
-    Column(modifier = Modifier.fillMaxSize()) {
-        PlannerSectionTabs(
-            selected = plannerSection,
-            onShowToday = onShowToday,
-            onShowCalendar = onShowCalendar,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        onBackToMonth?.let {
-            TextButton(onClick = it) {
-                Text(
-                    "Back to ${
-                        date?.format(uiDateFormatter("MMMM", "M月"))
-                    }",
-                )
-            }
-        }
-        SurfaceHeader(
-            title = title,
-            subtitle = date?.format(
-                uiDateFormatter(
-                    "EEEE, MMMM d, yyyy",
-                    "yyyy年M月d日 EEEE",
-                ),
-            ).orEmpty(),
-        )
-        PlannerStatus(state)
-        if (!state.isLoading) {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                item("daily-journal") { date?.let { journalDay(it) } }
-                if (state.schedules.isNotEmpty()) {
-                    item { SectionTitle("Mochi scheduled tasks") }
-                    items(
-                        state.schedules,
-                        key = AgentSchedule::id,
-                    ) { schedule ->
-                        ScheduledTaskCard(
-                            task = schedule,
-                            onRun = { onRunSchedule(schedule.id) },
-                            onEdit = { editTask = schedule; showTaskEditor = true },
-                            onResults = { actions.showResults(schedule) },
-                        )
-                    }
-                }
-                item { SectionTitle("User schedules") }
-                if (state.events.isEmpty() && state.todos.isEmpty()) item { EmptyRow("No user schedules") }
-                items(state.events.sortedBy { it.completedAt != null }, key = CalendarEvent::occurrenceId) { event ->
-                    UserScheduleCard(event.title,
-                        if (event.allDay) localizeUiText("All day") else plannerTime(event.startAt, event.timezone),
-                        event.completedAt != null, event.recurrenceRule != null,
-                        onEdit = { editEvent = event; editTodo = null; showUserEditor = true },
-                        highlighted = event.id in state.highlightIds || event.occurrenceId in state.highlightIds,
-                        onComplete = { actions.completeUser(event) })
-                }
-                items(activeTodos + completedTodos, key = MochiTodo::id) { todo ->
-                    UserScheduleCard(todo.content, todo.dueAt?.let { plannerTime(it, ZoneId.systemDefault()) }
-                        ?: todo.scheduledDate?.toString().orEmpty(), todo.status == TodoStatus.COMPLETED, false,
-                        onEdit = { editTodo = todo; editEvent = null; showUserEditor = true },
-                        highlighted = todo.id in state.highlightIds,
-                        onComplete = { onCompleteTodo(todo.id) })
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { editEvent = null; editTodo = null; showUserEditor = true }, enabled = date != null,
-                modifier = Modifier.weight(1f)) { Text("Add schedule") }
-            OutlinedButton(onClick = { editTask = null; showTaskEditor = true }, enabled = date != null,
-                modifier = Modifier.weight(1f)) { Text("New Mochi task") }
-        }
-    }
-}
-
-@Composable
-private fun CalendarMonthSurface(
-    month: YearMonth,
-    onNavigate: (MochiNavigationIntent) -> Unit,
-    occupiedDates: Set<LocalDate>,
-) {
-    val firstDayOffset = month.atDay(1).dayOfWeek.value - 1
-    val cells = buildList<LocalDate?> {
-        repeat(firstDayOffset) { add(null) }
-        for (day in 1..month.lengthOfMonth()) {
-            add(month.atDay(day))
-        }
-        while (size % 7 != 0) {
-            add(null)
-        }
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        PlannerSectionTabs(
-            selected = PlannerSection.CALENDAR,
-            onShowToday = {
-                onNavigate(MochiNavigationIntent.ShowToday)
-            },
-            onShowCalendar = {
-                onNavigate(
-                    MochiNavigationIntent.ShowCalendarMonth(
-                        YearMonth.now(),
-                    ),
-                )
-            },
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(
-                onClick = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            month.minusMonths(1),
-                        ),
-                    )
-                },
-            ) {
-                Text("Previous")
-            }
-            Text(
-                text = month.format(
-                    uiDateFormatter("MMMM yyyy", "yyyy年M月"),
-                ),
-                color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            TextButton(
-                onClick = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            month.plusMonths(1),
-                        ),
-                    )
-                },
-            ) {
-                Text("Next")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach {
-                Text(
-                    text = it,
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        cells.chunked(7).forEach { week ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                week.forEach { date ->
-                    if (date == null) {
-                        Spacer(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                        )
-                    } else {
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp)
-                                .clickable {
-                                    onNavigate(
-                                        MochiNavigationIntent.ShowCalendarDay(date),
-                                    )
-                                },
-                            color = if (date == LocalDate.now()) {
-                                Color.White
-                            } else {
-                                Color(0xFF202020)
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                                Text(
-                                    text = date.dayOfMonth.toString(),
-                                    color = if (date == LocalDate.now()) {
-                                        Color.Black
-                                    } else {
-                                        Color.White
-                                    },
-                                )
-                                if (date in occupiedDates) Surface(
-                                    modifier = Modifier.size(4.dp),
-                                    shape = androidx.compose.foundation.shape.CircleShape,
-                                    color = if (date == LocalDate.now()) Color.Black else MaterialTheme.colorScheme.primary,
-                                ) { }
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-    }
-}
-
-@Composable
-private fun PlannerSectionTabs(
-    selected: PlannerSection,
-    onShowToday: () -> Unit,
-    onShowCalendar: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SkillSectionTab(
-            label = "Today",
-            selected = selected == PlannerSection.TODAY,
-            onClick = onShowToday,
-            modifier = Modifier.weight(1f),
-        )
-        SkillSectionTab(
-            label = "Calendar",
-            selected = selected == PlannerSection.CALENDAR,
-            onClick = onShowCalendar,
-            modifier = Modifier.weight(1f),
-        )
     }
 }
 
@@ -5428,7 +5131,7 @@ private val ORDERED_LIST_PATTERN = Regex("""(\d+)\.\s+(.+)""")
 private val TABLE_DIVIDER_PATTERN = Regex(
     """\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?""",
 )
-private fun uiDateFormatter(
+internal fun uiDateFormatter(
     englishPattern: String,
     chinesePattern: String,
 ): DateTimeFormatter {

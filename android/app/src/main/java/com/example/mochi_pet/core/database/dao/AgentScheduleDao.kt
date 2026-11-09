@@ -46,6 +46,9 @@ interface AgentScheduleDao {
     @Query("SELECT * FROM agent_schedule_runs WHERE schedule_id = :id ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset")
     suspend fun runs(id: String, limit: Int, offset: Int): List<AgentScheduleRunEntity>
 
+    @Query("SELECT * FROM agent_schedule_runs WHERE created_at >= :start AND created_at < :end ORDER BY created_at, id")
+    suspend fun runsInWindow(start: Long, end: Long): List<AgentScheduleRunEntity>
+
     @Query("SELECT * FROM agent_schedule_runs WHERE schedule_id = :id AND state IN ('QUEUED', 'RUNNING') LIMIT 1")
     suspend fun activeRun(id: String): AgentScheduleRunEntity?
 

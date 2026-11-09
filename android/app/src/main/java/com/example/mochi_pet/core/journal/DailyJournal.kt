@@ -5,7 +5,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.serialization.Serializable
 
-enum class JournalStatus { WAITING, GENERATING, READY, EMPTY, FAILED, DELETED }
+enum class JournalStatus { WAITING, GENERATING, READY, EMPTY, NO_DATA, FAILED, DELETED }
 
 data class JournalSettings(val enabled: Boolean = false, val since: LocalDate? = null)
 
@@ -17,6 +17,10 @@ data class DailyJournal(
     val text: String,
     val error: String?,
     val updatedAt: Instant,
+    val conversationCount: Int? = null,
+    val userScheduleCount: Int? = null,
+    val taskCount: Int? = null,
+    val generatedAt: Instant? = null,
 )
 
 @Serializable

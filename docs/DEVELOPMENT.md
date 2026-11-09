@@ -169,7 +169,8 @@ Planner/Agent integration regressions:
 These cover native recurrence expansion and per-occurrence changes, finite
 defaults, revision conflicts, durable manual/scheduled runs, migration from
 every released schema, opt-in reminders and notification denial, large-text
-editor behavior and exact execution-result presentation. They use synthetic
+editor behavior, unified week/date navigation, grouped execution history,
+projected recurrence versus recorded outcomes, and exact execution-result presentation. They use synthetic
 records, Room and Robolectric, not real provider or personal-device operations.
 Device force-stop, OEM delivery restrictions and real voice parsing still need
 separately authorized device acceptance.
@@ -183,7 +184,8 @@ Daily journal regressions:
 
 These use synthetic records and fake model replies to verify whole-day paging,
 DST windows, source deduplication, cutoff states, bounded prompt assembly,
-claim fencing, deletion tombstones, default-off migration, consent and
+claim fencing, deletion tombstones, default-off migration, source counts,
+missing-input versus empty-summary states, consent and
 large-text journal controls. They do not invoke a live Provider or establish
 OEM midnight delivery guarantees.
 

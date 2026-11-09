@@ -13,6 +13,10 @@ data class DailyJournalEntity(
     val error: String?,
     val updatedAt: Long,
     val claim: String?,
+    val conversationCount: Int? = null,
+    val userScheduleCount: Int? = null,
+    val taskCount: Int? = null,
+    val generatedAt: Long? = null,
 )
 
 @Entity(tableName = "journal_settings")

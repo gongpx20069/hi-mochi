@@ -37,6 +37,9 @@ import com.example.mochi_pet.core.journal.DailyJournal
 import com.example.mochi_pet.core.journal.JournalSettings
 import com.example.mochi_pet.core.journal.JournalStatus
 import com.example.mochi_pet.feature.home.Text
+import com.example.mochi_pet.feature.home.localizeUiText
+import com.example.mochi_pet.ui.theme.AgendaKind
+import com.example.mochi_pet.ui.theme.agendaColor
 import java.time.LocalDate
 
 @Composable
@@ -109,8 +112,10 @@ internal fun JournalCard(
     var confirmation by remember(entry.date) { mutableStateOf<String?>(null) }
     val active = entry.status in setOf(JournalStatus.WAITING, JournalStatus.GENERATING)
     val written = entry.text.isNotBlank()
+    val statusText = if (entry.status == JournalStatus.EMPTY && entry.conversationCount == null)
+        "No journal content; source information unavailable" else statusLabel(entry.status)
     Card(onClick = { expanded = true }, shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f))) {
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             JournalLabel()
             if (written) {
@@ -118,11 +123,11 @@ internal fun JournalCard(
                 MaterialText(entry.text, style = MaterialTheme.typography.bodyMedium, maxLines = 3,
                     overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                Text(statusLabel(entry.status), style = MaterialTheme.typography.bodyMedium,
+                Text(statusText, style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (entry.status == JournalStatus.GENERATING) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            if (written && entry.status != JournalStatus.READY) Text(statusLabel(entry.status),
+            if (written && entry.status != JournalStatus.READY) Text(statusText,
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             entry.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         }
@@ -137,10 +142,25 @@ internal fun JournalCard(
             if (written) {
                 MaterialText(entry.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 SelectionContainer { MaterialText(entry.text, style = MaterialTheme.typography.bodyLarge) }
-            } else Text(statusLabel(entry.status), style = MaterialTheme.typography.titleMedium)
+            } else Text(statusText, style = MaterialTheme.typography.titleMedium)
             entry.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Text("AI-generated from saved records.", style = MaterialTheme.typography.bodySmall,
+            Text(when {
+                entry.status == JournalStatus.NO_DATA -> "No saved sources were available; no AI request was made."
+                entry.conversationCount == null -> "Source counts unavailable for this entry"
+                else -> "AI-generated from saved records."
+            }, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (entry.conversationCount != null) {
+                MaterialText("${localizeUiText("Saved conversations")}: ${entry.conversationCount}\n" +
+                    "${localizeUiText("User schedules")}: ${entry.userScheduleCount}\n" +
+                    "${localizeUiText("Mochi task records")}: ${entry.taskCount}",
+                    style = MaterialTheme.typography.bodySmall)
+            }
+            MaterialText("${entry.date} · ${entry.zone.id}", style = MaterialTheme.typography.bodySmall)
+            entry.generatedAt?.let {
+                MaterialText(localizeUiText("Generated") + " · " + it.atZone(entry.zone).format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), style = MaterialTheme.typography.bodySmall)
+            }
             TextButton(onClick = { confirmation = "retry" }, enabled = enabled && !busy && !active,
                 modifier = Modifier.fillMaxWidth()) { Text(if (written) "Regenerate journal" else "Retry") }
             if (!enabled) Text("Enable Daily journal before retrying", style = MaterialTheme.typography.bodySmall)
@@ -164,14 +184,19 @@ internal fun JournalCard(
 
 @Composable
 private fun JournalLabel() {
-    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-        Text("Daily journal", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelSmall)
+    val accent = agendaColor(AgendaKind.JOURNAL)
+    Surface(shape = RoundedCornerShape(8.dp), color = accent.copy(alpha = 0.12f)) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            com.example.mochi_pet.ui.theme.AgendaIcon(AgendaKind.JOURNAL)
+            Text("Daily journal", color = accent, style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 
 private fun statusLabel(status: JournalStatus) = when (status) {
     JournalStatus.EMPTY -> "Nothing important to record"
+    JournalStatus.NO_DATA -> "No saved records for this day"
     JournalStatus.WAITING -> "Waiting for background processing and a network connection"
     JournalStatus.GENERATING -> "Writing this day's journal"
     JournalStatus.FAILED -> "Journal could not be generated"

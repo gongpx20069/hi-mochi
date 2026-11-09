@@ -39,12 +39,45 @@ class JournalRepositoryTest {
     private val repository = JournalRepository(database, planner, clock) { zone }
     private val day = LocalDate.of(2026, 11, 9)
     private val draft = JournalDraft("written", "Launch", "Chose a launch date.")
+    private val source = JournalEvidence(listOf(JournalRecord("10:00", "Chose a launch date.")), emptyList(), emptyList())
     @After fun close() { database.close() }
 
     private suspend fun yesterday(): DailyJournal {
         repository.setEnabled(true)
         now = Instant.parse("2026-11-10T00:01:00Z")
         return repository.prepare().single()
+    }
+
+    @Test fun `source counts distinguish missing input and empty model summaries and survive failed retry`(): Unit = runBlocking {
+        yesterday()
+        val noData = JournalEvidence(emptyList(), emptyList(), emptyList())
+        repository.finish(requireNotNull(repository.claim(day, "one")), "one", JournalDraft("empty", "", ""), noData)
+        val emptyDay = requireNotNull(repository.get(day))
+        assertEquals(JournalStatus.NO_DATA, emptyDay.status)
+        assertEquals(0, emptyDay.conversationCount)
+        assertEquals(now, emptyDay.generatedAt)
+        repository.retry(day)
+        val routine = noData.copy(userSchedules = listOf(JournalRecord("10:00", "Routine", recurring = true)))
+        repository.finish(requireNotNull(repository.claim(day, "two")), "two", JournalDraft("empty", "", ""), routine)
+        assertEquals(JournalStatus.EMPTY, repository.get(day)?.status)
+        assertEquals(1, repository.get(day)?.userScheduleCount)
+        repository.retry(day)
+        repository.fail(requireNotNull(repository.claim(day, "three")), "three", "Interrupted")
+        assertEquals(1, repository.get(day)?.userScheduleCount)
+        assertEquals(emptyDay.generatedAt, repository.get(day)?.generatedAt)
+        repository.delete(day)
+        assertNull(repository.get(day)?.conversationCount)
+        assertNull(repository.get(day)?.generatedAt)
+    }
+
+    @Test fun `historical recurring task without a run is explicitly projected evidence`(): Unit = runBlocking {
+        val tasks = com.example.mochi_pet.core.schedule.RoomAgentScheduleRepository(database.agentScheduleDao(), clock)
+        tasks.set(draft = com.example.mochi_pet.core.schedule.AgentScheduleDraft("Routine", "Read",
+            com.example.mochi_pet.core.schedule.AgentScheduleType.DAILY, localTime = java.time.LocalTime.of(12, 0), timezone = zone))
+        val entry = yesterday()
+        val record = repository.evidence(entry).mochiTasks.single()
+        assertEquals("projected_from_current_rule_not_verified", record.status)
+        assertEquals(true, record.recurring)
     }
 
     @Test fun `default off no early generation and unique bounded catchup from enabling`(): Unit = runBlocking {
@@ -72,14 +105,14 @@ class JournalRepositoryTest {
         assertNotNull(repository.claim(day, "first"))
         repository.setEnabled(false)
         repository.setEnabled(true)
-        repository.finish(first, "first", draft)
+        repository.finish(first, "first", draft, source)
         assertEquals(JournalStatus.FAILED, repository.get(day)?.status)
         repository.retry(day)
         val second = requireNotNull(repository.claim(day, "second"))
-        repository.finish(first, "first", draft)
+        repository.finish(first, "first", draft, source)
         assertEquals(JournalStatus.GENERATING, repository.get(day)?.status)
         repository.delete(day)
-        repository.finish(second, "second", draft)
+        repository.finish(second, "second", draft, source)
         repository.prepare()
         assertEquals(JournalStatus.DELETED, repository.get(day)?.status)
         assertEquals("", repository.get(day)?.text)
@@ -88,7 +121,7 @@ class JournalRepositoryTest {
 
     @Test fun `regeneration retains good text on failure and abandoned work can be retried`(): Unit = runBlocking {
         yesterday()
-        repository.finish(requireNotNull(repository.claim(day, "one")), "one", draft)
+        repository.finish(requireNotNull(repository.claim(day, "one")), "one", draft, source)
         repository.retry(day)
         val retry = requireNotNull(repository.claim(day, "two"))
         repository.fail(retry, "two", "Network unavailable")
@@ -99,7 +132,7 @@ class JournalRepositoryTest {
         repository.interrupt(abandoned)
         assertEquals(JournalStatus.FAILED, repository.get(day)?.status)
         repository.retry(day)
-        repository.finish(requireNotNull(repository.claim(day, "four")), "four", JournalDraft("empty", "", ""))
+        repository.finish(requireNotNull(repository.claim(day, "four")), "four", JournalDraft("empty", "", ""), source)
         assertEquals(JournalStatus.EMPTY, repository.get(day)?.status)
         assertEquals("", repository.get(day)?.text)
     }

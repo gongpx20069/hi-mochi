@@ -37,7 +37,7 @@ import com.example.mochi_pet.core.database.entity.JournalSettingsEntity
         DailyJournalEntity::class,
         JournalSettingsEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class MochiDatabase : RoomDatabase() {
@@ -69,8 +69,18 @@ abstract class MochiDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
+                    MIGRATION_7_8,
                 )
                 .build()
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE daily_journals ADD COLUMN conversationCount INTEGER")
+                db.execSQL("ALTER TABLE daily_journals ADD COLUMN userScheduleCount INTEGER")
+                db.execSQL("ALTER TABLE daily_journals ADD COLUMN taskCount INTEGER")
+                db.execSQL("ALTER TABLE daily_journals ADD COLUMN generatedAt INTEGER")
+            }
+        }
 
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {

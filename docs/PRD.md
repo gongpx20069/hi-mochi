@@ -95,9 +95,17 @@ Mochi owns its calendar and todo data in Room.
   allowing model-generated code or arbitrary UI components.
 - Planner has two visible categories: **User schedules** and **Mochi scheduled
   tasks**. The executor, not the creator, determines the category.
-- Month view: dates containing events or todos are visibly marked.
-- Day view: reusable Today/selected-date agenda with expanded user occurrences,
-  active dated items and completed items, plus Mochi plans.
+- Planner is one date agenda, not separate Today/Calendar tabs. A compact week
+  strip expands into a month picker in place, with a return-to-today shortcut.
+  Blue user schedules, purple Mochi tasks and amber journals use shared cards,
+  explicit labels and per-type date markers rather than color alone.
+- Date content mixes user occurrences and grouped Mochi tasks chronologically,
+  with all-day items first and past-day journals above the agenda. All/My
+  schedule/Mochi tasks/Journal filters narrow the same date; one add action
+  offers the two task types. Manage all tasks includes paused/ended plans.
+- Multiple executions of a Mochi task share one daily card with counts and
+  exact result links. Past rule projections are explicitly unverified, never
+  displayed as successful execution. Saved run snapshots survive plan deletion.
 - User schedule primary actions are edit time/content and complete this
   occurrence. Repeating edits explicitly target one occurrence or this and
   future occurrences; completion never completes the series.
@@ -134,8 +142,11 @@ service and consuming model credits. There are no notifications or speech.
 Each past date has at most one journal with a short title and natural paragraph.
 There is no minimum length or filler. Routine recurring events and unchanged
 results are omitted unless meaningful progress occurred; plans are not treated
-as completed events. With nothing important, the native UI displays
+as completed events. When available records contain nothing important, the native UI displays
 **Nothing important to record / 无重要记录**.
+No saved input is instead **No saved records for this day / 这一天没有可用资料**,
+without a model call. Details show source counts and generation time captured
+with the result; legacy entries with unknown counts say so.
 
 Past-day cards and month markers share Planner styling without becoming a third
 task category. Users can inspect, explicitly regenerate or delete an entry.

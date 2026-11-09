@@ -35,7 +35,7 @@ replacement for this conversation store or an input to automatic recall.
 | [AgentMemoryRepository.kt](../../android/app/src/main/java/com/example/mochi_pet/core/memory/AgentMemoryRepository.kt) | `loadContext`, successful-turn persistence and recalled-line formatting |
 | [AgentMemoryDao.kt](../../android/app/src/main/java/com/example/mochi_pet/core/database/dao/AgentMemoryDao.kt) | Recent reads, bounded FTS candidates and batched neighbors |
 | [MemoryLexicalSearch.kt](../../android/app/src/main/java/com/example/mochi_pet/core/memory/MemoryLexicalSearch.kt) | ICU tokenization, FTS query construction and lexical ranking |
-| [MochiDatabase.kt](../../android/app/src/main/java/com/example/mochi_pet/core/database/MochiDatabase.kt) | Schema version 7 and migrations, including the FTS index and independent journals |
+| [MochiDatabase.kt](../../android/app/src/main/java/com/example/mochi_pet/core/database/MochiDatabase.kt) | Schema version 8 and migrations, including the FTS index and independent journals |
 | [AgentOrchestrator.kt](../../android/app/src/main/java/com/example/mochi_pet/core/agent/AgentOrchestrator.kt) | Recent message roles, recalled system context and normal Agent execution |
 | [MochiHomeViewModel.kt](../../android/app/src/main/java/com/example/mochi_pet/feature/home/MochiHomeViewModel.kt) | Foreground recall/save flow and chronological history display |
 | [MochiApplication.kt](../../android/app/src/main/java/com/example/mochi_pet/MochiApplication.kt) | Scheduled Agents use the same repository, including failure descriptions |
@@ -197,6 +197,9 @@ and reads a transactionally consistent snapshot:
   recurrence flags and completion timestamps interpreted at day end.
 - `mochi_tasks`: persisted run names/prompts/results and known due plans.
   Results after the cutoff are withheld; queued/running/planned are not success.
+  Current-rule projections fill dates without recorded runs and carry the
+  explicit `projected_from_current_rule_not_verified` status. They do not prove
+  the historical rule, enablement or execution.
 
 Only saved data is available. Failed unsaved foreground turns, content beyond
 the existing per-message storage cap, deleted schedules and prior versions of
@@ -222,7 +225,10 @@ The only accepted responses are:
 There are no source IDs in the response. Native validation rejects malformed
 JSON, Tool calls, inconsistent status/content, titles over 80 characters or
 paragraphs over 1,600 characters; there is no minimum length. An empty source
-day requires no Provider call. Empty results use the localized native label.
+day requires no Provider call and publishes `NO_DATA`, distinct from a model's
+`EMPTY` result. Native source counts and generation time are published under the
+same claim fence as the content; failed retries retain the previous provenance.
+Legacy entries retain null metadata and the UI explicitly reports that uncertainty.
 
 Large days are partitioned into bounded material batches, preserving source
 sections, timestamps, speakers and fragment order. Intermediate short journals
@@ -231,8 +237,8 @@ are recursively consolidated as `chunk_summaries`. Generation is limited to
 input fails explicitly rather than silently dropping the rest of the day.
 Intermediate summarization is lossy, not a verbatim archive.
 
-Room schema 7 owns the opt-in row and date-keyed journal lifecycle:
-`WAITING -> GENERATING -> READY / EMPTY / FAILED`. Enabling starts at the current
+Room schema 8 owns the opt-in row and date-keyed journal lifecycle:
+`WAITING -> GENERATING -> READY / EMPTY / NO_DATA / FAILED`. Enabling starts at the current
 date; missed processing creates at most the latest seven past dates since
 enabling. Older queued automatic work expires without model calls, while users
 may explicitly retry existing older entries. Per-date unique work and claim

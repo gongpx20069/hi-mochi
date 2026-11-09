@@ -124,7 +124,8 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 ## 5. Persistence
 
 - Room transactions own planner consistency.
-- Schema 7 also owns `daily_journals` and singleton `journal_settings`.
+- Schema 8 owns `daily_journals` and singleton `journal_settings`, including
+  nullable native source counts and generation time for legacy compatibility.
   Opt-in and claim invalidation share a transaction; date uniqueness and
   claim-checked publication prevent duplicates and late disable/delete writes.
   Journal content is not inserted into conversation memory. Scheduled chat

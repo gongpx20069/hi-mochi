@@ -62,10 +62,14 @@ interface JournalDao {
     @Query("UPDATE daily_journals SET status = :status, title = :title, text = :text, error = :error, claim = NULL, updatedAt = :now WHERE date = :date AND status = 'GENERATING' AND claim = :claim AND EXISTS (SELECT 1 FROM journal_settings WHERE id = 0 AND enabled = 1)")
     suspend fun finish(date: String, claim: String, status: String, title: String, text: String, error: String?, now: Long): Int
 
+    @Query("UPDATE daily_journals SET status = :status, title = :title, text = :text, error = NULL, claim = NULL, updatedAt = :now, generatedAt = :now, conversationCount = :conversations, userScheduleCount = :schedules, taskCount = :tasks WHERE date = :date AND status = 'GENERATING' AND claim = :claim AND EXISTS (SELECT 1 FROM journal_settings WHERE id = 0 AND enabled = 1)")
+    suspend fun publish(date: String, claim: String, status: String, title: String, text: String, now: Long,
+        conversations: Int, schedules: Int, tasks: Int): Int
+
     @Query("UPDATE daily_journals SET status = 'WAITING', claim = NULL, error = NULL, updatedAt = :now WHERE date = :date AND status NOT IN ('DELETED', 'GENERATING') AND EXISTS (SELECT 1 FROM journal_settings WHERE id = 0 AND enabled = 1)")
     suspend fun retry(date: String, now: Long): Int
 
-    @Query("UPDATE daily_journals SET status = 'DELETED', title = '', text = '', error = NULL, claim = NULL, updatedAt = :now WHERE date = :date")
+    @Query("UPDATE daily_journals SET status = 'DELETED', title = '', text = '', error = NULL, claim = NULL, updatedAt = :now, generatedAt = NULL, conversationCount = NULL, userScheduleCount = NULL, taskCount = NULL WHERE date = :date")
     suspend fun delete(date: String, now: Long)
 
     @Query("UPDATE daily_journals SET status = 'FAILED', error = 'Journal generation was interrupted', claim = NULL, updatedAt = :now WHERE date = :date AND status = 'GENERATING' AND updatedAt = :expectedTime")

@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.example.mochi_pet.core.database.MochiDatabase
 import com.example.mochi_pet.core.database.PlannerStore
 import com.example.mochi_pet.core.database.entity.DailyJournalEntity
+import com.example.mochi_pet.core.schedule.RoomAgentScheduleRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -55,10 +56,12 @@ class JournalRepository(
         return get(date)
     }
 
-    suspend fun finish(entry: DailyJournal, claim: String, result: JournalDraft) {
+    suspend fun finish(entry: DailyJournal, claim: String, result: JournalDraft, evidence: JournalEvidence) {
         val value = result.validated()
-        dao.finish(entry.date.toString(), claim, if (value.status == "empty") "EMPTY" else "READY",
-            value.title, value.text, null, clock.millis())
+        val noData = evidence.conversations.isEmpty() && evidence.userSchedules.isEmpty() && evidence.mochiTasks.isEmpty()
+        require(!noData || value.status == "empty") { "A journal without sources must be empty" }
+        dao.publish(entry.date.toString(), claim, if (noData) "NO_DATA" else if (value.status == "empty") "EMPTY" else "READY",
+            value.title, value.text, clock.millis(), evidence.conversations.size, evidence.userSchedules.size, evidence.mochiTasks.size)
     }
 
     suspend fun fail(entry: DailyJournal, claim: String, message: String, retryable: Boolean = false) {
@@ -105,19 +108,17 @@ class JournalRepository(
                 })
         }
         val executedIds = executions.mapTo(mutableSetOf()) { it.scheduleId }
-        val planned = plans.values.filter {
-            it.id !in executedIds &&
-                it.createdAtEpochMillis < end.toEpochMilli() &&
-                (it.nextRunAtEpochMillis ?: it.runAtEpochMillis)?.let { time ->
-                    time >= start.toEpochMilli() && time < end.toEpochMilli()
-                } == true
-        }.map {
-            JournalRecord(Instant.ofEpochMilli(requireNotNull(it.nextRunAtEpochMillis ?: it.runAtEpochMillis)).toString(),
-                it.prompt, title = it.name, recurring = it.type != "ONCE", status = "planned")
+        val planned = RoomAgentScheduleRepository(database.agentScheduleDao(), clock).agenda(entry.date, entry.zone)
+            .filter { it.id !in executedIds && it.plannedAt != null }.map { day ->
+            val plan = requireNotNull(day.plan)
+            JournalRecord(requireNotNull(day.plannedAt).toString(), plan.prompt, title = plan.name,
+                recurring = plan.type != com.example.mochi_pet.core.schedule.AgentScheduleType.ONCE,
+                status = "projected_from_current_rule_not_verified")
         }
         JournalEvidence(conversations, events + todos, runs + planned)
     }
 }
 
 private fun DailyJournalEntity.toDomain() = DailyJournal(LocalDate.parse(date), ZoneId.of(timezone),
-    JournalStatus.valueOf(status), title, text, error, Instant.ofEpochMilli(updatedAt))
+    JournalStatus.valueOf(status), title, text, error, Instant.ofEpochMilli(updatedAt),
+    conversationCount, userScheduleCount, taskCount, generatedAt?.let(Instant::ofEpochMilli))

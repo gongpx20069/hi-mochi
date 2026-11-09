@@ -46,6 +46,45 @@ class AgentScheduleTest {
     }
     @After fun close() { db.close() }
 
+    @Test fun `agenda projects past and future dates without claiming historical execution`() = runBlocking {
+        val plan = repository.set(draft = draft().copy(type = AgentScheduleType.DAILY, localTime = LocalTime.of(8, 0)))
+        current = now.plusSeconds(3 * 86400)
+        val day = LocalDate.of(2026, 8, 8)
+        val past = repository.agenda(day, ZoneOffset.UTC).single()
+        assertEquals(plan.id, past.id)
+        assertEquals(Instant.parse("2026-08-08T08:00:00Z"), past.plannedAt)
+        assertTrue(past.runs.isEmpty())
+        assertTrue(day in repository.markedDates(day, day.plusDays(4), ZoneOffset.UTC))
+        assertEquals(1, repository.agenda(day.plusDays(3), ZoneOffset.UTC).size)
+    }
+
+    @Test fun `agenda groups interval runs and preserves snapshots after deleting the plan`() = runBlocking {
+        val plan = repository.set(draft = draft())
+        repeat(3) {
+            current = now.plusSeconds(it * 900L)
+            val run = requireNotNull(repository.queue(plan.id, true, current))
+            repository.startRun(run.id)
+            repository.finishRun(run.id, ScheduleRunState.SUCCESS, "Result $it")
+        }
+        val day = LocalDate.of(2026, 8, 7)
+        val grouped = repository.agenda(day, ZoneOffset.UTC).single()
+        assertEquals(3, grouped.runs.size)
+        repository.remove(plan.id)
+        val preserved = repository.agenda(day, ZoneOffset.UTC).single()
+        assertNull(preserved.plan)
+        assertEquals("Weather", preserved.name)
+        assertEquals(listOf("Result 0", "Result 1", "Result 2"), preserved.runs.map { it.output })
+        assertEquals(setOf(day), repository.markedDates(day, day.plusDays(3), ZoneOffset.UTC))
+    }
+
+    @Test fun `future projections respect count expiry and paused plans`() = runBlocking {
+        val plan = repository.set(draft = draft().copy(type = AgentScheduleType.DAILY, localTime = LocalTime.of(8, 0), maxRuns = 2))
+        assertNotNull(plan.projectedTime(LocalDate.of(2026, 8, 8), ZoneOffset.UTC, now))
+        assertNull(plan.projectedTime(LocalDate.of(2026, 8, 9), ZoneOffset.UTC, now))
+        assertNull(plan.copy(enabled = false).projectedTime(LocalDate.of(2026, 8, 8), ZoneOffset.UTC, now))
+        assertNull(plan.copy(endsAt = now.plusSeconds(86400)).projectedTime(LocalDate.of(2026, 8, 8), ZoneOffset.UTC, now))
+    }
+
     @Test fun `daily and weekly follow wall clock and skip a DST gap`() {
         assertEquals(Instant.parse("2026-08-08T00:00:00Z"), nextAgentScheduleRun(
             draft().copy(type = AgentScheduleType.DAILY, localTime = LocalTime.of(8, 0), timezone = ZoneId.of("Asia/Shanghai")),

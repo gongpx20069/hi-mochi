@@ -137,6 +137,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -169,6 +170,11 @@ data class PlannerSurfaceState(
     val errorMessage: String? = null,
     val occupiedDates: Set<LocalDate> = emptySet(),
     val highlightIds: List<String> = emptyList(),
+    val taskDays: List<com.example.mochi_pet.core.schedule.ScheduleDay> = emptyList(),
+    val allSchedules: List<AgentSchedule> = emptyList(),
+    val userDates: Set<LocalDate> = emptySet(),
+    val taskDates: Set<LocalDate> = emptySet(),
+    val journalDates: Set<LocalDate> = emptySet(),
 )
 
 data class PersonaUiState(
@@ -836,6 +842,7 @@ class MochiHomeViewModel(
             results = { id, offset -> withContext(ioDispatcher) { requireNotNull(agentScheduleStore).runs(id, 20, offset) } },
             result = { id -> withContext(ioDispatcher) { requireNotNull(requireNotNull(agentScheduleStore).run(id)) { "Execution not found" } } },
             showResults = { task -> mutablePlannerResults.value = PlannerResultSelection(task.id, task.name) },
+            showRun = { run -> mutablePlannerResults.value = PlannerResultSelection(run.scheduleId, run.name, run.id) },
             changes = agentScheduleStore?.changes ?: kotlinx.coroutines.flow.emptyFlow(),
         )
 
@@ -2880,22 +2887,10 @@ class MochiHomeViewModel(
 
     private suspend fun loadPlannerState(target: MochiSurface): PlannerSurfaceState =
         when (target) {
-            MochiSurface.Today -> loadDay(LocalDate.now(clock))
-            is MochiSurface.CalendarDay -> loadDay(target.date)
+            MochiSurface.Today -> loadAgenda(LocalDate.now(clock))
+            is MochiSurface.CalendarDay -> loadAgenda(target.date)
             is MochiSurface.CalendarMonth -> {
-                val zone = clock.zone
-                val start = target.month.atDay(1)
-                val end = target.month.plusMonths(1).atDay(1)
-                val events = plannerStore.listCalendarEvents(start.atStartOfDay(zone).toInstant(), end.atStartOfDay(zone).toInstant())
-                val dates = mutableSetOf<LocalDate>()
-                events.forEach { event ->
-                    var date = maxOf(start, event.startAt.atZone(zone).toLocalDate())
-                    val last = minOf(end.minusDays(1), (event.endAt?.minusNanos(1) ?: event.startAt).atZone(zone).toLocalDate())
-                    while (date <= last) { dates += date; date = date.plusDays(1) }
-                }
-                plannerStore.listTodosInRange(start, end).mapNotNullTo(dates) { it.scheduledDate }
-                agentScheduleStore?.list()?.mapNotNullTo(dates) { it.nextRunAt?.atZone(zone)?.toLocalDate()?.takeIf { date -> date >= start && date < end } }
-                PlannerSurfaceState(occupiedDates = dates)
+                loadAgenda(LocalDate.now(clock).takeIf { YearMonth.from(it) == target.month } ?: target.month.atDay(1))
             }
             is MochiSurface.Todo -> {
                 val todos = if (target.date == null) {
@@ -3074,6 +3069,22 @@ class MochiHomeViewModel(
             else -> "多变"
         }
 
+    private suspend fun loadAgenda(selected: LocalDate): PlannerSurfaceState {
+        val month = YearMonth.from(selected)
+        val start = month.atDay(1).with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+        val end = month.atEndOfMonth().with(java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.SUNDAY)).plusDays(1)
+        val zone = clock.zone
+        val dates = mutableSetOf<LocalDate>()
+        plannerStore.listCalendarEvents(start.atStartOfDay(zone).toInstant(), end.atStartOfDay(zone).toInstant()).forEach { event ->
+            var day = maxOf(start, event.startAt.atZone(zone).toLocalDate())
+            val last = minOf(end.minusDays(1), (event.endAt?.minusNanos(1) ?: event.startAt).atZone(zone).toLocalDate())
+            while (day <= last) { dates += day; day = day.plusDays(1) }
+        }
+        plannerStore.listTodosInRange(start, end).mapNotNullTo(dates) { it.scheduledDate }
+        val taskDates = agentScheduleStore?.markedDates(start, end, zone).orEmpty()
+        return loadDay(selected).copy(userDates = dates, taskDates = taskDates, occupiedDates = dates + taskDates)
+    }
+
     private suspend fun loadDay(date: LocalDate): PlannerSurfaceState {
         val range = dayRange(date, clock.zone)
         return coroutineScope {
@@ -3084,13 +3095,17 @@ class MochiHomeViewModel(
                 plannerStore.listAgendaTodos(date, LocalDate.now(clock))
             }
             val schedules = async(ioDispatcher) {
-                agentScheduleStore?.listForDate(date).orEmpty()
+                agentScheduleStore?.agenda(date, clock.zone).orEmpty()
             }
+            val allSchedules = async(ioDispatcher) { agentScheduleStore?.list().orEmpty() }
+            val taskDays = schedules.await()
             PlannerSurfaceState(
                 date = date,
                 events = events.await(),
                 todos = todos.await(),
-                schedules = schedules.await(),
+                schedules = taskDays.mapNotNull { it.plan },
+                taskDays = taskDays,
+                allSchedules = allSchedules.await(),
             )
         }
     }

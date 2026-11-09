@@ -68,7 +68,7 @@ class MochiDatabaseMigrationTest {
             MochiDatabase::class.java,
             DATABASE_NAME,
         )
-            .addMigrations(MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7)
+            .addMigrations(MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7, MochiDatabase.MIGRATION_7_8)
             .allowMainThreadQueries()
             .build()
         try {
@@ -95,7 +95,7 @@ class MochiDatabaseMigrationTest {
 
     @Test
     fun `all released schemas migrate with planner records and indefinite schedules preserved`() {
-        for (version in 1..6) {
+        for (version in 1..7) {
             context.deleteDatabase(DATABASE_NAME)
             createDatabaseFromSchema(version).apply {
                 execSQL("""INSERT INTO calendar_events
@@ -111,7 +111,7 @@ class MochiDatabaseMigrationTest {
             }
             val database = Room.databaseBuilder(context, MochiDatabase::class.java, DATABASE_NAME)
                 .addMigrations(MochiDatabase.MIGRATION_1_2, MochiDatabase.MIGRATION_2_3,
-                    MochiDatabase.MIGRATION_3_4, MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7)
+                    MochiDatabase.MIGRATION_3_4, MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7, MochiDatabase.MIGRATION_7_8)
                 .allowMainThreadQueries().build()
             try {
                 val db = database.openHelper.writableDatabase
@@ -143,6 +143,24 @@ class MochiDatabaseMigrationTest {
                 }
             } finally { database.close() }
         }
+    }
+
+    @Test
+    fun `journal migration preserves existing content without inventing source counts`() {
+        createDatabaseFromSchema(7).apply {
+            execSQL("INSERT INTO daily_journals (date,timezone,status,title,text,error,updatedAt,claim) VALUES ('2026-11-08','Asia/Shanghai','READY','Decision','Saved paragraph',NULL,123,NULL)")
+            close()
+        }
+        val database = Room.databaseBuilder(context, MochiDatabase::class.java, DATABASE_NAME)
+            .addMigrations(MochiDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
+        try {
+            database.openHelper.writableDatabase.query("SELECT title,text,conversationCount,userScheduleCount,taskCount,generatedAt FROM daily_journals").use {
+                assertTrue(it.moveToFirst())
+                assertEquals("Decision", it.getString(0))
+                assertEquals("Saved paragraph", it.getString(1))
+                for (column in 2..5) assertTrue(it.isNull(column))
+            }
+        } finally { database.close() }
     }
 
     private fun createDatabaseFromSchema(version: Int): SQLiteDatabase {

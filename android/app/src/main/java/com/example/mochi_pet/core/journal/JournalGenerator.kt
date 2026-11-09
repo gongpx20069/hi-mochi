@@ -97,6 +97,7 @@ internal val JOURNAL_RULES = """
     Read all sections together and merge references to the same event, including task reports copied into conversations.
     Keep only meaningful events, decisions, progress, and outcomes.
     Do not describe plans as completed actions, assistant suggestions as user actions, or uncertain results as verified facts.
+    A projected_from_current_rule_not_verified task is only a projection of today's rule, not evidence of its historical configuration or execution.
     Omit routine recurring activities and unchanged task results unless there is a meaningful development.
     Write a short, natural title describing the main event, without the date or generic titles such as "Daily Summary".
     Write one concise journal paragraph. No minimum length, padding, invented feelings, or unsupported facts.

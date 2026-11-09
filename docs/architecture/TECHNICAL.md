@@ -572,6 +572,14 @@ receipts reconcile with unique WorkManager jobs; a restarted RUNNING receipt
 becomes interrupted rather than replaying uncertain side effects. Results retain
 the start configuration and survive deletion of the plan.
 
+The date agenda and its category markers use the same bounded date projection
+and persisted run window. Daily/weekly rules follow wall time and skip DST gaps;
+future projections honor enablement, expiry and remaining quota. Interval dates
+are approximate projections because actual cadence is completion-relative.
+Past projections use the current rule and are explicitly unverified; they cannot
+reconstruct past edits, pauses or consumed quota. Actual runs group by plan/date,
+including deleted plans, and retain their own names and outcomes.
+
 User reminder reconciliation reads persisted unfinished occurrences, posts due
 notifications and arms the next AlarmManager alarm. A daily WorkManager sweep,
 database invalidation, app startup and system time/boot/permission reconciliation

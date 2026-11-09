@@ -127,7 +127,7 @@ class JournalWorker(context: Context, parameters: WorkerParameters) : CoroutineW
                         AppLanguage.localizedContext(app).resources.configuration.locales[0].toLanguageTag(),
                         evidence, app.providerSettingsRepository.loadRuntimeConfig())
                 }
-                store.finish(entry, id.toString(), result)
+                store.finish(entry, id.toString(), result, evidence)
             }
             Result.success()
         } catch (_: TimeoutCancellationException) {

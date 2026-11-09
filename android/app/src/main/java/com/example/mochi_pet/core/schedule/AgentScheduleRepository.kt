@@ -18,6 +18,10 @@ interface AgentScheduleStore {
     suspend fun get(id: String): AgentSchedule?
     suspend fun list(): List<AgentSchedule>
     suspend fun listForDate(date: LocalDate): List<AgentSchedule>
+    suspend fun agenda(date: LocalDate, zone: ZoneId): List<ScheduleDay> =
+        listForDate(date).map { ScheduleDay(it, it.nextRunAt ?: it.createdAt, emptyList()) }
+    suspend fun markedDates(start: LocalDate, end: LocalDate, zone: ZoneId): Set<LocalDate> =
+        list().mapNotNull { it.nextRunAt?.atZone(zone)?.toLocalDate()?.takeIf { day -> day >= start && day < end } }.toSet()
     suspend fun remove(id: String)
     suspend fun queue(id: String, manual: Boolean, now: Instant): AgentScheduleRun?
     suspend fun run(id: String): AgentScheduleRun?
@@ -71,8 +75,28 @@ class RoomAgentScheduleRepository(
 
     override suspend fun get(id: String): AgentSchedule? = dao.getById(id)?.toDomain()
     override suspend fun list(): List<AgentSchedule> = dao.listAll().map { it.toDomain() }
-    override suspend fun listForDate(date: LocalDate): List<AgentSchedule> = list().filter {
-        it.nextRunAt?.atZone(it.timezone)?.toLocalDate() == date || (!it.enabled && date == LocalDate.now(clock))
+    override suspend fun listForDate(date: LocalDate): List<AgentSchedule> =
+        agenda(date, clock.zone).mapNotNull { it.plan }
+
+    override suspend fun agenda(date: LocalDate, zone: ZoneId): List<ScheduleDay> {
+        val runs = dao.runsInWindow(date.atStartOfDay(zone).toInstant().toEpochMilli(),
+            date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()).map { it.toDomain() }.groupBy { it.scheduleId }
+        val plans = list().associateBy { it.id }
+        return (plans.keys + runs.keys).mapNotNull { id ->
+            val plan = plans[id]
+            val time = plan?.projectedTime(date, zone, clock.instant())
+            val history = runs[id].orEmpty()
+            if (time == null && history.isEmpty()) null else ScheduleDay(plan, time, history)
+        }.sortedBy { it.time }
+    }
+
+    override suspend fun markedDates(start: LocalDate, end: LocalDate, zone: ZoneId): Set<LocalDate> {
+        val plans = list()
+        val days = generateSequence(start) { it.plusDays(1) }.takeWhile { it < end }
+            .filter { day -> plans.any { it.projectedTime(day, zone, clock.instant()) != null } }.toMutableSet()
+        dao.runsInWindow(start.atStartOfDay(zone).toInstant().toEpochMilli(), end.atStartOfDay(zone).toInstant().toEpochMilli())
+            .mapTo(days) { Instant.ofEpochMilli(it.createdAt).atZone(zone).toLocalDate() }
+        return days
     }
     override suspend fun remove(id: String) {
         dao.delete(dao.getById(id) ?: throw AgentScheduleNotFoundException(id))

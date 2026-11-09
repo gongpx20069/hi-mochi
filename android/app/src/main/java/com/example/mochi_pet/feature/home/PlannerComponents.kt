@@ -22,6 +22,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -43,6 +45,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +79,7 @@ data class PlannerUiActions(
     val result: suspend (String) -> AgentScheduleRun,
     val showResults: (AgentSchedule) -> Unit,
     val changes: Flow<Unit>,
+    val showRun: (AgentScheduleRun) -> Unit = {},
 )
 
 data class PlannerResultSelection(val scheduleId: String, val title: String, val runId: String? = null)
@@ -89,51 +94,28 @@ internal fun UserScheduleCard(
     onComplete: () -> Unit,
     highlighted: Boolean = false,
 ) {
-    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(
-        containerColor = if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+    val accent = com.example.mochi_pet.ui.theme.agendaColor(com.example.mochi_pet.ui.theme.AgendaKind.USER)
+    Card(onClick = onEdit, shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(
+        containerColor = if (highlighted) accent.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainer,
     )) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                MaterialText(time, style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                com.example.mochi_pet.ui.theme.AgendaIcon(com.example.mochi_pet.ui.theme.AgendaKind.USER)
+                Text("My schedule", style = MaterialTheme.typography.labelMedium, color = accent, modifier = Modifier.weight(1f))
+                MaterialText(time, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (repeating || complete) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (repeating) Text("Repeats", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 if (complete) Text("Completed", style = MaterialTheme.typography.labelSmall)
             }
-            MaterialText(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                maxLines = 3, overflow = TextOverflow.Ellipsis)
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onEdit) { Text("Edit") }
-                TextButton(onClick = onComplete, enabled = !complete) { Text("Complete this occurrence") }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ScheduledTaskCard(
-    task: AgentSchedule,
-    onRun: () -> Unit,
-    onEdit: () -> Unit,
-    onResults: () -> Unit,
-) {
-    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
-    )) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Mochi scheduled tasks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            MaterialText(task.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            MaterialText(task.prompt, style = MaterialTheme.typography.bodyMedium, maxLines = 2,
-                overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            MaterialText(task.nextRunAt?.let { plannerTime(it, task.timezone) }
-                ?: localizeUiText(if (task.enabled) "Not scheduled" else "Paused or ended"),
-                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            task.endsAt?.let {
-                MaterialText(localizeUiText("Ends") + " · " + plannerTime(it, task.timezone), style = MaterialTheme.typography.labelSmall)
-            }
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onResults) { Text("Results") }
-                TextButton(onClick = onEdit) { Text("Edit") }
-                OutlinedButton(onClick = onRun) { Text("Run now") }
+            val completionLabel = localizeUiText(if (complete) "Completed" else "Complete this occurrence")
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                MaterialText(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                    color = if (complete) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Checkbox(checked = complete, onCheckedChange = { if (!complete) onComplete() }, enabled = !complete,
+                    colors = CheckboxDefaults.colors(checkedColor = accent, uncheckedColor = accent),
+                    modifier = Modifier.semantics { contentDescription = completionLabel })
             }
         }
     }

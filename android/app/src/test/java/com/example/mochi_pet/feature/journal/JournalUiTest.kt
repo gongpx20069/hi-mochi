@@ -62,7 +62,7 @@ class JournalUiTest {
 
     @Test fun `empty day shows factual empty label`() {
         compose.setContent { MochiTheme {
-            JournalCard(entry.copy(status = JournalStatus.EMPTY, title = "", text = ""), today, true, false, {}, {})
+            JournalCard(entry.copy(status = JournalStatus.EMPTY, title = "", text = "", conversationCount = 2), today, true, false, {}, {})
         } }
         compose.onNodeWithText("Nothing important to record").assertIsDisplayed()
     }
@@ -84,5 +84,24 @@ class JournalUiTest {
         compose.onNodeWithText("This day will not be generated again automatically.").assertIsDisplayed()
         compose.onAllNodesWithText("Delete").onLast().performClick()
         assertTrue(deleted)
+    }
+
+    @Test fun `missing evidence is not presented as a model judgment`() {
+        compose.setContent { MochiTheme {
+            JournalCard(entry.copy(status = JournalStatus.NO_DATA, title = "", text = "", conversationCount = 0,
+                userScheduleCount = 0, taskCount = 0), today, true, false, {}, {})
+        } }
+        compose.onNodeWithText("No saved records for this day").assertIsDisplayed().performClick()
+        compose.onNodeWithText("No saved sources were available; no AI request was made.").assertIsDisplayed()
+        compose.onNodeWithText("Nothing important to record").assertDoesNotExist()
+    }
+
+    @Test fun `legacy empty entries do not imply a known model judgment`() {
+        compose.setContent { MochiTheme {
+            JournalCard(entry.copy(status = JournalStatus.EMPTY, title = "", text = ""), today, true, false, {}, {})
+        } }
+        compose.onNodeWithText("No journal content; source information unavailable").performClick()
+        compose.onNodeWithText("Source counts unavailable for this entry").assertIsDisplayed()
+        compose.onNodeWithText("AI-generated from saved records.").assertDoesNotExist()
     }
 }

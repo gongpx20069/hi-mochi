@@ -38,7 +38,9 @@ or verification in earlier phases.
 - [x] Todo scheduled date, due time, completion, priority, and filters.
 - [x] Unified day agenda showing events and dated todos.
 - [x] Opt-in Daily journal: independent midnight summaries, past-day cards,
-  consent, bounded recovery and claim-fenced retry/delete in Room schema 7.
+  consent, bounded recovery and claim-fenced retry/delete.
+- [x] Unified date agenda, three-category color markers and filters, grouped
+  task history/projections and explicit journal source metadata in Room schema 8.
 - [ ] Local export/import.
 
 ## P1 - Agent

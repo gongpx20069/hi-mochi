@@ -6,7 +6,7 @@
 | --- | --- |
 | Face | Default Mochi expression and voice state |
 | Conversation | Current and historical text conversation |
-| Planner | One bottom destination with Today and Calendar sections |
+| Planner | One date agenda with an expandable week/month date selector |
 | Settings | BYOK, voice, permissions, backup, and tools |
 | Skills | Bottom-navigation destination for built-ins and skills.sh |
 
@@ -344,12 +344,32 @@ new user direction rather than silently retrying or overwriting the human.
 Voice does not replace touch.
 
 - Face -> swipe/tap to Planner or Conversation.
-- Planner -> switch between Today and Calendar without changing tabs.
+- Planner -> select dates in a compact week strip; expand the month in place.
 - Month -> tap a date for Calendar Day.
 - Day -> return to its containing month or move between adjacent dates.
 - System back follows Android predictive-back behavior.
 
 All paths update the same `MochiSurface` state used by voice.
+
+Planner's bottom label is **日程** in Chinese. Today, month and date voice
+destinations render the same agenda; month navigation expands its date selector.
+A return-to-today shortcut appears only away from today. All/My schedule/Mochi
+tasks/Journal chips filter the selected date, and a single New button opens a
+two-choice sheet. Mochi tasks additionally exposes Manage all tasks, including
+paused and ended plans. No journal creation action appears in that sheet.
+
+Cards use neutral surfaces, consistent 24dp corners and 18dp padding: blue user
+labels/completion controls, purple Mochi labels, amber journal badges.
+Date cells have at most one marker per category and accessible category labels;
+today has an outline, distinct from the filled selected date. Failure is a
+separate red status, not a category color.
+All-day items precede chronological timed entries. Recurring Mochi executions
+group into one card per plan/date, with counts and current execution state.
+Tapping a user card edits it; its checkbox completes only that occurrence.
+Mochi cards offer results when records exist, otherwise Run now for nonpast
+dates or Details for historical projections. Details separates historical
+results from editing/running the current plan; deleted-plan results remain readable.
+Past-date journals lead the scrollable list, never a fake midnight task.
 
 Settings is always available from the top-right app action. If no provider is
 configured, first launch opens a guided connection screen before normal use.
@@ -362,10 +382,13 @@ The switch defaults off; enabling first explains use of saved records, the
 selected AI service and model credits. Disabling retains earlier journals.
 Past-date Planner pages show one matching rounded journal card, with a small
 type badge, generated title and short preview, or an explicit waiting, writing,
-empty or failed state. Today and future dates never show a journal. Month dates
+empty, no-source or failed state. Today and future dates never show a journal. Month dates
 with nondeleted journal entries are marked even without schedules.
 Opening a card reveals a scrollable bottom sheet with the date, selectable
-body, AI-generated label and confirmed regenerate/delete actions. Failed retries
+body, source counts, generation time and confirmed regenerate/delete actions.
+No-source entries explicitly say no AI request occurred. Older entries without
+source metadata are labeled unknown rather than retrospectively classified.
+Failed retries
 retain the last successful text. Retry requires the switch to be enabled;
 deletion explains that automatic processing will not recreate that date.
 These controls do not complete schedules or execute Mochi tasks.
