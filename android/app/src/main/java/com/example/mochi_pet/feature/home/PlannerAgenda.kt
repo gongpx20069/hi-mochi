@@ -54,7 +54,7 @@ internal fun PlannerAgenda(
     onCompleteTodo: (String) -> Unit,
     onRun: (String) -> Unit,
     onRemove: (String) -> Unit,
-    journalDay: @Composable (LocalDate) -> Unit,
+    journalDay: @Composable (LocalDate, Boolean) -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(monthMode) }
     LaunchedEffect(monthMode, date) { expanded = monthMode }
@@ -118,11 +118,8 @@ internal fun PlannerAgenda(
         state.errorMessage?.let { error -> item("error") { MaterialText(error, color = MaterialTheme.colorScheme.error) } }
         if (state.isLoading) item("loading") { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         else {
-            if (filter in setOf(AgendaFilter.ALL, AgendaFilter.JOURNAL) && date < today) {
-                item("journal-$date") { journalDay(date) }
-            }
-            if (filter == AgendaFilter.JOURNAL && (date >= today || date !in state.journalDates)) item("journal-empty") {
-                AgendaEmpty(if (date >= today) "Journals appear after the day ends" else "No journal for this day")
+            if (filter == AgendaFilter.JOURNAL || (filter == AgendaFilter.ALL && date < today)) {
+                item("journal") { journalDay(date, filter == AgendaFilter.JOURNAL) }
             }
             if (rows.isEmpty() && filter != AgendaFilter.JOURNAL) item("empty") { AgendaEmpty("No arrangements for this day") }
             items(rows, key = { it.key }) { row ->
@@ -161,6 +158,8 @@ internal fun PlannerAgenda(
                 modifier = Modifier.fillMaxWidth()) { Text("My schedule", color = agendaColor(AgendaKind.USER)) }
             TextButton(onClick = { adding = false; editTask = null; taskEditor = true },
                 modifier = Modifier.fillMaxWidth()) { Text("Mochi tasks", color = agendaColor(AgendaKind.MOCHI)) }
+            Text("You can also wake Mochi and ask it to arrange your schedule or create a task.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
     if (managing) ModalBottomSheet(onDismissRequest = { managing = false },

@@ -355,11 +355,15 @@ Planner's bottom label is **日程** in Chinese. Today, month and date voice
 destinations render the same agenda; month navigation expands its date selector.
 A return-to-today shortcut appears only away from today. All/My schedule/Mochi
 tasks/Journal chips filter the selected date, and a single New button opens a
-two-choice sheet. Mochi tasks additionally exposes Manage all tasks, including
+two-choice sheet. A secondary-text hint below its choices explains that users
+can also wake Mochi to arrange schedules or create tasks; it does not start
+voice capture. Mochi tasks additionally exposes Manage all tasks, including
 paused and ended plans. No journal creation action appears in that sheet.
 
 Cards use neutral surfaces, consistent 24dp corners and 18dp padding: blue user
-labels/completion controls, purple Mochi labels, amber journal badges.
+labels/completion controls, theme-primary warm-peach Mochi labels, amber journal
+badges. Mochi task markers, icons, labels and creation/filter accents share the
+same theme color rather than a separate purple palette.
 Date cells have at most one marker per category and accessible category labels;
 today has an outline, distinct from the filled selected date. Failure is a
 separate red status, not a category color.
@@ -380,6 +384,15 @@ section headings and descriptions. Share/import precedes every other group.
 **Conversation/persona** includes a rounded **Daily journal / 每日小记** card.
 The switch defaults off; enabling first explains use of saved records, the
 selected AI service and model credits. Disabling retains earlier journals.
+The Planner's Journal filter offers the same global switch and confirmation,
+independent of the selected date. While disabled, an amber-accented introduction
+explains the feature instead of promising generation after the day ends.
+While enabled, it collapses into a compact control card above date content.
+Today explains processing after the day ends; future dates explain that
+journals record past days; past dates without an entry show an empty state.
+Existing past entries remain visible below the introduction after disabling.
+Enabling explicitly says earlier dates are not automatically backfilled.
+Other agenda filters do not show this settings card.
 Past-date Planner pages show one matching rounded journal card, with a small
 type badge, generated title and short preview, or an explicit waiting, writing,
 empty, no-source or failed state. Today and future dates never show a journal. Month dates

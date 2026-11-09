@@ -46,7 +46,7 @@ fun agendaColor(kind: AgendaKind): Color {
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     return when (kind) {
         AgendaKind.USER -> if (dark) Color(0xFF9ABEFF) else Color(0xFF2459BD)
-        AgendaKind.MOCHI -> if (dark) Color(0xFFCAB2FF) else Color(0xFF7042BA)
+        AgendaKind.MOCHI -> MaterialTheme.colorScheme.primary
         AgendaKind.JOURNAL -> if (dark) Color(0xFFEAC178) else Color(0xFF885C15)
     }
 }

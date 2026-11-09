@@ -2,6 +2,7 @@ package com.example.mochi_pet.feature.journal
 
 import android.app.Application
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -58,6 +59,69 @@ class JournalUiTest {
             JournalCard(entry.copy(status = JournalStatus.DELETED), today, true, false, {}, {})
         } }
         compose.onNodeWithText("Daily journal").assertDoesNotExist()
+    }
+
+    @Test fun `agenda consent uses shared settings and date hints only appear while enabled`() {
+        val settings = mutableStateOf(JournalSettings())
+        val date = mutableStateOf(today)
+        val inPlanner = mutableStateOf(true)
+        compose.setContent { MochiTheme {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                if (inPlanner.value) JournalDayContent(date.value, today, null, settings.value, false, null, true,
+                    { settings.value = settings.value.copy(enabled = it) }, {}, {})
+                else JournalSettingsCard(settings.value, false, null) { settings.value = settings.value.copy(enabled = it) }
+            }
+        } }
+        compose.onNodeWithText("Keep what matters in a short journal.").assertIsDisplayed()
+        compose.onNode(isToggleable()).performClick()
+        compose.onNodeWithText("Enable Daily journal?").assertIsDisplayed()
+        compose.onNodeWithText("Earlier dates are not automatically backfilled.", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Cancel").performClick()
+        assertFalse(settings.value.enabled)
+        compose.onNode(isToggleable()).performClick()
+        compose.onNodeWithText("Enable", substring = false).performClick()
+        compose.onNodeWithText("Keep what matters in a short journal.").assertDoesNotExist()
+        compose.onNodeWithText("Today's journal will be prepared after the day ends.").assertIsDisplayed()
+        compose.runOnIdle { date.value = today.plusDays(1) }
+        compose.onNodeWithText("Journals only record days that have passed.").assertIsDisplayed()
+        compose.onNodeWithText("Today's journal will be prepared after the day ends.").assertDoesNotExist()
+        compose.runOnIdle { date.value = today.minusDays(1) }
+        compose.onNodeWithText("No journal for this day").assertIsDisplayed()
+        compose.runOnIdle { inPlanner.value = false }
+        compose.onNode(isToggleable()).assertIsOn().performClick()
+        assertFalse(settings.value.enabled)
+        compose.runOnIdle { inPlanner.value = true }
+        compose.onNode(isToggleable()).assertIsOff()
+        compose.onNodeWithText("Keep what matters in a short journal.").assertIsDisplayed()
+        compose.onNodeWithText("No journal for this day").assertDoesNotExist()
+    }
+
+    @Test fun `switching off preserves the selected past journal below the introduction`() {
+        val settings = mutableStateOf(JournalSettings(enabled = true))
+        compose.setContent { MochiTheme {
+            JournalDayContent(entry.date, today, entry, settings.value, false, null, true,
+                { settings.value = settings.value.copy(enabled = it) }, {}, {})
+        } }
+        compose.onNode(isToggleable()).performClick()
+        compose.onNodeWithText("Keep what matters in a short journal.").assertIsDisplayed()
+        compose.onNodeWithText(entry.text).assertIsDisplayed()
+        compose.onNodeWithText("No journal for this day").assertDoesNotExist()
+    }
+
+    @Test fun `loading and failed settings do not promise journal generation`() {
+        val settings = mutableStateOf<JournalSettings?>(null)
+        val error = mutableStateOf<String?>(null)
+        compose.setContent { MochiTheme {
+            JournalDayContent(today, today, null, settings.value, true, error.value, true, {}, {}, {})
+        } }
+        compose.onNode(isToggleable()).assertIsNotEnabled()
+        compose.onNodeWithText("Today's journal will be prepared after the day ends.").assertDoesNotExist()
+        compose.runOnIdle {
+            settings.value = JournalSettings(enabled = true)
+            error.value = "Could not update Daily journal. Please retry."
+        }
+        compose.onNodeWithText("Could not update Daily journal. Please retry.").assertIsDisplayed()
+        compose.onNodeWithText("Today's journal will be prepared after the day ends.").assertDoesNotExist()
     }
 
     @Test fun `empty day shows factual empty label`() {

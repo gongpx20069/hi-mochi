@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.Density
 import com.example.mochi_pet.core.model.CalendarEventDraft
 import com.example.mochi_pet.core.schedule.AgentScheduleRun
 import com.example.mochi_pet.core.schedule.ScheduleRunState
+import com.example.mochi_pet.core.journal.JournalSettings
+import com.example.mochi_pet.feature.journal.JournalDayContent
 import com.example.mochi_pet.ui.theme.MochiTheme
 import java.time.Instant
 import java.time.LocalDate
@@ -105,7 +107,7 @@ class PlannerUiTest {
             var selected by remember { mutableStateOf(today) }
             CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
                 PlannerAgenda(selected, today, false, PlannerSurfaceState(date = selected),
-                    { selected = it }, {}, { selected = today }, actions(), {}, {}, {}, {})
+                    { selected = it }, {}, { selected = today }, actions(), {}, {}, {}, { _, _ -> })
             }
         } }
         compose.onNodeWithText("Calendar").assertDoesNotExist()
@@ -115,6 +117,23 @@ class PlannerUiTest {
         compose.onNodeWithText("Back to today").assertDoesNotExist()
         compose.onNodeWithText("+ New").performClick()
         compose.onNodeWithText("New arrangement").assertIsDisplayed()
+        compose.onNodeWithText("You can also wake Mochi and ask it to arrange your schedule or create a task.").assertIsDisplayed()
+    }
+
+    @Test fun `journal filter offers opt in rather than promising a disabled journal`() {
+        val today = LocalDate.of(2026, 11, 9)
+        compose.setContent { MochiTheme {
+            PlannerAgenda(today, today, false, PlannerSurfaceState(date = today),
+                {}, {}, {}, actions(), {}, {}, {}, { date, controls ->
+                    JournalDayContent(date, today, null, JournalSettings(), false, null, controls, {}, {}, {})
+                })
+        } }
+        compose.onNodeWithText("Keep what matters in a short journal.").assertDoesNotExist()
+        compose.onNodeWithText("Journal").performScrollTo().performClick()
+        compose.onNodeWithText("Keep what matters in a short journal.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Today's journal will be prepared after the day ends.").assertDoesNotExist()
+        compose.onNodeWithText("All", substring = false).performScrollTo().performClick()
+        compose.onNodeWithText("Keep what matters in a short journal.").assertDoesNotExist()
     }
 
     @Test fun `history uses one task card and opens exact persisted result`() {
@@ -126,7 +145,7 @@ class PlannerUiTest {
         compose.setContent { MochiTheme {
             PlannerAgenda(day, today, false, PlannerSurfaceState(date = day, taskDays = listOf(
                 com.example.mochi_pet.core.schedule.ScheduleDay(null, null, listOf(run, run.copy(id = "history2"))))),
-                {}, {}, {}, actions().copy(showRun = { opened = it }), {}, {}, {}, {})
+                {}, {}, {}, actions().copy(showRun = { opened = it }), {}, {}, {}, { _, _ -> })
         } }
         compose.onNodeWithText("Historical task").performScrollTo().assertIsDisplayed()
         compose.onAllNodesWithText("Historical task").assertCountEquals(1)

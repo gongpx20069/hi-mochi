@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text as MaterialText
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -29,6 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +42,7 @@ import com.example.mochi_pet.core.journal.JournalStatus
 import com.example.mochi_pet.feature.home.Text
 import com.example.mochi_pet.feature.home.localizeUiText
 import com.example.mochi_pet.ui.theme.AgendaKind
+import com.example.mochi_pet.ui.theme.AgendaIcon
 import com.example.mochi_pet.ui.theme.agendaColor
 import java.time.LocalDate
 
@@ -47,26 +51,51 @@ fun JournalSettings(viewModel: JournalViewModel) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
-    JournalSettingsCard(settings, busy, error, viewModel::setEnabled)
+    JournalSettingsCard(settings, busy, error, onEnabled = viewModel::setEnabled)
 }
 
 @Composable
-internal fun JournalSettingsCard(settings: JournalSettings?, busy: Boolean, error: String?, onEnabled: (Boolean) -> Unit) {
+internal fun JournalSettingsCard(
+    settings: JournalSettings?,
+    busy: Boolean,
+    error: String?,
+    agenda: Boolean = false,
+    onEnabled: (Boolean) -> Unit,
+) {
     var confirm by remember { mutableStateOf(false) }
+    val accent = if (agenda) agendaColor(AgendaKind.JOURNAL) else MaterialTheme.colorScheme.primary
+    val switchLabel = localizeUiText("Daily journal")
     Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (agenda) AgendaIcon(AgendaKind.JOURNAL)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Daily journal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Keep the moments that matter.", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!agenda || settings != null) {
+                        Text(when {
+                            !agenda -> "Keep the moments that matter."
+                            settings?.enabled == true -> "Automatically collect important moments after each day."
+                            else -> "Keep what matters in a short journal."
+                        }, style = if (agenda) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Switch(checked = settings?.enabled == true, enabled = settings != null && !busy,
+                    modifier = Modifier.semantics { contentDescription = switchLabel },
+                    colors = if (agenda) SwitchDefaults.colors(checkedTrackColor = accent,
+                        checkedThumbColor = MaterialTheme.colorScheme.surface) else SwitchDefaults.colors(),
                     onCheckedChange = { if (it) confirm = true else onEnabled(false) })
             }
-            Text("After midnight, quietly summarize the previous day's saved conversations and schedules. Find your journal in past calendar days.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (settings?.enabled == true) {
+            if (agenda) {
+                if (settings == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+                else if (!settings.enabled) Text(
+                    "After each day, summarize important moments from saved conversations and schedules without repeating routine plans.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text("After midnight, quietly summarize the previous day's saved conversations and schedules. Find your journal in past calendar days.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (!agenda && settings?.enabled == true) {
                 Text("Uses your selected AI connection. No notifications or speech.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
@@ -76,24 +105,49 @@ internal fun JournalSettingsCard(settings: JournalSettings?, busy: Boolean, erro
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
         title = { Text("Enable Daily journal?") },
-        text = { Text("Starting today, saved conversations and schedules will be processed by your selected AI service. This uses model credits. Journals stay on this device; switching off keeps existing journals.") },
+        text = { Text("Starting today, saved conversations and schedules will be processed by your selected AI service. This uses model credits. Earlier dates are not automatically backfilled. Journals stay on this device; switching off keeps existing journals.") },
         confirmButton = { TextButton(onClick = { confirm = false; onEnabled(true) }) { Text("Enable") } },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
     )
 }
 
 @Composable
-fun JournalDay(viewModel: JournalViewModel, date: LocalDate) {
+fun JournalDay(viewModel: JournalViewModel, date: LocalDate, showControls: Boolean = false) {
     val today by viewModel.today.collectAsStateWithLifecycle()
-    if (date >= today) return
     val entry by remember(date, viewModel) { viewModel.observe(date) }.collectAsStateWithLifecycle(null)
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
-    error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-    entry?.let { journal ->
-        JournalCard(journal, today, settings?.enabled == true, busy,
-            onRetry = { viewModel.retry(date) }, onDelete = { viewModel.delete(date) })
+    JournalDayContent(date, today, entry, settings, busy, error, showControls,
+        onEnabled = viewModel::setEnabled, onRetry = { viewModel.retry(date) }, onDelete = { viewModel.delete(date) })
+}
+
+@Composable
+internal fun JournalDayContent(
+    date: LocalDate,
+    today: LocalDate,
+    entry: DailyJournal?,
+    settings: JournalSettings?,
+    busy: Boolean,
+    error: String?,
+    showControls: Boolean,
+    onEnabled: (Boolean) -> Unit,
+    onRetry: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (showControls) JournalSettingsCard(settings, busy, error, agenda = true, onEnabled = onEnabled)
+        else error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        if (date < today && entry?.date == date && entry.status != JournalStatus.DELETED) {
+            JournalCard(entry, today, settings?.enabled == true, busy, onRetry, onDelete)
+        } else if (showControls && settings?.enabled == true && error == null) {
+            Text(when {
+                date == today -> "Today's journal will be prepared after the day ends."
+                date > today -> "Journals only record days that have passed."
+                else -> "No journal for this day"
+            }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp))
+        }
     }
 }
 

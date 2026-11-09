@@ -762,7 +762,7 @@ private fun MochiAppContent(
             surface = surface,
             plannerState = plannerState.copy(occupiedDates = plannerState.occupiedDates + journalDates, journalDates = journalDates),
             journalSettings = { com.example.mochi_pet.feature.journal.JournalSettings(journal) },
-            journalDay = { date -> com.example.mochi_pet.feature.journal.JournalDay(journal, date) },
+            journalDay = { date, showControls -> com.example.mochi_pet.feature.journal.JournalDay(journal, date, showControls) },
             conversationState = conversationState,
             providerSettingsState = providerSettingsState,
             speechSettingsState = speechSettingsState,
@@ -1446,7 +1446,7 @@ private fun FocusStandbyScreen(
 private fun SurfaceContent(
     plannerToday: LocalDate,
     journalSettings: @Composable () -> Unit,
-    journalDay: @Composable (LocalDate) -> Unit,
+    journalDay: @Composable (LocalDate, Boolean) -> Unit,
     surface: MochiSurface,
     plannerState: PlannerSurfaceState,
     conversationState: ConversationUiState,

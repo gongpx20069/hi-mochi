@@ -97,7 +97,7 @@ Mochi owns its calendar and todo data in Room.
   tasks**. The executor, not the creator, determines the category.
 - Planner is one date agenda, not separate Today/Calendar tabs. A compact week
   strip expands into a month picker in place, with a return-to-today shortcut.
-  Blue user schedules, purple Mochi tasks and amber journals use shared cards,
+  Blue user schedules, theme-primary warm-peach Mochi tasks and amber journals use shared cards,
   explicit labels and per-type date markers rather than color alone.
 - Date content mixes user occurrences and grouped Mochi tasks chronologically,
   with all-day items first and past-day journals above the agenda. All/My
@@ -133,7 +133,10 @@ support is an optional import/export adapter.
 
 #### Daily journal
 
-**Daily journal / 每日小记** is an independent, default-off Settings option.
+**Daily journal / 每日小记** is an independent, default-off option shared by
+Settings and the Planner's Journal filter. The latter shows an introduction
+and switch while disabled, compact controls and date-specific states while
+enabled, and preserves access to existing entries after disabling.
 After local midnight, it quietly summarizes the previous natural day's saved
 conversations, user schedules and Mochi execution results through the selected
 AI connection. Enabling explicitly discloses sending these records to that
