@@ -100,7 +100,8 @@ class JournalRepository(
             val finished = it.finishedAt?.let(Instant::ofEpochMilli)
             JournalRecord((finished?.takeIf { value -> value < end } ?: Instant.ofEpochMilli(it.createdAt)).toString(),
                 if (finished != null && finished < end) it.output ?: it.error.orEmpty() else it.prompt,
-                title = it.name, recurring = plans[it.scheduleId]?.let { plan -> plan.type != "ONCE" },
+                title = it.name, recurring = plans[it.scheduleId]?.takeIf { plan -> plan.revision == it.revision }
+                    ?.let { plan -> plan.type != "ONCE" },
                 status = when {
                     finished != null && finished < end -> it.state.lowercase()
                     it.startedAt != null && it.startedAt < end.toEpochMilli() -> "running"

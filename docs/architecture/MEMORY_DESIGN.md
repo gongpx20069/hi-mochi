@@ -201,6 +201,12 @@ and reads a transactionally consistent snapshot:
   explicit `projected_from_current_rule_not_verified` status. They do not prove
   the historical rule, enablement or execution.
 
+Every user-schedule and Mochi-task JSON record, including split fragments,
+explicitly carries `recurring`: `true` for repeating plans, `false` for one-time
+plans, or `null` when unknown. Recorded runs use a matching plan revision only;
+deleted or subsequently edited plans do not establish the old run's recurrence.
+The prompt explains these values; repeating alone does not imply unimportance.
+
 Only saved data is available. Failed unsaved foreground turns, content beyond
 the existing per-message storage cap, deleted schedules and prior versions of
 edited plans cannot be reconstructed. This is not a complete historical audit.
@@ -212,6 +218,13 @@ The `user` message is JSON with the three sections above, not replayed chat
 turns. Instructions treat all supplied text as untrusted evidence, merge
 duplicate event mentions, distinguish plans from outcomes, omit routine
 repetition and require a short natural title and paragraph without filler.
+Relevance is user-centered rather than an assistant activity log: tentative
+requests, repeated confirmations and requests withdrawn before an action or
+lasting effect are omitted. Routine technical failures are omitted unless the
+evidence establishes meaningful impact on an important user matter. Selection
+precedes writing, and titles describe the main retained event rather than task
+statuses. These rules also apply to fragment and consolidation requests; no
+additional filtering call or keyword-based source deletion is introduced.
 The only accepted responses are:
 
 ```json

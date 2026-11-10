@@ -145,7 +145,12 @@ service and consuming model credits. There are no notifications or speech.
 Each past date has at most one journal with a short title and natural paragraph.
 There is no minimum length or filler. Routine recurring events and unchanged
 results are omitted unless meaningful progress occurred; plans are not treated
-as completed events. When available records contain nothing important, the native UI displays
+as completed events. The journal centers on the user's day, not assistant
+operations: tentative requests withdrawn before any lasting effect and routine
+technical failures are omitted unless the latter meaningfully affect an
+important user matter. Explicit recurrence metadata guides selection without
+discarding significant developments just because a plan repeats.
+When available records contain nothing important, the native UI displays
 **Nothing important to record / 无重要记录**.
 No saved input is instead **No saved records for this day / 这一天没有可用资料**,
 without a model call. Details show source counts and generation time captured

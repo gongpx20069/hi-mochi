@@ -13,6 +13,8 @@ import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -64,6 +66,35 @@ class JournalGeneratorTest {
         assertTrue(requests.isEmpty())
         response = response.copy(content = """{"status":"empty","title":"","text":""}""")
         assertEquals("empty", generate(empty.copy(userSchedules = listOf(JournalRecord("10:00", "Routine", recurring = true)))).status)
+    }
+
+    @Test fun `every schedule fragment explicitly carries repeating one time or unknown metadata`(): Unit = runBlocking {
+        val records = listOf(true, false, null).mapIndexed { index, recurring ->
+            JournalRecord("record-$index", "x".repeat(17_000), title = "Plan $index", recurring = recurring)
+        }
+        generate(empty.copy(userSchedules = records, mochiTasks = records))
+        val materials = requests.map { Json.parseToJsonElement(requireNotNull(it.messages[1].content)).jsonObject }
+        for (section in listOf("user_schedules", "mochi_tasks")) {
+            val sent = materials.flatMap { it[section]?.jsonArray.orEmpty() }
+            records.forEach { record ->
+                val fragments = sent.filter { it.jsonObject.getValue("time").jsonPrimitive.content == record.time }
+                assertEquals(3, fragments.size)
+                fragments.forEach {
+                    val recurring = it.jsonObject.getValue("recurring")
+                    if (record.recurring == null) assertEquals(JsonNull, recurring)
+                    else assertEquals(record.recurring, recurring.jsonPrimitive.booleanOrNull)
+                }
+            }
+        }
+        assertTrue(materials.last().containsKey("chunk_summaries"))
+        requests.forEach {
+            val system = requireNotNull(it.messages.first().content)
+            assertTrue(system.contains("not an assistant activity log"))
+            assertTrue(system.contains("requests withdrawn before any action or lasting effect"))
+            assertTrue(system.contains("Omit routine network errors, tool failures"))
+            assertTrue(system.contains("Recurring does not itself mean unimportant"))
+            assertTrue(system.contains("null when unknown"))
+        }
     }
 
     @Test fun `long history preserves every fragment including final record before consolidation`(): Unit = runBlocking {

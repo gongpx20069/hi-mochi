@@ -8,9 +8,13 @@ import com.example.mochi_pet.core.database.PlannerRepository
 import com.example.mochi_pet.core.database.entity.AgentMemoryEntity
 import com.example.mochi_pet.core.database.entity.AgentScheduleRunEntity
 import com.example.mochi_pet.core.model.CalendarEventDraft
+import com.example.mochi_pet.core.schedule.AgentScheduleDraft
+import com.example.mochi_pet.core.schedule.AgentScheduleType
+import com.example.mochi_pet.core.schedule.RoomAgentScheduleRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlinx.coroutines.flow.first
@@ -78,6 +82,33 @@ class JournalRepositoryTest {
         val record = repository.evidence(entry).mochiTasks.single()
         assertEquals("projected_from_current_rule_not_verified", record.status)
         assertEquals(true, record.recurring)
+    }
+
+    @Test fun `recurrence evidence distinguishes one time repeating and changed or deleted task plans`(): Unit = runBlocking {
+        planner.createCalendarEvent(CalendarEventDraft("One-time event", startAt = now, timezone = zone))
+        planner.createCalendarEvent(CalendarEventDraft("Repeating event", startAt = now, timezone = zone,
+            recurrenceRule = "FREQ=DAILY;COUNT=3"))
+        val tasks = RoomAgentScheduleRepository(database.agentScheduleDao(), clock)
+        for (name in listOf("Repeating task", "One-time task", "Changed task", "Deleted task")) {
+            val repeating = name == "Repeating task"
+            val taskDraft = AgentScheduleDraft(name, "Read a report",
+                if (repeating) AgentScheduleType.DAILY else AgentScheduleType.ONCE,
+                runAt = if (repeating) null else now.plusSeconds(60),
+                localTime = if (repeating) LocalTime.NOON else null, timezone = zone)
+            val plan = tasks.set(draft = taskDraft)
+            database.agentScheduleDao().saveRun(AgentScheduleRunEntity(
+                name, plan.id, plan.revision, name, plan.prompt, true, null,
+                "SUCCESS", now.toEpochMilli(), now.toEpochMilli(), now.toEpochMilli(), "Report", null,
+            ))
+            if (name == "Changed task") tasks.set(plan.id, taskDraft.copy(
+                type = AgentScheduleType.DAILY, runAt = null, localTime = LocalTime.NOON, expectedRevision = plan.revision))
+            if (name == "Deleted task") tasks.remove(plan.id)
+        }
+        val evidence = repository.evidence(yesterday())
+        assertEquals(mapOf("One-time event" to false, "Repeating event" to true),
+            evidence.userSchedules.associate { it.title to it.recurring })
+        assertEquals(mapOf("Repeating task" to true, "One-time task" to false, "Changed task" to null, "Deleted task" to null),
+            evidence.mochiTasks.associate { it.title to it.recurring })
     }
 
     @Test fun `default off no early generation and unique bounded catchup from enabling`(): Unit = runBlocking {
