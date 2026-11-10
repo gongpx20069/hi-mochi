@@ -25,9 +25,9 @@ data class DailyJournal(
 
 @Serializable
 data class JournalDraft(val status: String, val title: String, val text: String) {
-    fun validated(): JournalDraft {
+    fun validated(intermediate: Boolean = false): JournalDraft {
         require(status in setOf("written", "empty")) { "Invalid journal status" }
-        require(title.length <= 80 && text.length <= 1_600) { "Journal response is too long" }
+        require(title.length <= (if (intermediate) 80 else 50) && text.length <= 1_600) { "Journal response is too long" }
         require(if (status == "empty") title.isBlank() && text.isBlank() else title.isNotBlank() && text.isNotBlank()) {
             "Journal content does not match its status"
         }

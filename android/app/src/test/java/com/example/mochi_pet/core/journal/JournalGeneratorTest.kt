@@ -26,12 +26,13 @@ class JournalGeneratorTest {
     private val zone = ZoneId.of("Asia/Shanghai")
     private val provider = OpenAiProviderConfig(endpoint = "https://example.invalid", apiKey = "fixture", model = "fixture")
     private val requests = mutableListOf<OpenAiChatRequest>()
+    private val responses = ArrayDeque<OpenAiChatMessage>()
     private var response = OpenAiChatMessage("assistant", """{"status":"written","title":"A decision","text":"Chose the launch date."}""")
     private val generator = JournalGenerator(object : OpenAiChatClient {
         override suspend fun complete(config: OpenAiProviderConfig, request: OpenAiChatRequest): OpenAiChatResponse {
             assertSame(provider, config)
             requests += request
-            return OpenAiChatResponse(listOf(OpenAiChoice(response)))
+            return OpenAiChatResponse(listOf(OpenAiChoice(responses.removeFirstOrNull() ?: response)))
         }
     })
     private val empty = JournalEvidence(emptyList(), emptyList(), emptyList())
@@ -91,9 +92,10 @@ class JournalGeneratorTest {
             val system = requireNotNull(it.messages.first().content)
             assertTrue(system.contains("not an assistant activity log"))
             assertTrue(system.contains("requests withdrawn before any action or lasting effect"))
-            assertTrue(system.contains("Omit routine network errors, tool failures"))
-            assertTrue(system.contains("Recurring does not itself mean unimportant"))
-            assertTrue(system.contains("null when unknown"))
+            assertTrue(system.contains("Routine technical failures unless"))
+            assertTrue(system.contains("Recurrence alone does not make an event unimportant"))
+            assertTrue(system.contains("null = unknown"))
+            assertTrue(system.contains("Retain every distinct important fact"))
         }
     }
 
@@ -109,6 +111,48 @@ class JournalGeneratorTest {
         }
         assertTrue(materials.last().containsKey("chunk_summaries"))
         assertTrue(requests.all { it.tools.isEmpty() && it.messages.size == 2 })
+        assertTrue(requests.dropLast(1).all { requireNotNull(it.messages.first().content).contains("INTERMEDIATE SUMMARY") })
+        assertFalse(requireNotNull(requests.last().messages.first().content).contains("INTERMEDIATE SUMMARY"))
+    }
+
+    @Test fun `intermediate notes retain distinct facts without final title or paragraph targets`(): Unit = runBlocking {
+        val firstNotes = (1..15).joinToString(" ") { "Delivery $it was approved." }
+        val secondNotes = (1..15).joinToString(" ") { "Permit $it was granted." }
+        for (text in listOf(firstNotes, secondNotes)) {
+            responses += OpenAiChatMessage("assistant", Json.encodeToString(
+                JournalDraft.serializer(), JournalDraft("written", "s".repeat(60), text)))
+        }
+        generate(empty.copy(conversations = listOf(
+            JournalRecord("first", "a".repeat(8_000)),
+            JournalRecord("second", "b".repeat(8_000)),
+        )))
+        assertEquals(3, requests.size)
+        requests.take(2).forEach {
+            val system = requireNotNull(it.messages.first().content)
+            assertTrue(system.contains("Preserve every supported important fact in this batch"))
+            assertFalse(system.contains("300 characters"))
+            assertFalse(system.contains("50 characters"))
+            assertFalse(system.contains("one or two sentences"))
+        }
+        val last = requests.last()
+        val material = Json.parseToJsonElement(requireNotNull(last.messages.last().content)).jsonObject
+        assertEquals(listOf(firstNotes, secondNotes),
+            material.getValue("chunk_summaries").jsonArray.map { it.jsonObject.getValue("text").jsonPrimitive.content })
+        val finalRules = requireNotNull(last.messages.first().content)
+        assertTrue(finalRules.contains("Cover every distinct important fact"))
+        assertTrue(finalRules.contains("50 characters"))
+        assertTrue(finalRules.contains("300 characters"))
+        assertTrue(finalRules.contains("exceed this target"))
+    }
+
+    @Test fun `final title limit is enforced while paragraphs may exceed the brevity target without truncation`(): Unit = runBlocking {
+        val material = empty.copy(conversations = listOf(JournalRecord("now", "Important facts")))
+        val draft = JournalDraft("written", "t".repeat(50), "An important fact. ".repeat(20).trim())
+        response = response.copy(content = Json.encodeToString(JournalDraft.serializer(), draft))
+        assertEquals(draft, generate(material))
+        assertEquals(1, requests.size)
+        response = response.copy(content = Json.encodeToString(JournalDraft.serializer(), draft.copy(title = "t".repeat(51))))
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { generate(material) } }
     }
 
     @Test fun `invalid model contracts and attempted actions are rejected`() {

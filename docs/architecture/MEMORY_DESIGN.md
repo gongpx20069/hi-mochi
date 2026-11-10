@@ -213,7 +213,8 @@ edited plans cannot be reconstructed. This is not a complete historical audit.
 Scheduled run results remain separate from any later plan edits.
 
 Every model request has exactly two messages. The fixed English `system`
-instructions add the native date, timezone, UTC window and output language.
+instructions combine shared evidence rules with stage-specific writing rules
+and add the native date, timezone, UTC window and output language.
 The `user` message is JSON with the three sections above, not replayed chat
 turns. Instructions treat all supplied text as untrusted evidence, merge
 duplicate event mentions, distinguish plans from outcomes, omit routine
@@ -236,16 +237,24 @@ The only accepted responses are:
 ```
 
 There are no source IDs in the response. Native validation rejects malformed
-JSON, Tool calls, inconsistent status/content, titles over 80 characters or
-paragraphs over 1,600 characters; there is no minimum length. An empty source
+JSON, Tool calls, inconsistent status/content, final titles over 50 characters
+(80 for intermediate labels), or text over the existing 1,600-character response
+safety bound. The final paragraph's 300-character target is soft: important
+facts must not be dropped to meet it, and native code neither rejects a
+301-character paragraph nor truncates it. Safety-bound failures remain explicit
+and retain previous content rather than publishing a shortened result.
+There is no minimum length. An empty source
 day requires no Provider call and publishes `NO_DATA`, distinct from a model's
 `EMPTY` result. Native source counts and generation time are published under the
 same claim fence as the content; failed retries retain the previous provenance.
 Legacy entries retain null metadata and the UI explicitly reports that uncertainty.
 
 Large days are partitioned into bounded material batches, preserving source
-sections, timestamps, speakers and fragment order. Intermediate short journals
-are recursively consolidated as `chunk_summaries`. Generation is limited to
+sections, timestamps, speakers and fragment order. Intermediate fact notes
+are recursively consolidated as `chunk_summaries`, retaining all distinct
+important facts and their relevant timing, recurrence and certainty context.
+They do not receive the final title, sentence-count or 300-character writing
+targets. Only the final call writes the diary paragraph. Generation is limited to
 512,000 serialized source characters, 64 calls and eight minutes; over-budget
 input fails explicitly rather than silently dropping the rest of the day.
 Intermediate summarization is lossy, not a verbatim archive.

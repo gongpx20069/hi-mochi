@@ -143,7 +143,12 @@ AI connection. Enabling explicitly discloses sending these records to that
 service and consuming model credits. There are no notifications or speech.
 
 Each past date has at most one journal with a short title and natural paragraph.
-There is no minimum length or filler. Routine recurring events and unchanged
+The final title is at most 50 characters. The paragraph aims for 300 characters,
+usually one or two sentences, but may exceed that target to cover every
+distinct supported important fact. Accuracy and coverage take priority over
+brevity; text is not truncated to meet the target. Intermediate summaries retain
+important facts without the final writing targets. There is no minimum length
+or filler. Routine recurring events and unchanged
 results are omitted unless meaningful progress occurred; plans are not treated
 as completed events. The journal centers on the user's day, not assistant
 operations: tentative requests withdrawn before any lasting effect and routine
