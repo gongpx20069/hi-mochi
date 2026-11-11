@@ -23,7 +23,7 @@ contains the product and engineering source of truth.
 | [`architecture/AGENT_BROWSER.md`](architecture/AGENT_BROWSER.md) | Visible per-turn browser Tools, lifecycle, and safety |
 | [`architecture/CARD_PRESENTATION.md`](architecture/CARD_PRESENTATION.md) | Trusted Agent card evidence and rendering |
 | [`architecture/VOICE_RUNTIME.md`](architecture/VOICE_RUNTIME.md) | Wake word, recognition, audio focus, and speech runtime |
-| [`architecture/MEMORY_DESIGN.md`](architecture/MEMORY_DESIGN.md) | Sole memory reference: current design, device results and diagnostics, optimization goals, and proposed event-based evolution |
+| [`architecture/MEMORY_DESIGN.md`](architecture/MEMORY_DESIGN.md) | Current conversation context, independent journals, explicit recall, permissions, storage and diagnostics |
 
 ## Delivery
 

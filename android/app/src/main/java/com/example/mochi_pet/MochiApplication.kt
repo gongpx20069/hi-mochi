@@ -284,11 +284,16 @@ class MochiApplication : Application() {
             termuxClient = termuxClient,
             termuxRuntime = termuxRuntime,
             webdavClient = webdavClient,
+            journalEnabled = { memoryRecallStore.access().enabled },
         )
     }
 
     val skillRepository: SkillRepository by lazy {
-        RoomSkillRepository(database.skillDao())
+        RoomSkillRepository(database.skillDao(), journalEnabled = { memoryRecallStore.access().enabled })
+    }
+
+    val memoryRecallStore: com.example.mochi_pet.core.memory.MemoryRecallStore by lazy {
+        com.example.mochi_pet.core.memory.RoomMemoryRecallStore(database)
     }
 
     val skillMarketClient: SkillMarketClient by lazy {

@@ -239,6 +239,7 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 
 | Skill | 默认状态 | 能力 | 所需配置 |
 | --- | --- | --- | --- |
+| Memory Recall（回忆检索） | 随每日小记同步 | 先从小记定位日期，再按需检索和读取原始对话 | 在设置中开启每日小记；Skill 与 Tool 无独立开关 |
 | Mochi Planner | 启用 | 管理 Mochi 日历事件和带日期的待办 | 无 |
 | Voice Navigation | 启用 | 根据对话意图打开相关 Mochi 原生页面 | 无 |
 | Scheduled Automations | 启用 | 执行一次性或周期 Agent 任务，并把结果写入 Conversation | 通知权限；精确闹钟权限可选 |

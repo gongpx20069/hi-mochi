@@ -29,6 +29,7 @@ The native `ToolRegistry` currently supports:
 
 - `manage_mochi_calendar`;
 - `manage_mochi_schedule`;
+- `recall_memory` in foreground Main Agent conversations while Daily journal is enabled;
 - `get_current_location`;
 - `get_current_weather`;
 - `navigate_mochi_ui`;
@@ -39,6 +40,21 @@ The native `ToolRegistry` currently supports:
 - configured Amap map and merchant Tools;
 - enabled MCP tools discovered through the Tool catalog;
 - enabled custom REST tools in foreground Main Agent conversations only.
+
+### Memory recall
+
+`recall_memory` is read-only and governed solely by Settings > Daily journal.
+`search` accepts `source=journals|conversations`, optional keywords and half-open
+date/time bounds, page size 1-10 (default 5), and a result offset. Empty keywords
+require both bounds. `read` accepts an exact returned reference, text offset,
+and 0/1 neighboring turns (default 1). Results preserve provenance and timestamps,
+report truncation/continuation, and never turn saved content into instructions.
+Journal results carry frozen natural-day windows; stale journal references fail.
+Native calls check settings before reading and its revision before returning,
+including disable/re-enable cycles. It is absent from scheduled/child registries
+and the independent journal generator. It has no separate Tool toggle or credential.
+Search/indexing, page budgets and Skill workflow belong to
+[Memory design](MEMORY_DESIGN.md#15-explicit-journal-guided-recall).
 
 ### Custom REST tools
 

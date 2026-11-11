@@ -43,6 +43,7 @@ run in local JVM tests.
 | `PromptBuilder` | persona files, memory recall, skill catalog, time context |
 | `PersonaRepository` | app-private SOUL/USER/AGENTS files and atomic updates |
 | `AgentMemoryRepository` | [Conversation persistence and recall](MEMORY_DESIGN.md#1-current-design) |
+| `RoomMemoryRecallStore` / `RecallMemoryTool` | Explicit bounded journal/conversation retrieval and live journal-setting revocation |
 | `SkillRepository` | Agent Skills metadata, resources, and enablement |
 | `ToolRegistry` | schema registration, validation, dispatch |
 | `ToolCatalogRepository` | built-in enablement, MCP/OAuth, REST definitions and encrypted credentials, selected schemas |
@@ -190,7 +191,10 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   HTTPS REST endpoints; they are not represented as a remote MCP server.
 - Room stores editable market skills and their upstream/local digests; built-in
   skills remain read-only application resources while Room stores their local
-  enable/disable overrides.
+  enable/disable overrides. Memory Recall is managed instead by the journal
+  settings row, without an independent override. Schema 9 includes a journal
+  FTS index synchronized with publication/deletion and a persistent settings
+  revision that revokes in-flight explicit recall.
 - Conversation storage, memory retrieval and their settings follow
   [Memory design](MEMORY_DESIGN.md#1-current-design).
 - App-private `files/persona/SOUL.md`, `USER.md`, and `AGENTS.md` are seeded

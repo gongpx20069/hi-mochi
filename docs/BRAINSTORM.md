@@ -36,9 +36,9 @@ Build on existing Scheduled Agents and Skills rather than another executor.
 
 ## Memory management and local backup
 
-Future memory goals are owned by
-[Memory design](architecture/MEMORY_DESIGN.md#4-future-event-based-memory).
-Local backup remains a separate deferred idea:
+Evidence-backed event organization remains a deferred idea, not part of the
+[current memory architecture](architecture/MEMORY_DESIGN.md).
+Local backup is also deferred:
 
 - Offer versioned local export/import for persona, conversation and planner
   data with preview and explicit merge/replace behavior.

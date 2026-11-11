@@ -10,6 +10,8 @@ import com.example.mochi_pet.core.database.entity.AgentMemoryEntity
 import com.example.mochi_pet.core.database.entity.AgentScheduleRunEntity
 import com.example.mochi_pet.core.database.entity.DailyJournalEntity
 import com.example.mochi_pet.core.database.entity.JournalSettingsEntity
+import com.example.mochi_pet.core.database.entity.JournalSearchEntity
+import com.example.mochi_pet.core.memory.MemoryLexicalSearch
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -45,7 +47,8 @@ interface JournalDao {
     suspend fun setEnabled(enabled: Boolean, date: String, now: Long) {
         val previous = settings()
         if (previous?.enabled == enabled) return
-        saveSettings(JournalSettingsEntity(enabled = enabled, since = if (enabled) date else previous?.since))
+        saveSettings(JournalSettingsEntity(enabled = enabled, since = if (enabled) date else previous?.since,
+            revision = (previous?.revision ?: 0) + 1))
         if (!enabled) stopPending(now)
     }
 
@@ -63,14 +66,38 @@ interface JournalDao {
     suspend fun finish(date: String, claim: String, status: String, title: String, text: String, error: String?, now: Long): Int
 
     @Query("UPDATE daily_journals SET status = :status, title = :title, text = :text, error = NULL, claim = NULL, updatedAt = :now, generatedAt = :now, conversationCount = :conversations, userScheduleCount = :schedules, taskCount = :tasks WHERE date = :date AND status = 'GENERATING' AND claim = :claim AND EXISTS (SELECT 1 FROM journal_settings WHERE id = 0 AND enabled = 1)")
-    suspend fun publish(date: String, claim: String, status: String, title: String, text: String, now: Long,
+    suspend fun publishContent(date: String, claim: String, status: String, title: String, text: String, now: Long,
         conversations: Int, schedules: Int, tasks: Int): Int
+
+    @Transaction
+    suspend fun publish(date: String, claim: String, status: String, title: String, text: String, now: Long,
+        conversations: Int, schedules: Int, tasks: Int): Int {
+        val changed = publishContent(date, claim, status, title, text, now, conversations, schedules, tasks)
+        if (changed != 0) {
+            deleteSearch(date)
+            if (text.isNotBlank()) insertSearch(JournalSearchEntity(date = date,
+                searchText = MemoryLexicalSearch.searchableText("$title $text")))
+        }
+        return changed
+    }
+
+    @Insert
+    suspend fun insertSearch(row: JournalSearchEntity)
+
+    @Query("DELETE FROM journal_search WHERE date = :date")
+    suspend fun deleteSearch(date: String)
 
     @Query("UPDATE daily_journals SET status = 'WAITING', claim = NULL, error = NULL, updatedAt = :now WHERE date = :date AND status NOT IN ('DELETED', 'GENERATING') AND EXISTS (SELECT 1 FROM journal_settings WHERE id = 0 AND enabled = 1)")
     suspend fun retry(date: String, now: Long): Int
 
     @Query("UPDATE daily_journals SET status = 'DELETED', title = '', text = '', error = NULL, claim = NULL, updatedAt = :now, generatedAt = NULL, conversationCount = NULL, userScheduleCount = NULL, taskCount = NULL WHERE date = :date")
-    suspend fun delete(date: String, now: Long)
+    suspend fun deleteContent(date: String, now: Long)
+
+    @Transaction
+    suspend fun delete(date: String, now: Long) {
+        deleteContent(date, now)
+        deleteSearch(date)
+    }
 
     @Query("UPDATE daily_journals SET status = 'FAILED', error = 'Journal generation was interrupted', claim = NULL, updatedAt = :now WHERE date = :date AND status = 'GENERATING' AND updatedAt = :expectedTime")
     suspend fun interrupt(date: String, expectedTime: Long, now: Long)

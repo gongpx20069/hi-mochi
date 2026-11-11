@@ -417,8 +417,8 @@ independently of LLM provider configuration and do not require a provider
 connection to edit or save.
 
 Conversation persistence, recent-context settings, retrieval and prompt evidence
-are defined in [Memory design](MEMORY_DESIGN.md), together with device results,
-diagnostic instructions and the separately marked event-based proposal.
+are defined in [Memory design](MEMORY_DESIGN.md), together with explicit
+journal-guided recall, its permission boundaries and diagnostic instructions.
 
 Daily journal uses that document's [independent summary pipeline](MEMORY_DESIGN.md#17-daily-journal),
 not `AgentOrchestrator`, `PromptBuilder`, memory recall or a Tool/Skill.
@@ -439,6 +439,15 @@ Knowledge require **any one** enabled Tool from their connected, enabled
 provider. All other Skills require every declared mandatory Tool; explicitly
 optional capabilities do not block enablement. Provider-backed groups require
 the provider to be installed when applicable, connected, and enabled.
+
+`builtin:memory-recall` is first in Skills, with discovery name `memory-recall`
+and mandatory `recall_memory`. Its enabled state comes only from Daily journal;
+independent stored overrides are ignored and direct toggles rejected. It is
+discoverable/loadable only with its foreground Tool available. Its short
+instructions guide journal-first lookup, original-turn verification, fallback
+after misses and source/time distinctions; they do not enforce unnecessary
+retrieval when existing context suffices.
+
 The UI reports the aggregate label, such as
 `Tencent Docs MCP`, rather than raw Tool IDs. If readiness later fails, the
 saved preference remains but the Skill is omitted from discovery and

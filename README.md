@@ -272,6 +272,7 @@ once its provider is connected and its Tools are enabled.
 
 | Skill | Default | What it does | Required setup |
 | --- | --- | --- | --- |
+| Memory Recall | Follows Daily journal | Finds candidate dates in journals, then reads original saved conversation turns | Enable Daily journal in Settings; no separate Skill/Tool switch |
 | Mochi Planner | Enabled | Manages Mochi calendar events and dated todos | None |
 | Voice Navigation | Enabled | Opens the relevant native Mochi surface from conversation intent | None |
 | Scheduled Automations | Enabled | Runs one-time or recurring Agent prompts and writes results to Conversation | Notification permission; exact-alarm access is optional |

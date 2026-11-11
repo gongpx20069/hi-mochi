@@ -71,6 +71,7 @@ suspend fun MochiApplication.createAgentRunner(
     )
     if (extensionScope == ExtensionToolScope.FOREGROUND_MAIN) {
         builtInTools += ManageMochiScheduleTool(agentScheduleStore, agentScheduleController)
+        builtInTools += com.example.mochi_pet.core.memory.RecallMemoryTool(memoryRecallStore)
     }
     builtInTools += mediaToolRuntime.tools(extensionScope, toolCatalogRepository::isBuiltInEnabled)
     builtInTools += appToolRuntime.tools(extensionScope, toolCatalogRepository::isBuiltInEnabled)

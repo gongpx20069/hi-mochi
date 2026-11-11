@@ -68,7 +68,7 @@ class MochiDatabaseMigrationTest {
             MochiDatabase::class.java,
             DATABASE_NAME,
         )
-            .addMigrations(MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7, MochiDatabase.MIGRATION_7_8)
+            .addMigrations(MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7, MochiDatabase.MIGRATION_7_8, MochiDatabase.MIGRATION_8_9)
             .allowMainThreadQueries()
             .build()
         try {
@@ -95,7 +95,7 @@ class MochiDatabaseMigrationTest {
 
     @Test
     fun `all released schemas migrate with planner records and indefinite schedules preserved`() {
-        for (version in 1..7) {
+        for (version in 1..8) {
             context.deleteDatabase(DATABASE_NAME)
             createDatabaseFromSchema(version).apply {
                 execSQL("""INSERT INTO calendar_events
@@ -111,7 +111,7 @@ class MochiDatabaseMigrationTest {
             }
             val database = Room.databaseBuilder(context, MochiDatabase::class.java, DATABASE_NAME)
                 .addMigrations(MochiDatabase.MIGRATION_1_2, MochiDatabase.MIGRATION_2_3,
-                    MochiDatabase.MIGRATION_3_4, MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7, MochiDatabase.MIGRATION_7_8)
+                    MochiDatabase.MIGRATION_3_4, MochiDatabase.MIGRATION_4_5, MochiDatabase.MIGRATION_5_6, MochiDatabase.MIGRATION_6_7, MochiDatabase.MIGRATION_7_8, MochiDatabase.MIGRATION_8_9)
                 .allowMainThreadQueries().build()
             try {
                 val db = database.openHelper.writableDatabase
@@ -152,13 +152,39 @@ class MochiDatabaseMigrationTest {
             close()
         }
         val database = Room.databaseBuilder(context, MochiDatabase::class.java, DATABASE_NAME)
-            .addMigrations(MochiDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
+            .addMigrations(MochiDatabase.MIGRATION_7_8, MochiDatabase.MIGRATION_8_9).allowMainThreadQueries().build()
         try {
             database.openHelper.writableDatabase.query("SELECT title,text,conversationCount,userScheduleCount,taskCount,generatedAt FROM daily_journals").use {
                 assertTrue(it.moveToFirst())
                 assertEquals("Decision", it.getString(0))
                 assertEquals("Saved paragraph", it.getString(1))
                 for (column in 2..5) assertTrue(it.isNull(column))
+            }
+        } finally { database.close() }
+    }
+
+    @Test
+    fun `recall migration indexes retained journal content without enabling settings`() {
+        createDatabaseFromSchema(8).apply {
+            execSQL("INSERT INTO journal_settings (id,enabled,since) VALUES (0,0,'2026-11-01')")
+            execSQL("INSERT INTO daily_journals (date,timezone,status,title,text,error,updatedAt,claim) VALUES ('2026-11-08','Asia/Shanghai','FAILED','旅行','决定去杭州',NULL,123,NULL)")
+            execSQL("INSERT INTO daily_journals (date,timezone,status,title,text,error,updatedAt,claim) VALUES ('2026-11-07','UTC','DELETED','','',NULL,124,NULL)")
+            close()
+        }
+        val database = Room.databaseBuilder(context, MochiDatabase::class.java, DATABASE_NAME)
+            .addMigrations(MochiDatabase.MIGRATION_8_9).allowMainThreadQueries().build()
+        try {
+            val db = database.openHelper.writableDatabase
+            db.query("""SELECT date FROM journal_search WHERE search_text MATCH '"杭州"'""").use {
+                assertTrue(it.moveToFirst())
+                assertEquals("2026-11-08", it.getString(0))
+                assertTrue(!it.moveToNext())
+            }
+            db.query("SELECT enabled,since,revision FROM journal_settings").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(0, it.getInt(0))
+                assertEquals("2026-11-01", it.getString(1))
+                assertEquals(0, it.getInt(2))
             }
         } finally { database.close() }
     }

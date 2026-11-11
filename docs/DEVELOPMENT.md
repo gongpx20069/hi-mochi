@@ -121,9 +121,8 @@ separate acceptance work. The workflow and its emulator setup are in
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
-Memory retrieval regression sources, device results, measurement definitions
-and reproduction commands are owned by
-[Memory design](architecture/MEMORY_DESIGN.md#2-device-measurements-and-diagnostics).
+Memory retrieval regression sources and diagnostic instructions are owned by
+[Memory design](architecture/MEMORY_DESIGN.md#2-diagnostics-and-verification).
 
 App Control and Media Control regressions:
 

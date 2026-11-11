@@ -393,6 +393,15 @@ journals record past days; past dates without an entry show an empty state.
 Existing past entries remain visible below the introduction after disabling.
 Enabling explicitly says earlier dates are not automatically backfilled.
 Other agenda filters do not show this settings card.
+The same setting governs **Memory Recall / 回忆检索**, first in Skills, and
+`recall_memory` under **Mochi Built-ins** in Tools. Both show a grey read-only
+switch with the live on/off state. Tapping the surrounding control opens
+**Managed by Daily journal / 由每日小记统一管理** and explains that no separate
+switch is needed. **Got it / 知道了** dismisses; **Go to settings / 前往设置**
+opens Settings scrolled to the Daily journal card. Enabling discloses that
+relevant journal/conversation excerpts, including earlier history, may be sent
+to the selected AI while answering. Disabling stops explicit retrieval but
+preserves records and existing automatic conversation context.
 Past-date Planner pages show one matching rounded journal card, with a small
 type badge, generated title and short preview, or an explicit waiting, writing,
 empty, no-source or failed state. Today and future dates never show a journal. Month dates

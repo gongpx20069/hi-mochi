@@ -37,6 +37,17 @@ class JournalUiTest {
     @Before fun setup() { Locale.setDefault(Locale.ENGLISH) }
     @After fun restore() { Locale.setDefault(locale) }
 
+    @Test fun `managed recall control explains shared setting without changing it`() {
+        var navigated = false
+        compose.setContent { MochiTheme { JournalManagedControl(true) { navigated = true } } }
+        compose.onNodeWithText("Daily journal").performClick()
+        compose.onNodeWithText("Managed by Daily journal").assertIsDisplayed()
+        compose.onNodeWithText("This feature follows Daily journal in Settings. There is no separate switch.").assertIsDisplayed()
+        assertFalse(navigated)
+        compose.onNodeWithText("Go to settings").performClick()
+        assertTrue(navigated)
+    }
+
     @Test fun `enabling requires disclosure and confirmation at large font size`() {
         var enabled = false
         compose.setContent { MochiTheme {

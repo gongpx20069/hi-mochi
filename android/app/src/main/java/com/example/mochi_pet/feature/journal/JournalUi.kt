@@ -99,13 +99,18 @@ internal fun JournalSettingsCard(
                 Text("Uses your selected AI connection. No notifications or speech.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
+            if (!agenda) Text("Also manages Memory Recall for journals and saved conversations.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }
     }
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
         title = { Text("Enable Daily journal?") },
-        text = { Text("Starting today, saved conversations and schedules will be processed by your selected AI service. This uses model credits. Earlier dates are not automatically backfilled. Journals stay on this device; switching off keeps existing journals.") },
+        text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Starting today, saved conversations and schedules will be processed by your selected AI service. This uses model credits. Earlier dates are not automatically backfilled. Journals stay on this device; switching off keeps existing journals.")
+            Text("Memory Recall is enabled too. When answering, relevant excerpts from journals and saved conversations, including earlier history, may be sent to your selected AI. Switching off blocks recall but does not delete records.")
+        } },
         confirmButton = { TextButton(onClick = { confirm = false; onEnabled(true) }) { Text("Enable") } },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
     )

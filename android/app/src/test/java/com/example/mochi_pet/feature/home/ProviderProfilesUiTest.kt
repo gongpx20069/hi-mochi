@@ -186,17 +186,33 @@ class ProviderProfilesUiTest {
         assertEquals(WakeCaptureStatus.DISABLED, wake.value.status)
     }
 
+    @Test
+    @Config(sdk = [35, 37])
+    fun `managed recall opens settings directly at journal card`() {
+        Locale.setDefault(Locale.ENGLISH)
+        render(focusJournal = true)
+        compose.onNodeWithText("Daily journal").assertIsDisplayed()
+        compose.onNodeWithText("Also manages Memory Recall for journals and saved conversations.").assertIsDisplayed()
+    }
+
     private fun render(
         fontScale: Float = 1f,
         share: (ProviderShareSelection) -> Unit = {},
         speechProfiles: SpeechProfilesSummary = SpeechProfilesSummary(),
         wake: State<WakeRuntimeState> = mutableStateOf(WakeRuntimeState()),
         selectKeyword: (WakeKeyword?) -> Unit = {},
+        focusJournal: Boolean = false,
     ) {
         compose.setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
                     ProviderSettingsSurface(
+                        focusJournalSettings = focusJournal,
+                        journalSettings = {
+                            com.example.mochi_pet.feature.journal.JournalSettingsCard(
+                                com.example.mochi_pet.core.journal.JournalSettings(), false, null, onEnabled = {},
+                            )
+                        },
                         state = ProviderSettingsUiState(summary = first.settings, isLoading = false,
                             profiles = ProviderProfilesSummary(listOf(first, second), first.id)),
                         speechState = SpeechSettingsUiState(summary = speechProfiles.active.settings,

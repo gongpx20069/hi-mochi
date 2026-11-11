@@ -23,6 +23,8 @@ import com.example.mochi_pet.core.memory.MemoryLexicalSearch
 import com.example.mochi_pet.core.database.dao.JournalDao
 import com.example.mochi_pet.core.database.entity.DailyJournalEntity
 import com.example.mochi_pet.core.database.entity.JournalSettingsEntity
+import com.example.mochi_pet.core.database.entity.JournalSearchEntity
+import com.example.mochi_pet.core.database.dao.MemoryRecallDao
 
 @Database(
     entities = [
@@ -36,8 +38,9 @@ import com.example.mochi_pet.core.database.entity.JournalSettingsEntity
         PlannerReminderReceiptEntity::class,
         DailyJournalEntity::class,
         JournalSettingsEntity::class,
+        JournalSearchEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class MochiDatabase : RoomDatabase() {
@@ -52,6 +55,7 @@ abstract class MochiDatabase : RoomDatabase() {
     abstract fun agentScheduleDao(): AgentScheduleDao
 
     abstract fun journalDao(): JournalDao
+    abstract fun memoryRecallDao(): MemoryRecallDao
 
     companion object {
         const val DATABASE_NAME = "mochi.db"
@@ -70,8 +74,22 @@ abstract class MochiDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
                 )
                 .build()
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE journal_settings ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS `journal_search` USING FTS4(`date` TEXT NOT NULL, `search_text` TEXT NOT NULL)")
+                db.query("SELECT date, title, text FROM daily_journals WHERE status != 'DELETED' AND text != ''").use { rows ->
+                    while (rows.moveToNext()) {
+                        db.execSQL("INSERT INTO journal_search (date, search_text) VALUES (?, ?)",
+                            arrayOf(rows.getString(0), MemoryLexicalSearch.searchableText("${rows.getString(1)} ${rows.getString(2)}")))
+                    }
+                }
+            }
+        }
 
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {

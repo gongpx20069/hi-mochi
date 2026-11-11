@@ -171,7 +171,7 @@ class MochiDatabaseTest {
         assertEquals(false, installed.enabled)
         assertEquals(true, edited.modified)
         val skills = repository.listSkills()
-        assertEquals(18, skills.size)
+        assertEquals(19, skills.size)
         assertEquals(
             listOf("Browser"),
             skills.filter { it.id == "builtin:browser" }.map { it.name },
@@ -280,10 +280,10 @@ class MochiDatabaseTest {
 
     @Test
     fun `all other built-in Skills require every mandatory tool and expose available optional capabilities only`() = runBlocking {
-        val repository = RoomSkillRepository(database.skillDao())
+        val repository = RoomSkillRepository(database.skillDao(), journalEnabled = { true })
         val context = ToolExecutionContext(LocalDate.of(2026, 11, 1), MochiSurface.Conversation)
         for (initial in repository.listSkills().filter { it.requiredToolNames.isNotEmpty() }) {
-            val skill = repository.setEnabled(initial.id, true)
+            val skill = if (initial.id == "builtin:memory-recall") initial else repository.setEnabled(initial.id, true)
             val name = skill.id.removePrefix("builtin:")
             assertTrue(skill.readiness(skill.requiredToolNames).isReady)
             for (missing in skill.requiredToolNames) {
@@ -436,6 +436,7 @@ class MochiDatabaseTest {
                         it.name != "Mi Home Smart Home" &&
                         it.name != "AgentLink" &&
                         it.name != "Termux" &&
+                        it.name != "Memory Recall" &&
                         it.name != "WebDAV Files"
                 }.all { it.enabled },
             )

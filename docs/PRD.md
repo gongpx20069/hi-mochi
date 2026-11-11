@@ -167,8 +167,15 @@ Turning off cancels pending generation but retains existing text. Deleted dates
 are not automatically recreated. Scheduling is best effort under Android
 background/network restrictions; recovery covers the latest seven enabled days,
 never dates before enabling. Older existing entries require manual retry.
-Journals remain separate local derived records, not chat messages, recalled
-memories, new Tools or Skills. Saved-source limits and the independent generation
+Journals remain separate local derived records, not chat messages or automatic
+conversation context. The same setting controls the foreground-only, read-only
+`recall_memory` Tool and built-in Memory Recall Skill: locate dates in journals,
+then search and read original conversations when details are needed. Both
+managed entries stay visible without independent switches. Enabling discloses
+that relevant historical excerpts, including earlier saved records, may be sent
+to the selected AI while answering. Disabling blocks explicit recall without
+deleting records or changing existing automatic conversation context.
+Saved-source limits and the independent generation
 contract are defined in [Memory design](architecture/MEMORY_DESIGN.md#17-daily-journal).
 
 ### 3.4 Voice-driven surfaces

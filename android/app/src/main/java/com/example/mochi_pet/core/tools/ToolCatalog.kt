@@ -470,6 +470,7 @@ class DataStoreToolCatalogRepository(
     private val feishuOAuthClient: FeishuOAuthClient = FeishuOAuthClient(),
     private val restTransport: RestTransport = RestHttpTransport(),
     private val webdavClient: MochiExtensionClient = UnavailableExtensionClient,
+    private val journalEnabled: suspend () -> Boolean = { false },
 ) : ToolCatalogRepository {
     private val tencentCatalogMutex = Mutex()
     private val feishuAuthorizationMutex = Mutex()
@@ -610,7 +611,12 @@ class DataStoreToolCatalogRepository(
         val catalog = loadCatalog()
         val termux = termuxClient.snapshot()
         val webdav = webdavClient.snapshot()
-        return catalog.toSummary(extensionClient.snapshot()).copy(
+        val summary = catalog.toSummary(extensionClient.snapshot())
+        val recallEnabled = journalEnabled()
+        return summary.copy(
+            builtInTools = summary.builtInTools.map {
+                if (it.name == "recall_memory") it.copy(enabled = recallEnabled) else it
+            },
             feedback = if (refreshFailed) TENCENT_CATALOG_REFRESH_ERROR else null,
             agentLink = agentLinkClient?.refresh() ?: AgentLinkState(),
             termux = ExtensionProviderSummary(
@@ -647,6 +653,7 @@ class DataStoreToolCatalogRepository(
         name: String,
         enabled: Boolean,
     ): ToolCatalogSummary {
+        require(name != "recall_memory") { "Memory Recall is managed by Daily journal in Settings" }
         require(BUILT_IN_TOOLS.any { it.name == name }) {
             "Unknown built-in tool"
         }
@@ -1535,6 +1542,7 @@ class DataStoreToolCatalogRepository(
     }
 
     override suspend fun isBuiltInEnabled(name: String): Boolean {
+        if (name == "recall_memory") return journalEnabled()
         val descriptor = BUILT_IN_TOOLS.firstOrNull { it.name == name }
             ?: return false
         val catalog = loadCatalog()
@@ -2520,6 +2528,12 @@ private fun sha256UrlSafe(value: String): String =
         }
 
 val BUILT_IN_TOOLS = listOf(
+    BuiltInToolDescriptor(
+        name = "recall_memory",
+        displayName = "Memory Recall",
+        description = "Search daily journals and saved conversations. Managed by Daily journal in Settings.",
+        defaultEnabled = false,
+    ),
     BuiltInToolDescriptor(
         name = "manage_mochi_calendar",
         displayName = "User schedules",

@@ -469,6 +469,7 @@ private fun MochiAppContent(
 ) {
     val surface by viewModel.surface.collectAsStateWithLifecycle()
     val plannerToday by journal.today.collectAsStateWithLifecycle()
+    val journalSettingsState by journal.settings.collectAsStateWithLifecycle()
     LaunchedEffect(plannerToday) {
         if (surface == MochiSurface.Today) viewModel.navigate(MochiNavigationIntent.ShowToday)
     }
@@ -774,8 +775,12 @@ private fun MochiAppContent(
             pipelineState = visiblePipelineState,
             wakeState = wakeState,
             wakeFeedback = wakeFeedback,
-            skillsState = skillsState,
-            toolsState = toolsState,
+            skillsState = skillsState.copy(skills = skillsState.skills.map {
+                if (it.id == "builtin:memory-recall") it.copy(enabled = journalSettingsState?.enabled == true) else it
+            }),
+            toolsState = toolsState.copy(catalog = toolsState.catalog.copy(builtInTools = toolsState.catalog.builtInTools.map {
+                if (it.name == "recall_memory") it.copy(enabled = journalSettingsState?.enabled == true) else it
+            })),
             weatherState = weatherState,
             homeCard = homeCard,
             cameraSnapshot = cameraSnapshot,
@@ -1533,6 +1538,11 @@ private fun SurfaceContent(
     modifier: Modifier = Modifier,
     onSetMediaAppPackages: (Set<String>) -> Unit = {},
 ) {
+    var focusJournalSettings by rememberSaveable { mutableStateOf(false) }
+    val openJournalSettings = {
+        focusJournalSettings = true
+        onNavigate(MochiNavigationIntent.ShowSettings)
+    }
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -1569,6 +1579,8 @@ private fun SurfaceContent(
             )
             MochiSurface.Settings -> ProviderSettingsSurface(
                 journalSettings = journalSettings,
+                focusJournalSettings = focusJournalSettings,
+                onJournalSettingsFocused = { focusJournalSettings = false },
                 state = providerSettingsState,
                 speechState = speechSettingsState,
                 speechVoiceState = speechVoiceState,
@@ -1597,6 +1609,7 @@ private fun SurfaceContent(
                 onSavePersona = onSavePersona,
             )
             MochiSurface.Skills -> SkillsSurface(
+                onOpenJournalSettings = openJournalSettings,
                 state = skillsState,
                 onSearch = onSearchSkills,
                 onLoadPopular = onLoadPopularSkills,
@@ -1610,6 +1623,7 @@ private fun SurfaceContent(
                 onApplyUpdate = onApplySkillUpdate,
             )
             MochiSurface.Tools -> ToolsSurface(
+                onOpenJournalSettings = openJournalSettings,
                 state = toolsState,
                 onSetBuiltInEnabled = onSetBuiltInToolEnabled,
                 onConnectNotion = onConnectNotion,
@@ -3120,6 +3134,7 @@ private fun SkillsSurface(
     onDelete: (String) -> Unit,
     onCheckUpdates: () -> Unit,
     onApplyUpdate: (String) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     var explore by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -3234,6 +3249,7 @@ private fun SkillsSurface(
             } else {
                 items(state.skills, key = MochiSkill::id) { skill ->
                     InstalledSkillCard(
+                        onOpenJournalSettings = onOpenJournalSettings,
                         skill = skill,
                         readiness = state.readinessById[skill.id],
                         onView = { selectedSkill = skill },
@@ -3327,6 +3343,7 @@ private fun SkillsSurface(
 }
 
 private val MOCHI_BUILT_IN_TOOL_NAMES = setOf(
+    "recall_memory",
     "manage_mochi_calendar",
     "manage_mochi_schedule",
     "get_current_location",
@@ -3344,6 +3361,7 @@ private fun BuiltInToolGroupCard(
     disabled: Boolean,
     onToggleExpanded: () -> Unit,
     onSetEnabled: (String, Boolean) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     PlannerCard {
         Text(
@@ -3371,6 +3389,7 @@ private fun BuiltInToolGroupCard(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 tools.forEach { tool ->
                     BuiltInToolRow(
+                        onOpenJournalSettings = onOpenJournalSettings,
                         tool = tool,
                         disabled = disabled,
                         onSetEnabled = onSetEnabled,
@@ -3401,6 +3420,7 @@ internal fun BuiltInToolRow(
     tool: BuiltInToolSummary,
     disabled: Boolean,
     onSetEnabled: (String, Boolean) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -3425,7 +3445,9 @@ internal fun BuiltInToolRow(
                 fontFamily = FontFamily.Monospace,
             )
         }
-        Switch(
+        if (tool.name == "recall_memory") {
+            com.example.mochi_pet.feature.journal.JournalManagedControl(tool.enabled, onOpenJournalSettings)
+        } else Switch(
             checked = tool.enabled,
             onCheckedChange = { onSetEnabled(tool.name, it) },
             enabled = !disabled,
@@ -3465,6 +3487,7 @@ internal fun ToolsSurface(
     onRemoveServer: (String) -> Unit,
     onSetServerEnabled: (String, Boolean) -> Unit,
     onSetToolEnabled: (String, String, Boolean) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     var showAddServer by remember { mutableStateOf(false) }
     var showAddTool by remember { mutableStateOf(false) }
@@ -3527,7 +3550,7 @@ internal fun ToolsSurface(
                 item {
                     BuiltInToolGroupCard(
                         title = "Mochi Built-ins",
-                        subtitle = "Calendar, todos, schedules, weather, navigation, and sandbox",
+                        subtitle = "Memory recall, schedules, weather, navigation, and sandbox",
                         tools = mochiTools,
                         expanded = mochiToolsExpanded,
                         disabled = state.isLoading,
@@ -3535,6 +3558,7 @@ internal fun ToolsSurface(
                             mochiToolsExpanded = !mochiToolsExpanded
                         },
                         onSetEnabled = onSetBuiltInEnabled,
+                        onOpenJournalSettings = onOpenJournalSettings,
                     )
                 }
             }
@@ -4499,6 +4523,7 @@ internal fun InstalledSkillCard(
     onSetEnabled: (String, Boolean) -> Unit,
     onDelete: () -> Unit,
     onApplyUpdate: (String) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     PlannerCard {
         Column(
@@ -4531,7 +4556,7 @@ internal fun InstalledSkillCard(
                             "Built-in · " +
                                 when {
                                     !skill.enabled -> "Disabled"
-                                    readiness?.isReady != true -> "Suspended"
+                                    skill.id != "builtin:memory-recall" && readiness?.isReady != true -> "Suspended"
                                     else -> "Enabled"
                                 },
                             color =
@@ -4552,7 +4577,9 @@ internal fun InstalledSkillCard(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Switch(
+                    if (skill.id == "builtin:memory-recall") {
+                        com.example.mochi_pet.feature.journal.JournalManagedControl(skill.enabled, onOpenJournalSettings)
+                    } else Switch(
                         checked = skill.enabled,
                         onCheckedChange = {
                             onSetEnabled(skill.id, it)
@@ -4582,7 +4609,7 @@ internal fun InstalledSkillCard(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            if (readiness?.isReady == false) {
+            if (skill.id != "builtin:memory-recall" && readiness?.isReady == false) {
                 Text(
                     text = readiness.declarationError ?: (
                         if (readiness.anyToolRequirements.isNotEmpty()) "Enable at least one Tool in: "
@@ -5753,7 +5780,17 @@ internal fun ProviderSettingsSurface(
     onStopVoicePreview: () -> Unit = {},
     onSelectWakeKeyword: (WakeKeyword?) -> Unit = {},
     journalSettings: @Composable () -> Unit = {},
+    focusJournalSettings: Boolean = false,
+    onJournalSettingsFocused: () -> Unit = {},
 ) {
+    val settingsListState = rememberLazyListState()
+    LaunchedEffect(focusJournalSettings) {
+        if (focusJournalSettings) {
+            // Share/import (2), AI (2), speech/wake (3), conversation heading (1).
+            settingsListState.scrollToItem(if (Build.VERSION.SDK_INT >= 37) 9 else 8)
+            onJournalSettingsFocused()
+        }
+    }
     var recentTurns by remember(agentSettingsState.settings) {
         mutableStateOf(
             agentSettingsState.settings.recentConversationTurns.toString(),
@@ -6085,7 +6122,7 @@ internal fun ProviderSettingsSurface(
             }
         }
         val conversationSection: LazyListScope.() -> Unit = {
-            item { journalSettings() }
+            item(key = "daily-journal") { journalSettings() }
             item {
                 Text(
                     text = "Conversation context",
@@ -6183,6 +6220,7 @@ internal fun ProviderSettingsSurface(
         }
         LazyColumn(
             modifier = Modifier.weight(1f).testTag("settings-parts"),
+            state = settingsListState,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             providerShareSection()

@@ -65,6 +65,17 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ToolCatalogTest {
+    @Test fun `memory recall has no independent catalog switch`() = runBlocking {
+        var enabled = false
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client, journalEnabled = { enabled })
+        assertFalse(catalog.isBuiltInEnabled("recall_memory"))
+        enabled = true
+        assertTrue(catalog.isBuiltInEnabled("recall_memory"))
+        assertTrue(catalog.loadSummary().builtInTools.single { it.name == "recall_memory" }.enabled)
+        assertTrue(runCatching { catalog.setBuiltInEnabled("recall_memory", false) }.isFailure)
+        enabled = false
+        assertFalse(catalog.loadSummary().builtInTools.single { it.name == "recall_memory" }.enabled)
+    }
     @Test fun `app selection preserves explicit empty and non music choices across reload`() = runBlocking {
         val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
         assertNull(catalog.mediaAppPackages())

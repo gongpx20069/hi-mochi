@@ -40,7 +40,7 @@ or verification in earlier phases.
 - [x] Opt-in Daily journal: independent midnight summaries, past-day cards,
   consent, bounded recovery and claim-fenced retry/delete.
 - [x] Unified date agenda, three-category color markers and filters, grouped
-  task history/projections and explicit journal source metadata in Room schema 8.
+  task history/projections and explicit journal source metadata in Room schema 9.
 - [ ] Local export/import.
 
 ## P1 - Agent
@@ -50,6 +50,8 @@ or verification in earlier phases.
 - [x] Agent Skills metadata discovery and on-demand activation.
 - [x] App-private SOUL/USER/AGENTS files.
 - [x] [Local conversation context and memory retrieval](architecture/MEMORY_DESIGN.md#1-current-design).
+- [x] Journal-managed explicit recall: journal/conversation search, complete-turn reads,
+  bounded continuation, first-listed Memory Recall Skill and managed preset Tool.
 - [x] Typed ToolRegistry, JSON schemas, and result envelopes.
 - [x] Mochi calendar/todo CRUD tools with destructive confirmation.
 - [x] Permission-gated current-location and weather Tools with explicit
