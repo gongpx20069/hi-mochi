@@ -152,12 +152,22 @@
               </div>
             </article>
 
-            <article class="feature-card memory-feature reveal">
+            <article class="feature-card memory-feature reveal" id="memory" data-memory-feature>
               <div class="feature-icon memory-icon" aria-hidden="true"><span></span><i></i></div>
-              <span class="feature-label">Local memory</span>
-              <h3>Context that stays with you.</h3>
-              <p>Conversation history and relevant long-term memory live on your device and return when they are useful.</p>
-              <div class="memory-chips" aria-hidden="true"><span>Trip in August</span><span>Dad's birthday</span><span>Favorite coffee</span></div>
+              <span class="feature-label">Local-first memory architecture</span>
+              <h3>Remember the day.<br>Find the original words.</h3>
+              <dl class="memory-paths">
+                <div><dt>Keep the conversation flowing</dt><dd>Recent turns and relevant older messages provide context automatically.</dd></div>
+                <div><dt>Keep the day's highlights</dt><dd>Optional daily journals distill meaningful events from conversations, schedules, and Mochi task results.</dd></div>
+                <div><dt>Return to the source</dt><dd>The Memory Recall Skill uses journals to find candidate dates, then searches and reads original conversation turns for detail.</dd></div>
+              </dl>
+              <p class="feature-note">History and search indexes stay on your phone, without a separate vector service. Relevant excerpts may be sent to your selected AI provider.</p>
+              <details class="extension-setup">
+                <summary>How recall works &amp; what you control</summary>
+                <p>Enable Daily journal in Settings to use journals and explicit recall together; both are off by default. The Skill and Tool follow that setting. Turning it off leaves ordinary conversation context unchanged.</p>
+                <p class="feature-note">Journals are clues, not verbatim evidence. A missed journal search falls back to conversations; an exact date or quote can go straight to them. Search can miss information—it does not prove nothing happened.</p>
+              </details>
+              <a class="text-link" href="https://github.com/gongpx20069/hi-mochi/blob/main/docs/architecture/MEMORY_DESIGN.md">Explore the memory architecture →</a>
             </article>
 
             <article class="feature-card planner-feature reveal">

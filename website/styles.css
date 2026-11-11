@@ -997,23 +997,26 @@ img {
   transform: translate(10px, -10px);
 }
 
-.memory-chips {
-  position: absolute;
-  right: 34px;
-  bottom: 34px;
-  left: 34px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.memory-paths {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0 0;
 }
 
-.memory-chips span {
-  padding: 8px 12px;
-  border: 1px solid rgba(213, 193, 255, 0.14);
-  border-radius: 999px;
-  background: rgba(213, 193, 255, 0.06);
-  color: #cfc2e9;
-  font-size: 0.72rem;
+.memory-paths > div {
+  padding-left: 16px;
+  border-left: 2px solid rgba(213, 193, 255, 0.4);
+}
+
+.memory-paths dt {
+  color: var(--lavender);
+  font-weight: 700;
+}
+
+.memory-paths dd {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .planner-icon span {

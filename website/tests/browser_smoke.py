@@ -119,7 +119,7 @@ def main() -> None:
                         page.locator(".capability-map a[href='#webdav-extension']").click()
                         assert page.url.endswith("#webdav-extension")
                         for disclosure in page.locator(
-                            "[data-connections-feature] details, [data-app-control-feature] details, #webdav-extension details, #install details"
+                            "[data-connections-feature] details, [data-app-control-feature] details, [data-memory-feature] details, #webdav-extension details, #install details"
                         ).all():
                             summary = disclosure.locator("summary")
                             summary.focus()
@@ -162,7 +162,7 @@ def main() -> None:
                                 errors.push(`Horizontal overflow: ${overflow.join(", ")}`);
                             }
                             const cards = document.querySelectorAll(
-                                "[data-speech-feature], [data-documents-feature], " +
+                                "[data-speech-feature], [data-documents-feature], [data-memory-feature], " +
                                 "[data-connections-feature], [data-tasks-feature], " +
                                 "[data-browser-feature], [data-app-control-feature], [data-skills-feature], [data-api-feature], " +
                                 "[data-extension-card], .link-benefits article, .link-stage, " +
@@ -171,7 +171,7 @@ def main() -> None:
                             for (const card of cards) {
                                 const bounds = card.getBoundingClientRect();
                                 const items = [...card.querySelectorAll(
-                                    "h3, p, .knowledge-workspaces, .connection-presets, .waveform, .execution-preview"
+                                    "h3, p, dt, dd, .knowledge-workspaces, .connection-presets, .waveform, .execution-preview"
                                 )];
                                 for (const [index, item] of items.entries()) {
                                     const box = item.getBoundingClientRect();
@@ -256,7 +256,7 @@ def main() -> None:
                         f"{RELEASE_ROOT}download/{fallback}/Mochi-{fallback}-arm64-v8a.apk"
                     )
                     for disclosure in page.locator(
-                        "[data-connections-feature] details, [data-app-control-feature] details, #webdav-extension details, #install details"
+                        "[data-connections-feature] details, [data-app-control-feature] details, [data-memory-feature] details, #webdav-extension details, #install details"
                     ).all():
                         disclosure.locator("summary").click()
                         assert disclosure.evaluate("(item) => item.open")

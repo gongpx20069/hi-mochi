@@ -152,12 +152,22 @@
               </div>
             </article>
 
-            <article class="feature-card memory-feature reveal">
+            <article class="feature-card memory-feature reveal" id="memory" data-memory-feature>
               <div class="feature-icon memory-icon" aria-hidden="true"><span></span><i></i></div>
-              <span class="feature-label">本地记忆</span>
-              <h3>需要时，想起与你有关的事。</h3>
-              <p>对话历史与相关长期记忆保存在设备本地，并在真正有帮助时回到上下文中。</p>
-              <div class="memory-chips" aria-hidden="true"><span>八月旅行</span><span>爸爸的生日</span><span>喜欢的咖啡</span></div>
+              <span class="feature-label">本地优先的记忆架构</span>
+              <h3>记得日常，<br>也找得到原话。</h3>
+              <dl class="memory-paths">
+                <div><dt>接得上刚才的话</dt><dd>近期对话与相关旧消息自动进入上下文，让交流保持连贯。</dd></div>
+                <div><dt>留下每天的重要片段</dt><dd>可选的每日小记，从对话、日程和 Mochi 任务结果中提炼有意义的事件。</dd></div>
+                <div><dt>需要细节时，回到原始对话</dt><dd>回忆检索 Skill 先从简短小记定位候选日期，再按需搜索、读取原始对话。</dd></div>
+              </dl>
+              <p class="feature-note">历史与检索索引保存在手机本地，无需额外向量服务；相关片段可能发送给你选择的 AI 服务。</p>
+              <details class="extension-setup">
+                <summary>如何回忆，以及由你控制什么</summary>
+                <p>在设置中开启每日小记，即可同时使用小记和主动回忆检索；两者默认关闭，Skill 与 Tool 随该设置同步。关闭后，普通对话上下文不受影响。</p>
+                <p class="feature-note">小记是线索，不是原话。小记未命中时回查对话；已知明确日期或原句，也可以直接搜索对话。检索可能遗漏信息，未找到不代表没有发生。</p>
+              </details>
+              <a class="text-link" href="https://github.com/gongpx20069/hi-mochi/blob/main/docs/architecture/MEMORY_DESIGN.md">了解 Mochi 的记忆架构 →</a>
             </article>
 
             <article class="feature-card planner-feature reveal">

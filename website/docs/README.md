@@ -49,6 +49,13 @@ foreground chat is not a task-center item. Feishu requires guided self-built-app
 setup and authorization; do not present it as one-click login or claim support
 for whole-document deletion, native spreadsheets, Bitable, or PPT editing.
 Sharing copy must warn that a full link grants use of the included credentials.
+The memory feature distinguishes automatic conversation context, optional daily
+journals, and journal-guided explicit recall of original conversations. Journals
+are date clues, not quotations or proof that an event did not occur. Explain
+the default-off shared journal/recall setting without implying that it disables
+ordinary conversation context. Storage and indexes are local, but relevant
+excerpts may reach the selected model provider. Keep the architecture and
+control disclosure accessible with a keyboard and without JavaScript.
 The smart-home feature describes the optional signed Mi Home
 extension, its supported device categories, and foreground-only latest camera
 event images. It must not imply support for camera live view, playback, PTZ,

@@ -144,8 +144,9 @@ the provider and API compatibility, or submit a pull request.
 
 ### Tools and Skills setup
 
-Every Tool has an independent switch. Provider-backed Tools also require a
-connected, enabled provider. Enable only the capabilities you want to use.
+Most Tools have independent switches; Memory Recall follows the Daily journal
+setting instead. Provider-backed Tools also require a connected, enabled
+provider. Enable only the capabilities you want to use.
 Skills describe workflows; enabling a Skill does not automatically enable
 its dependencies. The Skills screen names any missing Tool groups.
 
@@ -201,6 +202,19 @@ resources and consume their quota**. Persona, memories, planner data, Feishu/Not
 OAuth, Mi Home sessions, and Android permissions are not shared.
 
 ## Core features
+
+### Local-first memory, with a path back to the source
+
+Mochi combines **automatic context** (recent turns and relevant older messages),
+**daily journals** (concise highlights from conversations, schedules, and task
+results), and **explicit recall**. The built-in Memory Recall Skill uses journals
+to find candidate dates, then searches and reads original conversation turns
+for detail. Journal misses fall back to conversations; summaries are not quotes.
+
+History and indexes stay on-device, without a separate vector service.
+Daily journal and explicit recall share one default-off setting; turning it
+off leaves ordinary conversation context unchanged. Relevant excerpts can
+reach your selected AI provider. See the [memory architecture](docs/architecture/MEMORY_DESIGN.md).
 
 ### Unified task center
 
