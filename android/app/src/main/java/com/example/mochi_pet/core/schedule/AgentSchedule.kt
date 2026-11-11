@@ -18,7 +18,26 @@ enum class AgentScheduleResult {
     SUCCESS,
     FAILED,
     CANCELLED,
+    INTERRUPTED,
 }
+
+enum class ScheduleRunState { QUEUED, RUNNING, SUCCESS, FAILED, CANCELLED, INTERRUPTED, SKIPPED_BUSY }
+
+data class AgentScheduleRun(
+    val id: String,
+    val scheduleId: String,
+    val revision: Long,
+    val name: String,
+    val prompt: String,
+    val manual: Boolean,
+    val plannedAt: Instant?,
+    val state: ScheduleRunState,
+    val createdAt: Instant,
+    val startedAt: Instant? = null,
+    val finishedAt: Instant? = null,
+    val output: String? = null,
+    val error: String? = null,
+)
 
 data class AgentSchedule(
     val id: String,
@@ -35,6 +54,10 @@ data class AgentSchedule(
     val lastResult: AgentScheduleResult?,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val endsAt: Instant? = null,
+    val maxRuns: Int? = null,
+    val plannedRuns: Int = 0,
+    val revision: Long = 0,
 )
 
 data class AgentScheduleDraft(
@@ -47,6 +70,10 @@ data class AgentScheduleDraft(
     val intervalMinutes: Long? = null,
     val timezone: ZoneId = ZoneId.systemDefault(),
     val enabled: Boolean = true,
+    val endsAt: Instant? = null,
+    val maxRuns: Int? = null,
+    val indefinite: Boolean = false,
+    val expectedRevision: Long? = null,
 )
 
 fun nextAgentScheduleRun(
@@ -73,14 +100,15 @@ fun nextAgentScheduleRun(
             ) { date -> date.dayOfWeek in draft.daysOfWeek }
         AgentScheduleType.EVERY ->
             after.plusSeconds(requireNotNull(draft.intervalMinutes) * 60L)
-    }
+    }?.takeIf { draft.endsAt == null || it <= draft.endsAt }
 }
 
 fun nextAgentScheduleRun(
     schedule: AgentSchedule,
     after: Instant,
 ): Instant? =
-    nextAgentScheduleRun(schedule.toDraft(), after)
+    if (schedule.maxRuns != null && schedule.plannedRuns >= schedule.maxRuns) null
+    else nextAgentScheduleRun(schedule.toDraft(), after)
 
 fun AgentSchedule.toDraft(enabled: Boolean = this.enabled): AgentScheduleDraft =
     AgentScheduleDraft(
@@ -93,6 +121,10 @@ fun AgentSchedule.toDraft(enabled: Boolean = this.enabled): AgentScheduleDraft =
         intervalMinutes = intervalMinutes,
         timezone = timezone,
         enabled = enabled,
+        endsAt = endsAt,
+        maxRuns = maxRuns,
+        indefinite = endsAt == null && maxRuns == null,
+        expectedRevision = revision,
     )
 
 private fun nextLocalRun(
@@ -107,6 +139,7 @@ private fun nextLocalRun(
         if (!dateMatches(date)) {
             continue
         }
+        if (zoneId.rules.getValidOffsets(date.atTime(localTime)).isEmpty()) continue
         val candidate = ZonedDateTime.of(date, localTime, zoneId).toInstant()
         if (candidate.isAfter(after)) {
             return candidate

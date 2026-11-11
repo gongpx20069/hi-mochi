@@ -138,6 +138,8 @@ class ToolRegistry(tools: List<AgentTool>) {
             )
         return try {
             tool.execute(arguments, context)
+        } catch (error: com.example.mochi_pet.core.model.PlannerConflictException) {
+            ToolResultEnvelope.error(ToolErrorCode.CONFLICT, requireNotNull(error.message))
         } catch (error: PlannerNotFoundException) {
             ToolResultEnvelope.error(
                 ToolErrorCode.NOT_FOUND,

@@ -1,6 +1,11 @@
 package com.example.mochi_pet.core.schedule
 
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
 import com.example.mochi_pet.core.database.MochiDatabase
+import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.agent.tool.ToolRegistry
+import com.example.mochi_pet.core.model.MochiSurface
 import java.time.Clock
 import java.time.DayOfWeek
 import java.time.Instant
@@ -10,253 +15,202 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [35], application = android.app.Application::class)
 class AgentScheduleTest {
-    @Test
-    fun `cancelled recurring run stays recurring and persists cancellation without another schema`() = runBlocking {
-        val database = androidx.room.Room.inMemoryDatabaseBuilder(
-            androidx.test.core.app.ApplicationProvider.getApplicationContext(),
-            MochiDatabase::class.java,
-        ).build()
+    private lateinit var db: MochiDatabase
+    private val now = Instant.parse("2026-08-07T00:00:00Z")
+    private var current = now
+    private val clock = object : Clock() {
+        override fun instant() = current
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+        override fun withZone(zone: ZoneId): Clock = Clock.fixed(current, zone)
+    }
+    private lateinit var repository: RoomAgentScheduleRepository
+    private fun draft() = AgentScheduleDraft("Weather", "Read weather", AgentScheduleType.EVERY,
+        intervalMinutes = 15, timezone = ZoneOffset.UTC)
+    @Before fun setup() {
+        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), MochiDatabase::class.java).build()
+        repository = RoomAgentScheduleRepository(db.agentScheduleDao(), clock)
+    }
+    @After fun close() { db.close() }
+
+    @Test fun `agenda projects past and future dates without claiming historical execution`() = runBlocking {
+        val plan = repository.set(draft = draft().copy(type = AgentScheduleType.DAILY, localTime = LocalTime.of(8, 0)))
+        current = now.plusSeconds(3 * 86400)
+        val day = LocalDate.of(2026, 8, 8)
+        val past = repository.agenda(day, ZoneOffset.UTC).single()
+        assertEquals(plan.id, past.id)
+        assertEquals(Instant.parse("2026-08-08T08:00:00Z"), past.plannedAt)
+        assertTrue(past.runs.isEmpty())
+        assertTrue(day in repository.markedDates(day, day.plusDays(4), ZoneOffset.UTC))
+        assertEquals(1, repository.agenda(day.plusDays(3), ZoneOffset.UTC).size)
+    }
+
+    @Test fun `agenda groups interval runs and preserves snapshots after deleting the plan`() = runBlocking {
+        val plan = repository.set(draft = draft())
+        repeat(3) {
+            current = now.plusSeconds(it * 900L)
+            val run = requireNotNull(repository.queue(plan.id, true, current))
+            repository.startRun(run.id)
+            repository.finishRun(run.id, ScheduleRunState.SUCCESS, "Result $it")
+        }
+        val day = LocalDate.of(2026, 8, 7)
+        val grouped = repository.agenda(day, ZoneOffset.UTC).single()
+        assertEquals(3, grouped.runs.size)
+        repository.remove(plan.id)
+        val preserved = repository.agenda(day, ZoneOffset.UTC).single()
+        assertNull(preserved.plan)
+        assertEquals("Weather", preserved.name)
+        assertEquals(listOf("Result 0", "Result 1", "Result 2"), preserved.runs.map { it.output })
+        assertEquals(setOf(day), repository.markedDates(day, day.plusDays(3), ZoneOffset.UTC))
+    }
+
+    @Test fun `future projections respect count expiry and paused plans`() = runBlocking {
+        val plan = repository.set(draft = draft().copy(type = AgentScheduleType.DAILY, localTime = LocalTime.of(8, 0), maxRuns = 2))
+        assertNotNull(plan.projectedTime(LocalDate.of(2026, 8, 8), ZoneOffset.UTC, now))
+        assertNull(plan.projectedTime(LocalDate.of(2026, 8, 9), ZoneOffset.UTC, now))
+        assertNull(plan.copy(enabled = false).projectedTime(LocalDate.of(2026, 8, 8), ZoneOffset.UTC, now))
+        assertNull(plan.copy(endsAt = now.plusSeconds(86400)).projectedTime(LocalDate.of(2026, 8, 8), ZoneOffset.UTC, now))
+    }
+
+    @Test fun `daily and weekly follow wall clock and skip a DST gap`() {
+        assertEquals(Instant.parse("2026-08-08T00:00:00Z"), nextAgentScheduleRun(
+            draft().copy(type = AgentScheduleType.DAILY, localTime = LocalTime.of(8, 0), timezone = ZoneId.of("Asia/Shanghai")),
+            Instant.parse("2026-08-07T00:30:00Z")))
+        assertEquals(Instant.parse("2026-08-10T09:00:00Z"), nextAgentScheduleRun(
+            draft().copy(type = AgentScheduleType.WEEKLY, localTime = LocalTime.of(9, 0), daysOfWeek = setOf(DayOfWeek.MONDAY)),
+            Instant.parse("2026-08-07T10:00:00Z")))
+        assertEquals(Instant.parse("2026-03-09T06:30:00Z"), nextAgentScheduleRun(
+            draft().copy(type = AgentScheduleType.DAILY, localTime = LocalTime.of(2, 30), timezone = ZoneId.of("America/New_York")),
+            Instant.parse("2026-03-08T06:59:00Z")))
+    }
+
+    @Test fun `finite defaults persist and content edits do not restart expiry or next run`() = runBlocking {
+        val plan = repository.set(draft = draft())
+        assertEquals(plan.nextRunAt!!.plusSeconds(7 * 86400).minusMillis(1), plan.endsAt)
+        current = now.plusSeconds(60)
+        val updated = repository.set(plan.id, plan.toDraft().copy(prompt = "Include humidity"))
+        assertEquals(plan.nextRunAt, updated.nextRunAt)
+        assertEquals(plan.endsAt, updated.endsAt)
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { repository.set(plan.id, plan.toDraft().copy(prompt = "Stale edit")) }
+        }
+        val daily = repository.set(draft = draft().copy(type = AgentScheduleType.DAILY, localTime = LocalTime.of(8, 0)))
+        assertEquals(daily.nextRunAt!!.plusSeconds(30 * 86400).minusMillis(1), daily.endsAt)
+    }
+
+    @Test fun `queue advances durably and manual runs deduplicate without changing planned count`() = runBlocking {
+        val plan = repository.set(draft = draft())
+        val manual = requireNotNull(repository.queue(plan.id, true, now))
+        assertEquals(manual.id, repository.queue(plan.id, true, now)?.id)
+        assertEquals(plan.nextRunAt, repository.get(plan.id)?.nextRunAt)
+        assertEquals(0, repository.get(plan.id)?.plannedRuns)
+        repository.startRun(manual.id)
+        repository.finishRun(manual.id, ScheduleRunState.SUCCESS, output = "Manual weather")
+        current = requireNotNull(plan.nextRunAt)
+        val due = requireNotNull(repository.queue(plan.id, false, current))
+        assertNotNull(repository.get(plan.id)?.nextRunAt)
+        assertNull(repository.queue(plan.id, false, current))
+        repository.startRun(due.id)
+        current = current.plusSeconds(40)
+        repository.finishRun(due.id, ScheduleRunState.CANCELLED)
+        assertEquals(current.plusSeconds(900), repository.get(plan.id)?.nextRunAt)
+        assertEquals(AgentScheduleResult.CANCELLED, repository.get(plan.id)?.lastResult)
+        assertEquals(2, repository.runs(plan.id).size)
+    }
+
+    @Test fun `old running result cannot overwrite a newer plan and queued versions are cancelled`() = runBlocking {
+        val plan = repository.set(draft = draft())
+        val run = requireNotNull(repository.queue(plan.id, true, now))
+        repository.startRun(run.id)
+        val changed = repository.set(plan.id, plan.toDraft().copy(prompt = "New content"))
+        repository.finishRun(run.id, ScheduleRunState.SUCCESS, "Old content result")
+        assertEquals(changed, repository.get(plan.id))
+        assertEquals("Read weather", repository.run(run.id)?.prompt)
+        val queued = requireNotNull(repository.queue(plan.id, true, now))
+        repository.set(plan.id, changed.toDraft().copy(prompt = "Another edit"))
+        assertNull(repository.startRun(queued.id))
+        assertEquals(ScheduleRunState.CANCELLED, repository.run(queued.id)?.state)
+    }
+
+    @Test fun `count exhaustion and once stop while manual results remain queryable after deletion`() = runBlocking {
+        val plan = repository.set(draft = draft().copy(maxRuns = 1))
+        current = requireNotNull(plan.nextRunAt)
+        val run = requireNotNull(repository.queue(plan.id, false, current))
+        assertFalse(requireNotNull(repository.get(plan.id)).enabled)
+        repository.startRun(run.id)
+        repository.finishRun(run.id, ScheduleRunState.SUCCESS, "Done")
+        assertNull(repository.get(plan.id)?.nextRunAt)
+        repository.remove(plan.id)
+        assertEquals("Done", repository.run(run.id)?.output)
+        val once = repository.set(draft = draft().copy(type = AgentScheduleType.ONCE, runAt = current.plusSeconds(60)))
+        repository.queue(once.id, false, current.plusSeconds(60))
+        assertFalse(requireNotNull(repository.get(once.id)).enabled)
+    }
+
+    @Test fun `tool create update results and delete use explicit current contracts`() = runBlocking {
+        val controller = object : AgentScheduleController {
+            override suspend fun sync(schedule: AgentSchedule) = Unit
+            override suspend fun cancel(id: String) = Unit
+            override suspend fun runNow(id: String) = requireNotNull(repository.queue(id, true, current))
+        }
+        val registry = ToolRegistry(listOf(ManageMochiScheduleTool(repository, controller)))
+        val context = ToolExecutionContext(LocalDate.of(2026, 8, 7), MochiSurface.Today)
+        suspend fun call(operation: String, id: String? = null) = registry.execute("manage_mochi_schedule",
+            buildJsonObject {
+                put("operation", operation)
+                if (id != null) put("id", id)
+                put("name", "Weather"); put("prompt", "Read weather"); put("schedule_type", "every")
+                put("interval_minutes", 15); put("revision", 0); put("confirmed", true)
+            }, context)
+        val created = call("create")
+        assertEquals("ok", created.status)
+        val id = created.data!!.jsonObject.getValue("id").jsonPrimitive.content
+        assertEquals("error", call("create", id).status)
+        assertEquals("ok", call("update", id).status)
+        val queued = call("run", id)
+        assertNotNull(queued.data!!.jsonObject["run_id"])
+        assertEquals("ok", call("results", id).status)
+        assertEquals("ok", call("delete", id).status)
+        assertEquals("error", call("set", id).status)
+    }
+
+    @Test fun `disk reopen retains the future plan and does not reclaim a running receipt`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val name = "recovery.db"
+        context.getDatabasePath(name).parentFile?.mkdirs()
+        var disk = Room.databaseBuilder(context, MochiDatabase::class.java, name).build()
         try {
-            val now = Instant.parse("2026-09-25T00:00:00Z")
-            val repository = RoomAgentScheduleRepository(database.agentScheduleDao(), Clock.fixed(now, ZoneOffset.UTC))
-            val schedule = repository.set(draft = AgentScheduleDraft(
-                name = "Hourly", prompt = "Brief me", type = AgentScheduleType.EVERY, intervalMinutes = 60,
-            ))
-            val cancelled = repository.recordResult(schedule.id, AgentScheduleResult.CANCELLED, now.plusSeconds(3600))
-            assertEquals(AgentScheduleResult.CANCELLED, repository.get(schedule.id)?.lastResult)
-            assertEquals(now.plusSeconds(7200), cancelled.nextRunAt)
-            assertEquals(true, cancelled.enabled)
-            val manual = repository.recordResult(schedule.id, AgentScheduleResult.CANCELLED, now.plusSeconds(3700),
-                advanceSchedule = false)
-            assertEquals(cancelled.nextRunAt, manual.nextRunAt)
-            assertEquals(null, repository.cancelQueuedOccurrence(schedule.id, now.plusSeconds(4000)))
-            val queued = requireNotNull(repository.cancelQueuedOccurrence(schedule.id, now.plusSeconds(7300)))
-            assertEquals(now.plusSeconds(10900), queued.nextRunAt)
-            assertEquals(AgentScheduleResult.CANCELLED, queued.lastResult)
+            var store = RoomAgentScheduleRepository(disk.agentScheduleDao(), clock)
+            val plan = store.set(draft = draft())
+            current = requireNotNull(plan.nextRunAt)
+            val run = requireNotNull(store.queue(plan.id, false, current))
+            store.startRun(run.id)
+            disk.close()
+            disk = Room.databaseBuilder(context, MochiDatabase::class.java, name).build()
+            store = RoomAgentScheduleRepository(disk.agentScheduleDao(), clock)
+            assertNotNull(store.get(plan.id)?.nextRunAt)
+            assertEquals(ScheduleRunState.RUNNING, store.run(run.id)?.state)
+            assertNull(store.startRun(run.id))
+            store.finishRun(run.id, ScheduleRunState.INTERRUPTED, error = "Process ended")
+            assertTrue(requireNotNull(store.get(plan.id)).enabled)
+            assertNotNull(store.get(plan.id)?.nextRunAt)
+            assertEquals(ScheduleRunState.INTERRUPTED, store.runs(plan.id).single().state)
         } finally {
-            database.close()
-        }
-    }
-
-    @Test
-    fun `daily schedule uses its local timezone`() {
-        val next = nextAgentScheduleRun(
-            draft = AgentScheduleDraft(
-                name = "Morning",
-                prompt = "Brief me",
-                type = AgentScheduleType.DAILY,
-                localTime = LocalTime.of(8, 0),
-                timezone = ZoneId.of("Asia/Shanghai"),
-            ),
-            after = Instant.parse("2026-08-07T00:30:00Z"),
-        )
-
-        assertEquals(
-            Instant.parse("2026-08-08T00:00:00Z"),
-            next,
-        )
-    }
-
-    @Test
-    fun `weekly schedule selects next matching day`() {
-        val next = nextAgentScheduleRun(
-            draft = AgentScheduleDraft(
-                name = "Weekly",
-                prompt = "Weekly brief",
-                type = AgentScheduleType.WEEKLY,
-                localTime = LocalTime.of(9, 0),
-                daysOfWeek = setOf(DayOfWeek.MONDAY),
-                timezone = ZoneOffset.UTC,
-            ),
-            after = Instant.parse("2026-08-07T10:00:00Z"),
-        )
-
-        assertEquals(
-            Instant.parse("2026-08-10T09:00:00Z"),
-            next,
-        )
-    }
-
-    @Test
-    fun `repository stores and advances recurring schedule`() = runBlocking {
-        val database = androidx.room.Room.inMemoryDatabaseBuilder(
-            androidx.test.core.app.ApplicationProvider
-                .getApplicationContext(),
-            MochiDatabase::class.java,
-        ).build()
-        try {
-            val clock = Clock.fixed(
-                Instant.parse("2026-08-07T00:00:00Z"),
-                ZoneOffset.UTC,
-            )
-            val repository = RoomAgentScheduleRepository(
-                database.agentScheduleDao(),
-                clock,
-            )
-            val created = repository.set(
-                draft = AgentScheduleDraft(
-                    name = "Brief",
-                    prompt = "Create a brief",
-                    type = AgentScheduleType.EVERY,
-                    intervalMinutes = 60,
-                    timezone = ZoneOffset.UTC,
-                ),
-            )
-            val completed = repository.recordResult(
-                created.id,
-                AgentScheduleResult.SUCCESS,
-                Instant.parse("2026-08-07T01:00:00Z"),
-            )
-
-            assertEquals(
-                Instant.parse("2026-08-07T02:00:00Z"),
-                completed.nextRunAt,
-            )
-            assertEquals(
-                listOf(created.id),
-                repository.listForDate(LocalDate.of(2026, 8, 7))
-                    .map(AgentSchedule::id),
-            )
-        } finally {
-            database.close()
-        }
-    }
-
-    @Test
-    fun `one time schedule disables after completion`() = runBlocking {
-        val database = androidx.room.Room.inMemoryDatabaseBuilder(
-            androidx.test.core.app.ApplicationProvider
-                .getApplicationContext(),
-            MochiDatabase::class.java,
-        ).build()
-        try {
-            val repository = RoomAgentScheduleRepository(
-                database.agentScheduleDao(),
-                Clock.fixed(
-                    Instant.parse("2026-08-07T00:00:00Z"),
-                    ZoneOffset.UTC,
-                ),
-            )
-            val created = repository.set(
-                draft = AgentScheduleDraft(
-                    name = "Once",
-                    prompt = "Run once",
-                    type = AgentScheduleType.ONCE,
-                    runAt = Instant.parse("2026-08-07T02:00:00Z"),
-                    timezone = ZoneOffset.UTC,
-                ),
-            )
-            val completed = repository.recordResult(
-                created.id,
-                AgentScheduleResult.SUCCESS,
-                Instant.parse("2026-08-07T02:01:00Z"),
-            )
-
-            assertFalse(completed.enabled)
-            assertEquals(null, completed.nextRunAt)
-        } finally {
-            database.close()
-        }
-    }
-
-    @Test
-    fun `schedule tool supports concise set list run and remove operations`() =
-        runBlocking {
-            val database = androidx.room.Room.inMemoryDatabaseBuilder(
-                androidx.test.core.app.ApplicationProvider
-                    .getApplicationContext(),
-                MochiDatabase::class.java,
-            ).build()
-            try {
-                val repository = RoomAgentScheduleRepository(
-                    database.agentScheduleDao(),
-                    Clock.fixed(
-                        Instant.parse("2026-08-07T00:00:00Z"),
-                        ZoneOffset.UTC,
-                    ),
-                )
-                val controller = RecordingScheduleController()
-                val tool = ManageMochiScheduleTool(repository, controller)
-                val context = com.example.mochi_pet.core.agent.tool
-                    .ToolExecutionContext(
-                        currentDate = LocalDate.of(2026, 8, 7),
-                        currentSurface =
-                            com.example.mochi_pet.core.model.MochiSurface.Today,
-                    )
-                val created = tool.execute(
-                    buildJsonObject {
-                        put("operation", "set")
-                        put("name", "Morning brief")
-                        put("prompt", "Summarize the morning")
-                        put("schedule_type", "daily")
-                        put("local_time", "08:00")
-                        put("timezone", "Asia/Shanghai")
-                    },
-                    context,
-                )
-                val id = created.data!!.jsonObject["id"]!!
-                    .jsonPrimitive.content
-
-                val listed = tool.execute(
-                    buildJsonObject { put("operation", "list") },
-                    context,
-                )
-                assertEquals(
-                    1,
-                    listed.data!!.jsonObject["schedules"]!!.jsonArray.size,
-                )
-                tool.execute(
-                    buildJsonObject {
-                        put("operation", "run")
-                        put("id", id)
-                    },
-                    context,
-                )
-                tool.execute(
-                    buildJsonObject {
-                        put("operation", "remove")
-                        put("id", id)
-                    },
-                    context,
-                )
-
-                assertEquals(listOf(id), controller.ran)
-                assertEquals(listOf(id), controller.cancelled)
-                assertEquals(1, controller.synced.size)
-            } finally {
-                database.close()
-            }
-        }
-
-    private class RecordingScheduleController : AgentScheduleController {
-        val synced = mutableListOf<AgentSchedule>()
-        val cancelled = mutableListOf<String>()
-        val ran = mutableListOf<String>()
-
-        override suspend fun sync(schedule: AgentSchedule) {
-            synced += schedule
-        }
-
-        override suspend fun cancel(id: String) {
-            cancelled += id
-        }
-
-        override suspend fun runNow(id: String) {
-            ran += id
+            disk.close()
+            context.deleteDatabase(name)
         }
     }
 }

@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private val oauthCallbacks = Channel<String>(Channel.BUFFERED)
     private val providerShareCallbacks = Channel<String>(Channel.BUFFERED)
     private val agentLinkResults = Channel<AgentLinkAuthorizationResult>(Channel.BUFFERED)
+    private val plannerDates = Channel<com.example.mochi_pet.core.model.PlannerDestination>(Channel.BUFFERED)
     private val agentLinkLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -59,6 +60,7 @@ class MainActivity : AppCompatActivity() {
         handleVoiceTriggerIntent(intent)
         handleOAuthIntent(intent)
         handleProviderShareIntent(intent)
+        handlePlannerIntent(intent)
         enableEdgeToEdge()
         setContent {
             MochiTheme {
@@ -70,6 +72,7 @@ class MainActivity : AppCompatActivity() {
                     providerShareCallbacks =
                         providerShareCallbacks.receiveAsFlow(),
                     agentLinkResults = agentLinkResults.receiveAsFlow(),
+                    plannerDates = plannerDates.receiveAsFlow(),
                     launchAgentLink = { request ->
                         lifecycleScope.launch {
                             try {
@@ -90,6 +93,31 @@ class MainActivity : AppCompatActivity() {
         handleVoiceTriggerIntent(intent)
         handleOAuthIntent(intent)
         handleProviderShareIntent(intent)
+        handlePlannerIntent(intent)
+    }
+
+    private fun handlePlannerIntent(intent: Intent) {
+        val runId = intent.getStringExtra("planner_run_id")
+        val scheduleId = intent.getStringExtra("planner_schedule_id")
+        if (runId != null && scheduleId != null) {
+            intent.removeExtra("planner_run_id")
+            intent.removeExtra("planner_schedule_id")
+            if (runId.length in 1..200 && scheduleId.length in 1..200) {
+                plannerDates.trySend(com.example.mochi_pet.core.model.PlannerDestination.Result(scheduleId, runId))
+            }
+            return
+        }
+        val key = com.example.mochi_pet.platform.schedule.AndroidUserReminderController.EXTRA_PLANNER_DATE
+        val value = intent.getStringExtra(key) ?: return
+        intent.removeExtra(key)
+        try {
+            plannerDates.trySend(com.example.mochi_pet.core.model.PlannerDestination.Day(
+                java.time.LocalDate.parse(value), intent.getStringExtra("planner_occurrence_id")?.takeIf { it.length <= 200 },
+            ))
+            intent.removeExtra("planner_occurrence_id")
+        } catch (error: java.time.format.DateTimeParseException) {
+            android.util.Log.w("MochiPlanner", "Invalid planner notification date", error)
+        }
     }
 
     override fun onStart() {

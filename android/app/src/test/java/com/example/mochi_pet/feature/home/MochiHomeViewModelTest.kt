@@ -978,7 +978,7 @@ class MochiHomeViewModelTest {
 private class PlannerStoreFake(
     private val events: List<CalendarEvent> = emptyList(),
     todos: List<MochiTodo> = emptyList(),
-) : PlannerStore {
+) : com.example.mochi_pet.core.database.TestPlannerStore() {
     private val todos = todos.toMutableList()
     var requestedTodoDate: LocalDate? = null
     val completedTodoIds = mutableListOf<String>()
@@ -1006,7 +1006,7 @@ private class PlannerStoreFake(
         draft: CalendarEventDraft,
     ): CalendarEvent = unsupported()
 
-    override suspend fun updateCalendarEvent(event: CalendarEvent): CalendarEvent =
+    override suspend fun updateCalendarEvent(event: CalendarEvent, indefiniteRecurrence: Boolean): CalendarEvent =
         unsupported()
 
     override suspend fun getCalendarEvent(id: String): CalendarEvent? =
@@ -1021,7 +1021,7 @@ private class PlannerStoreFake(
 
     override suspend fun getTodo(id: String): MochiTodo? = unsupported()
 
-    override suspend fun completeTodo(id: String): MochiTodo {
+    override suspend fun completeTodo(id: String, expectedRevision: Long?): MochiTodo {
         val index = todos.indexOfFirst { it.id == id }
         if (index < 0) {
             return unsupported()
@@ -1038,7 +1038,7 @@ private class PlannerStoreFake(
     override suspend fun listTodosByStatus(status: TodoStatus): List<MochiTodo> =
         unsupported()
 
-    override suspend fun deleteTodo(id: String) = unsupported<Unit>()
+    override suspend fun deleteTodo(id: String, expectedRevision: Long?) = unsupported<Unit>()
 
     private fun <T> unsupported(): T =
         throw UnsupportedOperationException("Not required by this test")

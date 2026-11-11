@@ -417,8 +417,13 @@ independently of LLM provider configuration and do not require a provider
 connection to edit or save.
 
 Conversation persistence, recent-context settings, retrieval and prompt evidence
-are defined in [Memory design](MEMORY_DESIGN.md), together with device results,
-diagnostic instructions and the separately marked event-based proposal.
+are defined in [Memory design](MEMORY_DESIGN.md), together with explicit
+journal-guided recall, its permission boundaries and diagnostic instructions.
+
+Daily journal uses that document's [independent summary pipeline](MEMORY_DESIGN.md#17-daily-journal),
+not `AgentOrchestrator`, `PromptBuilder`, memory recall or a Tool/Skill.
+Its Worker shares only the configured Provider transport and cancellation
+coordinator; midnight processing never opens UI, emits speech or runs actions.
 
 Skills follow the Agent Skills format: a root `SKILL.md` with required `name`
 and `description` frontmatter plus optional `license`, `compatibility`,
@@ -434,6 +439,15 @@ Knowledge require **any one** enabled Tool from their connected, enabled
 provider. All other Skills require every declared mandatory Tool; explicitly
 optional capabilities do not block enablement. Provider-backed groups require
 the provider to be installed when applicable, connected, and enabled.
+
+`builtin:memory-recall` is first in Skills, with discovery name `memory-recall`
+and mandatory `recall_memory`. Its enabled state comes only from Daily journal;
+independent stored overrides are ignored and direct toggles rejected. It is
+discoverable/loadable only with its foreground Tool available. Its short
+instructions guide journal-first lookup, original-turn verification, fallback
+after misses and source/time distinctions; they do not enforce unnecessary
+retrieval when existing context suffices.
+
 The UI reports the aggregate label, such as
 `Tencent Docs MCP`, rather than raw Tool IDs. If readiness later fails, the
 saved preference remains but the Skill is omitted from discovery and
@@ -544,6 +558,45 @@ todos
 Store instants in UTC and preserve timezone IDs for display and recurrence.
 Date-only values use ISO `LocalDate`. Room migrations must be tested from every
 released schema version.
+
+Schema 6 adds revision-checked planner changes, completion and recurrence
+exceptions, durable `agent_schedule_runs` and `planner_reminder_receipts`.
+Existing events, todos, priority, completion and indefinite rules are preserved.
+Occurrence IDs combine the series ID and original scheduled instant; moving a
+single occurrence retains its identity. Query expansion is bounded to 367 days.
+The supported RRULE subset is DAILY/WEEKLY/MONTHLY/YEARLY, INTERVAL, plain BYDAY,
+one BYMONTHDAY (including negative month-end offsets), and COUNT or UNTIL.
+Unsupported clauses are explicit errors, not silently approximated. Invalid
+dates and DST gaps are skipped; date-only duration follows local date boundaries.
+Future edits split a series transactionally, retaining previous occurrences,
+completed exceptions and the remaining count. Occurrence overrides cascade on
+series deletion.
+
+UI and Tools share planner/schedule repositories. Native defaults, optimistic
+revisions, completion and recurrence calculation do not depend on Skill prose.
+Run reservation and advancement of the future plan are transactional. A manual
+run consumes no scheduled quota; an overlapping planned slot is recorded as
+skipped-busy. Interval cadence remains completion-relative. Durable queued
+receipts reconcile with unique WorkManager jobs; a restarted RUNNING receipt
+becomes interrupted rather than replaying uncertain side effects. Results retain
+the start configuration and survive deletion of the plan.
+
+The date agenda and its category markers use the same bounded date projection
+and persisted run window. Daily/weekly rules follow wall time and skip DST gaps;
+future projections honor enablement, expiry and remaining quota. Interval dates
+are approximate projections because actual cadence is completion-relative.
+Past projections use the current rule and are explicitly unverified; they cannot
+reconstruct past edits, pauses or consumed quota. Actual runs group by plan/date,
+including deleted plans, and retain their own names and outcomes.
+
+User reminder reconciliation reads persisted unfinished occurrences, posts due
+notifications and arms the next AlarmManager alarm. A daily WorkManager sweep,
+database invalidation, app startup and system time/boot/permission reconciliation
+refresh the window. Only explicitly configured reminders participate. Delivery
+receipts and stable notification tags suppress repeat announcements; missing
+notification permission blocks delivery and unavailable exact-alarm permission
+uses an explicitly reported approximate alarm. A bounded one-day catch-up window
+avoids flooding the user after long inactivity. No LLM or network is involved.
 
 The day planner is shared by Today and calendar-date navigation. Todo queries
 order active rows before completed rows. Creation normalizes a missing

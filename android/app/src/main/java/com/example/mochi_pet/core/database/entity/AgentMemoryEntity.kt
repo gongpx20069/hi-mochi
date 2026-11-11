@@ -25,4 +25,6 @@ data class AgentMemoryEntity(
     val searchText: String,
     @ColumnInfo(name = "created_at_epoch_millis")
     val createdAtEpochMillis: Long,
+    @ColumnInfo(name = "source_run_id")
+    val sourceRunId: String? = null,
 )

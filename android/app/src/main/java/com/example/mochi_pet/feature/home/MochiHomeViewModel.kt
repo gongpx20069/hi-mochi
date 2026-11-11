@@ -22,7 +22,6 @@ import com.example.mochi_pet.core.agent.AgentReply
 import com.example.mochi_pet.core.agent.AgentRunRequest
 import com.example.mochi_pet.core.agent.AgentRunner
 import com.example.mochi_pet.core.agent.tool.ManageMochiCalendarTool
-import com.example.mochi_pet.core.agent.tool.ManageMochiTodoTool
 import com.example.mochi_pet.core.agent.tool.AgentToolJson
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
@@ -138,6 +137,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -168,6 +168,13 @@ data class PlannerSurfaceState(
     val todos: List<MochiTodo> = emptyList(),
     val schedules: List<AgentSchedule> = emptyList(),
     val errorMessage: String? = null,
+    val occupiedDates: Set<LocalDate> = emptySet(),
+    val highlightIds: List<String> = emptyList(),
+    val taskDays: List<com.example.mochi_pet.core.schedule.ScheduleDay> = emptyList(),
+    val allSchedules: List<AgentSchedule> = emptyList(),
+    val userDates: Set<LocalDate> = emptySet(),
+    val taskDates: Set<LocalDate> = emptySet(),
+    val journalDates: Set<LocalDate> = emptySet(),
 )
 
 data class PersonaUiState(
@@ -314,6 +321,7 @@ class MochiHomeViewModel(
     private val plannerStore: PlannerStore,
     private val agentScheduleStore: AgentScheduleStore? = null,
     private val agentScheduleController: AgentScheduleController? = null,
+    private val userReminderController: com.example.mochi_pet.core.model.UserReminderController? = null,
     private val providerSettingsRepository: ProviderSettingsRepository? = null,
     private val providerRuns: com.example.mochi_pet.core.settings.ProviderRunCoordinator =
         com.example.mochi_pet.core.settings.ProviderRunCoordinator(),
@@ -348,6 +356,7 @@ class MochiHomeViewModel(
     private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : ViewModel() {
     private val mutableSurface = MutableStateFlow<MochiSurface>(MochiSurface.Face)
+    private var plannerHighlights: List<String> = emptyList()
     private val mutablePlannerState = MutableStateFlow(PlannerSurfaceState())
     private val mutableConversationState =
         MutableStateFlow(ConversationUiState())
@@ -468,6 +477,15 @@ class MochiHomeViewModel(
             ?: unavailableLocationPermissionRequest.asStateFlow()
 
     init {
+        viewModelScope.launch(ioDispatcher) {
+            kotlinx.coroutines.flow.merge(plannerStore.changes, agentScheduleStore?.changes ?: kotlinx.coroutines.flow.emptyFlow())
+                .collect {
+                    if (mutableSurface.value is MochiSurface.CalendarDay || mutableSurface.value == MochiSurface.Today ||
+                        mutableSurface.value is MochiSurface.CalendarMonth || mutableSurface.value is MochiSurface.Todo) {
+                        load(mutableSurface.value)
+                    }
+                }
+        }
         loadProviderSettings()
         loadSpeechSettings()
         loadAgentContext()
@@ -739,7 +757,94 @@ class MochiHomeViewModel(
                 load(mutableSurface.value)
             }.onFailure(::showError)
         }
+
     }
+
+    private val mutablePlannerResults = MutableStateFlow<PlannerResultSelection?>(null)
+    val plannerResults: StateFlow<PlannerResultSelection?> = mutablePlannerResults.asStateFlow()
+
+    fun dismissPlannerResults() {
+        mutablePlannerResults.value = null
+    }
+
+    fun openPlannerDestination(destination: com.example.mochi_pet.core.model.PlannerDestination) {
+        when (destination) {
+            is com.example.mochi_pet.core.model.PlannerDestination.Day -> {
+                plannerHighlights = listOfNotNull(destination.occurrenceId)
+                navigate(MochiNavigationIntent.ShowCalendarDay(destination.date))
+            }
+            is com.example.mochi_pet.core.model.PlannerDestination.Result -> viewModelScope.launch(ioDispatcher) {
+                runCatching {
+                    val run = requireNotNull(requireNotNull(agentScheduleStore).run(destination.runId)) { "Execution not found" }
+                    require(run.scheduleId == destination.scheduleId) { "Execution does not belong to this task" }
+                    mutablePlannerResults.value = PlannerResultSelection(run.scheduleId, run.name, run.id)
+                }.onFailure(::showError)
+            }
+        }
+    }
+
+        val plannerActions = PlannerUiActions(
+            saveUser = { event, todo, draft, scope ->
+                withContext(ioDispatcher) {
+                    when {
+                        event != null -> plannerStore.updateCalendarOccurrence(event.copy(
+                            title = draft.title, description = draft.description, startAt = draft.startAt, endAt = draft.endAt,
+                            allDay = draft.allDay, timezone = draft.timezone, recurrenceRule = draft.recurrenceRule,
+                            location = draft.location, reminderAt = draft.reminderAt,
+                        ), scope)
+                        todo != null && draft.recurrenceRule == null -> plannerStore.updateTodo(todo.copy(
+                            content = draft.title, scheduledDate = draft.startAt.atZone(draft.timezone).toLocalDate(),
+                            dueAt = draft.startAt.takeUnless { draft.allDay }, reminderAt = draft.reminderAt,
+                        ))
+                        todo != null -> plannerStore.promoteTodo(todo, draft)
+                        draft.allDay && draft.recurrenceRule == null -> plannerStore.createTodo(MochiTodoDraft(
+                            content = draft.title, scheduledDate = draft.startAt.atZone(draft.timezone).toLocalDate(),
+                            reminderAt = draft.reminderAt,
+                        ))
+                        else -> plannerStore.createCalendarEvent(draft)
+                    }
+                    val readiness = try {
+                        userReminderController?.sync()
+                    } catch (error: Exception) {
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        AGENT_LOGGER.log(java.util.logging.Level.WARNING, "User schedule saved but reminders could not be registered", error)
+                        return@withContext localizeUiText("Schedule saved, but reminder registration failed. Check notification settings.")
+                    }
+                    load(mutableSurface.value)
+                    if (draft.reminderAt == null) null else when (readiness) {
+                        com.example.mochi_pet.core.model.ReminderReadiness.READY -> null
+                        com.example.mochi_pet.core.model.ReminderReadiness.APPROXIMATE ->
+                            localizeUiText("Schedule saved. Exact alarms are disabled; the reminder may be delayed.")
+                        else -> localizeUiText("Schedule saved, but notifications are disabled. Enable them in Android settings.")
+                    }
+                }
+            },
+            completeUser = { event ->
+                viewModelScope.launch(ioDispatcher) {
+                    runCatching { plannerStore.completeCalendarOccurrence(event.occurrenceId, event.revision) }
+                        .onSuccess { load(mutableSurface.value) }.onFailure(::showError)
+                }
+            },
+            deleteUser = { event, todo, scope ->
+                withContext(ioDispatcher) {
+                    if (event != null) plannerStore.deleteCalendarOccurrence(event.occurrenceId, event.revision, scope)
+                    else plannerStore.deleteTodo(requireNotNull(todo).id, todo.revision)
+                    load(mutableSurface.value)
+                }
+            },
+            saveTask = { existing, draft ->
+                withContext(ioDispatcher) {
+                    val saved = requireNotNull(agentScheduleStore).set(existing?.id, draft)
+                    requireNotNull(agentScheduleController).sync(saved)
+                    load(mutableSurface.value)
+                }
+            },
+            results = { id, offset -> withContext(ioDispatcher) { requireNotNull(agentScheduleStore).runs(id, 20, offset) } },
+            result = { id -> withContext(ioDispatcher) { requireNotNull(requireNotNull(agentScheduleStore).run(id)) { "Execution not found" } } },
+            showResults = { task -> mutablePlannerResults.value = PlannerResultSelection(task.id, task.name) },
+            showRun = { run -> mutablePlannerResults.value = PlannerResultSelection(run.scheduleId, run.name, run.id) },
+            changes = agentScheduleStore?.changes ?: kotlinx.coroutines.flow.emptyFlow(),
+        )
 
     fun setScheduleEnabled(
         id: String,
@@ -769,6 +874,8 @@ class MochiHomeViewModel(
         viewModelScope.launch(ioDispatcher) {
             runCatching {
                 controller.runNow(id)
+            }.onSuccess { run ->
+                mutablePlannerResults.value = PlannerResultSelection(run.scheduleId, run.name, run.id)
             }.onFailure(::showError)
         }
     }
@@ -875,9 +982,20 @@ class MochiHomeViewModel(
                     recentTurns = agentSettings.recentConversationTurns,
                 )
                 val sink = UiDirectiveSink { decision ->
+                    val selection = decision.directive.scheduleId?.let { scheduleId ->
+                        val store = requireNotNull(agentScheduleStore) { "Scheduled tasks unavailable" }
+                        val run = decision.directive.runId?.let { requireNotNull(store.run(it)) { "Execution not found" } }
+                        require(run == null || run.scheduleId == scheduleId) { "Execution does not belong to this task" }
+                        val name = store.get(scheduleId)?.name ?: run?.name
+                            ?: store.runs(scheduleId, 1).firstOrNull()?.name
+                            ?: throw IllegalArgumentException("Scheduled task not found")
+                        PlannerResultSelection(scheduleId, name, run?.id)
+                    }
                     withContext(mainDispatcher) {
                         if (version == interactionVersion) {
+                            plannerHighlights = decision.directive.highlightIds
                             navigate(decision.intent)
+                            if (selection != null) mutablePlannerResults.value = selection
                         }
                     }
                 }
@@ -2727,7 +2845,6 @@ class MochiHomeViewModel(
             MochiSurface.Settings,
             MochiSurface.Skills,
             MochiSurface.Tools,
-            is MochiSurface.CalendarMonth,
             -> {
                 mutablePlannerState.value = PlannerSurfaceState()
                 return
@@ -2758,7 +2875,7 @@ class MochiHomeViewModel(
                 loadPlannerState(target)
             }.onSuccess { state ->
                 if (version == loadVersion && target == mutableSurface.value) {
-                    mutablePlannerState.value = state
+                    mutablePlannerState.value = state.copy(highlightIds = plannerHighlights)
                 }
             }.onFailure { error ->
                 if (version == loadVersion && target == mutableSurface.value) {
@@ -2770,8 +2887,11 @@ class MochiHomeViewModel(
 
     private suspend fun loadPlannerState(target: MochiSurface): PlannerSurfaceState =
         when (target) {
-            MochiSurface.Today -> loadDay(LocalDate.now(clock))
-            is MochiSurface.CalendarDay -> loadDay(target.date)
+            MochiSurface.Today -> loadAgenda(LocalDate.now(clock))
+            is MochiSurface.CalendarDay -> loadAgenda(target.date)
+            is MochiSurface.CalendarMonth -> {
+                loadAgenda(LocalDate.now(clock).takeIf { YearMonth.from(it) == target.month } ?: target.month.atDay(1))
+            }
             is MochiSurface.Todo -> {
                 val todos = if (target.date == null) {
                     plannerStore.listTodosByStatus(
@@ -2949,6 +3069,22 @@ class MochiHomeViewModel(
             else -> "多变"
         }
 
+    private suspend fun loadAgenda(selected: LocalDate): PlannerSurfaceState {
+        val month = YearMonth.from(selected)
+        val start = month.atDay(1).with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+        val end = month.atEndOfMonth().with(java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.SUNDAY)).plusDays(1)
+        val zone = clock.zone
+        val dates = mutableSetOf<LocalDate>()
+        plannerStore.listCalendarEvents(start.atStartOfDay(zone).toInstant(), end.atStartOfDay(zone).toInstant()).forEach { event ->
+            var day = maxOf(start, event.startAt.atZone(zone).toLocalDate())
+            val last = minOf(end.minusDays(1), (event.endAt?.minusNanos(1) ?: event.startAt).atZone(zone).toLocalDate())
+            while (day <= last) { dates += day; day = day.plusDays(1) }
+        }
+        plannerStore.listTodosInRange(start, end).mapNotNullTo(dates) { it.scheduledDate }
+        val taskDates = agentScheduleStore?.markedDates(start, end, zone).orEmpty()
+        return loadDay(selected).copy(userDates = dates, taskDates = taskDates, occupiedDates = dates + taskDates)
+    }
+
     private suspend fun loadDay(date: LocalDate): PlannerSurfaceState {
         val range = dayRange(date, clock.zone)
         return coroutineScope {
@@ -2956,23 +3092,20 @@ class MochiHomeViewModel(
                 plannerStore.listCalendarEvents(range.start, range.end)
             }
             val todos = async(ioDispatcher) {
-                if (date == LocalDate.now(clock)) {
-                    val active = plannerStore.listActiveTodosThroughDate(date)
-                    val completedToday = plannerStore.listTodosForDate(date)
-                        .filter { it.status == TodoStatus.COMPLETED }
-                    active + completedToday
-                } else {
-                    plannerStore.listTodosForDate(date)
-                }
+                plannerStore.listAgendaTodos(date, LocalDate.now(clock))
             }
             val schedules = async(ioDispatcher) {
-                agentScheduleStore?.listForDate(date).orEmpty()
+                agentScheduleStore?.agenda(date, clock.zone).orEmpty()
             }
+            val allSchedules = async(ioDispatcher) { agentScheduleStore?.list().orEmpty() }
+            val taskDays = schedules.await()
             PlannerSurfaceState(
                 date = date,
                 events = events.await(),
                 todos = todos.await(),
-                schedules = schedules.await(),
+                schedules = taskDays.mapNotNull { it.plan },
+                taskDays = taskDays,
+                allSchedules = allSchedules.await(),
             )
         }
     }
@@ -3025,6 +3158,7 @@ class MochiHomeViewModel(
                         agentScheduleStore = application.agentScheduleStore,
                         agentScheduleController =
                             application.agentScheduleController,
+                        userReminderController = application.userReminderController,
                         providerSettingsRepository =
                             application.providerSettingsRepository,
                         providerRuns = application.providerRuns,

@@ -202,10 +202,6 @@ private data class AddTodoRequest(
     val scheduledDate: LocalDate?,
 )
 
-private enum class PlannerSection {
-    TODAY,
-    CALENDAR,
-}
 
 private sealed interface MarkdownBlock {
     data class Heading(
@@ -242,6 +238,7 @@ fun MochiApp(
     providerShareCallbacks: Flow<String>,
     agentLinkResults: Flow<AgentLinkAuthorizationResult>,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
+    plannerDates: Flow<com.example.mochi_pet.core.model.PlannerDestination> = kotlinx.coroutines.flow.emptyFlow(),
 ) {
     val context = LocalContext.current
     val application = context.applicationContext as MochiApplication
@@ -250,6 +247,14 @@ fun MochiApp(
         MochiHomeViewModel.factory(application, voiceRuntime, wakeRuntime)
     }
     val viewModel: MochiHomeViewModel = viewModel(factory = factory)
+    val journal: com.example.mochi_pet.feature.journal.JournalViewModel = viewModel(factory = remember(application) {
+        viewModelFactory { initializer {
+            com.example.mochi_pet.feature.journal.JournalViewModel(application.journalRepository, application.journalController)
+        } }
+    })
+    LaunchedEffect(plannerDates) {
+        plannerDates.collect(viewModel::openPlannerDestination)
+    }
     val taskCenter: TaskCenterViewModel = viewModel(factory = remember(application) {
         viewModelFactory { initializer { TaskCenterViewModel(application) } }
     })
@@ -270,6 +275,7 @@ fun MochiApp(
     val showTermuxTasks by viewModel.showTermuxTasks.collectAsStateWithLifecycle()
     LifecycleResumeEffect(Unit) {
         viewModel.refreshTools()
+        journal.refresh()
         onPauseOrDispose { }
     }
     LaunchedEffect(agentLinkResults) {
@@ -309,6 +315,10 @@ fun MochiApp(
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
                 grants[Manifest.permission.ACCESS_FINE_LOCATION] == true,
         )
+    }
+    val plannerResult by viewModel.plannerResults.collectAsStateWithLifecycle()
+    plannerResult?.let {
+        ScheduleResultsSheet(it, viewModel.plannerActions, viewModel::dismissPlannerResults)
     }
     val startVoice = { trigger: VoiceInputTrigger ->
         if (
@@ -440,6 +450,7 @@ fun MochiApp(
 
     MochiAppContent(
         viewModel = viewModel,
+        journal = journal,
         taskCenter = taskCenter,
         onStartVoice = { startVoice(VoiceInputTrigger.DIRECT) },
         onEnableWake = enableWake,
@@ -450,12 +461,28 @@ fun MochiApp(
 @Composable
 private fun MochiAppContent(
     viewModel: MochiHomeViewModel,
+    journal: com.example.mochi_pet.feature.journal.JournalViewModel,
     taskCenter: TaskCenterViewModel,
     onStartVoice: () -> Unit,
     onEnableWake: () -> Unit,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
     val surface by viewModel.surface.collectAsStateWithLifecycle()
+    val plannerToday by journal.today.collectAsStateWithLifecycle()
+    val journalSettingsState by journal.settings.collectAsStateWithLifecycle()
+    LaunchedEffect(plannerToday) {
+        if (surface == MochiSurface.Today) viewModel.navigate(MochiNavigationIntent.ShowToday)
+    }
+    val journalDates by remember(surface, journal, plannerToday) {
+        val month = when (surface) {
+            MochiSurface.Today -> YearMonth.from(plannerToday)
+            is MochiSurface.CalendarDay -> YearMonth.from((surface as MochiSurface.CalendarDay).date)
+            is MochiSurface.CalendarMonth -> (surface as MochiSurface.CalendarMonth).month
+            else -> null
+        }
+        month?.let { journal.markers(it) }
+            ?: kotlinx.coroutines.flow.flowOf(emptySet<LocalDate>())
+    }.collectAsStateWithLifecycle(emptySet())
     val plannerState by viewModel.plannerState.collectAsStateWithLifecycle()
     val conversationState by
         viewModel.conversationState.collectAsStateWithLifecycle()
@@ -732,8 +759,11 @@ private fun MochiAppContent(
             }
         }
         SurfaceContent(
+            plannerToday = plannerToday,
             surface = surface,
-            plannerState = plannerState,
+            plannerState = plannerState.copy(occupiedDates = plannerState.occupiedDates + journalDates, journalDates = journalDates),
+            journalSettings = { com.example.mochi_pet.feature.journal.JournalSettings(journal) },
+            journalDay = { date, showControls -> com.example.mochi_pet.feature.journal.JournalDay(journal, date, showControls) },
             conversationState = conversationState,
             providerSettingsState = providerSettingsState,
             speechSettingsState = speechSettingsState,
@@ -745,8 +775,12 @@ private fun MochiAppContent(
             pipelineState = visiblePipelineState,
             wakeState = wakeState,
             wakeFeedback = wakeFeedback,
-            skillsState = skillsState,
-            toolsState = toolsState,
+            skillsState = skillsState.copy(skills = skillsState.skills.map {
+                if (it.id == "builtin:memory-recall") it.copy(enabled = journalSettingsState?.enabled == true) else it
+            }),
+            toolsState = toolsState.copy(catalog = toolsState.catalog.copy(builtInTools = toolsState.catalog.builtInTools.map {
+                if (it.name == "recall_memory") it.copy(enabled = journalSettingsState?.enabled == true) else it
+            })),
             weatherState = weatherState,
             homeCard = homeCard,
             cameraSnapshot = cameraSnapshot,
@@ -815,6 +849,7 @@ private fun MochiAppContent(
                 addTodoRequest = AddTodoRequest(date)
             },
             onCompleteTodo = viewModel::completeTodo,
+            plannerActions = viewModel.plannerActions,
             onSetScheduleEnabled = viewModel::setScheduleEnabled,
             onRunSchedule = viewModel::runSchedule,
             onRemoveSchedule = viewModel::removeSchedule,
@@ -1414,6 +1449,9 @@ private fun FocusStandbyScreen(
 
 @Composable
 private fun SurfaceContent(
+    plannerToday: LocalDate,
+    journalSettings: @Composable () -> Unit,
+    journalDay: @Composable (LocalDate, Boolean) -> Unit,
     surface: MochiSurface,
     plannerState: PlannerSurfaceState,
     conversationState: ConversationUiState,
@@ -1490,6 +1528,7 @@ private fun SurfaceContent(
     onSetMcpToolEnabled: (String, String, Boolean) -> Unit,
     onAddTodo: (LocalDate?) -> Unit,
     onCompleteTodo: (String) -> Unit,
+    plannerActions: PlannerUiActions,
     onSetScheduleEnabled: (String, Boolean) -> Unit,
     onRunSchedule: (String) -> Unit,
     onRemoveSchedule: (String) -> Unit,
@@ -1499,6 +1538,11 @@ private fun SurfaceContent(
     modifier: Modifier = Modifier,
     onSetMediaAppPackages: (Set<String>) -> Unit = {},
 ) {
+    var focusJournalSettings by rememberSaveable { mutableStateOf(false) }
+    val openJournalSettings = {
+        focusJournalSettings = true
+        onNavigate(MochiNavigationIntent.ShowSettings)
+    }
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -1534,6 +1578,9 @@ private fun SurfaceContent(
                 onRemoteTask = { onAgentLinkAction(AgentLinkUiAction.OpenChat(it.link)) },
             )
             MochiSurface.Settings -> ProviderSettingsSurface(
+                journalSettings = journalSettings,
+                focusJournalSettings = focusJournalSettings,
+                onJournalSettingsFocused = { focusJournalSettings = false },
                 state = providerSettingsState,
                 speechState = speechSettingsState,
                 speechVoiceState = speechVoiceState,
@@ -1562,6 +1609,7 @@ private fun SurfaceContent(
                 onSavePersona = onSavePersona,
             )
             MochiSurface.Skills -> SkillsSurface(
+                onOpenJournalSettings = openJournalSettings,
                 state = skillsState,
                 onSearch = onSearchSkills,
                 onLoadPopular = onLoadPopularSkills,
@@ -1575,6 +1623,7 @@ private fun SurfaceContent(
                 onApplyUpdate = onApplySkillUpdate,
             )
             MochiSurface.Tools -> ToolsSurface(
+                onOpenJournalSettings = openJournalSettings,
                 state = toolsState,
                 onSetBuiltInEnabled = onSetBuiltInToolEnabled,
                 onConnectNotion = onConnectNotion,
@@ -1607,59 +1656,23 @@ private fun SurfaceContent(
                 onSetServerEnabled = onSetMcpServerEnabled,
                 onSetToolEnabled = onSetMcpToolEnabled,
             )
-            MochiSurface.Today -> DaySurface(
-                title = "Today",
+            MochiSurface.Today, is MochiSurface.CalendarMonth, is MochiSurface.CalendarDay -> PlannerAgenda(
+                journalDay = journalDay,
                 state = plannerState,
-                plannerSection = PlannerSection.TODAY,
-                onShowToday = {
-                    onNavigate(MochiNavigationIntent.ShowToday)
+                date = when (surface) {
+                    is MochiSurface.CalendarDay -> surface.date
+                    is MochiSurface.CalendarMonth -> plannerState.date ?: surface.month.atDay(1)
+                    else -> plannerToday
                 },
-                onShowCalendar = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            YearMonth.now(),
-                        ),
-                    )
-                },
-                onBackToMonth = null,
-                onAddTodo = onAddTodo,
+                today = plannerToday,
+                monthMode = surface is MochiSurface.CalendarMonth,
+                onDate = { onNavigate(MochiNavigationIntent.ShowCalendarDay(it)) },
+                onMonth = { onNavigate(MochiNavigationIntent.ShowCalendarMonth(it)) },
+                onToday = { onNavigate(MochiNavigationIntent.ShowToday) },
                 onCompleteTodo = onCompleteTodo,
-                onSetScheduleEnabled = onSetScheduleEnabled,
-                onRunSchedule = onRunSchedule,
-                onRemoveSchedule = onRemoveSchedule,
-            )
-            is MochiSurface.CalendarMonth -> CalendarMonthSurface(
-                month = surface.month,
-                onNavigate = onNavigate,
-            )
-            is MochiSurface.CalendarDay -> DaySurface(
-                title = surface.date.format(
-                    uiDateFormatter("EEEE, MMMM d", "M月d日 EEEE"),
-                ),
-                state = plannerState,
-                plannerSection = PlannerSection.CALENDAR,
-                onShowToday = {
-                    onNavigate(MochiNavigationIntent.ShowToday)
-                },
-                onShowCalendar = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            YearMonth.from(surface.date),
-                        ),
-                    )
-                },
-                onBackToMonth = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            YearMonth.from(surface.date),
-                        ),
-                    )
-                },
-                onAddTodo = onAddTodo,
-                onCompleteTodo = onCompleteTodo,
-                onSetScheduleEnabled = onSetScheduleEnabled,
-                onRunSchedule = onRunSchedule,
-                onRemoveSchedule = onRemoveSchedule,
+                actions = plannerActions,
+                onRun = onRunSchedule,
+                onRemove = onRemoveSchedule,
             )
             is MochiSurface.Todo -> TodoSurface(
                 state = plannerState,
@@ -3070,276 +3083,6 @@ private fun MochiExpression(stage: ChatPipelineStage) {
 }
 
 @Composable
-private fun DaySurface(
-    title: String,
-    state: PlannerSurfaceState,
-    plannerSection: PlannerSection,
-    onShowToday: () -> Unit,
-    onShowCalendar: () -> Unit,
-    onBackToMonth: (() -> Unit)?,
-    onAddTodo: (LocalDate?) -> Unit,
-    onCompleteTodo: (String) -> Unit,
-    onSetScheduleEnabled: (String, Boolean) -> Unit,
-    onRunSchedule: (String) -> Unit,
-    onRemoveSchedule: (String) -> Unit,
-) {
-    val date = state.date
-    val activeTodos = state.todos.filter { it.status == TodoStatus.ACTIVE }
-    val completedTodos = state.todos.filter {
-        it.status == TodoStatus.COMPLETED
-    }
-    val hasCarriedTodos = activeTodos.any {
-        it.scheduledDate != null &&
-            date != null &&
-            it.scheduledDate < date
-    }
-    Column(modifier = Modifier.fillMaxSize()) {
-        PlannerSectionTabs(
-            selected = plannerSection,
-            onShowToday = onShowToday,
-            onShowCalendar = onShowCalendar,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        onBackToMonth?.let {
-            TextButton(onClick = it) {
-                Text(
-                    "Back to ${
-                        date?.format(uiDateFormatter("MMMM", "M月"))
-                    }",
-                )
-            }
-        }
-        SurfaceHeader(
-            title = title,
-            subtitle = date?.format(
-                uiDateFormatter(
-                    "EEEE, MMMM d, yyyy",
-                    "yyyy年M月d日 EEEE",
-                ),
-            ).orEmpty(),
-        )
-        PlannerStatus(state)
-        if (!state.isLoading) {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                if (state.schedules.isNotEmpty()) {
-                    item { SectionTitle("Agent schedules") }
-                    items(
-                        state.schedules,
-                        key = AgentSchedule::id,
-                    ) { schedule ->
-                        AgentScheduleRow(
-                            schedule = schedule,
-                            onSetEnabled = onSetScheduleEnabled,
-                            onRun = onRunSchedule,
-                            onRemove = onRemoveSchedule,
-                        )
-                    }
-                }
-                if (state.events.isNotEmpty()) {
-                    item { SectionTitle("Events") }
-                    items(state.events, key = CalendarEvent::id) { event ->
-                        EventRow(event)
-                    }
-                }
-                item {
-                    SectionTitle(
-                        if (hasCarriedTodos) {
-                            "Active · includes carry-over"
-                        } else {
-                            "Active"
-                        },
-                    )
-                }
-                if (activeTodos.isEmpty()) {
-                    item { EmptyRow("No active todos") }
-                } else {
-                    items(activeTodos, key = MochiTodo::id) { todo ->
-                        TodoRow(
-                            todo = todo,
-                            displayDate = date,
-                            onCompleteTodo = onCompleteTodo,
-                        )
-                    }
-                }
-                if (completedTodos.isNotEmpty()) {
-                    item { SectionTitle("Completed") }
-                    items(completedTodos, key = MochiTodo::id) { todo ->
-                        TodoRow(
-                            todo = todo,
-                            displayDate = date,
-                            onCompleteTodo = onCompleteTodo,
-                        )
-                    }
-                }
-            }
-        }
-        Button(
-            onClick = { onAddTodo(date) },
-            enabled = date != null,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Add todo")
-        }
-    }
-}
-
-@Composable
-private fun CalendarMonthSurface(
-    month: YearMonth,
-    onNavigate: (MochiNavigationIntent) -> Unit,
-) {
-    val firstDayOffset = month.atDay(1).dayOfWeek.value - 1
-    val cells = buildList<LocalDate?> {
-        repeat(firstDayOffset) { add(null) }
-        for (day in 1..month.lengthOfMonth()) {
-            add(month.atDay(day))
-        }
-        while (size % 7 != 0) {
-            add(null)
-        }
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        PlannerSectionTabs(
-            selected = PlannerSection.CALENDAR,
-            onShowToday = {
-                onNavigate(MochiNavigationIntent.ShowToday)
-            },
-            onShowCalendar = {
-                onNavigate(
-                    MochiNavigationIntent.ShowCalendarMonth(
-                        YearMonth.now(),
-                    ),
-                )
-            },
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(
-                onClick = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            month.minusMonths(1),
-                        ),
-                    )
-                },
-            ) {
-                Text("Previous")
-            }
-            Text(
-                text = month.format(
-                    uiDateFormatter("MMMM yyyy", "yyyy年M月"),
-                ),
-                color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            TextButton(
-                onClick = {
-                    onNavigate(
-                        MochiNavigationIntent.ShowCalendarMonth(
-                            month.plusMonths(1),
-                        ),
-                    )
-                },
-            ) {
-                Text("Next")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach {
-                Text(
-                    text = it,
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        cells.chunked(7).forEach { week ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                week.forEach { date ->
-                    if (date == null) {
-                        Spacer(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                        )
-                    } else {
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp)
-                                .clickable {
-                                    onNavigate(
-                                        MochiNavigationIntent.ShowCalendarDay(date),
-                                    )
-                                },
-                            color = if (date == LocalDate.now()) {
-                                Color.White
-                            } else {
-                                Color(0xFF202020)
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = date.dayOfMonth.toString(),
-                                    color = if (date == LocalDate.now()) {
-                                        Color.Black
-                                    } else {
-                                        Color.White
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-    }
-}
-
-@Composable
-private fun PlannerSectionTabs(
-    selected: PlannerSection,
-    onShowToday: () -> Unit,
-    onShowCalendar: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SkillSectionTab(
-            label = "Today",
-            selected = selected == PlannerSection.TODAY,
-            onClick = onShowToday,
-            modifier = Modifier.weight(1f),
-        )
-        SkillSectionTab(
-            label = "Calendar",
-            selected = selected == PlannerSection.CALENDAR,
-            onClick = onShowCalendar,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
 private fun TodoSurface(
     state: PlannerSurfaceState,
     onAddTodo: () -> Unit,
@@ -3391,6 +3134,7 @@ private fun SkillsSurface(
     onDelete: (String) -> Unit,
     onCheckUpdates: () -> Unit,
     onApplyUpdate: (String) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     var explore by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -3505,6 +3249,7 @@ private fun SkillsSurface(
             } else {
                 items(state.skills, key = MochiSkill::id) { skill ->
                     InstalledSkillCard(
+                        onOpenJournalSettings = onOpenJournalSettings,
                         skill = skill,
                         readiness = state.readinessById[skill.id],
                         onView = { selectedSkill = skill },
@@ -3598,8 +3343,8 @@ private fun SkillsSurface(
 }
 
 private val MOCHI_BUILT_IN_TOOL_NAMES = setOf(
+    "recall_memory",
     "manage_mochi_calendar",
-    "manage_mochi_todo",
     "manage_mochi_schedule",
     "get_current_location",
     "get_current_weather",
@@ -3616,6 +3361,7 @@ private fun BuiltInToolGroupCard(
     disabled: Boolean,
     onToggleExpanded: () -> Unit,
     onSetEnabled: (String, Boolean) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     PlannerCard {
         Text(
@@ -3643,6 +3389,7 @@ private fun BuiltInToolGroupCard(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 tools.forEach { tool ->
                     BuiltInToolRow(
+                        onOpenJournalSettings = onOpenJournalSettings,
                         tool = tool,
                         disabled = disabled,
                         onSetEnabled = onSetEnabled,
@@ -3673,6 +3420,7 @@ internal fun BuiltInToolRow(
     tool: BuiltInToolSummary,
     disabled: Boolean,
     onSetEnabled: (String, Boolean) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -3697,7 +3445,9 @@ internal fun BuiltInToolRow(
                 fontFamily = FontFamily.Monospace,
             )
         }
-        Switch(
+        if (tool.name == "recall_memory") {
+            com.example.mochi_pet.feature.journal.JournalManagedControl(tool.enabled, onOpenJournalSettings)
+        } else Switch(
             checked = tool.enabled,
             onCheckedChange = { onSetEnabled(tool.name, it) },
             enabled = !disabled,
@@ -3737,6 +3487,7 @@ internal fun ToolsSurface(
     onRemoveServer: (String) -> Unit,
     onSetServerEnabled: (String, Boolean) -> Unit,
     onSetToolEnabled: (String, String, Boolean) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     var showAddServer by remember { mutableStateOf(false) }
     var showAddTool by remember { mutableStateOf(false) }
@@ -3799,7 +3550,7 @@ internal fun ToolsSurface(
                 item {
                     BuiltInToolGroupCard(
                         title = "Mochi Built-ins",
-                        subtitle = "Calendar, todos, schedules, weather, navigation, and sandbox",
+                        subtitle = "Memory recall, schedules, weather, navigation, and sandbox",
                         tools = mochiTools,
                         expanded = mochiToolsExpanded,
                         disabled = state.isLoading,
@@ -3807,6 +3558,7 @@ internal fun ToolsSurface(
                             mochiToolsExpanded = !mochiToolsExpanded
                         },
                         onSetEnabled = onSetBuiltInEnabled,
+                        onOpenJournalSettings = onOpenJournalSettings,
                     )
                 }
             }
@@ -4771,6 +4523,7 @@ internal fun InstalledSkillCard(
     onSetEnabled: (String, Boolean) -> Unit,
     onDelete: () -> Unit,
     onApplyUpdate: (String) -> Unit,
+    onOpenJournalSettings: () -> Unit = {},
 ) {
     PlannerCard {
         Column(
@@ -4803,7 +4556,7 @@ internal fun InstalledSkillCard(
                             "Built-in · " +
                                 when {
                                     !skill.enabled -> "Disabled"
-                                    readiness?.isReady != true -> "Suspended"
+                                    skill.id != "builtin:memory-recall" && readiness?.isReady != true -> "Suspended"
                                     else -> "Enabled"
                                 },
                             color =
@@ -4824,7 +4577,9 @@ internal fun InstalledSkillCard(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Switch(
+                    if (skill.id == "builtin:memory-recall") {
+                        com.example.mochi_pet.feature.journal.JournalManagedControl(skill.enabled, onOpenJournalSettings)
+                    } else Switch(
                         checked = skill.enabled,
                         onCheckedChange = {
                             onSetEnabled(skill.id, it)
@@ -4854,7 +4609,7 @@ internal fun InstalledSkillCard(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            if (readiness?.isReady == false) {
+            if (skill.id != "builtin:memory-recall" && readiness?.isReady == false) {
                 Text(
                     text = readiness.declarationError ?: (
                         if (readiness.anyToolRequirements.isNotEmpty()) "Enable at least one Tool in: "
@@ -5403,7 +5158,7 @@ private val ORDERED_LIST_PATTERN = Regex("""(\d+)\.\s+(.+)""")
 private val TABLE_DIVIDER_PATTERN = Regex(
     """\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?""",
 )
-private fun uiDateFormatter(
+internal fun uiDateFormatter(
     englishPattern: String,
     chinesePattern: String,
 ): DateTimeFormatter {
@@ -5432,118 +5187,6 @@ private fun PlannerStatus(state: PlannerSurfaceState) {
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(vertical = 12.dp),
         )
-    }
-}
-
-@Composable
-private fun AgentScheduleRow(
-    schedule: AgentSchedule,
-    onSetEnabled: (String, Boolean) -> Unit,
-    onRun: (String) -> Unit,
-    onRemove: (String) -> Unit,
-) {
-    val nextRun = schedule.nextRunAt?.let { instant ->
-        DateTimeFormatter.ofPattern("MMM d · HH:mm")
-            .withZone(schedule.timezone)
-            .format(instant)
-    }
-    PlannerCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Surface(
-                    color = Color(0xFF8C6CE8).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Text(
-                        text = "AGENT",
-                        color = Color(0xFFB9A4FF),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(
-                            horizontal = 8.dp,
-                            vertical = 3.dp,
-                        ),
-                    )
-                }
-                MaterialText(
-                    text = schedule.name,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                )
-                MaterialText(
-                    text = schedule.prompt,
-                    color = Color.LightGray,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                )
-                Text(
-                    text = when {
-                        !schedule.enabled -> "Paused"
-                        schedule.lastResult == AgentScheduleResult.FAILED ->
-                            "Last run failed · Next ${nextRun ?: "pending"}"
-                        schedule.lastResult == AgentScheduleResult.CANCELLED ->
-                            localizeUiText("Last run cancelled") + " · " + (nextRun ?: localizeUiText("Not scheduled"))
-                        else -> "Next ${nextRun ?: "pending"}"
-                    },
-                    color = if (
-                        schedule.lastResult == AgentScheduleResult.FAILED
-                    ) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        Color(0xFFB9A4FF)
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-            Switch(
-                checked = schedule.enabled,
-                onCheckedChange = {
-                    onSetEnabled(schedule.id, it)
-                },
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            TextButton(onClick = { onRun(schedule.id) }) {
-                Text("Run now")
-            }
-            TextButton(onClick = { onRemove(schedule.id) }) {
-                Text("Delete")
-            }
-        }
-    }
-}
-
-@Composable
-private fun EventRow(event: CalendarEvent) {
-    val formatter = DateTimeFormatter.ofPattern("HH:mm")
-        .withZone(event.timezone)
-    PlannerCard {
-        MaterialText(
-            text = event.title,
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = if (event.allDay) {
-                "All day"
-            } else {
-                formatter.format(event.startAt)
-            },
-            color = Color.LightGray,
-        )
-        event.location?.let {
-            MaterialText(text = it, color = Color.Gray)
-        }
     }
 }
 
@@ -6136,7 +5779,18 @@ internal fun ProviderSettingsSurface(
     onPreviewSpeechVoice: (SpeechProvider, String, String?) -> Unit = { _, _, _ -> },
     onStopVoicePreview: () -> Unit = {},
     onSelectWakeKeyword: (WakeKeyword?) -> Unit = {},
+    journalSettings: @Composable () -> Unit = {},
+    focusJournalSettings: Boolean = false,
+    onJournalSettingsFocused: () -> Unit = {},
 ) {
+    val settingsListState = rememberLazyListState()
+    LaunchedEffect(focusJournalSettings) {
+        if (focusJournalSettings) {
+            // Share/import (2), AI (2), speech/wake (3), conversation heading (1).
+            settingsListState.scrollToItem(if (Build.VERSION.SDK_INT >= 37) 9 else 8)
+            onJournalSettingsFocused()
+        }
+    }
     var recentTurns by remember(agentSettingsState.settings) {
         mutableStateOf(
             agentSettingsState.settings.recentConversationTurns.toString(),
@@ -6468,6 +6122,7 @@ internal fun ProviderSettingsSurface(
             }
         }
         val conversationSection: LazyListScope.() -> Unit = {
+            item(key = "daily-journal") { journalSettings() }
             item {
                 Text(
                     text = "Conversation context",
@@ -6565,6 +6220,7 @@ internal fun ProviderSettingsSurface(
         }
         LazyColumn(
             modifier = Modifier.weight(1f).testTag("settings-parts"),
+            state = settingsListState,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             providerShareSection()

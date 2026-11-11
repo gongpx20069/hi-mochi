@@ -31,9 +31,16 @@ or verification in earlier phases.
 - [x] Room Schema v2 for calendar, todo, and editable market skills.
 - [x] Event CRUD, overlap queries, timezone, recurrence-rule persistence, and
   validation.
-- [ ] Recurrence expansion and Android reminder scheduling.
+- [x] Bounded recurrence expansion, per-occurrence completion and revision-checked
+  edits, with opt-in Android notifications and persisted delivery receipts.
+- [x] Finite Mochi plans, durable execution results and interrupted-run recovery;
+  shared UI/Agent operations and two-category Planner presentation.
 - [x] Todo scheduled date, due time, completion, priority, and filters.
 - [x] Unified day agenda showing events and dated todos.
+- [x] Opt-in Daily journal: independent midnight summaries, past-day cards,
+  consent, bounded recovery and claim-fenced retry/delete.
+- [x] Unified date agenda, three-category color markers and filters, grouped
+  task history/projections and explicit journal source metadata in Room schema 9.
 - [ ] Local export/import.
 
 ## P1 - Agent
@@ -43,6 +50,8 @@ or verification in earlier phases.
 - [x] Agent Skills metadata discovery and on-demand activation.
 - [x] App-private SOUL/USER/AGENTS files.
 - [x] [Local conversation context and memory retrieval](architecture/MEMORY_DESIGN.md#1-current-design).
+- [x] Journal-managed explicit recall: journal/conversation search, complete-turn reads,
+  bounded continuation, first-listed Memory Recall Skill and managed preset Tool.
 - [x] Typed ToolRegistry, JSON schemas, and result envelopes.
 - [x] Mochi calendar/todo CRUD tools with destructive confirmation.
 - [x] Permission-gated current-location and weather Tools with explicit
@@ -85,7 +94,7 @@ or verification in earlier phases.
   direct repair paths and safe localized errors.
 - [ ] Complete the multi-device and real companion-service acceptance matrix.
 
-Deferred reliability, scenario-template, memory/backup and recurring-calendar
+Deferred reliability, scenario-template and memory/backup
 ideas are recorded in [`BRAINSTORM.md`](BRAINSTORM.md), not promised as shipped.
 
 ## P2 - Agent Browser

@@ -28,6 +28,7 @@ enum class NavigationOperation {
     SHOW_DATE_TIME,
     SHOW_WEATHER,
     SHOW_CONVERSATION,
+    SHOW_SCHEDULE_RESULTS,
     SHOW_SETTINGS,
     SHOW_TODAY,
     SHOW_CALENDAR_MONTH,
@@ -63,6 +64,8 @@ data class UiDirectiveRequest(
     val section: UiSection? = null,
     val status: TodoStatus? = null,
     val highlightIds: List<String> = emptyList(),
+    val scheduleId: String? = null,
+    val runId: String? = null,
 )
 
 data class UiDirective(
@@ -74,6 +77,8 @@ data class UiDirective(
     val highlightIds: List<String> = emptyList(),
     val focusMode: Boolean? = null,
     val followUpListening: Boolean? = null,
+    val scheduleId: String? = null,
+    val runId: String? = null,
 )
 
 data class NavigationDecision(
@@ -95,6 +100,10 @@ class NavigationPolicy {
                 "Generic calendar or time knowledge must not navigate the UI",
             )
         }
+        if (request.operation != NavigationOperation.SHOW_SCHEDULE_RESULTS &&
+            (request.scheduleId != null || request.runId != null)) {
+            throw ToolInputException("Execution identifiers are only valid for show_schedule_results")
+        }
         val highlights = request.highlightIds
             .distinct()
             .also {
@@ -106,6 +115,18 @@ class NavigationPolicy {
             }
 
         return when (request.operation) {
+            NavigationOperation.SHOW_SCHEDULE_RESULTS -> {
+                request.requireExplicitUiRequest()
+                require(request.date == null && request.month == null && request.section == null &&
+                    request.status == null && request.highlightIds.isEmpty()) { "Execution navigation does not accept calendar arguments" }
+                val id = request.scheduleId?.takeIf { it.isNotBlank() && it.length <= 200 }
+                    ?: throw ToolInputException("schedule_id is required")
+                require(request.runId == null || request.runId.length in 1..200) { "Invalid run_id" }
+                NavigationDecision(
+                    UiDirective(surface = "schedule_results", scheduleId = id, runId = request.runId),
+                    MochiNavigationIntent.ShowToday,
+                )
+            }
             NavigationOperation.ENTER_FOCUS,
             NavigationOperation.EXIT_FOCUS,
             NavigationOperation.END_VOICE_SESSION,
@@ -328,6 +349,8 @@ class NavigateMochiUiTool(
             put("month", stringProperty(description = "Year-month as YYYY-MM"))
             put("section", stringProperty(UiSection.entries))
             put("status", stringProperty(TodoStatus.entries))
+            put("schedule_id", stringProperty(description = "Schedule ID for show_schedule_results"))
+            put("run_id", stringProperty(description = "Optional exact execution ID"))
             put(
                 "highlight_ids",
                 buildJsonObject {
@@ -377,6 +400,8 @@ fun parseUiDirectiveRequest(
         section = arguments.optionalEnum<UiSection>("section"),
         status = arguments.optionalEnum<TodoStatus>("status"),
         highlightIds = arguments.optionalStringList("highlight_ids"),
+        scheduleId = arguments.optionalString("schedule_id"),
+        runId = arguments.optionalString("run_id"),
     )
 }
 
@@ -385,6 +410,8 @@ fun UiDirective.toJson(): JsonObject =
         put("surface", surface)
         focusMode?.let { put("focus_mode", it) }
         followUpListening?.let { put("follow_up_listening", it) }
+        scheduleId?.let { put("schedule_id", it) }
+        runId?.let { put("run_id", it) }
         date?.let { put("date", it.toString()) }
         month?.let { put("month", it.toString()) }
         section?.let { put("section", it.name.lowercase()) }

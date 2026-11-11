@@ -22,6 +22,9 @@ data class MemoryMessage(
 )
 
 interface AgentMemoryRepository {
+    suspend fun saveScheduledTurn(runId: String, userText: String, assistantText: String) =
+        saveTurn(userText, assistantText)
+
     suspend fun loadContext(
         query: String,
         recentTurns: Int,
@@ -99,7 +102,12 @@ class RoomAgentMemoryRepository(
     override suspend fun saveTurn(
         userText: String,
         assistantText: String,
-    ) {
+    ) = persistTurn(userText, assistantText, null)
+
+    override suspend fun saveScheduledTurn(runId: String, userText: String, assistantText: String) =
+        persistTurn(userText, assistantText, runId)
+
+    private suspend fun persistTurn(userText: String, assistantText: String, sourceRunId: String?) {
         val user = userText.trim()
         val assistant = assistantText.trim()
         if (user.isEmpty() || assistant.isEmpty()) {
@@ -118,12 +126,14 @@ class RoomAgentMemoryRepository(
                     role = "user",
                     content = user,
                     createdAtEpochMillis = timestamp,
+                    sourceRunId = sourceRunId,
                 ),
                 messageEntity(
                     turnId = turnId,
                     role = "assistant",
                     content = assistant,
                     createdAtEpochMillis = timestamp + 1,
+                    sourceRunId = sourceRunId,
                 ),
             ),
         )
@@ -134,6 +144,7 @@ class RoomAgentMemoryRepository(
         role: String,
         content: String,
         createdAtEpochMillis: Long,
+        sourceRunId: String?,
     ): AgentMemoryEntity {
         val storedContent = content.take(MAX_MEMORY_CONTENT_CHARS)
         return AgentMemoryEntity(
@@ -144,6 +155,7 @@ class RoomAgentMemoryRepository(
             content = storedContent,
             searchText = searchableMemoryText(storedContent),
             createdAtEpochMillis = createdAtEpochMillis,
+            sourceRunId = sourceRunId,
         )
     }
 }

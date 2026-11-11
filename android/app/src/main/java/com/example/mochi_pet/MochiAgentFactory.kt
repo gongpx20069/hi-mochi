@@ -18,7 +18,6 @@ import com.example.mochi_pet.core.agent.tool.AgentTool
 import com.example.mochi_pet.core.agentlink.AgentLinkExecution
 import com.example.mochi_pet.core.agentlink.AgentLinkTool
 import com.example.mochi_pet.core.agent.tool.ManageMochiCalendarTool
-import com.example.mochi_pet.core.agent.tool.ManageMochiTodoTool
 import com.example.mochi_pet.core.agent.tool.ModelImageAttachment
 import com.example.mochi_pet.core.agent.tool.ModelImageRelay
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
@@ -65,16 +64,15 @@ suspend fun MochiApplication.createAgentRunner(
         sink.apply(decision)
     }
     val builtInTools = mutableListOf(
-        ManageMochiCalendarTool(plannerStore),
-        ManageMochiTodoTool(plannerStore),
+        ManageMochiCalendarTool(plannerStore, userReminderController),
         CurrentLocationTool(deviceLocationProvider),
         CurrentWeatherTool(weatherRepository, onWeatherLoaded),
         SandboxedJavaScriptTool(javaScriptExecutor),
-        ManageMochiScheduleTool(
-            agentScheduleStore,
-            agentScheduleController,
-        ),
     )
+    if (extensionScope == ExtensionToolScope.FOREGROUND_MAIN) {
+        builtInTools += ManageMochiScheduleTool(agentScheduleStore, agentScheduleController)
+        builtInTools += com.example.mochi_pet.core.memory.RecallMemoryTool(memoryRecallStore)
+    }
     builtInTools += mediaToolRuntime.tools(extensionScope, toolCatalogRepository::isBuiltInEnabled)
     builtInTools += appToolRuntime.tools(extensionScope, toolCatalogRepository::isBuiltInEnabled)
     if (includeBrowserInteractions) {

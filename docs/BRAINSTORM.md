@@ -36,9 +36,9 @@ Build on existing Scheduled Agents and Skills rather than another executor.
 
 ## Memory management and local backup
 
-Future memory goals are owned by
-[Memory design](architecture/MEMORY_DESIGN.md#4-future-event-based-memory).
-Local backup remains a separate deferred idea:
+Evidence-backed event organization remains a deferred idea, not part of the
+[current memory architecture](architecture/MEMORY_DESIGN.md).
+Local backup is also deferred:
 
 - Offer versioned local export/import for persona, conversation and planner
   data with preview and explicit merge/replace behavior.
@@ -46,17 +46,6 @@ Local backup remains a separate deferred idea:
   default. Provider sharing remains a separate, explicit flow.
 - Test restoration to a fresh installation and recovery from interrupted
   imports. Define schema migration and secret reconfiguration requirements.
-
-## Recurring calendar events and local reminders
-
-Complete the planner's recurrence expansion and notification behavior.
-
-- Define timezone, daylight-saving, all-day and recurrence-exception behavior.
-- Support editing one occurrence versus the whole series without duplicates.
-- Distinguish planner reminders from Agent schedules: a reminder should not
-  need a model call, network access or a running Termux process.
-- Test notification denial, exact-alarm restrictions, reboot reconciliation
-  and duplicate suppression.
 
 ## Prioritization
 

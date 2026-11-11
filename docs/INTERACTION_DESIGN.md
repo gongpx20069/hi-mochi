@@ -6,7 +6,7 @@
 | --- | --- |
 | Face | Default Mochi expression and voice state |
 | Conversation | Current and historical text conversation |
-| Planner | One bottom destination with Today and Calendar sections |
+| Planner | One date agenda with an expandable week/month date selector |
 | Settings | BYOK, voice, permissions, backup, and tools |
 | Skills | Bottom-navigation destination for built-ins and skills.sh |
 
@@ -344,18 +344,77 @@ new user direction rather than silently retrying or overwriting the human.
 Voice does not replace touch.
 
 - Face -> swipe/tap to Planner or Conversation.
-- Planner -> switch between Today and Calendar without changing tabs.
+- Planner -> select dates in a compact week strip; expand the month in place.
 - Month -> tap a date for Calendar Day.
 - Day -> return to its containing month or move between adjacent dates.
 - System back follows Android predictive-back behavior.
 
 All paths update the same `MochiSurface` state used by voice.
 
+Planner's bottom label is **日程** in Chinese. Today, month and date voice
+destinations render the same agenda; month navigation expands its date selector.
+A return-to-today shortcut appears only away from today. All/My schedule/Mochi
+tasks/Journal chips filter the selected date, and a single New button opens a
+two-choice sheet. A secondary-text hint below its choices explains that users
+can also wake Mochi to arrange schedules or create tasks; it does not start
+voice capture. Mochi tasks additionally exposes Manage all tasks, including
+paused and ended plans. No journal creation action appears in that sheet.
+
+Cards use neutral surfaces, consistent 24dp corners and 18dp padding: blue user
+labels/completion controls, theme-primary warm-peach Mochi labels, amber journal
+badges. Mochi task markers, icons, labels and creation/filter accents share the
+same theme color rather than a separate purple palette.
+Date cells have at most one marker per category and accessible category labels;
+today has an outline, distinct from the filled selected date. Failure is a
+separate red status, not a category color.
+All-day items precede chronological timed entries. Recurring Mochi executions
+group into one card per plan/date, with counts and current execution state.
+Tapping a user card edits it; its checkbox completes only that occurrence.
+Mochi cards offer results when records exist, otherwise Run now for nonpast
+dates or Details for historical projections. Details separates historical
+results from editing/running the current plan; deleted-plan results remain readable.
+Past-date journals lead the scrollable list, never a fake midnight task.
+
 Settings is always available from the top-right app action. If no provider is
 configured, first launch opens a guided connection screen before normal use.
 The Settings groups are ordered **Share/import**, **AI connections**,
 **Speech/wake**, **Conversation/persona**, **Display/language**, with visible
 section headings and descriptions. Share/import precedes every other group.
+
+**Conversation/persona** includes a rounded **Daily journal / 每日小记** card.
+The switch defaults off; enabling first explains use of saved records, the
+selected AI service and model credits. Disabling retains earlier journals.
+The Planner's Journal filter offers the same global switch and confirmation,
+independent of the selected date. While disabled, an amber-accented introduction
+explains the feature instead of promising generation after the day ends.
+While enabled, it collapses into a compact control card above date content.
+Today explains processing after the day ends; future dates explain that
+journals record past days; past dates without an entry show an empty state.
+Existing past entries remain visible below the introduction after disabling.
+Enabling explicitly says earlier dates are not automatically backfilled.
+Other agenda filters do not show this settings card.
+The same setting governs **Memory Recall / 回忆检索**, first in Skills, and
+`recall_memory` under **Mochi Built-ins** in Tools. Both show a grey read-only
+switch with the live on/off state. Tapping the surrounding control opens
+**Managed by Daily journal / 由每日小记统一管理** and explains that no separate
+switch is needed. **Got it / 知道了** dismisses; **Go to settings / 前往设置**
+opens Settings scrolled to the Daily journal card. Enabling discloses that
+relevant journal/conversation excerpts, including earlier history, may be sent
+to the selected AI while answering. Disabling stops explicit retrieval but
+preserves records and existing automatic conversation context.
+Past-date Planner pages show one matching rounded journal card, with a small
+type badge, generated title and short preview, or an explicit waiting, writing,
+empty, no-source or failed state. Today and future dates never show a journal. Month dates
+with nondeleted journal entries are marked even without schedules.
+Opening a card reveals a scrollable bottom sheet with the date, selectable
+body, source counts, generation time and confirmed regenerate/delete actions.
+No-source entries explicitly say no AI request occurred. Older entries without
+source metadata are labeled unknown rather than retrospectively classified.
+Failed retries
+retain the last successful text. Retry requires the switch to be enabled;
+deletion explains that automatic processing will not recreate that date.
+These controls do not complete schedules or execute Mochi tasks.
+
 AI connections shows named saved cards with current selection and Use/Edit/Delete.
 Add opens a screenshot-protected editor; OpenAI is prefilled, and presets also
 include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Azure, and custom. Each
@@ -370,7 +429,7 @@ Keys are masked and never loaded into the editor. Blank preserves only that
 profile's encrypted key; changing provider authentication type or endpoint host requires
 replacement. Each profile independently stores timeout and image-input policy.
 First save activates; subsequent additions do not switch. Use cancels running
-local Agents, children and current scheduled runs before the new configuration
+local Agents, children, current scheduled runs and journal generation before the new configuration
 is selected. Editing active runtime settings has the same effect; renaming
 or editing an inactive connection does not. Future schedules remain enabled.
 Remote AgentLink tasks and submitted Termux processes are not stopped by this
@@ -748,14 +807,23 @@ without individual borders.
 
 ```text
 Date header
-Mochi compact state
-All-day events
-Timed agenda
-Dated todos
-Add action
+Mochi scheduled tasks: run now / edit / results
+User schedules: edit / complete this occurrence
+Add schedule / new Mochi task
 ```
 
 Events and todos remain distinct domain objects but share the day timeline.
+Use restrained rounded cards, readable content hierarchy and explicit status
+labels. Editing opens a scrollable bottom sheet with native date/time pickers;
+recurring user edits select this occurrence or this and future. Saving is
+single-dispatch, with inline validation and permission warnings. Delete remains
+secondary and requires native confirmation. Result sheets show persisted
+execution outcomes and support history paging; queued is never labeled complete.
+An explicit Agent navigation request can open a plan's results or a specific run.
+Month markers come from the same expanded user occurrences as the day view.
+Reminders start off. Enabling one uses a system notification, not automatic TTS;
+timed items initially use ten minutes before, date-only items 09:00 on that date.
+Existing custom reminder offsets are preserved while editing.
 Overdue todos are visible without being silently moved to today.
 Active todos are listed before completed todos. New todos always receive an
 explicit date; when no date is supplied, the current local date is used and the

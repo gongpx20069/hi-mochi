@@ -470,6 +470,7 @@ class DataStoreToolCatalogRepository(
     private val feishuOAuthClient: FeishuOAuthClient = FeishuOAuthClient(),
     private val restTransport: RestTransport = RestHttpTransport(),
     private val webdavClient: MochiExtensionClient = UnavailableExtensionClient,
+    private val journalEnabled: suspend () -> Boolean = { false },
 ) : ToolCatalogRepository {
     private val tencentCatalogMutex = Mutex()
     private val feishuAuthorizationMutex = Mutex()
@@ -610,7 +611,12 @@ class DataStoreToolCatalogRepository(
         val catalog = loadCatalog()
         val termux = termuxClient.snapshot()
         val webdav = webdavClient.snapshot()
-        return catalog.toSummary(extensionClient.snapshot()).copy(
+        val summary = catalog.toSummary(extensionClient.snapshot())
+        val recallEnabled = journalEnabled()
+        return summary.copy(
+            builtInTools = summary.builtInTools.map {
+                if (it.name == "recall_memory") it.copy(enabled = recallEnabled) else it
+            },
             feedback = if (refreshFailed) TENCENT_CATALOG_REFRESH_ERROR else null,
             agentLink = agentLinkClient?.refresh() ?: AgentLinkState(),
             termux = ExtensionProviderSummary(
@@ -647,6 +653,7 @@ class DataStoreToolCatalogRepository(
         name: String,
         enabled: Boolean,
     ): ToolCatalogSummary {
+        require(name != "recall_memory") { "Memory Recall is managed by Daily journal in Settings" }
         require(BUILT_IN_TOOLS.any { it.name == name }) {
             "Unknown built-in tool"
         }
@@ -1535,6 +1542,7 @@ class DataStoreToolCatalogRepository(
     }
 
     override suspend fun isBuiltInEnabled(name: String): Boolean {
+        if (name == "recall_memory") return journalEnabled()
         val descriptor = BUILT_IN_TOOLS.firstOrNull { it.name == name }
             ?: return false
         val catalog = loadCatalog()
@@ -1992,6 +2000,11 @@ class DataStoreToolCatalogRepository(
             it.id == LEGACY_DIANPING_SERVER_ID
         }
         val migratedBuiltIns = builtInEnabled.toMutableMap()
+        if ("manage_mochi_todo" in migratedBuiltIns) {
+            migratedBuiltIns["manage_mochi_calendar"] = migratedBuiltIns["manage_mochi_calendar"] != false &&
+                migratedBuiltIns["manage_mochi_todo"] != false
+            migratedBuiltIns.remove("manage_mochi_todo")
+        }
         if (appControlEnabled == null) {
             val uiEnabled = builtInEnabled["app_ui"] ?: true
             com.example.mochi_pet.core.apps.APP_TOOL_NAMES.forEach { name ->
@@ -2516,20 +2529,20 @@ private fun sha256UrlSafe(value: String): String =
 
 val BUILT_IN_TOOLS = listOf(
     BuiltInToolDescriptor(
-        name = "manage_mochi_calendar",
-        displayName = "Mochi Calendar",
-        description = "Read and update Mochi calendar events.",
-        defaultEnabled = true,
+        name = "recall_memory",
+        displayName = "Memory Recall",
+        description = "Search daily journals and saved conversations. Managed by Daily journal in Settings.",
+        defaultEnabled = false,
     ),
     BuiltInToolDescriptor(
-        name = "manage_mochi_todo",
-        displayName = "Mochi Todo",
-        description = "Read and update Mochi todos.",
+        name = "manage_mochi_calendar",
+        displayName = "User schedules",
+        description = "Create, edit and complete user schedules and their reminders.",
         defaultEnabled = true,
     ),
     BuiltInToolDescriptor(
         name = "manage_mochi_schedule",
-        displayName = "Agent Schedules",
+        displayName = "Mochi scheduled tasks",
         description = "Create and manage scheduled Mochi Agent prompts.",
         defaultEnabled = true,
     ),

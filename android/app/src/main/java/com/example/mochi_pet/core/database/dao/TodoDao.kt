@@ -4,6 +4,8 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Query
 import androidx.room.Upsert
+import androidx.room.Transaction
+import com.example.mochi_pet.core.model.checkPlannerRevision
 import com.example.mochi_pet.core.database.entity.TodoEntity
 
 @Dao
@@ -62,6 +64,24 @@ interface TodoDao {
         """,
     )
     suspend fun listByStatus(status: String): List<TodoEntity>
+
+    @Query("SELECT * FROM todos WHERE scheduled_date_epoch_day >= :start AND scheduled_date_epoch_day < :end ORDER BY scheduled_date_epoch_day, due_at_epoch_millis, id")
+    suspend fun listRange(start: Long, end: Long): List<TodoEntity>
+
+    @Query("UPDATE todos SET revision = revision + 1 WHERE id = :id AND revision = :revision")
+    suspend fun claimRevision(id: String, revision: Long): Int
+
+    @Transaction
+    suspend fun replace(todo: TodoEntity, expectedRevision: Long) {
+        checkPlannerRevision(claimRevision(todo.id, expectedRevision) == 1)
+        upsert(todo)
+    }
+
+    @Transaction
+    suspend fun deleteVersion(todo: TodoEntity) {
+        checkPlannerRevision(claimRevision(todo.id, todo.revision) == 1)
+        delete(todo)
+    }
 
     @Delete
     suspend fun delete(todo: TodoEntity)

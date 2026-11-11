@@ -93,16 +93,90 @@ Mochi owns its calendar and todo data in Room.
 - Home can transform into current date-time or local weather presentations.
 - Trusted Agent cards can transform Home or render inline in Talk without
   allowing model-generated code or arbitrary UI components.
-- Today view: events and todos for the current date.
-- Month view: dates containing events or todos are visibly marked.
-- Day view: reusable Today/selected-date agenda with events, active todos, then
-  completed todos.
+- Planner has two visible categories: **User schedules** and **Mochi scheduled
+  tasks**. The executor, not the creator, determines the category.
+- Planner is one date agenda, not separate Today/Calendar tabs. A compact week
+  strip expands into a month picker in place, with a return-to-today shortcut.
+  Blue user schedules, theme-primary warm-peach Mochi tasks and amber journals use shared cards,
+  explicit labels and per-type date markers rather than color alone.
+- Date content mixes user occurrences and grouped Mochi tasks chronologically,
+  with all-day items first and past-day journals above the agenda. All/My
+  schedule/Mochi tasks/Journal filters narrow the same date; one add action
+  offers the two task types. Manage all tasks includes paused/ended plans.
+- Multiple executions of a Mochi task share one daily card with counts and
+  exact result links. Past rule projections are explicitly unverified, never
+  displayed as successful execution. Saved run snapshots survive plan deletion.
+- User schedule primary actions are edit time/content and complete this
+  occurrence. Repeating edits explicitly target one occurrence or this and
+  future occurrences; completion never completes the series.
+- Mochi task primary actions are run now, edit future time/content, and view
+  results. Manual runs preserve the planned next time, expiry and occurrence
+  quota. Concurrent requests for the same task reuse its active execution.
+- New user recurrence defaults to a 90-day cutoff, extended to include the next
+  low-frequency occurrence. Mochi intervals default to one week; daily/weekly
+  tasks default to 30 days from the first run. Explicit count, end date and
+  indefinite repetition are supported. Edits do not reset expiry. Existing
+  indefinite plans remain indefinite.
+- Each Mochi execution has a durable ID, configuration snapshot, status and
+  result, independent of chat history. Interrupted work is reported, not blindly
+  replayed. Editing future work cannot overwrite running or historical results.
 - Todos always have a scheduled date. Missing dates default to today with an
   explicit notice to the user.
-- Reminders: local notifications and exact alarms where permitted.
+- User reminders are off by default and enabled only on an explicit request.
+  Delivery uses local system notifications, without a model, network or speech.
+  Permission denial and approximate-alarm fallback are visible rather than
+  presented as guaranteed delivery. Device force-stop and OEM restrictions may
+  delay delivery; opening the app reconciles persisted plans.
 
 Android Calendar Provider is not the source of truth. Future system-calendar
 support is an optional import/export adapter.
+
+#### Daily journal
+
+**Daily journal / 每日小记** is an independent, default-off option shared by
+Settings and the Planner's Journal filter. The latter shows an introduction
+and switch while disabled, compact controls and date-specific states while
+enabled, and preserves access to existing entries after disabling.
+After local midnight, it quietly summarizes the previous natural day's saved
+conversations, user schedules and Mochi execution results through the selected
+AI connection. Enabling explicitly discloses sending these records to that
+service and consuming model credits. There are no notifications or speech.
+
+Each past date has at most one journal with a short title and natural paragraph.
+The final title is at most 50 characters. The paragraph aims for 300 characters,
+usually one or two sentences, but may exceed that target to cover every
+distinct supported important fact. Accuracy and coverage take priority over
+brevity; text is not truncated to meet the target. Intermediate summaries retain
+important facts without the final writing targets. There is no minimum length
+or filler. Routine recurring events and unchanged
+results are omitted unless meaningful progress occurred; plans are not treated
+as completed events. The journal centers on the user's day, not assistant
+operations: tentative requests withdrawn before any lasting effect and routine
+technical failures are omitted unless the latter meaningfully affect an
+important user matter. Explicit recurrence metadata guides selection without
+discarding significant developments just because a plan repeats.
+When available records contain nothing important, the native UI displays
+**Nothing important to record / 无重要记录**.
+No saved input is instead **No saved records for this day / 这一天没有可用资料**,
+without a model call. Details show source counts and generation time captured
+with the result; legacy entries with unknown counts say so.
+
+Past-day cards and month markers share Planner styling without becoming a third
+task category. Users can inspect, explicitly regenerate or delete an entry.
+Turning off cancels pending generation but retains existing text. Deleted dates
+are not automatically recreated. Scheduling is best effort under Android
+background/network restrictions; recovery covers the latest seven enabled days,
+never dates before enabling. Older existing entries require manual retry.
+Journals remain separate local derived records, not chat messages or automatic
+conversation context. The same setting controls the foreground-only, read-only
+`recall_memory` Tool and built-in Memory Recall Skill: locate dates in journals,
+then search and read original conversations when details are needed. Both
+managed entries stay visible without independent switches. Enabling discloses
+that relevant historical excerpts, including earlier saved records, may be sent
+to the selected AI while answering. Disabling blocks explicit recall without
+deleting records or changing existing automatic conversation context.
+Saved-source limits and the independent generation
+contract are defined in [Memory design](architecture/MEMORY_DESIGN.md#17-daily-journal).
 
 ### 3.4 Voice-driven surfaces
 

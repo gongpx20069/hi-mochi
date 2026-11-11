@@ -43,6 +43,7 @@ run in local JVM tests.
 | `PromptBuilder` | persona files, memory recall, skill catalog, time context |
 | `PersonaRepository` | app-private SOUL/USER/AGENTS files and atomic updates |
 | `AgentMemoryRepository` | [Conversation persistence and recall](MEMORY_DESIGN.md#1-current-design) |
+| `RoomMemoryRecallStore` / `RecallMemoryTool` | Explicit bounded journal/conversation retrieval and live journal-setting revocation |
 | `SkillRepository` | Agent Skills metadata, resources, and enablement |
 | `ToolRegistry` | schema registration, validation, dispatch |
 | `ToolCatalogRepository` | built-in enablement, MCP/OAuth, REST definitions and encrypted credentials, selected schemas |
@@ -69,10 +70,14 @@ run in local JVM tests.
 | `BrowserCredentialCapture` | source-validated top-level form submissions, transient save requests and turn-local password redaction |
 | `McpStreamableHttpClient` | MCP sessions, discovery, and calls |
 | `AndroidJavaScriptExecutor` | bounded JavaScript in an isolated process |
-| `PlannerRepository` | calendar/todo transactions and queries |
+| `PlannerRepository` | revision-checked calendar/todo commands, recurrence instances, completion, exceptions and reminder receipts |
 | `SurfaceNavigator` | validated app-surface transitions |
 | `NavigationPolicy` | intent/date-to-surface rules |
-| `ReminderScheduler` | WorkManager/AlarmManager scheduling |
+| `AndroidUserReminderController` | opt-in local notifications, permission readiness and AlarmManager/WorkManager reconciliation |
+| `RoomAgentScheduleRepository` | finite Agent plans, transactional run reservation, versioned configuration snapshots and durable results |
+| `core/journal` | date-bounded saved evidence, journal lifecycle and independent typed summary requests |
+| `platform/journal` | quiet midnight WorkManager reconciliation, per-date workers and Provider-change cancellation |
+| `JournalViewModel` / `feature/journal` | independent opt-in settings, past-day cards and detail actions; composition slots in Settings/Planner |
 | Feature ViewModels | screen state and user events |
 
 No Composable may call the LLM, database DAO, SpeechRecognizer, TextToSpeech,
@@ -120,6 +125,12 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
 ## 5. Persistence
 
 - Room transactions own planner consistency.
+- Schema 8 owns `daily_journals` and singleton `journal_settings`, including
+  nullable native source counts and generation time for legacy compatibility.
+  Opt-in and claim invalidation share a transaction; date uniqueness and
+  claim-checked publication prevent duplicates and late disable/delete writes.
+  Journal content is not inserted into conversation memory. Scheduled chat
+  copies carry nullable `source_run_id` for evidence deduplication.
 - DataStore owns non-relational preferences.
 - The Tool catalog stores REST connections and endpoint definitions alongside
   existing settings; an absent REST field decodes as empty. Tokens use
@@ -180,7 +191,10 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   HTTPS REST endpoints; they are not represented as a remote MCP server.
 - Room stores editable market skills and their upstream/local digests; built-in
   skills remain read-only application resources while Room stores their local
-  enable/disable overrides.
+  enable/disable overrides. Memory Recall is managed instead by the journal
+  settings row, without an independent override. Schema 9 includes a journal
+  FTS index synchronized with publication/deletion and a persistent settings
+  revision that revokes in-flight explicit recall.
 - Conversation storage, memory retrieval and their settings follow
   [Memory design](MEMORY_DESIGN.md#1-current-design).
 - App-private `files/persona/SOUL.md`, `USER.md`, and `AGENTS.md` are seeded

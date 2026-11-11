@@ -273,7 +273,7 @@ class CardPresentationTest {
             },
             evidence = listOf(
                 CardToolEvidence(
-                    toolName = "manage_mochi_todo",
+                    toolName = "manage_mochi_calendar",
                     data = buildJsonObject {
                         put(
                             "todos",

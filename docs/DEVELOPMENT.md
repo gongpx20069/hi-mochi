@@ -31,7 +31,7 @@ android/
 - An Android 8.0 or newer device or emulator
 
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
-The wrapper pins Gradle 9.9.0 with its official distribution SHA-256.
+The wrapper pins Gradle 9.9.1 with its official distribution SHA-256.
 The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
 and serialization 1.12.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply
@@ -121,9 +121,8 @@ separate acceptance work. The workflow and its emulator setup are in
 For a narrow iteration, run the smallest affected Gradle test or compile task
 before returning to the full gates.
 
-Memory retrieval regression sources, device results, measurement definitions
-and reproduction commands are owned by
-[Memory design](architecture/MEMORY_DESIGN.md#2-device-measurements-and-diagnostics).
+Memory retrieval regression sources and diagnostic instructions are owned by
+[Memory design](architecture/MEMORY_DESIGN.md#2-diagnostics-and-verification).
 
 App Control and Media Control regressions:
 
@@ -156,6 +155,38 @@ Tool/final-directive parsing, saved Focus state, idempotent enter/exit and
 preserved Home presentation. Real-device return/Focus verification must not
 restart the host with instrumentation while exercising its bound accessibility
 service.
+
+Planner/Agent integration regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*PlannerRepositoryTest" `
+  --tests "*AgentScheduleTest" --tests "*MochiDatabaseMigrationTest" `
+  --tests "*AgentToolRegistryTest" --tests "*PlannerUiTest" `
+  --tests "*UserReminderTest" --tests "*NavigationPolicyTest" --no-daemon
+```
+
+These cover native recurrence expansion and per-occurrence changes, finite
+defaults, revision conflicts, durable manual/scheduled runs, migration from
+every released schema, opt-in reminders and notification denial, large-text
+editor behavior, unified week/date navigation, grouped execution history,
+projected recurrence versus recorded outcomes, and exact execution-result presentation. They use synthetic
+records, Room and Robolectric, not real provider or personal-device operations.
+Device force-stop, OEM delivery restrictions and real voice parsing still need
+separately authorized device acceptance.
+
+Daily journal regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*Journal*Test" `
+  --tests "*MochiDatabaseMigrationTest" --tests "*AgentMemoryRepositoryTest" --no-daemon
+```
+
+These use synthetic records and fake model replies to verify whole-day paging,
+DST windows, source deduplication, cutoff states, bounded prompt assembly,
+claim fencing, deletion tombstones, default-off migration, source counts,
+missing-input versus empty-summary states, consent and
+large-text journal controls. They do not invoke a live Provider or establish
+OEM midnight delivery guarantees.
 
 Skill readiness/content regressions:
 

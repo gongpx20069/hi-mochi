@@ -28,8 +28,8 @@ IDs, permissions, and state before performing side effects.
 The native `ToolRegistry` currently supports:
 
 - `manage_mochi_calendar`;
-- `manage_mochi_todo`;
 - `manage_mochi_schedule`;
+- `recall_memory` in foreground Main Agent conversations while Daily journal is enabled;
 - `get_current_location`;
 - `get_current_weather`;
 - `navigate_mochi_ui`;
@@ -40,6 +40,21 @@ The native `ToolRegistry` currently supports:
 - configured Amap map and merchant Tools;
 - enabled MCP tools discovered through the Tool catalog;
 - enabled custom REST tools in foreground Main Agent conversations only.
+
+### Memory recall
+
+`recall_memory` is read-only and governed solely by Settings > Daily journal.
+`search` accepts `source=journals|conversations`, optional keywords and half-open
+date/time bounds, page size 1-10 (default 5), and a result offset. Empty keywords
+require both bounds. `read` accepts an exact returned reference, text offset,
+and 0/1 neighboring turns (default 1). Results preserve provenance and timestamps,
+report truncation/continuation, and never turn saved content into instructions.
+Journal results carry frozen natural-day windows; stale journal references fail.
+Native calls check settings before reading and its revision before returning,
+including disable/re-enable cycles. It is absent from scheduled/child registries
+and the independent journal generator. It has no separate Tool toggle or credential.
+Search/indexing, page budgets and Skill workflow belong to
+[Memory design](MEMORY_DESIGN.md#15-explicit-journal-guided-recall).
 
 ### Custom REST tools
 
@@ -461,14 +476,17 @@ connection-revision binding, local-network policy and cancellation semantics.
 
 ### `manage_mochi_calendar`
 
-Operations: `create`, `list`, `update`, `delete`.
+`operation`: `create`, `list`, `get`, `update`, `complete`, `delete`.
 
-Calendar events live in Mochi Room storage. IDs are Mochi IDs; no Android
-calendar ID is required.
+Manages user schedules in Mochi Room storage, including dated items. Query
+before editing ambiguous targets. `id` targets an item or occurrence;
+`occurrence_id` identifies a repeating instance and `revision` protects updates
+against stale UI/Agent edits. `scope` is `this`, `future` or `all`; completion
+always affects only the selected occurrence.
 
 Important fields:
 
-- `event_id`
+- `id`, `revision`, `scope`
 - `title`
 - `description`
 - `start_iso`
@@ -479,31 +497,20 @@ Important fields:
 - `location`
 - `reminder_iso`
 - `range_start_iso` / `range_end_iso`
+- `scheduled_date` for a date-only item; omitted dates default to runtime today
+- `limit`, `offset` for bounded mixed event/todo lists
+- `indefinite` only for explicitly requested unbounded recurrence
 
 Delete requires explicit user intent. System calendar import/export is a
 separate optional adapter and is never implicit.
 
 The native executor requires `confirmed=true` for delete.
-
-### `manage_mochi_todo`
-
-Operations: `create`, `list`, `update`, `complete`, `delete`.
-
-Important fields:
-
-- `todo_id`
-- `content`
-- `status`
-- `priority`
-- `scheduled_date`
-- `due_iso`
-- `reminder_iso`
-- list filters for date and status
-
-The agent must not infer a todo from ordinary conversation.
-
-The native executor requires `confirmed=true` for delete and requires
-`operate=complete` instead of changing completion state through update.
+The executor supplies finite recurrence defaults and returns their resolved
+rules. Set reminders only on explicit user requests; `reminder_capability`
+reports ready, approximate or notifications-disabled, separately from persistence.
+The agent must not infer a schedule from ordinary conversation. Existing disabled
+planner switches migrate conservatively: the merged tool remains disabled when
+either previous capability was explicitly disabled.
 
 ## 3. Presentation tool
 
@@ -515,6 +522,7 @@ Operations:
 - `show_date_time`
 - `show_weather`
 - `show_conversation`
+- `show_schedule_results` (explicit UI intent, `schedule_id`, optional `run_id`)
 - `show_settings`
 - `show_today`
 - `show_calendar_month`
@@ -715,15 +723,26 @@ WebView session. Background runs cannot click controls or enter page data.
 
 ## Scheduled Agent automations
 
-`manage_mochi_schedule` exposes four operations: `set`, `list`, `remove`, and
-`run`. Schedules support one-time instants, daily or weekly local times, and
-intervals of at least 15 minutes. They are persisted in Room and shown in
-Planner with an Agent marker.
+`manage_mochi_schedule` uses `operation`: `create`, `update`, `get`, `list`,
+`delete`, `run`, and `results`. Creation rejects an existing ID; update requires
+`id` and current `revision`; delete requires `confirmed=true`.
+Schedules support one-time instants, daily or weekly local times, and
+intervals of at least 15 minutes. Repetition uses `ends_at`, `max_runs` or
+explicit `indefinite`. Intervals default to one week, daily/weekly to 30 days.
+Editing preserves the deadline unless explicitly changed.
 
-Android registers the next occurrence through AlarmManager. The alarm receiver
-only enqueues unique WorkManager execution; a transactional due-time claim
-prevents duplicate scheduled runs. Reboot, wall-clock, timezone, package, and
-exact-alarm permission changes reconcile all active schedules.
+Android registers the next occurrence through AlarmManager. A transactional
+reservation creates a durable run and advances the future plan before work.
+Unique WorkManager jobs execute run IDs, not an unversioned plan lookup.
+Reboot, wall-clock, timezone and exact-alarm permission changes reconcile plans.
+Uncertain interrupted work is never replayed automatically.
+
+`run` returns `run_id` and queued/running state, not completion. It does not
+change the planned next time, expiry or quota. An existing active execution is
+reused. `results` with `id` pages run summaries using `limit`/`offset`; with
+`run_id` it reads an exact result, with `output_offset` for bounded output pages.
+Results survive plan deletion and retain the original configuration.
+Plan management is available only in the foreground Main Agent registry.
 
 The Worker uses the same Agent runner factory as foreground Conversation,
 including the current provider, persona, memory, Skills, and enabled
@@ -731,8 +750,8 @@ background-safe Tools. It may use the serialized read-only Browser subset
 (`browser_navigate`, `browser_read`, and `browser_scroll`), while click, input,
 and visible navigation remain excluded. The tagged scheduled prompt and final
 response are saved to Agent Memory, so they appear in Conversation with their
-stored timestamps. Completion posts a notification and calculates the next
-occurrence; one-time schedules disable after execution.
+stored timestamps. Completion posts a notification and persists the outcome; intervals calculate
+their next occurrence from completion. One-time schedules stop after reservation.
 
 The final model response may instead include the same data as `ui_directive`.
 The app uses one validator and one navigation path for both forms.
