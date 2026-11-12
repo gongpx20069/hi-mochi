@@ -57,11 +57,17 @@ class BrowserExperienceSmokeTest {
         compose.runOnUiThread { compose.activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
-    @Test fun websiteManagementIsReachableWithoutOpeningAToolGroup() {
-        compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
-        compose.onAllNodesWithText(localizeUiText("Tools")).onFirst().performClick()
+    private fun openWebsiteManager() {
+        compose.onAllNodesWithText(localizeUiText("Capabilities")).onFirst().performClick()
+        compose.onNodeWithTag("capability-list").performScrollToNode(hasTestTag("capability-tool-browser"))
+        compose.onNodeWithTag("capability-tool-browser").performClick()
         compose.onNodeWithTag("tools-list").performScrollToNode(hasText(localizeUiText("Websites and logins")))
         compose.onNodeWithText(localizeUiText("Websites and logins")).performClick()
+    }
+
+    @Test fun websiteManagementIsReachableWithoutExpandingBrowserTools() {
+        compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        openWebsiteManager()
         compose.onNodeWithTag("browser-management").assertIsDisplayed()
         if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("browserScreenshot") == "true") {
             val image = compose.onNodeWithTag("browser-management").captureToImage().asAndroidBitmap()
@@ -70,7 +76,7 @@ class BrowserExperienceSmokeTest {
             }
         }
         compose.onNodeWithTag("browser-search").assertIsDisplayed()
-        compose.onNodeWithText(localizeUiText("Search Bing or enter a website")).assertIsDisplayed()
+        compose.onNodeWithText(localizeUiText("Enter a website to sign in")).assertIsDisplayed()
         compose.onNodeWithTag("browser-logo").assertIsDisplayed()
         compose.onNodeWithTag("browser-accounts-panel").assertIsDisplayed()
         compose.onNodeWithTag("browser-management-close").performClick()
@@ -210,9 +216,7 @@ class BrowserExperienceSmokeTest {
         mark("manual test starting")
         compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         val runtime = (compose.activity.application as MochiApplication).agentBrowserRuntime
-        compose.onAllNodesWithText(localizeUiText("Tools")).onFirst().performClick()
-        compose.onNodeWithTag("tools-list").performScrollToNode(hasText(localizeUiText("Websites and logins")))
-        compose.onNodeWithText(localizeUiText("Websites and logins")).performClick()
+        openWebsiteManager()
         compose.onNodeWithTag("browser-search").performTextInput("mochi browser fixture")
         compose.onNodeWithTag("browser-search").performImeAction()
         mark("search submitted")
@@ -317,9 +321,7 @@ class BrowserExperienceSmokeTest {
             val entries = vault.summaries.first()
             val password = entries.single { it.origin == BASE && it.username == username }
             val sms = entries.single { it.origin == child && it.username == phone }
-            compose.onAllNodesWithText(localizeUiText("Tools")).onFirst().performClick()
-            compose.onNodeWithTag("tools-list").performScrollToNode(hasText(localizeUiText("Websites and logins")))
-            compose.onNodeWithText(localizeUiText("Websites and logins")).performClick()
+            openWebsiteManager()
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("browser-website-$domain").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("browser-website-$domain").performClick()
             compose.onNodeWithTag("browser-website-details").assertIsDisplayed()
