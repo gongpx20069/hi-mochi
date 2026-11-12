@@ -519,6 +519,10 @@ Rows show identity, type, status and purpose rather than an ambiguous master
 switch. Memory Recall is the first Skill. Standalone Tools and services stay
 visible without inventing a Skill for them. Each MCP/REST connection occupies
 one row; its individual Tool controls live in its detail.
+Skill rows use a subtle lavender tint; Tool/service rows use a subtle peach
+tint, including dependency and related-Skill links. Type labels remain visible
+so color is not the only distinction; body text retains the theme's readable
+foreground colors.
 
 Opening a Skill shows its enable control, content/maintenance actions, required
 dependencies and optional enhancements. Dependency rows open the exact shared

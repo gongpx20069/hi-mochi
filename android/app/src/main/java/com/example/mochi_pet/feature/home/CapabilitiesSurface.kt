@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -92,6 +93,7 @@ internal fun CapabilityCatalogSurface(
                                     else if (dependency.optional) "Optional tool is not available."
                                     else "Required tool is not registered. Add its service or repair the Skill declaration.",
                                     tag = "dependency-${dependency.group?.id ?: dependency.name}",
+                                    isSkill = false,
                                     onClick = dependency.group?.let { group -> { open("tool/${group.id}") } },
                                 )
                             }
@@ -111,6 +113,7 @@ internal fun CapabilityCatalogSurface(
                                     val required = catalog.capabilityDependencies(skill).any { it.group?.id == selectedGroup?.id && !it.optional }
                                     CapabilityRow(skill.name, if (required) "Required dependency" else "Optional enhancement",
                                         capabilitySkillStatus(skill, catalog, loading), skill.description, "related-${skill.id}",
+                                        isSkill = true,
                                         onClick = { open("skill/${skill.id}") })
                                 }
                             }
@@ -159,12 +162,12 @@ internal fun CapabilityCatalogSurface(
                 LazyColumn(Modifier.weight(1f).testTag("capability-list"), state = listState, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(visibleSkills, key = { "skill/${it.id}" }) { skill ->
                         CapabilityRow(skill.name, "Skill", capabilitySkillStatus(skill, catalog, loading), skill.description,
-                            "capability-skill-${skill.id}", onClick = { open("skill/${skill.id}") })
+                            "capability-skill-${skill.id}", isSkill = true, onClick = { open("skill/${skill.id}") })
                     }
                     items(visibleGroups, key = { "tool/${it.id}" }) { group ->
                         CapabilityRow(group.name, if (group.id.startsWith("builtin:")) "Built-in tool" else "Tools and services",
                             if (tools.isLoading) "Checking" else group.status, group.description,
-                            "capability-tool-${group.id}", onClick = { open("tool/${group.id}") })
+                            "capability-tool-${group.id}", isSkill = false, onClick = { open("tool/${group.id}") })
                     }
                     if (!loading && visibleSkills.isEmpty() && visibleGroups.isEmpty()) item { Text("No matching capabilities.") }
                     item { Spacer(Modifier.height(8.dp)) }
@@ -181,12 +184,16 @@ private fun CapabilityRow(
     status: String,
     description: String,
     tag: String,
+    isSkill: Boolean,
     onClick: (() -> Unit)?,
 ) {
+    val colors = MaterialTheme.colorScheme
+    val accent = if (isSkill) colors.secondary else colors.primary
     Surface(
         modifier = Modifier.fillMaxWidth().testTag(tag).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = accent.copy(alpha = 0.14f).compositeOver(colors.surfaceContainer),
+        contentColor = colors.onSurface,
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row {
@@ -194,7 +201,7 @@ private fun CapabilityRow(
                 if (onClick != null) ToolGlyphIcon(ToolGlyph.CHEVRON)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(kind, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+                Text(kind, style = MaterialTheme.typography.labelSmall, color = accent, modifier = Modifier.weight(1f))
                 Text(status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f))
             }
