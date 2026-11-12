@@ -182,6 +182,15 @@ internal fun localizeUiText(
 }
 
 private val ZH_UI_TEXT = mapOf(
+    "Download APK" to "下载 APK",
+    "Finding the APK download..." to "正在查找 APK 下载地址…",
+    "Opening APK download. Android will ask before installation." to "正在打开 APK 下载。Android 会在安装前请求确认。",
+    "Opening pre-release APK download. Android will ask before installation." to "正在打开预发布版 APK 下载。Android 会在安装前请求确认。",
+    "APK download is unavailable. Check your connection and try again." to "暂时无法获取 APK 下载，请检查网络后重试。",
+    "Open release" to "查看发布页面",
+    "Later" to "稍后",
+    "Download the APK for your device. Your browser handles the download; Android asks before installation." to "下载适合此设备的 APK。浏览器负责下载，Android 会在安装前请求确认。",
+    "No compatible APK was found in this release. Open the release page to choose a download." to "此版本未找到兼容的 APK，请前往发布页面选择下载。",
     "Agenda" to "日程",
     "All" to "全部",
     "Success" to "成功",

@@ -30,6 +30,9 @@ import com.example.mochi_pet.core.settings.ProviderSettingsRepository
 import com.example.mochi_pet.core.settings.ProviderSettingsSummary
 import com.example.mochi_pet.core.weather.CurrentWeather
 import com.example.mochi_pet.core.weather.WeatherRepository
+import com.example.mochi_pet.core.update.ApkDownload
+import com.example.mochi_pet.core.update.ExtensionApk
+import com.example.mochi_pet.core.agentlink.AgentLinkUiAction
 import com.example.mochi_pet.core.voice.VoiceRuntime
 import com.example.mochi_pet.core.voice.SpeechPlaybackResult
 import com.example.mochi_pet.core.voice.SpeechPurpose
@@ -70,6 +73,55 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test fun `extension install actions open the resolved APK and lookup failures show feedback`() {
+        val requested = mutableListOf<ExtensionApk>()
+        var fail = false
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+            extensionDownload = {
+                requested += it
+                if (fail) throw java.io.IOException("Synthetic lookup failure")
+                ApkDownload("https://example.com/${it.name}.apk", it == ExtensionApk.AGENTLINK)
+            },
+        )
+        viewModel.installMijiaExtension()
+        assertEquals("https://example.com/MIJIA.apk", viewModel.toolsState.value.authorizationUrl)
+        viewModel.onTermuxAction(TermuxUiAction.Install)
+        assertEquals("https://example.com/TERMUX.apk", viewModel.toolsState.value.authorizationUrl)
+        viewModel.onWebdavAction(WebdavUiAction.Install)
+        assertEquals("https://example.com/WEBDAV.apk", viewModel.toolsState.value.authorizationUrl)
+        viewModel.onAgentLinkAction(AgentLinkUiAction.Install)
+        assertEquals("https://example.com/AGENTLINK.apk", viewModel.toolsState.value.authorizationUrl)
+        assertTrue(viewModel.toolsState.value.feedback.orEmpty().contains("pre-release"))
+        assertEquals(ExtensionApk.entries.toList(), requested)
+        fail = true
+        viewModel.installMijiaExtension()
+        assertEquals(null, viewModel.toolsState.value.authorizationUrl)
+        assertFalse(viewModel.toolsState.value.isDownloadingApk)
+        assertEquals("APK download is unavailable. Check your connection and try again.", viewModel.toolsState.value.feedback)
+    }
+
+    @Test fun `superseded or navigated away APK lookups cannot launch a browser or clear newer progress`() {
+        val first = CompletableDeferred<ApkDownload>()
+        val second = CompletableDeferred<ApkDownload>()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+            extensionDownload = { kind -> withContext(NonCancellable) {
+                if (kind == ExtensionApk.MIJIA) first.await() else second.await()
+            } },
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowTools)
+        viewModel.installMijiaExtension()
+        viewModel.onTermuxAction(TermuxUiAction.Install)
+        first.complete(ApkDownload("https://example.com/old.apk", false))
+        assertEquals(null, viewModel.toolsState.value.authorizationUrl)
+        assertTrue(viewModel.toolsState.value.isDownloadingApk)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        second.complete(ApkDownload("https://example.com/late.apk", false))
+        assertEquals(null, viewModel.toolsState.value.authorizationUrl)
+        assertFalse(viewModel.toolsState.value.isDownloadingApk)
+    }
+
     @Test fun `focus navigation is idempotent and preserves the current Home view across an Agent turn`() {
         val saved = SavedStateHandle(mapOf("focus_mode" to true))
         val viewModel = MochiHomeViewModel(

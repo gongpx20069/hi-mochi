@@ -27,6 +27,8 @@ import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.extensions.ExtensionActivityTarget
 import com.example.mochi_pet.core.extensions.MochiExtensionClient
+import com.example.mochi_pet.core.update.ApkDownload
+import com.example.mochi_pet.core.update.ExtensionApk
 import com.example.mochi_pet.core.agentlink.AgentLinkClient
 import com.example.mochi_pet.core.agentlink.AgentLinkActivityRequest
 import com.example.mochi_pet.core.agentlink.AgentLinkAuthorizationResult
@@ -285,6 +287,7 @@ data class SkillsUiState(
 data class ToolsUiState(
     val catalog: ToolCatalogSummary = ToolCatalogSummary(),
     val isLoading: Boolean = true,
+    val isDownloadingApk: Boolean = false,
     val feedback: String? = null,
     val authorizationUrl: String? = null,
     val awaitingFeishuAuthorization: Boolean = false,
@@ -354,6 +357,9 @@ class MochiHomeViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
     private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val extensionDownload: suspend (ExtensionApk) -> ApkDownload = {
+        throw IOException("Extension downloads are unavailable.")
+    },
 ) : ViewModel() {
     private val mutableSurface = MutableStateFlow<MochiSurface>(MochiSurface.Face)
     private var plannerHighlights: List<String> = emptyList()
@@ -392,6 +398,8 @@ class MochiHomeViewModel(
     val speechVoiceState = mutableSpeechVoiceState.asStateFlow()
     private var voiceCatalogJob: Job? = null
     private var feishuAuthorizationJob: Job? = null
+    private var extensionDownloadJob: Job? = null
+    private var extensionDownloadVersion = 0L
     private var voiceCatalogVersion = 0L
     private var voicePreviewVersion = 0L
     private var resumeWakeAfterPreview = false
@@ -706,6 +714,7 @@ class MochiHomeViewModel(
             return
         }
         val target = MochiNavigationReducer.reduce(intent, mutableSurface.value)
+        if (target != mutableSurface.value) cancelExtensionDownload()
         if (!target.isHomePresentation()) savedStateHandle["focus_mode"] = false
         if (target != MochiSurface.Settings) stopVoicePreview()
         if (
@@ -2203,11 +2212,46 @@ class MochiHomeViewModel(
     }
 
     fun installMijiaExtension() {
+        downloadExtension(ExtensionApk.MIJIA)
+    }
+
+    private fun downloadExtension(extension: ExtensionApk) {
+        cancelExtensionDownload()
+        val version = extensionDownloadVersion
+        val source = mutableSurface.value
         mutableToolsState.update {
-            it.copy(
-                feedback = "Download the trusted Mi Home extension APK",
-                authorizationUrl = MIJIA_RELEASE_URL,
-            )
+            it.copy(isDownloadingApk = true, authorizationUrl = null, feedback = "Finding the APK download...")
+        }
+        extensionDownloadJob = viewModelScope.launch(mainDispatcher) {
+            try {
+                val download = extensionDownload(extension)
+                if (version == extensionDownloadVersion && mutableSurface.value == source) {
+                    mutableToolsState.update {
+                        it.copy(
+                            authorizationUrl = download.url,
+                            feedback = if (download.prerelease) "Opening pre-release APK download. Android will ask before installation."
+                            else "Opening APK download. Android will ask before installation.",
+                        )
+                    }
+                }
+            } catch (_: IOException) {
+                if (version == extensionDownloadVersion) mutableToolsState.update {
+                    it.copy(feedback = "APK download is unavailable. Check your connection and try again.")
+                }
+            } finally {
+                if (version == extensionDownloadVersion) mutableToolsState.update {
+                    it.copy(isDownloadingApk = false)
+                }
+            }
+        }
+    }
+
+    private fun cancelExtensionDownload() {
+        extensionDownloadVersion++
+        extensionDownloadJob?.cancel()
+        extensionDownloadJob = null
+        if (mutableToolsState.value.isDownloadingApk) {
+            mutableToolsState.update { it.copy(isDownloadingApk = false, feedback = null) }
         }
     }
 
@@ -2221,9 +2265,7 @@ class MochiHomeViewModel(
             return
         }
         when (action) {
-            TermuxUiAction.Install -> mutableToolsState.update {
-                it.copy(authorizationUrl = MIJIA_RELEASE_URL)
-            }
+            TermuxUiAction.Install -> downloadExtension(ExtensionApk.TERMUX)
             TermuxUiAction.Configure -> {
                 val summary = mutableToolsState.value.catalog.termux
                 val pkg = summary.configurationPackage
@@ -2251,7 +2293,7 @@ class MochiHomeViewModel(
 
     fun onWebdavAction(action: WebdavUiAction) {
         when (action) {
-            WebdavUiAction.Install -> mutableToolsState.update { it.copy(authorizationUrl = MIJIA_RELEASE_URL) }
+            WebdavUiAction.Install -> downloadExtension(ExtensionApk.WEBDAV)
             WebdavUiAction.EnableWithSkill -> pendingExtensionSetup.value = ExtensionSetupKind.WEBDAV
             WebdavUiAction.Configure -> {
                 val summary = mutableToolsState.value.catalog.webdav
@@ -2355,13 +2397,13 @@ class MochiHomeViewModel(
     }
 
     fun onAgentLinkAction(action: AgentLinkUiAction) {
-        if (action == AgentLinkUiAction.Install || action == AgentLinkUiAction.SetupGuide) {
+        if (action == AgentLinkUiAction.Install) {
+            downloadExtension(ExtensionApk.AGENTLINK)
+            return
+        }
+        if (action == AgentLinkUiAction.SetupGuide) {
             mutableToolsState.update {
-                it.copy(authorizationUrl = if (action == AgentLinkUiAction.Install) {
-                    "https://github.com/gongpx20069/android-agent-link/releases"
-                } else {
-                    "https://github.com/gongpx20069/android-agent-link#readme"
-                })
+                it.copy(authorizationUrl = "https://github.com/gongpx20069/android-agent-link#readme")
             }
             return
         }
@@ -3126,6 +3168,7 @@ class MochiHomeViewModel(
         }
 
     override fun onCleared() {
+        cancelExtensionDownload()
         closeManualBrowser()
         stopVoicePreview()
         voiceCatalogJob?.cancel()
@@ -3143,8 +3186,6 @@ class MochiHomeViewModel(
         private val AGENT_LOGGER = Logger.getLogger(AGENT_LOG_TAG)
         private const val TENCENT_DOCS_TOKEN_URL =
             "https://docs.qq.com/open/auth/mcp.html"
-        private const val MIJIA_RELEASE_URL =
-            "https://github.com/gongpx20069/hi-mochi/releases/latest"
 
         fun factory(
             application: MochiApplication,
@@ -3186,6 +3227,7 @@ class MochiHomeViewModel(
                         toolCatalogRepository =
                             application.toolCatalogRepository,
                         extensionClient = application.extensionClient,
+                        extensionDownload = application.appUpdateClient::extensionDownload,
                         agentLinkClient = application.agentLinkClient,
                         agentLinkResults = application.agentLinkResults,
                         termuxRuntime = application.termuxRuntime,

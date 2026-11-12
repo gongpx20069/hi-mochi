@@ -44,8 +44,13 @@ start the protected extension Service or configuration Activity.
 ## 3. Installation and discovery
 
 The Tools surface contains a stable Mi Home card even when the package is
-absent. **Install extension** opens the repository's trusted latest Release
-page; Android owns download and package-install confirmation. Mochi never
+absent. **Install extension** resolves the corresponding universal Mi Home,
+Termux or WebDAV APK in Mochi's latest stable GitHub Release and opens that
+asset directly. It validates the exact package filename, repository/tag URL,
+uploaded state and nonzero size; it never substitutes another extension or the
+base app. Missing assets or lookup failures show retry feedback, not a Release
+page disguised as a download. Leaving the surface cancels pending navigation.
+The external browser handles downloading; Android owns installation confirmation. Mochi never
 silently installs packages or requests broad package installation access.
 
 The extension manifest has no `MAIN/LAUNCHER` activity. Its label and icon are

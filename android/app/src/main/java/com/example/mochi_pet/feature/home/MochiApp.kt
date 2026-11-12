@@ -572,7 +572,7 @@ private fun MochiAppContent(
         }
     }
     LaunchedEffect(Unit) {
-        availableUpdate = application.appUpdateClient.check()
+        availableUpdate = application.appUpdateClient.check(android.os.Build.SUPPORTED_ABIS.toList())
     }
     LaunchedEffect(providerShareState.shareLink) {
         val shareLink = providerShareState.shareLink ?: return@LaunchedEffect
@@ -1000,30 +1000,12 @@ private fun MochiAppContent(
     }
 
     availableUpdate?.let { update ->
-        AlertDialog(
-            onDismissRequest = { availableUpdate = null },
-            title = { Text("Mochi ${update.version} is available") },
-            text = {
-                Text(
-                    update.notes.ifBlank {
-                        "Open the GitHub Release page to download the APK."
-                    },
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        openExternalPage(context, update.releaseUrl)
-                        availableUpdate = null
-                    },
-                ) {
-                    Text("Open release")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { availableUpdate = null }) {
-                    Text("Later")
-                }
+        AppUpdateDialog(
+            update = update,
+            onDismiss = { availableUpdate = null },
+            onOpen = { url ->
+                openExternalPage(context, url)
+                availableUpdate = null
             },
         )
     }
@@ -1065,6 +1047,37 @@ private fun MochiAppContent(
             },
         )
     }
+}
+
+@Composable
+internal fun AppUpdateDialog(
+    update: AppUpdate,
+    onDismiss: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mochi ${update.version}") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(if (update.apkUrl != null) {
+                    "Download the APK for your device. Your browser handles the download; Android asks before installation."
+                } else {
+                    "No compatible APK was found in this release. Open the release page to choose a download."
+                })
+                if (update.notes.isNotBlank()) Text(update.notes)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onOpen(update.apkUrl ?: update.releaseUrl) }) {
+                Text(if (update.apkUrl != null) "Download APK" else "Open release")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Later") } },
+    )
 }
 
 @Composable
@@ -3883,7 +3896,7 @@ internal fun ToolsSurface(
                 MijiaExtensionCard(
                     summary = state.catalog.mijia,
                     toolsExpanded = mijiaToolsExpanded,
-                    disabled = state.isLoading,
+                    disabled = state.isLoading || state.isDownloadingApk,
                     onToggleTools = {
                         mijiaToolsExpanded = !mijiaToolsExpanded
                     },
@@ -3897,17 +3910,17 @@ internal fun ToolsSurface(
             item {
                 TermuxProviderCard(
                     summary = state.catalog.termux,
-                    disabled = state.isLoading,
+                    disabled = state.isLoading || state.isDownloadingApk,
                     onAction = onTermuxAction,
                 )
             }
             item {
-                WebdavProviderCard(state.catalog.webdav, state.isLoading, onWebdavAction)
+                WebdavProviderCard(state.catalog.webdav, state.isLoading || state.isDownloadingApk, onWebdavAction)
             }
             item {
                 AgentLinkProviderCard(
                     state = state.catalog.agentLink,
-                    loading = state.isLoading,
+                    loading = state.isLoading || state.isDownloadingApk,
                     onAction = onAgentLinkAction,
                 )
             }

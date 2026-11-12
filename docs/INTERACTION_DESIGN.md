@@ -13,6 +13,25 @@
 Mochi remains visible as a compact companion where space permits, but planner
 content takes priority when the selected surface requires reading or editing.
 
+### App updates
+
+The app's newer-version dialog offers **Download APK**, opening the published
+base-app asset for the device's first supported ABI with an available package.
+It uses the universal APK only when no supported ABI-specific asset exists.
+Only uploaded, nonempty assets with the exact base-app filename and download
+URL under Mochi's GitHub Release are eligible; extension APKs are not app updates.
+If no compatible asset is available, the dialog explains this and offers
+**Open release** instead. Release notes remain scrollable. The external browser
+handles downloading and Android owns installation confirmation; Mochi neither
+silently installs packages nor requests installation permission for this flow.
+
+Extension download actions also open the matching APK directly. Mi Home,
+Termux and WebDAV use Mochi's latest stable release; AgentLink uses its newest
+public release, including its existing pre-release channel, and identifies a
+pre-release in download feedback. Lookup progress and retryable failures are
+visible; missing assets do not silently open a release page. Leaving the surface
+cancels pending download navigation. AgentLink's setup-guide link remains a guide.
+
 ## 2. Voice navigation
 
 Voice navigation is semantic and structured. UI code must not scan final reply
@@ -656,7 +675,7 @@ card always occupies one stable position there, follows Mochi's selected
 Chinese or English UI language, and moves through these states:
 
 1. **Not installed**: describe the optional unofficial connector, its
-   approximate download size, and open the trusted GitHub Release page through
+   approximate download size, and open its trusted APK download through
    an **Install extension** action.
 2. **Installed, not connected**: show extension version and a **Connect Mi
    Home** action.
