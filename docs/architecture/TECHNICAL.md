@@ -440,7 +440,7 @@ provider. All other Skills require every declared mandatory Tool; explicitly
 optional capabilities do not block enablement. Provider-backed groups require
 the provider to be installed when applicable, connected, and enabled.
 
-`builtin:memory-recall` is first in Skills, with discovery name `memory-recall`
+`builtin:memory-recall` is first among Skills in Capabilities, with discovery name `memory-recall`
 and mandatory `recall_memory`. Its enabled state comes only from Daily journal;
 independent stored overrides are ignored and direct toggles rejected. It is
 discoverable/loadable only with its foreground Tool available. Its short
@@ -482,7 +482,7 @@ instructions for selected-app operation, safe popup dismissal, verification and
 return with the prior Mochi presentation/Focus preserved. It has no mandatory
 Tool dependency so it remains discoverable when explaining setup. Its optional
 header includes only the five App Control Tools and `media_read` actually present
-in the caller's registry. Missing capabilities point to Tools > App Control,
+in the caller's registry. Missing capabilities point to Capabilities > App Control,
 app selection and manual accessibility authorization; playback verification
 additionally points to Media Control/player access. The Skill never grants
 foreground app operations to scheduled or child runs or enables any permission.

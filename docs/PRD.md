@@ -257,7 +257,7 @@ contract are defined in [Memory design](architecture/MEMORY_DESIGN.md#17-daily-j
 ### 3.5.1 Custom REST tools
 
 Custom REST APIs are optional foreground-only Tools, configured from
-**Tools > Add tool > Connect REST API** alongside manual MCP services.
+**Capabilities > Add tool > Connect REST API** alongside manual MCP services.
 A named service shares one encrypted Token across multiple independently
 switchable JSON endpoints. No Python runtime or code editor is required.
 Users explicitly test a real request, select scalar response fields and their
@@ -272,8 +272,8 @@ conversation history; authentication material is excluded.
 
 ### 3.5.2 App Control and Media Control tools
 
-Two independent bundled groups appear between Agent Browser and Amap Maps,
-outside Mochi Built-ins: **App Control** (`app_read`, `app_navigate`, `app_click`,
+Two independent bundled groups appear between Agent Browser and Amap Maps
+in the capability catalog: **App Control** (`app_read`, `app_navigate`, `app_click`,
 `app_input`, `app_scroll`), then **Media Control** (`media_read`,
 `media_play_from_search`, `media_control`, `media_volume`). Their master and
 individual switches default to enabled, preserve old disabled settings on
@@ -350,7 +350,7 @@ a permission status, and an unconfirmed return is an explicit Tool error.
 - Entering the background does not itself pause or cancel Browser execution.
   Pending user assistance is exposed by a private notification when enabled;
   Android process/background limits still apply.
-- The Tools surface groups the Agent Browser provider switch and all five
+- Capabilities groups the Agent Browser provider switch and all five
   individual Browser Tool switches in one card.
 - The Agent chooses auto/mobile/desktop mode according to the task, without
   asking the user to configure it. Mode switches must not replay forms.
@@ -360,7 +360,7 @@ a permission status, and an unconfirmed return is an explicit Tool error.
   The user completes/cancels in native UI. Website passwords are handled only
   by the website or native account editor, never chat/model context.
   A fresh read verifies reported completion.
-- **Tools > Agent Browser > Websites and logins** manages shared local sessions,
+- **Capabilities > Agent Browser > Websites and logins** manages shared local sessions,
   with a Bing search/address field and a website-grouped list. Known websites
   with detectable local data or saved credentials appear automatically. Opening
   a website item shows its Cookie/site-data entry and saved accounts in a new
@@ -410,14 +410,28 @@ a permission status, and an unconfirmed return is an explicit Tool error.
 - Subagent Browser work reuses the current per-turn session. Home keeps the
   Browser Card visible and identifies the active Subagent.
 
-### 3.8 Skills
+### 3.8 Capabilities and Skills
 
-- Skills has Installed and Explore surfaces.
+- Bottom navigation has Home, Talk, Planner, and Capabilities. There is no
+  standalone browser tab: website login preparation belongs to Agent Browser.
+- Capabilities is one searchable catalog of Skills, built-in Tools, and tool
+  services, with All, Skills, Tools and services, and Needs setup filters.
+  Memory Recall stays first among Skills. Services without Skills remain
+  independently configurable; MCP/REST services group their child tools.
+- Skill details link directly to required and optional tool/service details.
+  Returning preserves the originating Skill and reflects live readiness.
+  Service details link back to dependent Skills; shared Tools are never copied
+  into a Skill or automatically enabled by it. Disabling required Tools warns
+  about currently ready enabled Skills that will pause, without changing their
+  saved preferences. Optional Tools do not block enablement.
+- Discover Skills opens the skills.sh catalog. Existing Skills/Tools navigation
+  intents remain compatible entries into Capabilities; the Skills entry selects
+  the Skills filter. Connection and permission ownership is unchanged.
 - Built-in Mochi skills are visible and read-only.
 - App Assistant is a default-on, generic app-operation Skill: close safe
   obstructing ads/popups, search and operate selected apps, verify the result,
   and return without resetting Mochi's page or Focus mode. It remains available
-  without app Tools to explain enabling Tools > App Control, selecting apps and
+  without app Tools to explain enabling Capabilities > App Control, selecting apps and
   manually granting app assistance. It never grants a Tool or permission.
 - skills.sh market skills can be installed, enabled, edited, updated, and
   removed locally.
@@ -481,7 +495,7 @@ a permission status, and an unconfirmed return is an explicit Tool error.
   APK extensions rather than increasing every base APK.
 - The first extension is the optional Mi Home connector. It has no launcher
   entry and is installed, connected, enabled, updated, and disconnected from
-  the Mochi Tools surface.
+  the Capabilities surface.
 - The base app accepts only extension packages signed by the same trusted
   release certificate and implementing the versioned Mochi Extension API.
   Installing an extension never enables it or grants device access implicitly.

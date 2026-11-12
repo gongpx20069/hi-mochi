@@ -131,7 +131,7 @@ class AndroidMediaPlatform(
         checkActive()
         val player = requirePlayer(playerId)
         if (!mediaNotificationAccessGranted(application)) {
-            throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "Grant notification access in Tools > Media Control.")
+            throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "Grant notification access in Capabilities > Media Control.")
         }
         val intent = searchIntent(player.packageName).apply {
             putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/audio")
@@ -258,7 +258,7 @@ class AndroidMediaPlatform(
     override suspend fun control(id: String, action: MediaAction, positionMs: Long?): Unit =
         withContext(Dispatchers.Main.immediate) {
             if (!mediaNotificationAccessGranted(application)) {
-                throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "Grant notification access in Tools > Media Control.")
+                throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "Grant notification access in Capabilities > Media Control.")
             }
             val controller = controllers().firstOrNull { ids[it.sessionToken] == id }
                 ?: throw MediaFailure(ToolErrorCode.NOT_FOUND, "Media session expired; read available players again.")

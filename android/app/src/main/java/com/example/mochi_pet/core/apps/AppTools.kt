@@ -132,7 +132,7 @@ class AppToolRuntime(private val platform: AppPlatform, private val mutationMute
                                 checkEnabled()
                                 if (!platform.returnToMochi(::checkEnabled)) {
                                     throw MediaFailure(ToolErrorCode.CONFLICT,
-                                        "Mochi has not returned to the foreground. If Android blocks background launches, use Tools > App Control > Background pop-up permission, then grant it manually in system settings. Do not claim return succeeded.")
+                                        "Mochi has not returned to the foreground. If Android blocks background launches, use Capabilities > App Control > Background pop-up permission, then grant it manually in system settings. Do not claim return succeeded.")
                                 }
                                 put("returnedToMochi", true)
                                 put("notice", "Navigation only; this does not verify playback or task completion.")

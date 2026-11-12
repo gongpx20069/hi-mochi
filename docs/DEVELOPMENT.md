@@ -33,10 +33,10 @@ android/
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
 The wrapper pins Gradle 9.9.1 with its official distribution SHA-256.
 The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
-and serialization 1.12.0 across the host and extensions. The root buildscript
+and serialization 1.13.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply
-`org.jetbrains.kotlin.android` in modules. Serialization 1.12.0 uses Kotlin 2.4
-metadata and requires a compatible Kotlin compiler.
+`org.jetbrains.kotlin.android` in modules. The serialization runtime requires
+a compatible Kotlin compiler.
 The host and all three extensions compile against and target Android 17 (API 37);
 the shared libraries also compile against API 37. Android 8.0 (API 26) remains
 the minimum supported version. Keep Lint warnings fatal, including target-SDK
@@ -202,6 +202,19 @@ any-one-Tool readiness, exact role-scoped `allowed-tools` headers, multiline
 imported declarations and explicit invalid-metadata rejection, suspended/unknown
 UI states, and the absence of retired-operation/version-history guidance in
 built-in prompts. They do not modify phone configuration or call live providers.
+
+Unified capability catalog and website login UI regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*CapabilityCatalogTest" `
+  --tests "*CapabilitiesUiTest" --tests "*BrowserCredentialsUiTest" `
+  --tests "*MediaToolsUiTest" --tests "*RestApiUiTest" --no-daemon
+```
+
+These cover four-item navigation, independent Tools, cross-service and any-one
+dependencies, shared-disable warnings, live configuration/return paths, managed
+memory controls, Chinese large text, and website-session disclosure. Fixtures
+use synthetic accounts and do not log in to real websites.
 
 Tencent Docs Smart Canvas regressions:
 
@@ -410,7 +423,7 @@ Feishu integration regressions:
 
 These use synthetic credentials and local fixtures, not an actual Feishu account.
 Device acceptance separately requires a user-owned published Feishu app: follow
-Tools > Feishu MCP, confirm browser return, permission denial, cancellation,
+Capabilities > Feishu MCP, confirm browser return, permission denial, cancellation,
 refresh and process-death retry, then read/search an authorized document.
 Only with explicit permission create/update a test document and verify readback.
 Never request App Secret/tokens in chat or put them in logs/screenshots.
@@ -612,7 +625,7 @@ Real-service/device acceptance remains pending until that evidence is recorded.
 Use matching-signed base and `extensions\termux\build\outputs\apk\debug\termux-debug.apk`
 APKs, updating existing packages with `adb install -r`. Termux is installed
 separately from its official channels; do not uninstall an existing Termux to
-change its source. Follow Tools > Extensions > Termux > Configure.
+change its source. Follow Capabilities > Termux extension > Configure Termux.
 The connector uses RUN_COMMAND callbacks (Termux 0.109+) and per-command log
 control (0.118+); use a current compatible official Termux build.
 

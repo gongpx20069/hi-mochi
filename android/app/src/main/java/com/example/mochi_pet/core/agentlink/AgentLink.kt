@@ -135,7 +135,7 @@ class AgentLinkTool(
         name,
         "Control authorized shared AgentLink CLI/App chats. Load agentlink skill first. " +
             "List to ground IDs; read before control. Human changes cause CONFLICT: stop, never retry. " +
-            "No browser/network bypass. Permission requires Tools > AgentLink confirmation.",
+            "No browser/network bypass. Permission requires Capabilities > AgentLink confirmation.",
         buildJsonObject {
             put("action", buildJsonObject {
                 put("type", "string")
@@ -187,7 +187,7 @@ class AgentLinkTool(
         if (!state.authorized || !state.connected || !state.enabled || name !in state.enabledTools) {
             return@withLock ToolResultEnvelope.error(
                 ToolErrorCode.PERMISSION_DENIED,
-                "AgentLink unavailable. Open Tools > AgentLink > Connect/Open AgentLink; " +
+                "AgentLink unavailable. Open Capabilities > AgentLink > Connect/Open AgentLink; " +
                     "authorize scopes in its native page. Never bypass with browser or network.",
             )
         }
@@ -222,7 +222,7 @@ class AgentLinkTool(
             }
             return@withLock ToolResultEnvelope.success(buildJsonObject {
                 put("chatId", request.chatId)
-                put("instruction", "Tap the linked chat in Tools > AgentLink to open its trusted native view.")
+                put("instruction", "Tap the linked chat in Capabilities > AgentLink to open its trusted native view.")
             })
         }
         val guarded = if (control && request.action == "send") request.copy(

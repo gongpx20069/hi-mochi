@@ -135,7 +135,7 @@ class MediaToolRuntime(private val platform: MediaPlatform, private val mutation
                                 put("volumePercent", snapshot.volume.percent)
                                 put("volumeScope", "Local device media stream, shared with music, video and Mochi speech; not cast volume.")
                                 if (!snapshot.notificationAccess) {
-                                    put("notice", "Active sessions and verified song requests require player access in Tools > Media Control. App Control and local volume do not require it.")
+                                    put("notice", "Active sessions and verified song requests require player access in Capabilities > Media Control. App Control and local volume do not require it.")
                                 }
                             }
                         }
@@ -176,7 +176,7 @@ class MediaToolRuntime(private val platform: MediaPlatform, private val mutation
             val player = requirePlayer(before, id)
             if (!before.notificationAccess) {
                 throw MediaFailure(ToolErrorCode.PERMISSION_DENIED,
-                    "Grant notification access in Tools > Media Control before requesting a song, so playback can be verified.")
+                    "Grant notification access in Capabilities > Media Control before requesting a song, so playback can be verified.")
             }
             val sessions = before.sessions.filter { it.packageName == player.packageName && "play_from_search" in it.actions }
             if (sessions.size > 1) {
@@ -313,7 +313,7 @@ class MediaToolRuntime(private val platform: MediaPlatform, private val mutation
 
 private fun requireSession(snapshot: MediaSnapshot, id: String): MediaSessionInfo {
     if (!snapshot.notificationAccess) {
-        throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "Grant notification access in Tools > Media Control.")
+        throw MediaFailure(ToolErrorCode.PERMISSION_DENIED, "Grant notification access in Capabilities > Media Control.")
     }
     return snapshot.sessions.firstOrNull { it.id == id }
         ?: throw MediaFailure(ToolErrorCode.NOT_FOUND,

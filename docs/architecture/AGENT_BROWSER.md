@@ -272,9 +272,9 @@ not prove successful login. Captured/filled passwords remain native-only and
 are redacted if echoed into subsequent Agent snapshots during the same turn.
 More than 32 distinct protected passwords blocks snapshots until a new turn.
 
-## 6. Tools UI
+## 6. Capability UI and website login preparation
 
-The Tools surface presents one **Agent Browser** provider card. Browser
+Capabilities presents one **Agent Browser** tool-service entry. Browser
 configuration is not scattered among unrelated built-in Tools.
 
 The card contains:
@@ -290,11 +290,16 @@ When enabled, individual Tool switches still determine which schemas are
 registered. The five switches remain adjacent and in the same order as the
 Tool contract table.
 
-Website management is a secure full-screen dialog with a Bing search/address
-field centered beneath the Mochi logo, a top-right Close button, and a separate
-translucent website-list panel, not dashboard cards. Its entry is a rounded
+Website management prepares website logins for Agent use; it is not an
+independent bottom-navigation browser. It is a secure full-screen dialog with
+a website field (also accepting Bing searches) beneath the Mochi logo, a
+top-right Return to Mochi button, and a separate translucent website-list
+panel. The login caption and What is saved? disclosure distinguish reusable
+sessions from optional stored credentials and disclose model access to task
+page content. Neither local data nor saved accounts proves current login.
+Its entry is a rounded
 settings row matching App Control, with globe icon, detail and chevron; the
-management dialog and login flow remain unchanged. Opening a website row shows a secure second
+underlying login/session lifecycle is unchanged. Opening a website row shows a secure second
 list containing one shared Cookie/site-data entry, when detected, plus its
 password/SMS accounts. Blue data and purple credential badges include text labels.
 Credential swipes reveal Edit/Delete; data swipes reveal only Delete. A shared

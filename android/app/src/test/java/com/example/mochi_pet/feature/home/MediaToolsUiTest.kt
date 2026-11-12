@@ -81,11 +81,12 @@ class MediaToolsUiTest {
         compose.onNodeWithText("Open Mochi while another app is in the foreground").assertIsDisplayed()
     }
 
-    @Test fun `media appears between Browser and Amap and outside Mochi builtins`() {
+    @Test fun `browser capability detail exposes login preparation without unrelated tools`() {
         var managedBrowser = false
         compose.setContent {
             MochiTheme {
-                ToolsSurface(
+                ToolCapabilityDetail(
+                    detailGroup = "browser",
                     state = ToolsUiState(catalog = ToolCatalogSummary(media = summary, appControl = appSummary), isLoading = false),
                     onSetBuiltInEnabled = { _, _ -> }, onConnectNotion = {}, onDisconnectNotion = {},
                     onFeishuAction = {}, onOpenTencentDocsTokenPage = {}, onConfigureTencentDocs = {},
@@ -100,16 +101,12 @@ class MediaToolsUiTest {
                 )
             }
         }
-        compose.onNodeWithTag("tools-list").performScrollToIndex(1)
         compose.onNodeWithText("Agent Browser").assertIsDisplayed()
         compose.onNodeWithTag("browser-websites-settings").performClick()
         assertTrue(managedBrowser)
-        compose.onNodeWithTag("tools-list").performScrollToIndex(2)
-        compose.onNodeWithText("App Control").assertIsDisplayed()
-        compose.onNodeWithTag("tools-list").performScrollToIndex(3)
-        compose.onNodeWithText("Media Control").assertIsDisplayed()
-        compose.onNodeWithTag("tools-list").performScrollToIndex(4)
-        compose.onNodeWithText("Amap Maps").assertIsDisplayed()
+        compose.onNodeWithText("App Control").assertDoesNotExist()
+        compose.onNodeWithText("Media Control").assertDoesNotExist()
+        compose.onNodeWithText("Amap Maps").assertDoesNotExist()
         compose.onNodeWithText("Mochi Built-ins").assertDoesNotExist()
     }
 

@@ -80,7 +80,11 @@ internal fun AddToolDialog(onMcp: () -> Unit, onRest: () -> Unit, onDismiss: () 
 }
 
 @Composable
-internal fun RestApiConnectionCard(summary: RestConnectionSummary, actions: RestApiActions) {
+internal fun RestApiConnectionCard(
+    summary: RestConnectionSummary,
+    actions: RestApiActions,
+    onBeforeDisable: (String?, () -> Unit) -> Unit = { _, action -> action() },
+) {
     val connection = summary.connection
     var expanded by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
@@ -90,10 +94,17 @@ internal fun RestApiConnectionCard(summary: RestConnectionSummary, actions: Rest
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     fun change(action: RestApiChange) {
-        scope.launch {
-            busy = true
-            error = restUiOperation { actions.change(action) }
-            busy = false
+        val apply: () -> Unit = {
+            scope.launch {
+                busy = true
+                error = restUiOperation { actions.change(action) }
+                busy = false
+            }
+        }
+        when {
+            action is RestApiChange.SetEnabled && !action.enabled -> onBeforeDisable(action.toolId, apply)
+            action is RestApiChange.Delete -> onBeforeDisable(action.toolId, apply)
+            else -> apply()
         }
     }
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {

@@ -108,7 +108,7 @@ This is neither embedding similarity nor an event-membership probability.
 
 ### 1.5 Explicit journal-guided recall
 
-The built-in **Memory Recall / 回忆检索** Skill is first in Skills, with stable
+The built-in **Memory Recall / 回忆检索** Skill is first among Skills in Capabilities, with stable
 ID `builtin:memory-recall` and discovery name `memory-recall`. It requires
 `recall_memory`; metadata enters `available_skills` only when enabled and ready.
 `load_skill` supplies concise guidance on demand, not a large permanent prompt.
@@ -163,8 +163,8 @@ Deleted, contentless and nonpast journal dates are not search results.
 
 Daily journal is the sole enablement owner. Skill overrides and Tool toggles
 cannot independently enable or disable recall; native setters reject them.
-Both entries remain visible with a grey read-only switch reflecting current
-state. The clickable control explains the relationship and opens Settings
+Both catalog entries remain visible with a managed status; their details show
+a grey read-only switch reflecting current state. The clickable control explains the relationship and opens Settings
 at the Daily journal card.
 
 The Tool exists only in foreground Main Agent registries, not scheduled Agents,

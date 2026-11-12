@@ -67,7 +67,7 @@ internal fun WebsiteManager(viewModel: MochiHomeViewModel, onClose: () -> Unit) 
             search = {
                 OutlinedTextField(
                     value = search, onValueChange = { if (it.length <= 2_000) search = it },
-                    placeholder = { Text("Search Bing or enter a website") },
+                    placeholder = { Text("Enter a website to sign in") },
                     singleLine = true, shape = MaterialTheme.shapes.extraLarge,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { if (search.isNotBlank()) viewModel.openManagedWebsite(search) }),
@@ -365,6 +365,7 @@ internal fun BrowserManagementLayout(
     search: @Composable () -> Unit,
     accounts: @Composable ColumnScope.() -> Unit,
 ) {
+    var showPrivacy by remember { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize().testTag("browser-management"), color = MaterialTheme.colorScheme.background) {
         Box(
             Modifier.fillMaxSize().background(Brush.verticalGradient(
@@ -381,7 +382,7 @@ internal fun BrowserManagementLayout(
                         }
                         Spacer(Modifier.weight(1f))
                         TextButton(onClose, enabled = closeEnabled, modifier = Modifier.testTag("browser-management-close")) {
-                            Text("Close")
+                            Text("Return to Mochi")
                         }
                     }
                     Column(
@@ -404,10 +405,22 @@ internal fun BrowserManagementLayout(
                                 ) {
                                     Image(painterResource(R.drawable.ic_launcher_foreground), "Mochi", Modifier.fillMaxSize())
                                 }
-                                Text("Search the web. Save accounts safely.", style = MaterialTheme.typography.bodySmall,
+                                Text("Sign in once. Mochi can reuse valid website sessions.", style = MaterialTheme.typography.bodySmall,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(onClick = { showPrivacy = true }, modifier = Modifier.testTag("browser-login-privacy")) {
+                                    Text("What is saved?")
+                                }
                             }
+                            if (showPrivacy) AlertDialog(
+                                onDismissRequest = { showPrivacy = false },
+                                title = { Text("Websites and logins") },
+                                text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text("Sign in yourself, then return to Mochi. Valid website sessions can be reused by Agent Browser. Stored website data or a saved account does not prove you are signed in.")
+                                    Text("Saving an account is optional. Passwords stay in native secure storage, not model context. Page content used for a task may reach your AI provider. Deleting a saved account does not sign you out; clearing website data may.")
+                                } },
+                                confirmButton = { TextButton(onClick = { showPrivacy = false }) { Text("Got it") } },
+                            )
                         }
                         Spacer(Modifier.height(20.dp))
                         search()

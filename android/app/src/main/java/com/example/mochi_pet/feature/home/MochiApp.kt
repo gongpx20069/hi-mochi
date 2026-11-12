@@ -1,5 +1,7 @@
 package com.example.mochi_pet.feature.home
 
+import com.example.mochi_pet.core.tools.skillReadiness
+
 import androidx.compose.ui.platform.testTag
 
 import androidx.compose.foundation.BorderStroke
@@ -509,7 +511,12 @@ private fun MochiAppContent(
     val browserState by viewModel.browserState.collectAsStateWithLifecycle()
     val assistanceRequest by viewModel.assistanceRequest.collectAsStateWithLifecycle()
     var showBrowserManager by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(surface) { if (surface != MochiSurface.Tools) showBrowserManager = false }
+    LaunchedEffect(surface) {
+        if (surface != MochiSurface.Tools && surface != MochiSurface.Skills) {
+            if (showBrowserManager) viewModel.closeManualBrowser()
+            showBrowserManager = false
+        }
+    }
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
     val focusMode by viewModel.focusMode.collectAsStateWithLifecycle()
     var focusStandby by rememberSaveable { mutableStateOf(false) }
@@ -1394,8 +1401,7 @@ private fun MochiSurface.displayName(): String =
         MochiSurface.Card -> "Mochi card"
         MochiSurface.Conversation -> "Conversation"
         MochiSurface.Settings -> "Settings"
-        MochiSurface.Skills -> "Skills"
-        MochiSurface.Tools -> "Tools"
+        MochiSurface.Skills, MochiSurface.Tools -> "Capabilities"
         MochiSurface.Today -> "Today"
         is MochiSurface.CalendarMonth ->
             month.format(uiDateFormatter("MMMM yyyy", "yyyy年M月"))
@@ -1608,7 +1614,9 @@ private fun SurfaceContent(
                 onSetFocusStandby = onSetFocusStandby,
                 onSavePersona = onSavePersona,
             )
-            MochiSurface.Skills -> SkillsSurface(
+            MochiSurface.Skills, MochiSurface.Tools -> CapabilitiesController(
+                toolsState = toolsState,
+                initialSkillsOnly = surface == MochiSurface.Skills,
                 onOpenJournalSettings = openJournalSettings,
                 state = skillsState,
                 onSearch = onSearchSkills,
@@ -1621,40 +1629,45 @@ private fun SurfaceContent(
                 onDelete = onDeleteSkill,
                 onCheckUpdates = onCheckSkillUpdates,
                 onApplyUpdate = onApplySkillUpdate,
-            )
-            MochiSurface.Tools -> ToolsSurface(
-                onOpenJournalSettings = openJournalSettings,
-                state = toolsState,
-                onSetBuiltInEnabled = onSetBuiltInToolEnabled,
-                onConnectNotion = onConnectNotion,
-                onDisconnectNotion = onDisconnectNotion,
-                onFeishuAction = onFeishuAction,
-                onOpenTencentDocsTokenPage =
-                    onOpenTencentDocsTokenPage,
-                onConfigureTencentDocs = onConfigureTencentDocs,
-                onDisconnectTencentDocs = onDisconnectTencentDocs,
-                onOpenAmapConsole = onOpenAmapConsole,
-                onConfigureAmap = onConfigureAmap,
-                onDisconnectAmap = onDisconnectAmap,
-                onSetAmapEnabled = onSetAmapEnabled,
-                onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
-                onSetMediaEnabled = onSetMediaEnabled,
-                onSetAppControlEnabled = onSetAppControlEnabled,
-                onSetMediaAppPackages = onSetMediaAppPackages,
-                onManageBrowser = onManageBrowser,
-                onAgentLinkAction = onAgentLinkAction,
-                onInstallMijia = onInstallMijia,
-                onConfigureMijia = onConfigureMijia,
-                onDisconnectMijia = onDisconnectMijia,
-                onSetMijiaEnabled = onSetMijiaEnabled,
-                onSetMijiaToolEnabled = onSetMijiaToolEnabled,
-                onTermuxAction = onTermuxAction,
-                onWebdavAction = onWebdavAction,
-                onAddServer = onAddMcpServer,
-                restActions = restActions,
-                onRemoveServer = onRemoveMcpServer,
-                onSetServerEnabled = onSetMcpServerEnabled,
-                onSetToolEnabled = onSetMcpToolEnabled,
+                toolContent = { group, footer ->
+                    ToolCapabilityDetail(
+                        detailGroup = group,
+                        footer = footer,
+                        skills = skillsState.skills,
+                        onOpenJournalSettings = openJournalSettings,
+                        state = toolsState,
+                        onSetBuiltInEnabled = onSetBuiltInToolEnabled,
+                        onConnectNotion = onConnectNotion,
+                        onDisconnectNotion = onDisconnectNotion,
+                        onFeishuAction = onFeishuAction,
+                        onOpenTencentDocsTokenPage =
+                            onOpenTencentDocsTokenPage,
+                        onConfigureTencentDocs = onConfigureTencentDocs,
+                        onDisconnectTencentDocs = onDisconnectTencentDocs,
+                        onOpenAmapConsole = onOpenAmapConsole,
+                        onConfigureAmap = onConfigureAmap,
+                        onDisconnectAmap = onDisconnectAmap,
+                        onSetAmapEnabled = onSetAmapEnabled,
+                        onSetAgentBrowserEnabled = onSetAgentBrowserEnabled,
+                        onSetMediaEnabled = onSetMediaEnabled,
+                        onSetAppControlEnabled = onSetAppControlEnabled,
+                        onSetMediaAppPackages = onSetMediaAppPackages,
+                        onManageBrowser = onManageBrowser,
+                        onAgentLinkAction = onAgentLinkAction,
+                        onInstallMijia = onInstallMijia,
+                        onConfigureMijia = onConfigureMijia,
+                        onDisconnectMijia = onDisconnectMijia,
+                        onSetMijiaEnabled = onSetMijiaEnabled,
+                        onSetMijiaToolEnabled = onSetMijiaToolEnabled,
+                        onTermuxAction = onTermuxAction,
+                        onWebdavAction = onWebdavAction,
+                        onAddServer = onAddMcpServer,
+                        restActions = restActions,
+                        onRemoveServer = onRemoveMcpServer,
+                        onSetServerEnabled = onSetMcpServerEnabled,
+                        onSetToolEnabled = onSetMcpToolEnabled,
+                    )
+                },
             )
             MochiSurface.Today, is MochiSurface.CalendarMonth, is MochiSurface.CalendarDay -> PlannerAgenda(
                 journalDay = journalDay,
@@ -3122,8 +3135,11 @@ private fun TodoSurface(
 }
 
 @Composable
-private fun SkillsSurface(
+private fun CapabilitiesController(
     state: SkillsUiState,
+    toolsState: ToolsUiState,
+    initialSkillsOnly: Boolean,
+    toolContent: @Composable (String, @Composable () -> Unit) -> Unit,
     onSearch: (String) -> Unit,
     onLoadPopular: () -> Unit,
     onPreview: (MarketSkillSummary) -> Unit,
@@ -3136,8 +3152,9 @@ private fun SkillsSurface(
     onApplyUpdate: (String) -> Unit,
     onOpenJournalSettings: () -> Unit = {},
 ) {
-    var explore by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
+    var explore by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val catalogState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     var selectedSkill by remember { mutableStateOf<MochiSkill?>(null) }
     var pendingDelete by remember { mutableStateOf<MochiSkill?>(null) }
     var pendingUpdate by remember { mutableStateOf<MochiSkill?>(null) }
@@ -3149,34 +3166,33 @@ private fun SkillsSurface(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        SurfaceHeader(
-            title = "Skills",
-            subtitle = if (explore) {
-                "Explore skills.sh"
-            } else {
-                "Built-in and installed capabilities"
-            },
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SkillSectionTab(
-                label = "Installed",
-                selected = !explore,
-                onClick = { explore = false },
-                modifier = Modifier.weight(1f),
-            )
-            SkillSectionTab(
-                label = "Explore",
-                selected = explore,
-                onClick = { explore = true },
-                modifier = Modifier.weight(1f),
+    BackHandler(explore) { explore = false }
+    if (!explore) {
+        catalogState.SaveableStateProvider("catalog") {
+            CapabilityCatalogSurface(
+                skills = state, tools = toolsState, initialSkillsOnly = initialSkillsOnly,
+                onExplore = { explore = true }, onCheckUpdates = onCheckUpdates,
+                toolContent = toolContent,
+                skillContent = { skill ->
+                    InstalledSkillCard(
+                        skill = skill,
+                        readiness = if (toolsState.isLoading || state.isLoading) null else toolsState.catalog.skillReadiness(skill),
+                        onView = { selectedSkill = skill },
+                        onSetEnabled = onSetEnabled,
+                        onDelete = { pendingDelete = skill },
+                        onApplyUpdate = { pendingUpdate = skill },
+                        onOpenJournalSettings = onOpenJournalSettings,
+                    )
+                },
             )
         }
+    } else Column(modifier = Modifier.fillMaxSize()) {
+        TextButton(onClick = { explore = false }) { Text("Back to capabilities") }
+        SurfaceHeader(
+            title = "Discover Skills",
+            subtitle = "Explore skills.sh",
+        )
         Spacer(modifier = Modifier.height(12.dp))
-        if (explore) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -3196,15 +3212,6 @@ private fun SkillsSurface(
                     Text("Search")
                 }
             }
-        } else {
-            OutlinedButton(
-                onClick = onCheckUpdates,
-                enabled = !state.isLoading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Check for updates")
-            }
-        }
         state.feedback?.let {
             Text(
                 text = it,
@@ -3225,7 +3232,6 @@ private fun SkillsSurface(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (explore) {
                 item {
                     Text(
                         text = state.marketHeading,
@@ -3246,19 +3252,6 @@ private fun SkillsSurface(
                         onInstall = { onInstall(skill) },
                     )
                 }
-            } else {
-                items(state.skills, key = MochiSkill::id) { skill ->
-                    InstalledSkillCard(
-                        onOpenJournalSettings = onOpenJournalSettings,
-                        skill = skill,
-                        readiness = state.readinessById[skill.id],
-                        onView = { selectedSkill = skill },
-                        onSetEnabled = onSetEnabled,
-                        onDelete = { pendingDelete = skill },
-                        onApplyUpdate = { pendingUpdate = skill },
-                    )
-                }
-            }
         }
     }
 
@@ -3278,7 +3271,7 @@ private fun SkillsSurface(
     selectedSkill?.let { skill ->
         SkillContentDialog(
             skill = skill,
-            readiness = state.readinessById[skill.id],
+            readiness = if (toolsState.isLoading) null else toolsState.catalog.skillReadiness(skill),
             onDismiss = { selectedSkill = null },
             onSave = { content ->
                 onEdit(skill.id, content)
@@ -3342,79 +3335,6 @@ private fun SkillsSurface(
     }
 }
 
-private val MOCHI_BUILT_IN_TOOL_NAMES = setOf(
-    "recall_memory",
-    "manage_mochi_calendar",
-    "manage_mochi_schedule",
-    "get_current_location",
-    "get_current_weather",
-    "navigate_mochi_ui",
-    "run_sandboxed_javascript",
-)
-
-@Composable
-private fun BuiltInToolGroupCard(
-    title: String,
-    subtitle: String,
-    tools: List<BuiltInToolSummary>,
-    expanded: Boolean,
-    disabled: Boolean,
-    onToggleExpanded: () -> Unit,
-    onSetEnabled: (String, Boolean) -> Unit,
-    onOpenJournalSettings: () -> Unit = {},
-) {
-    PlannerCard {
-        Text(
-            text = title,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "$subtitle · ${tools.size} tools",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-        )
-        TextButton(
-            onClick = onToggleExpanded,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                if (expanded) {
-                    "Hide tools (${tools.size})"
-                } else {
-                    "Show tools (${tools.size})"
-                },
-            )
-        }
-        AnimatedVisibility(visible = expanded) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                tools.forEach { tool ->
-                    BuiltInToolRow(
-                        onOpenJournalSettings = onOpenJournalSettings,
-                        tool = tool,
-                        disabled = disabled,
-                        onSetEnabled = onSetEnabled,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BuiltInToolCard(
-    tool: BuiltInToolSummary,
-    disabled: Boolean,
-    onSetEnabled: (String, Boolean) -> Unit,
-) {
-    PlannerCard {
-        BuiltInToolRow(
-            tool = tool,
-            disabled = disabled,
-            onSetEnabled = onSetEnabled,
-        )
-    }
-}
-
 @Composable
 internal fun BuiltInToolRow(
     tool: BuiltInToolSummary,
@@ -3456,8 +3376,9 @@ internal fun BuiltInToolRow(
 }
 
 @Composable
-internal fun ToolsSurface(
+internal fun ToolCapabilityDetail(
     state: ToolsUiState,
+    detailGroup: String,
     onSetBuiltInEnabled: (String, Boolean) -> Unit,
     onConnectNotion: () -> Unit,
     onDisconnectNotion: () -> Unit,
@@ -3488,9 +3409,11 @@ internal fun ToolsSurface(
     onSetServerEnabled: (String, Boolean) -> Unit,
     onSetToolEnabled: (String, String, Boolean) -> Unit,
     onOpenJournalSettings: () -> Unit = {},
+    skills: List<MochiSkill> = emptyList(),
+    footer: @Composable () -> Unit = {},
 ) {
     var showAddServer by remember { mutableStateOf(false) }
-    var showAddTool by remember { mutableStateOf(false) }
+    var showAddTool by remember { mutableStateOf(detailGroup == "add") }
     var showRestConnection by remember { mutableStateOf(false) }
     var showFeishuSetup by remember { mutableStateOf(false) }
     var showTencentDocsToken by remember { mutableStateOf(false) }
@@ -3504,18 +3427,19 @@ internal fun ToolsSurface(
     var mijiaToolsExpanded by rememberSaveable {
         mutableStateOf(false)
     }
-    var mochiToolsExpanded by rememberSaveable {
-        mutableStateOf(false)
+    var pendingDisable by remember { mutableStateOf<Pair<List<String>, () -> Unit>?>(null) }
+    fun changeTools(names: Set<String>, enabled: Boolean, action: () -> Unit) {
+        val affected = if (enabled) emptyList() else state.catalog.skillsAffectedByDisabling(skills, names).map { it.name }
+        if (affected.isEmpty()) action() else pendingDisable = affected to action
     }
-    val mochiTools = state.catalog.builtInTools.filter {
-        it.name in MOCHI_BUILT_IN_TOOL_NAMES
-    }
-    val otherBuiltInTools = state.catalog.builtInTools.filterNot {
-        it.name in MOCHI_BUILT_IN_TOOL_NAMES
+    fun groupChange(id: String, enabled: Boolean, action: () -> Unit) =
+        changeTools(state.catalog.capabilityGroups().firstOrNull { it.id == id }?.tools.orEmpty(), enabled, action)
+    val setBuiltIn: (String, Boolean) -> Unit = { name, enabled ->
+        changeTools(setOf(name), enabled) { onSetBuiltInEnabled(name, enabled) }
     }
     Column(modifier = Modifier.fillMaxSize()) {
-        SurfaceHeader(
-            title = "Tools",
+        if (detailGroup == "add") SurfaceHeader(
+            title = "Add tool",
             subtitle = "Choose what Mochi may call",
         )
         state.feedback?.let {
@@ -3538,41 +3462,18 @@ internal fun ToolsSurface(
             modifier = Modifier.weight(1f).testTag("tools-list"),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item {
-                Text(
-                    text = "Built-in",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            if (mochiTools.isNotEmpty()) {
-                item {
-                    BuiltInToolGroupCard(
-                        title = "Mochi Built-ins",
-                        subtitle = "Memory recall, schedules, weather, navigation, and sandbox",
-                        tools = mochiTools,
-                        expanded = mochiToolsExpanded,
-                        disabled = state.isLoading,
-                        onToggleExpanded = {
-                            mochiToolsExpanded = !mochiToolsExpanded
-                        },
-                        onSetEnabled = onSetBuiltInEnabled,
-                        onOpenJournalSettings = onOpenJournalSettings,
-                    )
-                }
-            }
             items(
-                items = otherBuiltInTools,
+                items = state.catalog.builtInTools.filter { detailGroup == "builtin:${it.name}" },
                 key = { it.name },
             ) { tool ->
-                BuiltInToolCard(
+                PlannerCard { BuiltInToolRow(
                     tool = tool,
                     disabled = state.isLoading,
-                    onSetEnabled = onSetBuiltInEnabled,
-                )
+                    onSetEnabled = setBuiltIn,
+                    onOpenJournalSettings = onOpenJournalSettings,
+                ) }
             }
-            item {
+            if (detailGroup == "browser") item {
                 PlannerCard {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -3595,13 +3496,13 @@ internal fun ToolsSurface(
 
                         Switch(
                             checked = state.catalog.agentBrowser.enabled,
-                            onCheckedChange = onSetAgentBrowserEnabled,
+                            onCheckedChange = { enabled -> groupChange("browser", enabled) { onSetAgentBrowserEnabled(enabled) } },
                             enabled = !state.isLoading,
                         )
                     }
                     ToolSettingsRow(
                         title = "Websites and logins",
-                        detail = "Manage websites and saved logins",
+                        detail = "Sign in to websites for Mochi to reuse valid sessions",
                         icon = ToolGlyph.WEBSITES,
                         enabled = !state.isLoading,
                         tag = "browser-websites-settings",
@@ -3660,7 +3561,7 @@ internal fun ToolsSurface(
                                     Switch(
                                         checked = tool.enabled,
                                         onCheckedChange = {
-                                            onSetBuiltInEnabled(tool.name, it)
+                                            setBuiltIn(tool.name, it)
                                         },
                                         enabled =
                                             state.catalog.agentBrowser.enabled &&
@@ -3672,24 +3573,24 @@ internal fun ToolsSurface(
                     }
                 }
             }
-            item {
+            if (detailGroup == "app-control") item {
                 AppControlProviderCard(
                     summary = state.catalog.appControl,
                     disabled = state.isLoading,
-                    onSetEnabled = onSetAppControlEnabled,
+                    onSetEnabled = { enabled -> groupChange("app-control", enabled) { onSetAppControlEnabled(enabled) } },
                     onSetAppPackages = onSetMediaAppPackages,
-                    onSetToolEnabled = onSetBuiltInEnabled,
+                    onSetToolEnabled = setBuiltIn,
                 )
             }
-            item {
+            if (detailGroup == "media") item {
                 MediaProviderCard(
                     summary = state.catalog.media,
                     disabled = state.isLoading,
-                    onSetEnabled = onSetMediaEnabled,
-                    onSetToolEnabled = onSetBuiltInEnabled,
+                    onSetEnabled = { enabled -> groupChange("media", enabled) { onSetMediaEnabled(enabled) } },
+                    onSetToolEnabled = setBuiltIn,
                 )
             }
-            item {
+            if (detailGroup == "amap") item {
                     PlannerCard {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -3715,14 +3616,14 @@ internal fun ToolsSurface(
                             if (state.catalog.amap.connected) {
                                 Switch(
                                     checked = state.catalog.amap.enabled,
-                                    onCheckedChange = onSetAmapEnabled,
+                                    onCheckedChange = { enabled -> groupChange("amap", enabled) { onSetAmapEnabled(enabled) } },
                                     enabled = !state.isLoading,
                                 )
                             }
                         }
                         if (state.catalog.amap.connected) {
                             OutlinedButton(
-                                onClick = onDisconnectAmap,
+                                onClick = { groupChange("amap", false, onDisconnectAmap) },
                                 enabled = !state.isLoading,
                             ) {
                                 Text("Disconnect")
@@ -3798,7 +3699,7 @@ internal fun ToolsSurface(
                                             Switch(
                                                 checked = tool.enabled,
                                                 onCheckedChange = {
-                                                    onSetBuiltInEnabled(
+                                                    setBuiltIn(
                                                         tool.name,
                                                         it,
                                                     )
@@ -3815,7 +3716,7 @@ internal fun ToolsSurface(
                         }
                     }
                 }
-            item {
+            if (detailGroup == "add") item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -3823,7 +3724,7 @@ internal fun ToolsSurface(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Connected tools",
+                        text = "Tools and services",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
@@ -3836,7 +3737,7 @@ internal fun ToolsSurface(
                 }
             }
             items(
-                items = state.catalog.servers,
+                items = state.catalog.servers.filter { detailGroup == "mcp:${it.id}" },
                 key = McpServerSummary::id,
             ) { server ->
                 McpServerCard(
@@ -3846,18 +3747,20 @@ internal fun ToolsSurface(
                         { showFeishuSetup = true }
                     } else onConnectNotion,
                     onDisconnectNotion = if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) {
-                        { onFeishuAction(FeishuUiAction.Disconnect) }
-                    } else onDisconnectNotion,
+                        { groupChange("mcp:${server.id}", false) { onFeishuAction(FeishuUiAction.Disconnect) } }
+                    } else { { groupChange("mcp:${server.id}", false, onDisconnectNotion) } },
                     onConfigureTencentDocs = {
                         showTencentDocsToken = true
                     },
-                    onDisconnectTencentDocs = onDisconnectTencentDocs,
-                    onRemove = { onRemoveServer(server.id) },
+                    onDisconnectTencentDocs = { groupChange("mcp:${server.id}", false, onDisconnectTencentDocs) },
+                    onRemove = { groupChange("mcp:${server.id}", false) { onRemoveServer(server.id) } },
                     onSetEnabled = {
-                        onSetServerEnabled(server.id, it)
+                        enabled -> groupChange("mcp:${server.id}", enabled) { onSetServerEnabled(server.id, enabled) }
                     },
                     onSetToolEnabled = { remoteName, enabled ->
-                        onSetToolEnabled(server.id, remoteName, enabled)
+                        changeTools(server.tools.filter { it.remoteName == remoteName }.map { it.alias }.toSet(), enabled) {
+                            onSetToolEnabled(server.id, remoteName, enabled)
+                        }
                     },
                 )
                 if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID &&
@@ -3868,18 +3771,15 @@ internal fun ToolsSurface(
                     }
                 }
             }
-            items(state.catalog.restConnections, key = { "rest-${it.connection.id}" }) { connection ->
-                RestApiConnectionCard(connection, restActions)
+            items(state.catalog.restConnections.filter { detailGroup == "rest:${it.connection.id}" }, key = { "rest-${it.connection.id}" }) { connection ->
+                RestApiConnectionCard(connection, restActions) { toolId, action ->
+                    val names = connection.connection.tools.filter { toolId == null || it.id == toolId }.map {
+                        com.example.mochi_pet.core.rest.restToolAlias(connection.connection.id, it.id)
+                    }.toSet()
+                    changeTools(names, false, action)
+                }
             }
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Extensions",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            item {
+            if (detailGroup == "mijia") item {
                 MijiaExtensionCard(
                     summary = state.catalog.mijia,
                     toolsExpanded = mijiaToolsExpanded,
@@ -3889,29 +3789,63 @@ internal fun ToolsSurface(
                     },
                     onInstall = onInstallMijia,
                     onConfigure = onConfigureMijia,
-                    onDisconnect = onDisconnectMijia,
-                    onSetEnabled = onSetMijiaEnabled,
-                    onSetToolEnabled = onSetMijiaToolEnabled,
+                    onDisconnect = { groupChange("mijia", false, onDisconnectMijia) },
+                    onSetEnabled = { enabled -> groupChange("mijia", enabled) { onSetMijiaEnabled(enabled) } },
+                    onSetToolEnabled = { name, enabled -> changeTools(setOf(name), enabled) { onSetMijiaToolEnabled(name, enabled) } },
                 )
             }
-            item {
+            if (detailGroup == "termux") item {
                 TermuxProviderCard(
                     summary = state.catalog.termux,
                     disabled = state.isLoading,
-                    onAction = onTermuxAction,
+                    onAction = { action ->
+                        when (action) {
+                            is TermuxUiAction.Enable -> groupChange("termux", action.enabled) { onTermuxAction(action) }
+                            is TermuxUiAction.EnableTool -> changeTools(setOf(action.name), action.enabled) { onTermuxAction(action) }
+                            TermuxUiAction.Disconnect -> groupChange("termux", false) { onTermuxAction(action) }
+                            else -> onTermuxAction(action)
+                        }
+                    },
                 )
             }
-            item {
-                WebdavProviderCard(state.catalog.webdav, state.isLoading, onWebdavAction)
+            if (detailGroup == "webdav") item {
+                WebdavProviderCard(state.catalog.webdav, state.isLoading) { action ->
+                    when (action) {
+                        is WebdavUiAction.Enable -> groupChange("webdav", action.enabled) { onWebdavAction(action) }
+                        is WebdavUiAction.EnableTool -> changeTools(setOf(action.name), action.enabled) { onWebdavAction(action) }
+                        WebdavUiAction.Disconnect -> groupChange("webdav", false) { onWebdavAction(action) }
+                        else -> onWebdavAction(action)
+                    }
+                }
             }
-            item {
+            if (detailGroup == "agentlink") item {
                 AgentLinkProviderCard(
                     state = state.catalog.agentLink,
                     loading = state.isLoading,
-                    onAction = onAgentLinkAction,
+                    onAction = { action ->
+                        when (action) {
+                            is AgentLinkUiAction.Enable -> groupChange("agentlink", action.enabled) { onAgentLinkAction(action) }
+                            is AgentLinkUiAction.EnableTool -> changeTools(setOf(action.name), action.enabled) { onAgentLinkAction(action) }
+                            AgentLinkUiAction.Revoke -> groupChange("agentlink", false) { onAgentLinkAction(action) }
+                            else -> onAgentLinkAction(action)
+                        }
+                    },
                 )
             }
+            item { footer() }
         }
+    }
+    pendingDisable?.let { (affected, action) ->
+        AlertDialog(
+            onDismissRequest = { pendingDisable = null },
+            title = { Text("Pause dependent Skills?") },
+            text = { Column {
+                Text("These Skills will pause. Their saved switches are kept; restoring the required tools makes them available again.")
+                affected.forEach { Text(it) }
+            } },
+            confirmButton = { TextButton(onClick = { pendingDisable = null; action() }) { Text("Continue") } },
+            dismissButton = { TextButton(onClick = { pendingDisable = null }) { Text("Cancel") } },
+        )
     }
     if (showAddTool) {
         AddToolDialog(
@@ -6544,7 +6478,7 @@ private fun AddTodoDialog(
 }
 
 @Composable
-private fun NavigationBar(
+internal fun NavigationBar(
     surface: MochiSurface,
     onNavigate: (MochiNavigationIntent) -> Unit,
     modifier: Modifier = Modifier,
@@ -6588,14 +6522,8 @@ private fun NavigationBar(
                 modifier = Modifier.weight(1f),
             )
             MochiNavigationItem(
-                label = "Skills",
-                selected = surface == MochiSurface.Skills,
-                onClick = { onNavigate(MochiNavigationIntent.ShowSkills) },
-                modifier = Modifier.weight(1f),
-            )
-            MochiNavigationItem(
-                label = "Tools",
-                selected = surface == MochiSurface.Tools,
+                label = "Capabilities",
+                selected = surface == MochiSurface.Tools || surface == MochiSurface.Skills,
                 onClick = { onNavigate(MochiNavigationIntent.ShowTools) },
                 modifier = Modifier.weight(1f),
             )

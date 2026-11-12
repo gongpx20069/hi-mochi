@@ -137,7 +137,9 @@ Mochi 不会在报错后自动切换。
 大多数 Tool 有独立开关；回忆检索随每日小记设置同步。
 Provider 支持的 Tools 还要求对应服务已连接并启用。
 只开启你需要的能力。Skill 描述执行流程，启用 Skill 不会自动开启依赖；
-Skills 页面会提示尚未就绪的 Tool 分组。
+**能力**将技能与工具服务合并为可搜索的目录。在技能详情里直接配置所需服务，
+完成后返回该技能；服务详情也会列出关联技能。没有 Skill 的 Tool 仍可独立使用。
+**发现更多技能**进入 skills.sh 市场。
 
 地图与商家发现需要[高德 Web 服务 Key](https://console.amap.com/)。
 创建时请选择 **Web 服务**，不是 Android；不需要发布版或调试版 SHA1。
@@ -147,17 +149,17 @@ Mochi 中可选的“安全密钥”也不是 SHA1，仅在高德控制台启用
 或[腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html)，再启用对应
 Tools 和 Skill。
 
-**飞书：**进入 **工具 > 飞书 MCP > 连接飞书**，按引导完成
+**飞书：**进入 **能力 > 飞书 MCP > 连接飞书**，按引导完成
 [企业自建应用](https://open.feishu.cn/app)、用户身份权限、发布和账号授权。
 把 Mochi 显示的完整回调地址复制到飞书「安全设置」；回调临时运行在手机本机，
 无需部署服务器。只在配置弹窗填写自己的 App ID/Secret，不要发到聊天中。
 连接后默认开启搜索、知识库目录浏览、读取、创建和更新云文档；
-另外在 Skills 中启用 **飞书知识**。暂不支持整篇删除、原生电子表格、
+另外在能力目录中启用 **飞书知识**。暂不支持整篇删除、原生电子表格、
 多维表格和 PPT 编辑。
 
 ### 连接自己的 REST API
 
-进入**工具 > 添加工具 > 连接 REST API**，填写连接名称、服务地址
+进入**能力 > 添加工具 > 连接 REST API**，填写连接名称、服务地址
 （例如 `https://api.example.com`），选择无需鉴权、Bearer Token、
 API Key 请求头或完整 Authorization 值。Token 在手机本机加密保存，
 同一连接下的多个 API 工具可以复用，无需编写代码。
@@ -260,7 +262,7 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | Douban Ratings | 启用 | 获取公开豆瓣评分、评分人数和评论主题 | 无 |
 | US Stock Analysis | 启用 | 对比美股七姐妹的行情、资金、支撑/压力、评级、目标价、财务和新闻 | 无；使用百度股市通和公司官网公开页面 |
 | **Notion Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新页面，并在已授权的私人知识库中查找或更新信息 | [通过 Notion MCP OAuth 连接](https://www.notion.com/help/notion-mcp) |
-| **Feishu Knowledge（飞书知识）** | 禁用 | 搜索与浏览已授权云文档，编辑前读取内容，并回读验证创建或更新结果 | 工具 > 飞书 MCP；[自建应用与用户授权](https://open.feishu.cn/app) |
+| **Feishu Knowledge（飞书知识）** | 禁用 | 搜索与浏览已授权云文档，编辑前读取内容，并回读验证创建或更新结果 | 能力 > 飞书 MCP；[自建应用与用户授权](https://open.feishu.cn/app) |
 | **腾讯文档 Knowledge** | 禁用 | 与你一起调研、整理资料和撰写新文档，并在已授权的私人知识库中查找或更新信息 | [获取腾讯文档 MCP Token](https://docs.qq.com/open/auth/mcp.html) |
 | 出行规划 | 启用 | 使用高德规划可信路线与查询天气，再通过智能体浏览器调研火车票或机票信息，但不进行预订 | [创建高德 Web 服务 Key](https://console.amap.com/)；启用智能体浏览器 |
 | 商家发现 | 启用 | 使用高德提供的评分、人均、营业时间、电话、标签和图片发现并比较商家 | [创建高德 Web 服务 Key](https://console.amap.com/) |
@@ -282,11 +284,11 @@ Researcher 可使用已启用的 Browser 与经批准的只读 MCP Tools；Analy
 | **高德地图** | 地点搜索 · 商家详情 · 路线<br>地理编码 · 逆地理编码 · 天气 | 使用可信 GCJ-02 坐标搜索地点和商家、比较可用评分与人均并规划路线，需要 Web 服务 Key。 |
 | **已连接 MCP** | **Notion** · **腾讯文档** · **飞书**<br>手动配置的 MCP Server | 检索私人知识、开展调研，并在已授权工作区中协作创建或更新文档。 |
 
-Tools 页面会将智能体浏览器、Mochi 内建能力和 Provider Tools 分组并默认
-收起。定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
+能力目录列出独立内置工具和分组服务；进入服务详情后可展开工具列表。
+定时 Agent 仅获得只读 Browser 能力；前台对话还可点击和输入网页控件。
 Provider Tools 有独立开关，还要求对应 Provider 开关已启用。
 
-**应用操作**与**媒体控制**依次位于智能体浏览器和高德地图之间，不归入 Mochi 内建能力。
+**应用操作**与**媒体控制**依次位于智能体浏览器和高德地图之间，作为独立服务分组。
 两个集合各有独立总开关和工具开关，默认开启并保留旧设置中的禁用选择。
 五个应用工具仅用于前台对话，四个媒体工具还可用于定时任务，均不提供给子 Agent。
 打开应用要求手机已解锁且 Mochi 位于前台对话；定时任务只能通过已有的、
@@ -309,7 +311,9 @@ Provider Tools 有独立开关，还要求对应 Provider 开关已启用。
 从 **应用操作 > 后台弹出界面** 可进入 Mochi 系统应用设置，手动允许在其他应用
 位于前台时打开 Mochi。
 
-**Tools > 智能体浏览器 > 网站与登录管理**会打开 Bing 搜索/地址框和按网站归组的列表。
+**能力 > 智能体浏览器 > 网站与登录**用于提前登录网站，而不是独立的浏览器导航页。
+输入网站（也支持 Bing 搜索），自行登录后返回 Mochi，智能体浏览器即可复用仍有效的登录状态。
+“会保存什么？”说明可选账号保存、登录状态与任务网页内容发送给模型的边界。
 已知网站中检测到本地数据或保存账号的，会自动出现在列表。点击网站弹出第二层列表，
 蓝色标签表示 Cookie／网站数据，紫色标签表示密码或短信账号，同时用文字区分。
 凭证左滑显示编辑和删除，网站数据左滑只显示删除；都最多停在半行，不会滑掉或自动删除。
@@ -352,7 +356,7 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 
 回答问题时，Mochi 会把必要的对话上下文发送给你配置的 AI 提供商。外部 Tool
 只会在已启用的调用中收到完成任务所需的信息。调用 `get_current_location`
-时，获得权限的坐标会作为 Tool 证据发送给你配置的 AI 提供商；你可以在 Tools
+时，获得权限的坐标会作为 Tool 证据发送给你配置的 AI 提供商；你可以在能力目录
 中单独关闭该能力。
 
 ## 使用要求与当前状态
@@ -381,8 +385,8 @@ Conversation 中每条消息会在 **Mochi / 你** 标志旁显示本地保存�
 
 ### WebDAV 文件：坚果云、兼容私有云与 NAS
 
-安装相同版本、同签名的 Mochi 和 WebDAV 扩展 APK。打开 **Tools > Extensions >
-WebDAV 文件 > 连接 WebDAV**，填写 HTTPS WebDAV 地址、已存在的授权目录、
+安装相同版本、同签名的 Mochi 和 WebDAV 扩展 APK。打开 **能力 >
+WebDAV 文件扩展 > 连接 WebDAV**，填写 HTTPS WebDAV 地址、已存在的授权目录、
 账号和应用密码，检查并保存。坚果云预设地址为 `https://dav.jianguoyun.com/dav/`，
 请在坚果云中生成第三方应用密码，勿把凭据发到聊天中。其他服务必须提供兼容
 WebDAV，不能只填普通网页登录地址；无需另行部署 MCP 服务器。
@@ -402,7 +406,7 @@ Mochi 下载后只是暂存，需点击**保存到设备**选择最终位置。�
 ### 米家智能家居
 
 安装与 Mochi 同一发布/签名渠道的 `Mochi-Mijia-Extension`。
-进入 **Tools > Extensions > 米家 > 连接米家**，使用另一台已登录米家的手机
+进入 **能力 > 米家扩展 > 连接米家**，使用另一台已登录米家的手机
 扫码并确认连接。按家庭搜索和选择支持的设备，然后保存。返回 Mochi 验证后，
 点击**启用工具和 Skill**即可开启 Provider 及 Skill 必需的工具；选择**暂不启用**
 则仅保留连接。管理已启用的扩展时，不会自动改动已有工具开关。
@@ -416,12 +420,12 @@ Mochi 不要求你粘贴账号密码。
 从 [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases)
 下载 Android APK（目前标记为 **Pre-release**）。电脑端 Bridge 的安装和连接方法
 见 [AgentLink 仓库](https://github.com/gongpx20069/android-agent-link)。
-安装并连接 AgentLink 后，进入 **Tools > AgentLink > 连接/打开 AgentLink**，
+安装并连接 AgentLink 后，进入 **能力 > AgentLink > 连接/打开 AgentLink**，
 在 AgentLink 原生页面确认限定范围的权限后返回 Mochi。启用 Provider、
 `agentlink_workspace`、`agentlink_chat`、`agentlink_control` 三个开关，
 再启用内置 **AgentLink** Skill。Mochi 可发现已授权机器和工作区，创建或继续
 CLI/App 使用的同一个聊天、读取变化、发送任务，以及请求取消或更改配置。
-Tools 中的关联聊天按钮打开可信的原生 AgentLink 页面，也可刷新、管理或撤销权限。
+AgentLink 能力详情中的关联聊天按钮打开可信的原生页面，也可刷新、管理或撤销权限。
 
 关闭 Mochi 不会停止远程任务。人工 CLI/App 输入优先于过期自动操作；发生冲突后
 停止后续操作，不自动重发。凭据保留在 AgentLink，不进入 Mochi 导出或分享。
@@ -436,7 +440,7 @@ Tools 中的关联聊天按钮打开可信的原生 AgentLink 页面，也可刷
 
 安装与 Mochi 同一发布/签名渠道的 `Mochi-Termux-Extension`，另行安装
 [官方 Termux](https://github.com/termux/termux-app#installation)。
-打开 **Tools > Extensions > Termux > 配置 Termux**，向导先检查安装和 Android
+打开 **能力 > Termux 扩展 > 配置 Termux**，向导先检查安装和 Android
 命令权限，再检查连接。已配置好的 Termux 无需再次跳转终端；首次配置时，
 选择**第一次连接？配置 Termux**，复制命令并打开 Termux，长按提示符粘贴、
 按回车，再返回，向导会自动检查连接。验证成功后选择**启用工具和 Skill**
