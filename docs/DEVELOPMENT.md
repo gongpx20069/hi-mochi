@@ -203,6 +203,19 @@ imported declarations and explicit invalid-metadata rejection, suspended/unknown
 UI states, and the absence of retired-operation/version-history guidance in
 built-in prompts. They do not modify phone configuration or call live providers.
 
+Unified capability catalog and website login UI regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*CapabilityCatalogTest" `
+  --tests "*CapabilitiesUiTest" --tests "*BrowserCredentialsUiTest" `
+  --tests "*MediaToolsUiTest" --tests "*RestApiUiTest" --no-daemon
+```
+
+These cover four-item navigation, independent Tools, cross-service and any-one
+dependencies, shared-disable warnings, live configuration/return paths, managed
+memory controls, Chinese large text, and website-session disclosure. Fixtures
+use synthetic accounts and do not log in to real websites.
+
 Tencent Docs Smart Canvas regressions:
 
 ```powershell
@@ -410,7 +423,7 @@ Feishu integration regressions:
 
 These use synthetic credentials and local fixtures, not an actual Feishu account.
 Device acceptance separately requires a user-owned published Feishu app: follow
-Tools > Feishu MCP, confirm browser return, permission denial, cancellation,
+Capabilities > Feishu MCP, confirm browser return, permission denial, cancellation,
 refresh and process-death retry, then read/search an authorized document.
 Only with explicit permission create/update a test document and verify readback.
 Never request App Secret/tokens in chat or put them in logs/screenshots.
@@ -612,7 +625,7 @@ Real-service/device acceptance remains pending until that evidence is recorded.
 Use matching-signed base and `extensions\termux\build\outputs\apk\debug\termux-debug.apk`
 APKs, updating existing packages with `adb install -r`. Termux is installed
 separately from its official channels; do not uninstall an existing Termux to
-change its source. Follow Tools > Extensions > Termux > Configure.
+change its source. Follow Capabilities > Termux extension > Configure Termux.
 The connector uses RUN_COMMAND callbacks (Termux 0.109+) and per-command log
 control (0.118+); use a current compatible official Termux build.
 

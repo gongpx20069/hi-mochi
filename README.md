@@ -148,7 +148,10 @@ Most Tools have independent switches; Memory Recall follows the Daily journal
 setting instead. Provider-backed Tools also require a connected, enabled
 provider. Enable only the capabilities you want to use.
 Skills describe workflows; enabling a Skill does not automatically enable
-its dependencies. The Skills screen names any missing Tool groups.
+its dependencies. **Capabilities** brings Skills and Tools into one searchable
+catalog. Open a Skill to configure its required services directly, then return
+to it; service details also show related Skills. Tools without Skills remain
+independently usable. **Discover Skills** opens the skills.sh market.
 
 For maps and merchant discovery, create an [Amap Web Service Key](https://console.amap.com/).
 Select **Web Service**, not Android: no release/debug SHA1 is required.
@@ -159,7 +162,7 @@ For document collaboration, use [Notion MCP OAuth](https://www.notion.com/help/n
 or a [Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html), then
 enable the corresponding Tools and Skill.
 
-**Feishu:** open **Tools > Feishu MCP > Connect Feishu** for guided
+**Feishu:** open **Capabilities > Feishu MCP > Connect Feishu** for guided
 [enterprise self-built app setup](https://open.feishu.cn/app), permissions,
 publication, and account authorization. Copy the exact redirect URL shown by
 Mochi into Feishu Security Settings; a temporary phone-local callback means no
@@ -170,7 +173,7 @@ spreadsheets, Bitable, and PPT editing are not supported.
 
 ### Connect your own REST API
 
-Open **Tools > Add tool > Connect REST API**. Save a named service origin
+Open **Capabilities > Add tool > Connect REST API**. Save a named service origin
 (for example `https://api.example.com`) and choose no authentication, Bearer
 Token, an API-key header, or a complete Authorization value. Tokens stay encrypted
 on the phone and are reused by that connection's API tools.
@@ -297,7 +300,7 @@ once its provider is connected and its Tools are enabled.
 | US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
 | **Notion Knowledge** | Disabled | Coworks with you to research, organize material, draft new pages, and find or update information in your authorized private knowledge base | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
 | **Tencent Docs Knowledge** | Disabled | Coworks with you to research, organize material, draft new documents, and find or update information in your authorized private knowledge base | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
-| **Feishu Knowledge** | Disabled | Searches and browses authorized cloud documents, reads before editing, and verifies requested creation/updates by readback | Tools > Feishu MCP; [self-built app and user authorization](https://open.feishu.cn/app) |
+| **Feishu Knowledge** | Disabled | Searches and browses authorized cloud documents, reads before editing, and verifies requested creation/updates by readback | Capabilities > Feishu MCP; [self-built app and user authorization](https://open.feishu.cn/app) |
 | Travel Planning | Enabled | Uses Amap for grounded routes and weather, then Agent Browser to research train or flight options without booking | [Create an Amap Web Service Key](https://console.amap.com/); enable Agent Browser |
 | Merchant Discovery | Enabled | Finds and compares merchants using available Amap ratings, average cost, hours, phone, tags, and photos | [Create an Amap Web Service Key](https://console.amap.com/) |
 
@@ -318,14 +321,14 @@ Skills requiring separately installed apps are listed under
 | **Amap Maps** | Place search · Merchant details · Routes<br>Geocoding · Reverse geocoding · Weather | Search places and merchants, compare available ratings and average cost, and plan routes with trusted GCJ-02 coordinates. Requires a Web Service Key. |
 | **Connected MCP** | **Notion** · **Tencent Docs** · **Feishu**<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
 
-Agent Browser, Mochi built-ins, and provider Tool details are grouped and
-collapsed by default in Tools. Scheduled runs receive only the read-only
+Capabilities lists independent built-in Tools and grouped services. Open a
+service to configure its collapsed Tool list. Scheduled runs receive only the read-only
 Browser subset; foreground conversations may also click and enter page data.
 Provider Tools have independent switches, and provider-backed Tools also require
 their provider switch to be enabled.
 
 **App Control** and **Media Control** appear in that order between Agent Browser
-and Amap Maps, outside Mochi built-ins, with independent master and child switches.
+and Amap Maps, with independent master and child switches.
 The five app Tools are foreground-only; the four media Tools also support
 Scheduled Agents, not Subagents. App launch requires a foreground conversation
 with Mochi visible and the phone unlocked; schedules can request songs only
@@ -353,8 +356,11 @@ Mochi Navigation also supports entering and exiting Focus mode by request.
 for manually allowing Mochi to open while another app is in the foreground.
 For UI song requests, playback and return to Mochi are verified separately.
 
-**Tools > Agent Browser > Websites and logins** opens a Bing search/address field
-and website list. Known websites with detected local data or saved accounts appear
+**Capabilities > Agent Browser > Websites and logins** prepares website logins
+for Agent use, not a separate browser tab. Enter a website (or search Bing),
+sign in yourself, then return to Mochi so Agent Browser can reuse valid sessions.
+The **What is saved?** disclosure explains optional account storage and model
+access to task page content. Known websites with detected local data or saved accounts appear
 automatically. Open a website item for its blue Cookie/site-data entry and purple
 password/SMS accounts; labels distinguish them without relying on color.
 Swipe credentials halfway left for Edit/Delete, or site data for Delete only;
@@ -409,7 +415,7 @@ When answering, Mochi sends the necessary conversation context to the AI
 provider you configured. An external Tool receives only the information needed
 for an enabled Tool call. When `get_current_location` is called, its
 permission-gated coordinates are included in Tool evidence sent to that
-configured AI provider; the Tool can be disabled independently in Tools.
+configured AI provider; the Tool can be disabled independently in Capabilities.
 
 ## Requirements & current status
 
@@ -441,8 +447,8 @@ and enabled. Installation alone never enables its provider.
 
 ### WebDAV files: Nutstore, compatible clouds and NAS
 
-Install matching, same-signed Mochi and WebDAV extension APKs. Open **Tools >
-Extensions > WebDAV Files > Connect WebDAV**, enter the HTTPS WebDAV address,
+Install matching, same-signed Mochi and WebDAV extension APKs. Open **Capabilities >
+WebDAV Files extension > Connect WebDAV**, enter the HTTPS WebDAV address,
 existing allowed folder, account and application password, then check and save.
 For Nutstore, the preset uses `https://dav.jianguoyun.com/dav/`; create a
 third-party application password in Nutstore rather than entering credentials
@@ -467,7 +473,7 @@ Real Nutstore/NAS compatibility and device acceptance remain pending.
 ### Mi Home smart-home devices
 
 Install `Mochi-Mijia-Extension` from the same Release/signing channel as Mochi.
-Open **Tools > Extensions > Mi Home > Connect Mi Home**, scan the QR code
+Open **Capabilities > Mi Home extension > Connect Mi Home**, scan the QR code
 using another phone already signed into Mi Home, and confirm the connection.
 Search and select supported devices by home, then save. On the verified return,
 **Enable tools and Skill** enables the provider and the Skill's required Tools;
@@ -484,14 +490,14 @@ Mochi never asks you to paste an account password.
 Download the Android APK from [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases)
 (currently marked **Pre-release**). See the [AgentLink repository](https://github.com/gongpx20069/android-agent-link)
 for desktop Bridge setup and connection instructions.
-After installing and connecting AgentLink, open **Tools > AgentLink > Connect/Open AgentLink**.
+After installing and connecting AgentLink, open **Capabilities > AgentLink > Connect/Open AgentLink**.
 Approve the scoped access request in AgentLink and return to Mochi. Enable the
 provider, its three switches (`agentlink_workspace`, `agentlink_chat`,
 `agentlink_control`), and the built-in **AgentLink** Skill.
 Mochi can discover authorized machines/workspaces, create or continue the same
 CLI/App chat, read changes, send work and request cancellation/configuration.
 Linked chat buttons open the trusted native AgentLink view; Refresh and
-Manage access/Revoke remain available in Tools.
+Manage access/Revoke remain available in the AgentLink capability detail.
 
 Remote tasks continue when Mochi closes. Human CLI/App changes override stale
 automation: conflicts stop follow-ups instead of retrying. Credentials remain
@@ -509,7 +515,7 @@ deleting history or cancelling the remote task.
 
 Install `Mochi-Termux-Extension` from the same Release/signing channel as Mochi
 and install [official Termux](https://github.com/termux/termux-app#installation)
-separately. Open **Tools > Extensions > Termux > Configure Termux**. The wizard
+separately. Open **Capabilities > Termux extension > Configure Termux**. The wizard
 checks installation and Android command permission, then checks the connection.
 Already configured Termux needs no terminal visit. For first-time setup, choose
 **First connection? Set up Termux**, copy the command, paste it at the Termux

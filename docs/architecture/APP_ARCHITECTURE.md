@@ -100,6 +100,12 @@ sealed interface MochiSurface {
 
 The app has one authoritative navigation state. Gestures, buttons, reminders,
 and voice directives all dispatch typed navigation intents to the same owner.
+The Skills and Tools surface identifiers are compatibility entries into the
+same Capabilities UI, not separate bottom-navigation destinations. Skills
+selects the skill filter; Tools opens the complete catalog. Capability detail
+routes use stable Skill/service IDs, retain their caller for Back, and derive
+dependencies from Skill declarations and the existing Tool catalog. Feature
+state owns only navigation/search/filter state, not permission copies.
 Agent Browser does not add a navigation surface: Home may render a temporary
 Browser Card, while every other current surface remains unchanged.
 Researcher and Analyst reuse that top-level Browser session; the runtime actor
@@ -291,7 +297,7 @@ and five adjacent individual Tool switches. The session controller is created
 lazily by the first Browser Tool call and destroyed after the final model
 response, before TTS, or on every earlier exit path.
 Tencent Docs uses its official hosted MCP endpoint with an encrypted personal
-token pasted through the Tools surface; its discovered tools use a dedicated
+token pasted through its capability detail; its discovered tools use a dedicated
 raw-Authorization mode rather than OAuth or Bearer formatting.
 
 Remote MCP endpoints pass the same public HTTPS policy as web tools. Private,

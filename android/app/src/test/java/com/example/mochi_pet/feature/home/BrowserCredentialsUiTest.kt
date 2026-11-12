@@ -127,7 +127,7 @@ class BrowserCredentialsUiTest {
                 BrowserManagementLayout(
                     onClose = { closed = true }, closeEnabled = true,
                     search = {
-                        OutlinedTextField("", {}, placeholder = { Text("Search Bing or enter a website") },
+                        OutlinedTextField("", {}, placeholder = { Text("Enter a website to sign in") },
                             modifier = Modifier.fillMaxWidth().testTag("browser-search"), singleLine = true)
                     },
                 ) {
@@ -149,6 +149,10 @@ class BrowserCredentialsUiTest {
         compose.onNodeWithText("example.com").assertIsDisplayed()
         compose.onNodeWithText(localizeUiText("Cookies")).assertIsDisplayed()
         captureFixture("browser-management", "browser-accounts-fixture.png")
+        compose.onNodeWithTag("browser-login-privacy").performClick()
+        compose.onNodeWithText(localizeUiText("Sign in yourself, then return to Mochi. Valid website sessions can be reused by Agent Browser. Stored website data or a saved account does not prove you are signed in."))
+            .assertIsDisplayed()
+        compose.onNodeWithText(localizeUiText("Got it")).performClick()
         compose.onNodeWithTag("browser-management-close").performClick()
         assertTrue(closed)
     }

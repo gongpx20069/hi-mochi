@@ -619,7 +619,7 @@ class MochiDatabaseTest {
             val declared = content.lineSequence().firstOrNull { it.startsWith("allowed-tools: ") }
                 ?.removePrefix("allowed-tools: ")?.split(" ")?.toSet().orEmpty()
             assertEquals(available - "unrelated_tool", declared)
-            assertTrue(content.contains("Tools > App Control"))
+            assertTrue(content.contains("Capabilities > App Control"))
         }
         repository.setEnabled("builtin:app-assistant", false)
         val restored = RoomSkillRepository(database.skillDao())

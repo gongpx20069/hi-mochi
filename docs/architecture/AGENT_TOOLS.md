@@ -265,7 +265,7 @@ connection cannot discover/access all requested scopes.
 
 ### App Control and Media Control
 
-These are two independent bundled collections, not part of **Mochi Built-ins**.
+These are two independent bundled collections in the capability catalog.
 App Control has five Tools; Media Control has four. Both master switches and
 child switches default to on. Foreground Main Agents receive enabled Tools;
 schedules receive only media Tools, and Subagents receive neither collection.
@@ -414,7 +414,7 @@ before control becomes eligible. A successful write consumes that read guard;
 CONFLICT, timeout or uncertain write blocks same-run follow-ups even after
 another read. Never automatically resend or approve permission escalation.
 
-`open` after a successful read offers a native linked-chat action in Tools;
+`open` after a successful read offers a native linked-chat action in its capability detail;
 it does not accept or execute a URI, Intent or component from the model.
 Linked task IDs and cursors are not cached-live state. Remote tasks survive
 Mochi cancellation; explicit `cancel` is the only task-cancellation request.
@@ -432,7 +432,7 @@ Both provider and individual switches are required, along with fresh connection
 and authorization. Disabled/unavailable definitions and the dependent Skill are
 excluded from discovery. AgentLink is unavailable to Subagents and Scheduled
 Agents. Mid-run revocation returns typed `PERMISSION_DENIED` with a
-Tools > AgentLink connection instruction. Browser, HTTP, JavaScript and MCP
+Capabilities > AgentLink connection instruction. Browser, HTTP, JavaScript and MCP
 must never be used as an authorization or disabled-Tool workaround.
 
 ## 2. Planner tools
@@ -771,7 +771,7 @@ typed Tool errors instead of aborting the Agent loop.
 
 ## 6. MCP tools and Tool catalog
 
-The top-level Tools surface controls which schemas enter the model request.
+Tool details in Capabilities control which schemas enter the model request.
 Built-in definitions are immutable but can be enabled or disabled. Disabled
 Tools are absent from `OpenAiChatRequest.tools`.
 
@@ -883,7 +883,7 @@ identity rules, or an approved relay is selected.
 
 ## 7. Signed extension Tools
 
-The Tools surface places signed Extensions after the MCP servers. Official
+The capability catalog lists signed extensions after connected services. Official
 extension cards use the same provider-card hierarchy as built-in providers:
 localized display name and description, stable monospace Tool ID, localized
 risk label, and individual switch. The extension configuration Activity

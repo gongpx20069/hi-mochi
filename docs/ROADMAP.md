@@ -21,6 +21,8 @@ or verification in earlier phases.
 - [ ] Navigation Compose integration.
 - [x] Face, Today, Calendar Month, Calendar Day, and Todo surfaces.
 - [x] Conversation and Settings surfaces.
+- [x] Four-item navigation and unified capability catalog with direct dependency
+  setup, reverse Skill links, shared-permission warnings, and nested website login preparation.
 - [x] Connect Today, Calendar Day, and Todo to Room through ViewModel.
 - [x] Add local todo creation and completion interactions.
 - [ ] Gesture and Android predictive-back behavior.

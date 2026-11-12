@@ -43,7 +43,7 @@ start the protected extension Service or configuration Activity.
 
 ## 3. Installation and discovery
 
-The Tools surface contains a stable Mi Home card even when the package is
+The capability catalog contains a stable Mi Home entry even when the package is
 absent. **Install extension** opens the repository's trusted latest Release
 page; Android owns download and package-install confirmation. Mochi never
 silently installs packages or requests broad package installation access.

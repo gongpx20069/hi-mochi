@@ -7,8 +7,8 @@
 | Face | Default Mochi expression and voice state |
 | Conversation | Current and historical text conversation |
 | Planner | One date agenda with an expandable week/month date selector |
-| Settings | BYOK, voice, permissions, backup, and tools |
-| Skills | Bottom-navigation destination for built-ins and skills.sh |
+| Settings | BYOK, voice, permissions, and backup |
+| Capabilities | Unified Skills, built-in Tools, connections, and extension management |
 
 Mochi remains visible as a compact companion where space permits, but planner
 content takes priority when the selected surface requires reading or editing.
@@ -280,8 +280,8 @@ subsequent microphone test or voice preview to establish real operation.
 Checks stop on Back/Close, retain explicitly incomplete results after cancellation,
 and reject late callbacks from superseded checks.
 
-The Tools surface orders **Agent Browser**, **App Control**, **Media Control**,
-then **Amap Maps**, outside **Mochi Built-ins**. App Control has five Tools and
+The capability catalog orders bundled services **Agent Browser**, **App Control**,
+**Media Control**, then **Amap Maps**. App Control has five Tools and
 Media Control has four, each with its own master switch and collapsed child
 switches. Settings survive migration, including old disabled operations.
 Each card has one short capability description: operating allowed apps, or
@@ -320,7 +320,7 @@ Android settings for manual authorization. Neither selecting apps nor enabling
 the group silently grants that permission. Removing an app blocks subsequent
 reads/actions; it cannot undo already dispatched actions.
 
-The Tools surface has a stable **AgentLink** provider card even before connection.
+The capability catalog has a stable **AgentLink** entry even before connection.
 It reuses the same rounded surface, spacing, localized typography, and Tool rows
 as other providers. The three Tools start collapsed behind **Show tools (3)**;
 each expanded row shows a localized name and description plus its technical ID.
@@ -393,8 +393,8 @@ journals record past days; past dates without an entry show an empty state.
 Existing past entries remain visible below the introduction after disabling.
 Enabling explicitly says earlier dates are not automatically backfilled.
 Other agenda filters do not show this settings card.
-The same setting governs **Memory Recall / 回忆检索**, first in Skills, and
-`recall_memory` under **Mochi Built-ins** in Tools. Both show a grey read-only
+The same setting governs **Memory Recall / 回忆检索**, first among Skills in
+Capabilities, and the built-in `recall_memory` entry. Both details show a grey read-only
 switch with the live on/off state. Tapping the surrounding control opens
 **Managed by Daily journal / 由每日小记统一管理** and explains that no separate
 switch is needed. **Got it / 知道了** dismisses; **Go to settings / 前往设置**
@@ -512,12 +512,33 @@ shares without these fields import with system speech output. New shares use
 v5, include AI API protocol, and require an updated receiver; existing authenticated v2/v3/v4 links remain
 importable as additional saved connections.
 
-Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
-Installed/Explore uses a dark selected segment. Explore opens with the public
-skills.sh Trending (24h) leaderboard, then switches to search results after a
-query. Cards show rank, source, install count, and a derived popularity label.
-Every installed Skill, including app-managed built-ins, can be enabled or
-disabled. A Skill cannot be enabled until all of its required aggregate Tool
+Bottom navigation contains **Home, Talk, Planner, Capabilities**. Capabilities
+has one searchable catalog with All, Skills, Tools and services, and Needs setup
+filters, a Discover Skills action, update checking, and Add tool for MCP/REST.
+Rows show identity, type, status and purpose rather than an ambiguous master
+switch. Memory Recall is the first Skill. Standalone Tools and services stay
+visible without inventing a Skill for them. Each MCP/REST connection occupies
+one row; its individual Tool controls live in its detail.
+
+Opening a Skill shows its enable control, content/maintenance actions, required
+dependencies and optional enhancements. Dependency rows open the exact shared
+service/Tool detail; Back returns to the same Skill with live readiness. Tool
+details list related Skills and distinguish required from optional use. Search
+and filters survive these detail visits. Unknown tool declarations show explicit
+unavailable/repair feedback instead of a guessed connection. Existing Skills
+navigation selects the Skills filter; Tools navigation opens the catalog.
+No new permission or connection store is introduced.
+
+Disabling a required Tool or service asks before pausing currently ready,
+enabled dependent Skills. Disabling an optional Tool does not pause a Skill;
+document-provider any-one dependencies pause only when their last available
+Tool is lost. Saved Skill choices remain unchanged. Closing/removing a Skill
+does not disable shared Tools or disconnect accounts.
+
+Discover opens the public skills.sh Trending (24h) leaderboard, then switches
+to search results after a query. Cards show rank, source, install count, and
+a derived popularity label. Installed Skills can be enabled or disabled,
+except Memory Recall, which follows Daily journal. A Skill cannot be enabled until all of its required aggregate Tool
 groups are ready; its card names missing provider/group labels such as
 **Tencent Docs MCP**, never a list of raw Tool IDs, and keeps the switch off.
 A document-provider group (Tencent Docs, Notion or Feishu) is ready when its
@@ -597,12 +618,16 @@ Agent Browser uses the same provider-card pattern. Its provider-level enable
 switch and the five `browser_read`, `browser_navigate`, `browser_click`,
 `browser_input`, and `browser_scroll` switches are grouped together in one
 expandable card rather than appearing as separate built-in cards.
-**Websites and logins** stays outside its collapsed Tool list as the same rounded
+**Capabilities > Agent Browser > Websites and logins** stays outside its collapsed Tool list as the same rounded
 settings row used by App Control, with a globe icon, short detail and chevron.
-Only the entry styling changes; it opens the existing secure full-screen dialog with a Bing
-search/address field centered in the page, Mochi's launcher logo above it, and
-an always-visible Close action at the top right. The logo and concise
-"Search the web. Save accounts safely." caption share a softly tinted brand area.
+It opens a secure full-screen login-preparation dialog with a website field
+(also accepting Bing searches), Mochi's launcher logo above it, and an
+always-visible Return to Mochi action at the top right. The logo and
+"Sign in once. Mochi can reuse valid website sessions." caption share a tinted
+brand area. What is saved? explains shared sessions, optional native-only
+credentials, model-provider access to task page content, and the difference
+between deleting an account and clearing site data. It never labels stored
+data as proof of a current login. This is not a bottom-navigation browser.
 A separate rounded translucent
 frosted-look panel below search contains website groups and the compact data
 overflow menu. There are no introductory or session-status cards.
@@ -639,7 +664,8 @@ Editing supports username, website and replacement password for password account
 changing their website requires password re-entry. SMS editing offers only website
 and phone. Confirmed account deletion preserves current login.
 The overflow menu has separate cache and confirmed all-website-data deletion;
-both preserve saved passwords. Closing reveals the unchanged Tools page.
+both preserve saved passwords. Returning to Mochi ends manual browsing and
+reveals the unchanged Agent Browser capability detail.
 There is no mode selector; Mochi chooses mobile/desktop as needed. Legacy manual
 preferences do not override that decision.
 Website-data deletion includes shared login, unlike saved-account deletion.
