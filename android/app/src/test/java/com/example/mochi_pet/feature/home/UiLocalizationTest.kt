@@ -20,6 +20,7 @@ class UiLocalizationTest {
     @Test
     fun `Chinese locale translates known UI text`() {
         assertEquals("设置", localizeUiText("Settings", "zh"))
+        assertEquals("已暂停", localizeUiText("Suspended", "zh"))
         assertEquals(
             "Mochi 正在思考",
             localizeUiText("Mochi is Thinking", "zh"),

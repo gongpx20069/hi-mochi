@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +63,7 @@ internal fun CapabilityCatalogSurface(
     val selectedSkill = if (route?.startsWith("skill/") == true) skills.skills.firstOrNull { it.id == route.removePrefix("skill/") } else null
     val selectedGroup = if (route?.startsWith("tool/") == true) groups.firstOrNull { it.id == route.removePrefix("tool/") } else null
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(Modifier.fillMaxSize(), color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.fillMaxSize()) {
             if (route != null) {
                 TextButton(onClick = ::back, modifier = Modifier.testTag("capabilities-back")) { Text("Back to capabilities") }

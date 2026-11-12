@@ -189,6 +189,7 @@ private val ZH_UI_TEXT = mapOf(
     "Search skills, tools, or services" to "搜索技能、工具或服务",
     "Tools and services" to "工具与服务",
     "Needs setup" to "待配置",
+    "Suspended" to "已暂停",
     "Discover Skills" to "发现更多技能",
     "Skill" to "技能",
     "Built-in tool" to "内置工具",

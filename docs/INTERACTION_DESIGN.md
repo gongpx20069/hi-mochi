@@ -522,7 +522,8 @@ one row; its individual Tool controls live in its detail.
 Skill rows use a subtle lavender tint; Tool/service rows use a subtle peach
 tint, including dependency and related-Skill links. Type labels remain visible
 so color is not the only distinction; body text retains the theme's readable
-foreground colors.
+foreground colors. The catalog inherits its enclosing surface background rather
+than painting a second opaque panel inside the rounded app container.
 
 Opening a Skill shows its enable control, content/maintenance actions, required
 dependencies and optional enhancements. Dependency rows open the exact shared
