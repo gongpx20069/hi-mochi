@@ -33,10 +33,10 @@ android/
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
 The wrapper pins Gradle 9.9.1 with its official distribution SHA-256.
 The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
-and serialization 1.12.0 across the host and extensions. The root buildscript
+and serialization 1.13.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply
-`org.jetbrains.kotlin.android` in modules. Serialization 1.12.0 uses Kotlin 2.4
-metadata and requires a compatible Kotlin compiler.
+`org.jetbrains.kotlin.android` in modules. The serialization runtime requires
+a compatible Kotlin compiler.
 The host and all three extensions compile against and target Android 17 (API 37);
 the shared libraries also compile against API 37. Android 8.0 (API 26) remains
 the minimum supported version. Keep Lint warnings fatal, including target-SDK
