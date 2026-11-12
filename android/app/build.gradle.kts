@@ -213,7 +213,7 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     //noinspection NewerVersionAvailable
     implementation("com.squareup.okhttp3:okhttp:5.4.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
     implementation(files(sherpaOnnxAar))
 
     ksp("androidx.room:room-compiler:2.8.4")
