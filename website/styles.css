@@ -1631,6 +1631,33 @@ img {
   color: #463546;
 }
 
+.architecture-downloads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.architecture-downloads a {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 16px;
+  border: 1px solid rgba(40, 25, 45, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.25);
+  color: #211823;
+}
+
+.architecture-downloads a:hover,
+.architecture-downloads a:focus-visible {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.architecture-downloads span {
+  font-size: 0.75rem;
+}
+
 .open-grid {
   display: grid;
   grid-template-columns: 1.08fr 0.92fr;

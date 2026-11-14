@@ -147,17 +147,32 @@ link to the user guide for cache and compatibility details.
 
 ## Release links
 
-Download controls include a checked-in current-release fallback. On page load,
-`scripts.js` reads GitHub's public `releases/latest` API, validates the returned
-repository URLs, and updates the displayed version, ARM64 download, and release
-page links, plus all three extension APK links. All expected assets and repository
+Both homepages provide direct APK links for `arm64-v8a`, `armeabi-v7a`, `x86`,
+`x86_64`, and `universal`, plus the three official extension APKs. The hero and
+primary installation button recommend ARM64; a native installation disclosure
+provides all five architectures, including without JavaScript.
+
+The Chinese homepage downloads from the public CNB mirror at
+`https://cnb.cool/hi-mochi/hi-mochi`, without a token, login, or GitHub API request.
+It pins the verified bundled release rather than following GitHub's latest tag:
+GitHub publication can precede successful CNB mirroring. Never manufacture CNB
+links from unverified GitHub metadata. Source, documentation, issue links and
+the independent AgentLink downloads retain their original GitHub destinations.
+
+The English homepage keeps GitHub downloads and a checked-in fallback. On page
+load, `scripts.js` reads GitHub's public `releases/latest` API, validates the
+returned repository URLs, and updates the displayed version, all architecture
+downloads, release page links, and all three extension APK links. All assets and repository
 URLs are validated before any link changes, so missing/untrusted extensions
 preserve the matching bundled release as a whole. If the API is unavailable or
 rate-limited, the fallback remains usable. AgentLink pages do not request the
 Mochi release API.
 
-The bundled fallback is **v1.0.20**. After publishing a new release, update
-both homepages' base/extension download URLs, release-page URLs, and version labels together.
+The bundled release is **v1.0.22**. After publishing a new release and completing
+full anonymous download and SHA-256 verification of all nine CNB mirror files,
+update both homepages' architecture/extension URLs, release-page URLs, and version
+labels together. Retain the last verified Chinese version if mirroring fails;
+do not switch to GitHub or advertise a CNB APK that has not been mirrored.
 The static check enforces consistency within and between languages; it does
 not query GitHub or infer an unpublished version. An API outage must not send
 visitors back to an obsolete installation guide.
@@ -192,9 +207,11 @@ Alternatively, use `--channel msedge` or `--channel chrome` with an installed
 browser instead of downloading Chromium. The check serves only `website/` at
 the project path, checks all four pages at 320/390/768/1024/1280/1440 pixels, exercises
 mobile/cross-page navigation and expanded setup disclosures, and mocks GitHub
-responses to verify matching base/extension updates, API-outage fallback,
+responses to verify matching architecture/extension updates, API-outage fallback,
 missing extension assets, and rejection of untrusted download URLs.
 It also verifies the complete fallback on missing/untrusted WebDAV assets,
+missing/untrusted non-ARM64 assets, all five direct links without JavaScript,
+Chinese CNB links staying unchanged with no GitHub API request,
 the downloadable preview's setup entry, and that setup disclosures
 work with keyboard input and without JavaScript.
 AgentLink checks also cover keyboard-operated setup disclosures, no-JavaScript

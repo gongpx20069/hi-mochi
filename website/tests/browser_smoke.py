@@ -13,6 +13,8 @@ from playwright.sync_api import sync_playwright
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
 RELEASE_ROOT = "https://github.com/gongpx20069/hi-mochi/releases/"
+CNB_RELEASE_ROOT = "https://cnb.cool/hi-mochi/hi-mochi/-/releases/"
+ABIS = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64", "universal")
 API_URL = "https://api.github.com/repos/gongpx20069/hi-mochi/releases/latest"
 TEST_VERSION = "v1.0.99"
 
@@ -44,12 +46,15 @@ def main() -> None:
             browser = playwright.chromium.launch(channel=options.channel)
             for language in ("", "zh-CN/", "agentlink/", "zh-CN/agentlink/"):
                 is_home = "agentlink/" not in language
+                expects_api = is_home and language == ""
+                release_root = CNB_RELEASE_ROOT if language == "zh-CN/" else RELEASE_ROOT
                 source = (SITE_ROOT / language / "index.html").read_text(encoding="utf-8")
                 fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1) if is_home else None
                 modes = (
                     "latest", "unavailable", "untrusted", "missing-extension",
                     "untrusted-extension", "missing-webdav", "untrusted-webdav",
-                ) if is_home else ("standalone",)
+                    "missing-architecture", "untrusted-architecture",
+                ) if expects_api else ("latest", "unavailable") if is_home else ("standalone",)
                 for mode in modes:
                     context = browser.new_context(reduced_motion="reduce")
                     asset_name = f"Mochi-{TEST_VERSION}-arm64-v8a.apk"
@@ -67,6 +72,18 @@ def main() -> None:
                             ),
                         }],
                     }
+                    for abi in ABIS[1:]:
+                        if mode == "missing-architecture" and abi == "universal":
+                            continue
+                        filename = f"Mochi-{TEST_VERSION}-{abi}.apk"
+                        payload["assets"].append({
+                            "name": filename,
+                            "browser_download_url": (
+                                "https://example.invalid/architecture.apk"
+                                if mode == "untrusted-architecture" and abi == "x86"
+                                else f"{RELEASE_ROOT}download/{TEST_VERSION}/{filename}"
+                            ),
+                        })
                     for extension in ("Mijia", "Termux", "WebDAV"):
                         if mode == "missing-extension" and extension == "Termux":
                             continue
@@ -88,28 +105,30 @@ def main() -> None:
                     ))
                     page = context.new_page()
                     failures = []
-                    page.on("request", lambda request: failures.append("AgentLink requested Mochi release API")
-                            if not is_home and request.url == API_URL else None)
+                    page.on("request", lambda request: failures.append("Static download page requested Mochi release API")
+                            if not expects_api and request.url == API_URL else None)
                     page.on("pageerror", lambda error: failures.append(str(error)))
                     page.on("response", lambda response: failures.append(response.url)
                             if response.url.startswith("http://127.0.0.1") and response.status >= 400
                             else None)
                     page.goto(f"http://127.0.0.1:{server.server_port}/hi-mochi/{language}")
                     page.wait_for_load_state("networkidle")
-                    expected = TEST_VERSION if mode == "latest" else fallback
+                    expected = TEST_VERSION if mode == "latest" and expects_api else fallback
                     assert page.locator("[data-release-version]").all_text_contents() == ([expected] * 3 if is_home else [])
                     for link in page.locator("[data-release-download]").all():
+                        abi = link.get_attribute("data-release-download") or "arm64-v8a"
                         assert link.get_attribute("href") == (
-                            f"{RELEASE_ROOT}download/{expected}/Mochi-{expected}-arm64-v8a.apk"
+                            f"{release_root}download/{expected}/Mochi-{expected}-{abi}.apk"
                         )
                     for link in page.locator("[data-release-page]").all():
-                        assert link.get_attribute("href") == f"{RELEASE_ROOT}tag/{expected}"
+                        assert link.get_attribute("href") == f"{release_root}tag/{expected}"
                     for extension, name in (("mijia", "Mijia"), ("termux", "Termux"), ("webdav", "WebDAV")):
                         if is_home:
                             assert page.locator(f"[data-extension-download='{extension}']").get_attribute("href") == (
-                                f"{RELEASE_ROOT}download/{expected}/Mochi-{name}-Extension-{expected}.apk"
+                                f"{release_root}download/{expected}/Mochi-{name}-Extension-{expected}.apk"
                             )
                     if is_home:
+                        assert page.locator("#download-options [data-release-download]").count() == 5
                         preview = page.locator("[data-extension-card='webdav']")
                         assert preview.get_attribute("data-release-status") == "released-preview"
                         assert preview.locator("[data-extension-download='webdav']").count() == 1
@@ -150,6 +169,14 @@ def main() -> None:
 
                     for width in (320, 390, 768, 1024, 1280, 1440):
                         page.set_viewport_size({"width": width, "height": 900})
+                        if is_home:
+                            for link in page.locator("#download-options a").all():
+                                assert link.is_visible()
+                                assert link.evaluate("""item => {
+                                    const box = item.getBoundingClientRect();
+                                    return box.left >= 0 && box.right <= innerWidth &&
+                                        item.scrollWidth <= item.clientWidth + 1;
+                                }""")
                         layout_errors = page.evaluate("""() => {
                             const errors = [];
                             if (document.documentElement.scrollWidth > innerWidth) {
@@ -252,9 +279,12 @@ def main() -> None:
                 if "agentlink/" not in language:
                     source = (SITE_ROOT / language / "index.html").read_text(encoding="utf-8")
                     fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1)
-                    assert page.locator("[data-release-download]").first.get_attribute("href") == (
-                        f"{RELEASE_ROOT}download/{fallback}/Mochi-{fallback}-arm64-v8a.apk"
-                    )
+                    release_root = CNB_RELEASE_ROOT if language == "zh-CN/" else RELEASE_ROOT
+                    for link in page.locator("[data-release-download]").all():
+                        abi = link.get_attribute("data-release-download") or "arm64-v8a"
+                        assert link.get_attribute("href") == (
+                            f"{release_root}download/{fallback}/Mochi-{fallback}-{abi}.apk"
+                        )
                     for disclosure in page.locator(
                         "[data-connections-feature] details, [data-app-control-feature] details, [data-memory-feature] details, #webdav-extension details, #install details"
                     ).all():
@@ -262,7 +292,7 @@ def main() -> None:
                         assert disclosure.evaluate("(item) => item.open")
                         assert disclosure.locator("p, ol").first.is_visible()
                     assert page.locator("[data-extension-download='webdav']").get_attribute("href") == (
-                        f"{RELEASE_ROOT}download/{fallback}/Mochi-WebDAV-Extension-{fallback}.apk"
+                        f"{release_root}download/{fallback}/Mochi-WebDAV-Extension-{fallback}.apk"
                     )
                     context.close()
                     continue
@@ -277,7 +307,7 @@ def main() -> None:
                 )
                 context.close()
             browser.close()
-        print("Browser checks passed: 4 pages, 6 widths, agent logos, extension downloads/fallbacks, and cross-page navigation.")
+        print("Browser checks passed: 4 pages, 6 widths, localized five-ABI downloads, extension fallbacks, and cross-page navigation.")
     finally:
         server.shutdown()
         server.server_close()

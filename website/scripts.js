@@ -59,23 +59,27 @@ const updateLatestRelease = async () => {
     throw new Error("GitHub returned an unsupported release");
   }
 
-  const assetName = `Mochi-${version}-arm64-v8a.apk`;
-  const asset = release.assets?.find((item) => item.name === assetName);
-  if (!asset) {
-    throw new Error(`GitHub release ${version} has no ARM64 APK`);
-  }
-
   const releasePage = trustedReleaseUrl(
     release.html_url,
     `${releasePath}tag/${version}`,
   );
-  const downloadUrl = trustedReleaseUrl(
-    asset.browser_download_url,
-    `${releasePath}download/${version}/${assetName}`,
-  );
-  if (!releasePage || !downloadUrl) {
+  if (!releasePage) {
     throw new Error("GitHub returned an unexpected release URL");
   }
+
+  const appDownloads = [...document.querySelectorAll("[data-release-download]")].map((link) => {
+    const abi = link.dataset.releaseDownload || "arm64-v8a";
+    const filename = `Mochi-${version}-${abi}.apk`;
+    const asset = release.assets?.find((item) => item.name === filename);
+    const url = asset && trustedReleaseUrl(
+      asset.browser_download_url,
+      `${releasePath}download/${version}/${filename}`,
+    );
+    if (!url) {
+      throw new Error(`GitHub release ${version} has no trusted ${abi} APK`);
+    }
+    return { link, url };
+  });
 
   const extensionNames = { mijia: "Mijia", termux: "Termux", webdav: "WebDAV" };
   const extensionDownloads = [...document.querySelectorAll("[data-extension-download]")].map((link) => {
@@ -98,15 +102,16 @@ const updateLatestRelease = async () => {
   document.querySelectorAll("[data-release-page]").forEach((element) => {
     element.href = releasePage;
   });
-  document.querySelectorAll("[data-release-download]").forEach((element) => {
-    element.href = downloadUrl;
+  appDownloads.forEach(({ link, url }) => {
+    link.href = url;
   });
   extensionDownloads.forEach(({ link, url }) => {
     link.href = url;
   });
 };
 
-if (document.querySelector("[data-release-download]")) {
+// A GitHub release may precede its CNB mirror; Chinese links stay on the verified bundle.
+if (document.documentElement.lang !== "zh-CN" && document.querySelector("[data-release-download]")) {
   updateLatestRelease().catch((error) => {
     console.warn("Using the bundled release fallback.", error);
   });

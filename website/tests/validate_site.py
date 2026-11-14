@@ -139,13 +139,20 @@ def main() -> None:
                 errors.append(
                     f"{relative_page}: missing localized smart-home label",
                 )
+            release_root = (
+                "https://cnb.cool/hi-mochi/hi-mochi/-/releases/"
+                if language == "zh-CN"
+                else "https://github.com/gongpx20069/hi-mochi/releases/"
+            )
+            trusted_root = re.escape(release_root)
+            abis = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64", "universal")
+            abi_pattern = "|".join(abis)
             download_versions = re.findall(
-                r'data-release-download href="[^"]+/download/'
-                r'(v1\.0\.[1-9][0-9]*)/Mochi-\1-arm64-v8a\.apk"',
-                source,
+                rf'data-release-download(?:="(?:{abi_pattern})")? href="{trusted_root}download/'
+                rf'(v1\.0\.[1-9][0-9]*)/Mochi-\1-(?:{abi_pattern})\.apk"', source,
             )
             page_versions = re.findall(
-                r'data-release-page href="[^"]+/tag/(v1\.0\.[1-9][0-9]*)"',
+                rf'data-release-page href="{trusted_root}tag/(v1\.0\.[1-9][0-9]*)"',
                 source,
             )
             label_versions = re.findall(
@@ -153,10 +160,17 @@ def main() -> None:
                 source,
             )
             versions = set(download_versions + page_versions + label_versions)
+            for abi in abis:
+                abi_versions = re.findall(
+                    rf'data-release-download="{abi}" href="{trusted_root}download/'
+                    rf'(v1\.0\.[1-9][0-9]*)/Mochi-\1-{abi}\.apk"', source,
+                )
+                if len(abi_versions) != 1 or set(abi_versions) != versions:
+                    errors.append(f"{relative_page}: missing or inconsistent {abi} download")
             for extension, name in (("mijia", "Mijia"), ("termux", "Termux"), ("webdav", "WebDAV")):
                 extension_versions = re.findall(
-                    rf'data-extension-download="{extension}" href="https://github.com/'
-                    rf'gongpx20069/hi-mochi/releases/download/(v1\.0\.[1-9][0-9]*)/'
+                    rf'data-extension-download="{extension}" href="{trusted_root}'
+                    rf'download/(v1\.0\.[1-9][0-9]*)/'
                     rf'Mochi-{name}-Extension-\1\.apk"', source,
                 )
                 if len(extension_versions) != 1 or set(extension_versions) != versions:
@@ -168,7 +182,8 @@ def main() -> None:
                 errors.append(f"{relative_page}: missing extensions section")
             fallback_versions.update(versions)
             if (
-                len(download_versions) != 2
+                len(download_versions) != 7
+                or source.count("data-release-download") != 7
                 or len(page_versions) != 2
                 or len(label_versions) != 3
                 or len(versions) != 1
