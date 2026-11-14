@@ -17,6 +17,10 @@ function Assert-Fails([scriptblock] $Action, [string] $Message) {
 $tag = 'v1.0.22'
 $names = @(
     "Mochi-$tag-arm64-v8a.apk",
+    "Mochi-$tag-armeabi-v7a.apk",
+    "Mochi-$tag-x86.apk",
+    "Mochi-$tag-x86_64.apk",
+    "Mochi-$tag-universal.apk",
     "Mochi-Mijia-Extension-$tag.apk",
     "Mochi-Termux-Extension-$tag.apk",
     "Mochi-WebDAV-Extension-$tag.apk",
@@ -42,7 +46,7 @@ foreach ($bad in @('', 'https://cnb.cool/example/mochi', 'example/../mochi', 'ex
     Assert-Fails { Assert-CnbRepository $bad } 'organization/repository'
 }
 $plan = @(Get-MirrorAssetPlan $source $tag)
-Assert-Equal $plan.Count 5
+Assert-Equal $plan.Count 9
 Assert-Equal $plan[0].name "Mochi-$tag-arm64-v8a.apk"
 $source.assets[0].browser_download_url = 'https://example.invalid/application.apk'
 Assert-Fails { Get-MirrorAssetPlan $source $tag } 'Invalid GitHub release asset'
@@ -52,7 +56,13 @@ Assert-Fails { Get-MirrorAssetPlan $source $tag } 'stable Mochi'
 $source.prerelease = $false
 $source.assets += $source.assets[0]
 Assert-Fails { Get-MirrorAssetPlan $source $tag } 'duplicate'
-$source.assets = @($source.assets | Select-Object -First 5)
+$source.assets = @($source.assets | Select-Object -First 9)
+$completeAssets = $source.assets
+foreach ($abi in @('armeabi-v7a', 'x86', 'x86_64', 'universal')) {
+    $source.assets = @($completeAssets | Where-Object { $_.name -cne "Mochi-$tag-$abi.apk" })
+    Assert-Fails { Get-MirrorAssetPlan $source $tag | Out-Null } "Missing or duplicate GitHub asset: Mochi-$tag-$abi.apk"
+}
+$source.assets = $completeAssets
 $source.assets[0].digest = ''
 Assert-Fails { Get-MirrorAssetPlan $source $tag } 'Invalid GitHub release asset'
 $source.assets[0].digest = 'sha256:' + ('a' * 64)
@@ -221,7 +231,7 @@ try {
         $env:CNB_TOKEN = 'synthetic-test-only'
         $env:GITHUB_STEP_SUMMARY = ''
         Publish-CnbAndroidRelease $tag 'example/mochi' | Out-Null
-        Assert-Equal ($script:events -join ',') 'download,tag,create,upload,upload,upload,upload,upload,verify-draft,verify-draft,verify-draft,verify-draft,verify-draft,publish,verify,verify,verify,verify,verify'
+        Assert-Equal ($script:events -join ',') ((@('download', 'tag', 'create') + @('upload') * 9 + @('verify-draft') * 9 + @('publish') + @('verify') * 9) -join ',')
         Assert-Equal (Test-Path $script:workDirectory) $false
         $script:releaseMissing = $false
         $script:visibility = 'Private'
@@ -246,7 +256,26 @@ try {
         $script:mirrorRelease.assets = @($source.assets | ForEach-Object { @{ name = $_.name; size = $_.size } })
         $script:events = @()
         Publish-CnbAndroidRelease $tag 'example/mochi' | Out-Null
-        Assert-Equal ($script:events -join ',') 'download,tag,verify,verify,verify,verify,verify'
+        Assert-Equal ($script:events -join ',') ((@('download', 'tag') + @('verify') * 9) -join ',')
+        $fullMirrorAssets = $script:mirrorRelease.assets
+        $script:mirrorRelease.assets = @($fullMirrorAssets | Where-Object {
+            $_.name -ceq "Mochi-$tag-arm64-v8a.apk" -or $_.name -like '*-Extension-*' -or $_.name -like '*-SHA256SUMS.txt'
+        })
+        $script:events = @()
+        Publish-CnbAndroidRelease $tag 'example/mochi' -CompletePublishedRelease | Out-Null
+        Assert-Equal ($script:events -join ',') ((@('download', 'tag') + @('verify') * 5 + @('upload') * 4 + @('verify') * 9) -join ',')
+        $script:events = @()
+        $script:failVerify = $true
+        Assert-Fails { Publish-CnbAndroidRelease $tag 'example/mochi' -CompletePublishedRelease } 'anonymous verification'
+        Assert-Equal ($script:events -contains 'upload') $false
+        Assert-Equal (Test-Path $script:workDirectory) $false
+        $script:failVerify = $false
+        $script:mirrorRelease.assets[-1].size = 5
+        $script:events = @()
+        Assert-Fails { Publish-CnbAndroidRelease $tag 'example/mochi' -CompletePublishedRelease } 'Conflicting CNB asset'
+        Assert-Equal ($script:events -contains 'upload') $false
+        $script:mirrorRelease.assets[-1].size = 4
+        $script:mirrorRelease.assets = $fullMirrorAssets
         $script:mirrorRelease.assets[0].size = 5
         Assert-Fails { Publish-CnbAndroidRelease $tag 'example/mochi' } 'Conflicting CNB asset'
         Assert-Equal (Test-Path $script:workDirectory) $false

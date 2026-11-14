@@ -592,9 +592,9 @@ authentication as above before relying on the API fallback.
 ### Optional CNB download mirror
 
 GitHub remains the canonical signed release publisher. The optional CNB mirror
-copies the published ARM64 APK, all three official extension APKs, and the
-original SHA-256 manifest without rebuilding or resigning anything. Other
-ABIs remain on GitHub. App update and website download URLs are unchanged.
+copies all five published app APKs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`,
+and `universal`), all three official extension APKs, and the original SHA-256
+manifest without rebuilding or resigning anything. App update URLs are unchanged.
 
 Create a dedicated public repository at `https://cnb.cool/`. Configure GitHub
 **Settings > Secrets and variables > Actions**:
@@ -619,8 +619,14 @@ mirror file again anonymously and verifies its full size and SHA-256 against
 GitHub metadata and the original checksum manifest. Public verification
 necessarily follows publication: a failed check leaves the CNB release in place
 for diagnosis and fails the job, without reporting the mirror as verified.
-Conflicting assets or incomplete already-published releases require manual
-investigation, not automatic replacement. Temporary downloads are removed on
+Conflicting assets require manual investigation, never automatic replacement.
+An incomplete already-published mirror fails by default. To intentionally expand
+an older ARM64-only mirror, select `complete_published_release` in the manual
+workflow (or pass `-CompletePublishedRelease` locally). This first checks all
+existing asset metadata and anonymously verifies every existing selected file,
+then adds only missing official files with overwrite disabled and verifies the
+entire public set again. It never changes existing attachments or source tags,
+and does not hide or recreate the published release. Temporary downloads are removed on
 normal success/failure; hosted runners are disposable if a job is cancelled.
 
 Use a dedicated CNB organization and do not bind a paid Tencent Cloud budget.

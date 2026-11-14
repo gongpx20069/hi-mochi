@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
     [string] $Tag,
-    [string] $CnbRepository = $env:CNB_REPOSITORY
+    [string] $CnbRepository = $env:CNB_REPOSITORY,
+    [switch] $CompletePublishedRelease
 )
 
 $ErrorActionPreference = 'Stop'
@@ -117,6 +118,10 @@ function Get-MirrorAssetPlan {
     }
     $names = @(
         "Mochi-$ReleaseTag-arm64-v8a.apk",
+        "Mochi-$ReleaseTag-armeabi-v7a.apk",
+        "Mochi-$ReleaseTag-x86.apk",
+        "Mochi-$ReleaseTag-x86_64.apk",
+        "Mochi-$ReleaseTag-universal.apk",
         "Mochi-Mijia-Extension-$ReleaseTag.apk",
         "Mochi-Termux-Extension-$ReleaseTag.apk",
         "Mochi-WebDAV-Extension-$ReleaseTag.apk",
@@ -281,7 +286,7 @@ function Confirm-CnbMirrorAsset {
 }
 
 function Publish-CnbAndroidRelease {
-    param([string] $ReleaseTag, [string] $Repository)
+    param([string] $ReleaseTag, [string] $Repository, [switch] $CompletePublishedRelease)
 
     Assert-CnbRepository $Repository
     if ([string]::IsNullOrWhiteSpace($env:CNB_TOKEN)) { throw 'Set CNB_TOKEN using a GitHub Actions secret.' }
@@ -308,7 +313,7 @@ function Publish-CnbAndroidRelease {
                 tag_name = $ReleaseTag
                 target_commitish = $commit
                 name = "Mochi $ReleaseTag"
-                body = "Official mirror of https://github.com/gongpx20069/hi-mochi/releases/tag/$ReleaseTag`nSource commit: $commit`nARM64 app and optional extensions; other ABIs remain on GitHub."
+                body = "Official mirror of https://github.com/gongpx20069/hi-mochi/releases/tag/$ReleaseTag`nSource commit: $commit`nAll five app architectures, optional extensions, and the original SHA-256 manifest."
                 draft = $true
                 prerelease = $false
                 make_latest = 'false'
@@ -326,6 +331,7 @@ function Publish-CnbAndroidRelease {
         if (@($existingNames | Where-Object { $_ -cnotin $assets.name }).Count -gt 0) {
             throw 'The CNB release contains unexpected assets; refusing to modify it.'
         }
+        $missingAssets = @()
         foreach ($asset in $assets) {
             $existing = @($releaseAssets | Where-Object { $_.name -ceq $asset.name })
             if ($existing.Count -gt 1) { throw "Duplicate CNB asset: $($asset.name)" }
@@ -333,9 +339,19 @@ function Publish-CnbAndroidRelease {
                 if ($existing[0].size -ne $asset.size) { throw "Conflicting CNB asset: $($asset.name)" }
                 continue
             }
-            if (-not $release.draft) {
-                throw 'Published CNB release is incomplete; refusing to change an existing published version.'
+            $missingAssets += $asset
+        }
+        if (-not $release.draft -and $missingAssets.Count -gt 0) {
+            if (-not $CompletePublishedRelease) {
+                throw 'Published CNB release is incomplete; use -CompletePublishedRelease only for an intentional additive mirror expansion.'
             }
+            # Validate every existing byte before adding files to a public release.
+            foreach ($asset in $assets | Where-Object { $_.name -cin $existingNames }) {
+                Confirm-CnbMirrorAsset $Repository $ReleaseTag $asset `
+                    (Join-Path $directory "verify-$($asset.name)") | Out-Null
+            }
+        }
+        foreach ($asset in $missingAssets) {
             Send-CnbMirrorAsset $Repository $release.id $asset (Join-Path $directory $asset.name)
         }
         if ($release.draft) {
@@ -354,7 +370,7 @@ function Publish-CnbAndroidRelease {
         $summary = @(
             "CNB mirror verified: $ReleaseTag",
             "Source commit: $commit",
-            'All five files were downloaded anonymously and matched GitHub SHA-256 digests.',
+            "All $($assets.Count) files were downloaded anonymously and matched GitHub SHA-256 digests.",
             ($urls -join "`n")
         ) -join "`n`n"
         Write-Output $summary
@@ -365,5 +381,5 @@ function Publish-CnbAndroidRelease {
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-    Publish-CnbAndroidRelease -ReleaseTag $Tag -Repository $CnbRepository
+    Publish-CnbAndroidRelease -ReleaseTag $Tag -Repository $CnbRepository -CompletePublishedRelease:$CompletePublishedRelease
 }

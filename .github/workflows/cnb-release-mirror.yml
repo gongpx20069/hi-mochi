@@ -7,6 +7,11 @@ on:
         description: Existing stable GitHub release tag (v1.0.x)
         required: true
         type: string
+      complete_published_release:
+        description: Verify existing files, then add missing official APKs to a published mirror (never overwrite)
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       tag:
@@ -43,4 +48,5 @@ jobs:
           CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
           CNB_REPOSITORY: ${{ vars.CNB_REPOSITORY }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: ./scripts/Publish-CnbAndroidRelease.ps1 -Tag $env:RELEASE_TAG
+          COMPLETE_PUBLISHED_RELEASE: ${{ inputs.complete_published_release }}
+        run: ./scripts/Publish-CnbAndroidRelease.ps1 -Tag $env:RELEASE_TAG -CompletePublishedRelease:($env:COMPLETE_PUBLISHED_RELEASE -eq 'true')
