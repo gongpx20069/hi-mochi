@@ -320,12 +320,14 @@ function Publish-CnbAndroidRelease {
         ) {
             throw 'CNB returned an unexpected release.'
         }
-        $existingNames = @($release.assets | ForEach-Object { $_.name })
+        $releaseAssets = @()
+        if ($null -ne $release.assets) { $releaseAssets = @($release.assets) }
+        $existingNames = @($releaseAssets | ForEach-Object { $_.name })
         if (@($existingNames | Where-Object { $_ -cnotin $assets.name }).Count -gt 0) {
             throw 'The CNB release contains unexpected assets; refusing to modify it.'
         }
         foreach ($asset in $assets) {
-            $existing = @($release.assets | Where-Object { $_.name -ceq $asset.name })
+            $existing = @($releaseAssets | Where-Object { $_.name -ceq $asset.name })
             if ($existing.Count -gt 1) { throw "Duplicate CNB asset: $($asset.name)" }
             if ($existing.Count -eq 1) {
                 if ($existing[0].size -ne $asset.size) { throw "Conflicting CNB asset: $($asset.name)" }

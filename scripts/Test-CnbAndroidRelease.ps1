@@ -170,7 +170,7 @@ try {
         tag_name = $tag
         draft = $true
         prerelease = $false
-        assets = @()
+        assets = $null
     }
     $script:events = @()
     $script:failVerify = $false
