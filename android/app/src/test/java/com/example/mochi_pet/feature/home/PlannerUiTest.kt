@@ -136,6 +136,49 @@ class PlannerUiTest {
         compose.onNodeWithText("Keep what matters in a short journal.").assertDoesNotExist()
     }
 
+    @Test fun `date loading keeps cards in place under their original heading until replacement`() {
+        val today = LocalDate.of(2026, 11, 9)
+        val base = Instant.parse("2026-11-09T08:00:00Z")
+        val event = com.example.mochi_pet.core.model.CalendarEvent("first", "Morning walk", null, base,
+            null, false, java.time.ZoneOffset.UTC, null, null, null, base, base)
+        var selected by mutableStateOf(today)
+        var state by mutableStateOf(PlannerSurfaceState(date = today, events = listOf(event)))
+        compose.setContent { MochiTheme {
+            PlannerAgenda(selected, today, false, state,
+                { selected = it }, {}, {}, actions(), {}, {}, {}, { _, _ -> })
+        } }
+        val card = compose.onNodeWithText("Morning walk")
+        card.assertIsDisplayed()
+        val position = card.fetchSemanticsNode().boundsInRoot
+        compose.runOnIdle {
+            selected = today.plusDays(1)
+            state = state.copy(isLoading = true)
+        }
+        card.assertIsDisplayed()
+        assertEquals(position, card.fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("Nov 9 · Monday").assertIsDisplayed()
+        compose.onNodeWithText("Nov 10 · Tuesday").assertDoesNotExist()
+        compose.onNodeWithText("No arrangements for this day").assertDoesNotExist()
+        compose.runOnIdle {
+            state = PlannerSurfaceState(date = selected, events = listOf(
+                event.copy(id = "next", title = "Evening walk", startAt = base.plusSeconds(86400))))
+        }
+        card.assertDoesNotExist()
+        compose.onNodeWithText("Nov 10 · Tuesday").assertIsDisplayed()
+        compose.onNodeWithText("Evening walk").assertIsDisplayed()
+    }
+
+    @Test fun `initial date load does not briefly report an empty day`() {
+        val date = LocalDate.of(2026, 11, 9)
+        var state by mutableStateOf(PlannerSurfaceState(isLoading = true))
+        compose.setContent { MochiTheme {
+            PlannerAgenda(date, date, false, state, {}, {}, {}, actions(), {}, {}, {}, { _, _ -> })
+        } }
+        compose.onNodeWithText("No arrangements for this day").assertDoesNotExist()
+        compose.runOnIdle { state = PlannerSurfaceState(date = date) }
+        compose.onNodeWithText("No arrangements for this day").assertIsDisplayed()
+    }
+
     @Test fun `history uses one task card and opens exact persisted result`() {
         val today = LocalDate.of(2026, 11, 9)
         val day = today.minusDays(1)

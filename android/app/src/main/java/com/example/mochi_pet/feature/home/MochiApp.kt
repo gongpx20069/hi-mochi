@@ -1674,7 +1674,8 @@ private fun SurfaceContent(
                 state = plannerState,
                 date = when (surface) {
                     is MochiSurface.CalendarDay -> surface.date
-                    is MochiSurface.CalendarMonth -> plannerState.date ?: surface.month.atDay(1)
+                    is MochiSurface.CalendarMonth -> plannerToday.takeIf { YearMonth.from(it) == surface.month }
+                        ?: surface.month.atDay(1)
                     else -> plannerToday
                 },
                 today = plannerToday,

@@ -71,6 +71,7 @@ internal fun PlannerAgenda(
     if (taskEditor) ScheduledTaskEditor(editTask, date, actions,
         onRemove = { editTask?.let { onRemove(it.id) } }, onDismiss = { taskEditor = false })
     val rows = remember(state, filter) { agendaRows(state, filter) }
+    val contentDate = state.date ?: date
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 24.dp)) {
         item("heading") {
@@ -110,18 +111,20 @@ internal fun PlannerAgenda(
         }
         item("day") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                MaterialText(date.format(uiDateFormatter("MMM d · EEEE", "M月d日 · EEEE")),
+                MaterialText(contentDate.format(uiDateFormatter("MMM d · EEEE", "M月d日 · EEEE")),
                     style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                    if (state.isLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                }
                 if (filter == AgendaFilter.MOCHI) TextButton(onClick = { managing = true }) { Text("Manage all tasks") }
             }
         }
         state.errorMessage?.let { error -> item("error") { MaterialText(error, color = MaterialTheme.colorScheme.error) } }
-        if (state.isLoading) item("loading") { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-        else {
-            if (filter == AgendaFilter.JOURNAL || (filter == AgendaFilter.ALL && date < today)) {
-                item("journal") { journalDay(date, filter == AgendaFilter.JOURNAL) }
+        if (!state.isLoading || state.date != null) {
+            if (filter == AgendaFilter.JOURNAL || (filter == AgendaFilter.ALL && contentDate < today)) {
+                item("journal") { journalDay(contentDate, filter == AgendaFilter.JOURNAL) }
             }
-            if (rows.isEmpty() && filter != AgendaFilter.JOURNAL) item("empty") { AgendaEmpty("No arrangements for this day") }
+            if (rows.isEmpty() && state.errorMessage == null && filter != AgendaFilter.JOURNAL) item("empty") { AgendaEmpty("No arrangements for this day") }
             items(rows, key = { it.key }) { row ->
                 when (row) {
                     is AgendaRow.Event -> {
@@ -140,12 +143,12 @@ internal fun PlannerAgenda(
                             onEdit = { editTodo = todo; editEvent = null; userEditor = true },
                             onComplete = { onCompleteTodo(todo.id) }, highlighted = todo.id in state.highlightIds)
                     }
-                    is AgendaRow.Task -> ScheduleAgendaCard(row.value, date < today,
+                    is AgendaRow.Task -> ScheduleAgendaCard(row.value, contentDate < today,
                         onDetails = { details = row.value },
                         onAction = {
                             val run = row.value.runs.lastOrNull()
                             if (run != null) actions.showRun(run)
-                            else row.value.plan?.let { if (date < today) details = row.value else onRun(it.id) }
+                            else row.value.plan?.let { if (contentDate < today) details = row.value else onRun(it.id) }
                         })
                 }
             }

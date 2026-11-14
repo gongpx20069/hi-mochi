@@ -2906,6 +2906,8 @@ class MochiHomeViewModel(
                 loadWeather()
                 return
             }
+            MochiSurface.Today, is MochiSurface.CalendarDay, is MochiSurface.CalendarMonth ->
+                mutablePlannerState.update { it.copy(isLoading = true, errorMessage = null) }
             else -> mutablePlannerState.value = PlannerSurfaceState(
                 isLoading = true,
                 date = target.selectedDate(),

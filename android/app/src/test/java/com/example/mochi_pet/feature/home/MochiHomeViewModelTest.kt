@@ -515,6 +515,53 @@ class MochiHomeViewModelTest {
     }
 
     @Test
+    fun `date changes retain the dated snapshot and ignore superseded loads`() {
+        val date = LocalDate.now(fixedClock())
+        val next = date.plusDays(1)
+        val latest = date.plusDays(2)
+        val firstTodo = todo(date).copy(id = "first")
+        val nextTodo = todo(next).copy(id = "next")
+        val latestTodo = todo(latest).copy(id = "latest")
+        val pending = mapOf(next to CompletableDeferred<Unit>(), latest to CompletableDeferred<Unit>())
+        val store = PlannerStoreFake(todos = listOf(firstTodo, nextTodo, latestTodo),
+            beforeAgendaLoad = { pending[it]?.await() })
+        val viewModel = MochiHomeViewModel(
+            plannerStore = store, clock = fixedClock(),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowToday)
+        val original = viewModel.plannerState.value
+        viewModel.navigate(MochiNavigationIntent.ShowCalendarDay(next))
+        assertEquals(original.copy(isLoading = true), viewModel.plannerState.value)
+        viewModel.navigate(MochiNavigationIntent.ShowCalendarDay(latest))
+        assertEquals(original.copy(isLoading = true), viewModel.plannerState.value)
+        pending.getValue(latest).complete(Unit)
+        assertEquals(latest, viewModel.plannerState.value.date)
+        assertEquals(listOf(latestTodo), viewModel.plannerState.value.todos)
+        assertFalse(viewModel.plannerState.value.isLoading)
+        val completed = viewModel.plannerState.value
+        pending.getValue(next).complete(Unit)
+        assertEquals(completed, viewModel.plannerState.value)
+    }
+
+    @Test
+    fun `failed date load retains the previous date and reports the failure`() {
+        val date = LocalDate.now(fixedClock())
+        val pending = CompletableDeferred<Unit>()
+        val store = PlannerStoreFake(todos = listOf(todo(date)),
+            beforeAgendaLoad = { if (it != date) pending.await() })
+        val viewModel = MochiHomeViewModel(
+            plannerStore = store, clock = fixedClock(),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowToday)
+        val original = viewModel.plannerState.value
+        viewModel.navigate(MochiNavigationIntent.ShowCalendarDay(date.plusDays(1)))
+        pending.completeExceptionally(IllegalStateException("Synthetic planner read failure"))
+        assertEquals(original.copy(errorMessage = "Synthetic planner read failure"), viewModel.plannerState.value)
+    }
+
+    @Test
     fun `agent reply is appended and navigation is applied`() {
         val store = PlannerStoreFake()
         val repository = ProviderSettingsRepositoryFake()
@@ -1030,10 +1077,16 @@ class MochiHomeViewModelTest {
 private class PlannerStoreFake(
     private val events: List<CalendarEvent> = emptyList(),
     todos: List<MochiTodo> = emptyList(),
+    private val beforeAgendaLoad: suspend (LocalDate) -> Unit = {},
 ) : com.example.mochi_pet.core.database.TestPlannerStore() {
     private val todos = todos.toMutableList()
     var requestedTodoDate: LocalDate? = null
     val completedTodoIds = mutableListOf<String>()
+
+    override suspend fun listAgendaTodos(date: LocalDate, today: LocalDate): List<MochiTodo> {
+        beforeAgendaLoad(date)
+        return super.listAgendaTodos(date, today)
+    }
 
     override suspend fun listCalendarEvents(
         rangeStart: Instant,

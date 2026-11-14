@@ -372,6 +372,11 @@ All paths update the same `MochiSurface` state used by voice.
 
 Planner's bottom label is **日程** in Chinese. Today, month and date voice
 destinations render the same agenda; month navigation expands its date selector.
+Date selection updates immediately, while the last loaded agenda keeps its own
+date heading and cards until the new snapshot is ready. A fixed-size progress
+indicator in that heading signals loading without removing or shifting the list.
+Only the latest selection may replace the snapshot; failures retain the dated
+content with an explicit error, never presenting old entries under a new date.
 A return-to-today shortcut appears only away from today. All/My schedule/Mochi
 tasks/Journal chips filter the selected date, and a single New button opens a
 two-choice sheet. A secondary-text hint below its choices explains that users
