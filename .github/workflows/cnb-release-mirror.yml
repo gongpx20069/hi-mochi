@@ -1,0 +1,46 @@
+name: Mirror Android Release to CNB
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable GitHub release tag (v1.0.x)
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      CNB_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnb-release-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check mirror tooling
+        shell: pwsh
+        run: ./scripts/Test-CnbAndroidRelease.ps1
+
+      - name: Mirror and verify published APKs
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
+          CNB_REPOSITORY: ${{ vars.CNB_REPOSITORY }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: ./scripts/Publish-CnbAndroidRelease.ps1 -Tag $env:RELEASE_TAG

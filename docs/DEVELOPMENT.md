@@ -589,6 +589,54 @@ stops allocation rather than guessing a version. Run
 access. Git transfers use a bounded low-speed timeout; configure `gh`
 authentication as above before relying on the API fallback.
 
+### Optional CNB download mirror
+
+GitHub remains the canonical signed release publisher. The optional CNB mirror
+copies the published ARM64 APK, all three official extension APKs, and the
+original SHA-256 manifest without rebuilding or resigning anything. Other
+ABIs remain on GitHub. App update and website download URLs are unchanged.
+
+Create a dedicated public repository at `https://cnb.cool/`. Configure GitHub
+**Settings > Secrets and variables > Actions**:
+
+- Repository variable `CNB_REPOSITORY`: the path `organization/hi-mochi`,
+  without a URL scheme or `.git` suffix.
+- Repository secret `CNB_TOKEN`: a CNB access token restricted to that repository,
+  with code read/write, `repo-basic-info:r`, and `repo-release:rw` permissions.
+  Never put this token in an APK, public download URL, source file, or chat.
+
+Run **Actions > Mirror Android Release to CNB > Run workflow** with an already
+published stable tag, such as `v1.0.22`, for the initial verification or a retry.
+Once the variable is configured, Manual Android Release invokes the same mirror
+workflow after GitHub publication. A missing/expired token or mirror failure
+fails the mirror job visibly; it does not remove or roll back the GitHub Release.
+Locally published GitHub releases can be mirrored using the manual workflow.
+
+The mirror pushes only the original source tag (never force-pushes), starts new
+releases as drafts, uploads missing assets without overwriting, then downloads
+and verifies every draft asset before publication. It downloads every published
+mirror file again anonymously and verifies its full size and SHA-256 against
+GitHub metadata and the original checksum manifest. Public verification
+necessarily follows publication: a failed check leaves the CNB release in place
+for diagnosis and fails the job, without reporting the mirror as verified.
+Conflicting assets or incomplete already-published releases require manual
+investigation, not automatic replacement. Temporary downloads are removed on
+normal success/failure; hosted runners are disposable if a job is cancelled.
+
+Use a dedicated CNB organization and do not bind a paid Tencent Cloud budget.
+CNB currently includes 100 GiB of object storage; this is an allowance, not an
+unlimited free CDN guarantee. The script additionally stops before the mirror's
+release attachments plus the incoming batch exceed 20 GiB. This conservative
+check is not an organization-wide billing meter and does not count other
+repositories, Git, LFS, or build use. No old releases are deleted automatically.
+See [CNB pricing](https://docs.cnb.cool/zh/pricing.html) and
+[public download permissions](https://docs.cnb.cool/zh/guide/role-permissions.html).
+
+Run `.\scripts\Test-CnbAndroidRelease.ps1` with PowerShell 7 for deterministic,
+offline contract checks. Real acceptance additionally requires a user-owned CNB
+repository/token and a successful complete anonymous download of the mirrored
+Mochi release; a fixture test or unrelated public download is not that acceptance.
+
 ### WebDAV acceptance
 
 Run `:extensions:webdav:testDebugUnitTest :extensions:webdav:lintDebug

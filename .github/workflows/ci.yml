@@ -10,6 +10,17 @@ permissions:
   contents: read
 
 jobs:
+  release-tooling:
+    name: Release Tooling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check release scripts
+        shell: pwsh
+        run: |
+          ./scripts/Test-AndroidReleaseVersion.ps1
+          ./scripts/Test-CnbAndroidRelease.ps1
+
   android-native:
     name: Native Android Verification
     runs-on: ubuntu-latest

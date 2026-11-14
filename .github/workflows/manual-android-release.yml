@@ -13,6 +13,8 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     defaults:
       run:
         working-directory: android
@@ -148,3 +150,12 @@ jobs:
             --title "Mochi $VERSION" \
             --notes "$notes" \
             --generate-notes
+
+  mirror-cnb:
+    needs: release
+    if: ${{ vars.CNB_REPOSITORY != '' }}
+    uses: ./.github/workflows/cnb-release-mirror.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets:
+      CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
