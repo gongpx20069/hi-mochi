@@ -130,6 +130,7 @@ try {
     foreach ($name in $environmentNames) {
         $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
     }
+    $savedExitCode = Get-Variable LASTEXITCODE -Scope Global -ValueOnly -ErrorAction SilentlyContinue
     $script:pushExit = 0
     function git {
         $global:LASTEXITCODE = 0
@@ -158,6 +159,7 @@ try {
         Assert-Equal $env:GIT_CONFIG_VALUE_0 'test-original-value'
     } finally {
         Remove-Item Function:git
+        $global:LASTEXITCODE = $savedExitCode
         foreach ($name in $environmentNames) {
             [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process')
         }
