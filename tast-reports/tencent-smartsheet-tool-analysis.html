@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>为什么一个腾讯智能表工具需要 35 KB？ · Mochi 诊断报告</title>
+  <style>
+    :root{--ink:#17233b;--muted:#59677c;--blue:#2456bd;--line:#dce4ee;--paper:#fff;--wash:#f3f6fb;--teal:#127c77}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--wash);color:var(--ink);font:16px/1.8 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+    a{color:var(--blue);text-underline-offset:3px}a:focus-visible,summary:focus-visible{outline:3px solid var(--teal);outline-offset:4px}
+    .wrap{max-width:1120px;margin:auto;padding:40px 24px 72px}.eyebrow{color:var(--blue);font-size:.8rem;font-weight:750;letter-spacing:.14em}
+    header{padding:28px 0 34px}h1{font-size:clamp(2rem,4.2vw,3.5rem);line-height:1.2;letter-spacing:-.045em;margin:16px 0 22px}
+    h2{font-size:1.6rem;line-height:1.4;margin:0 0 20px}h3{font-size:1.1rem;margin:22px 0 10px}p{margin:10px 0}.lede{font-size:1.12rem;max-width:870px}.muted,small{color:var(--muted)}
+    nav{display:flex;gap:12px 24px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)}
+    section{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:28px;margin:22px 0;scroll-margin-top:20px}
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.stat{border:1px solid var(--line);border-radius:14px;padding:20px;background:white}
+    .stat strong{display:block;font-size:1.9rem;line-height:1.25;font-variant-numeric:tabular-nums}.stat span{color:var(--muted);font-size:.88rem}
+    .note{border-left:4px solid var(--blue);padding:12px 18px;background:#eef4ff;border-radius:0 10px 10px 0}.caution{border-color:#aa6b12;background:#fff7e9}
+    .table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#f5f8fd}td.num{white-space:nowrap;font-variant-numeric:tabular-nums}
+    code,pre{font-family:ui-monospace,"Cascadia Code",Consolas,monospace}code{font-size:.88em;overflow-wrap:anywhere}pre{font-size:.83rem;line-height:1.65;background:#142035;color:#e4edf9;padding:20px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2}
+    details{border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:14px 0}summary{cursor:pointer;font-weight:650}details pre{max-height:680px;overflow:auto}
+    .bar{display:flex;height:36px;border-radius:8px;overflow:hidden;margin:18px 0 8px;background:#dce4ee}.bar .descriptions{width:74.31%;background:var(--blue)}.bar .structure{flex:1;background:#74b9b5}.legend{display:flex;gap:22px;flex-wrap:wrap;font-size:.9rem}
+    .tree{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}.branch{padding:16px;background:#f5f8fd;border:1px solid var(--line);border-radius:12px}.branch strong{display:block;color:var(--blue)}
+    ul,ol{padding-left:24px}.badge{display:inline-block;border-radius:99px;padding:2px 10px;background:#e7f5f2;color:#136553;font-size:.78rem;font-weight:700}
+    footer{font-size:.86rem;color:var(--muted);padding-top:18px}#full-schema pre{max-height:900px}
+    @media(max-width:720px){.wrap{padding:20px 14px 44px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tree{grid-template-columns:1fr}section{padding:20px 16px}.stat{padding:16px}.stat strong{font-size:1.55rem}th,td{padding:10px}}
+    @media print{body{background:white}.wrap{max-width:none;padding:0}section{break-inside:avoid;border-radius:0}nav{display:none}pre{background:#f3f5f8;color:#17233b}details pre{max-height:none}a{color:inherit}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="eyebrow">MOCHI / TOOL PAYLOAD DIAGNOSTICS / 2026-11-15</div>
+    <h1>为什么一个「新增字段」工具，<br>需要约 35 KB 的定义？</h1>
+    <p class="lede"><strong>不是工具名字或一句说明很长，而是把 24 种列类型的完整参数说明，以及公式、查找引用的嵌套格式设置，全部一次性交给模型。</strong>其中大量说明和类型配置重复展开。对一个购物请求来说，这些表格编辑细节完全没有必要提前出现。</p>
+    <p class="muted">对象：<code>tencent_docs_smartsheet_add_fields</code> · MCP 原名：<code>smartsheet.add_fields</code> · 取自当前手机的工具定义缓存，未执行新增字段操作。</p>
+    <nav aria-label="报告目录">
+      <a href="#summary">体积拆解</a><a href="#structure">为什么这么大</a><a href="#examples">真实内容摘录</a>
+      <a href="#impact">对超时的影响</a><a href="#recommendation">正确的优化方向</a><a href="#full-schema">完整定义</a><a href="#method">测量口径</a>
+    </nav>
+  </header>
+
+  <div class="grid" aria-label="关键测量结果">
+    <div class="stat"><strong>34,925 B</strong><span>单个工具紧凑 JSON，约 34.93 KB</span></div>
+    <div class="stat"><strong>223</strong><span>description 字段，121 种不同文本</span></div>
+    <div class="stat"><strong>74.3%</strong><span>说明字段及其 JSON 包装占比</span></div>
+    <div class="stat"><strong>24 种</strong><span>field_type 枚举中的列类型</span></div>
+  </div>
+
+  <section id="summary">
+    <h2>01 · 35 KB 到底花在哪里？</h2>
+    <p>工具最外层的英文说明只有 <strong>53 个 UTF-8 字节</strong>（加 JSON 引号为 55 字节）。真正的大头是 <code>parameters.fields.items</code> 中的各类列属性。</p>
+    <div class="bar" role="img" aria-label="说明字段及包装占 74.31%，剩余结构占 25.69%"><span class="descriptions"></span><span class="structure"></span></div>
+    <div class="legend"><span>■ 说明字段及包装：25,953 B</span><span>■ 删除所有说明后剩余结构：8,972 B</span></div>
+    <div class="table-scroll">
+      <table>
+        <caption>实际 schema 子树大小（紧凑 UTF-8 JSON）</caption>
+        <thead><tr><th scope="col">内容</th><th scope="col">大小</th><th scope="col">含义</th></tr></thead>
+        <tbody>
+          <tr><td><code>property_lookup</code></td><td class="num">13,148 B</td><td>查找引用：筛选条件、汇总方式、关联字段、结果展示格式。</td></tr>
+          <tr><td><code>property_formula</code></td><td class="num">9,990 B</td><td>公式：表达式、字段引用，以及又一套结果展示格式。</td></tr>
+          <tr><td><code>field_type</code></td><td class="num">1,586 B</td><td>24 个枚举值与长说明，包含 C/B 端成员列差异及错误提示。</td></tr>
+          <tr><td>其余结构、属性、说明和包装</td><td class="num">10,201 B</td><td>货币、日期、多选、勾选、编号等其他配置，以及 JSON 键名和分隔符。</td></tr>
+          <tr><th scope="row">合计</th><td class="num"><strong>34,925 B</strong></td><td>公式与查找引用两块本身就占约 <strong>66.3%</strong>。</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">说明字段占比和子树占比是两种不同切法，存在交叉，不能相加。删除说明的结果只是体积分析，不是建议直接删除这些约束。</p>
+  </section>
+
+  <section id="structure">
+    <h2>02 · 膨胀来自「多类型全集 + 嵌套重复」</h2>
+    <p>它不是一个仅接收「列名」的简单工具，而是一个能创建多种复杂列的通用接口。即使用户只要新增一列文本，模型也会先收到公式、货币、日期、查找引用、关联记录等完整定义。</p>
+    <div class="tree">
+      <div class="branch"><strong>普通字段配置</strong><code>fields.items.properties</code><p>展开数字、货币、日期、成员、多选等 <code>property_*</code> 结构。</p></div>
+      <div class="branch"><strong>公式结果格式</strong><code>property_formula.formatter</code><p>为了描述公式结果怎样显示，再展开一组类似属性。仅 formatter 就有 <strong>9,201 B</strong>。</p></div>
+      <div class="branch"><strong>查找结果格式</strong><code>property_lookup.formatter</code><p>查找结果同样需要展示格式，再展开一次。该 formatter 为 <strong>9,057 B</strong>。</p></div>
+    </div>
+    <p>例如 <code>currency_type</code> 的货币枚举说明、日期格式说明、数字精度说明，会在普通列、公式格式和查找格式中重复出现。三个 formatter 并非字节级完全相同，不能直接把其中一份删掉。</p>
+    <p>一共出现 <strong>223 个 description</strong>，但只有 <strong>121 种不同文本</strong>；重复出现的说明有 102 处。模型不仅要接收 JSON 结构，还要阅读大量同义的使用规则。</p>
+    <div class="note">中文通常每个汉字占 3 个 UTF-8 字节；但 <strong>字节数不是 token 数</strong>。不能把这里的 34,925 B 当成 34,925 tokens，也不能把整个请求的 27,090 tokens 都算在这个工具上。</div>
+  </section>
+
+  <section id="examples">
+    <h2>03 · 真实内容是什么样的？</h2>
+    <p>下面直接展示缓存定义里的字段，没有编造示例值，也没有真实表格内容。第一项仅 <code>description</code> 文本就占 <strong>1,268 B</strong>。</p>
+    <details open><summary>列类型定义：field_type（完整原文）</summary><pre>{
+  &quot;description&quot;: &quot;字段类型。add_fields 时必传且必须同时传入对应 property（如 number 传 property_number）。⚠️ 修改已有列的类型请优先使用 update_field_type 工具（更简单：只需 target_type + 可选 extra，后端自动补 property、自动兜底 field_title、自动处理成员列 C 端 property_user_c 等），本工具的 field_type 仅建议用于 add_fields 或批量重命名场景。成员列：MCP 枚举只有 user；传 property_user 走 B 端，传 property_user_c 走 C 端（本服务为 C 端部署，务必传 property_user_c，否则 22044 &#x27;Smartsheet invalid user field&#x27;——文案字面值漏了字母 C，实际是 UserC 校验失败）。枚举：text-文本，number-数字，checkbox-复选框，dateTime-日期，image-图片，attachment-附件，url-超链接，select-多选，createdUser-创建人，modifiedUser-最后编辑人，createdTime-创建时间，modifiedTime-最后编辑时间，progress-进度，phoneNumber-电话，email-邮件，singleSelect-单选，reference-关联，twoWayLinkRecords-双向关联，autoNumber-自动编号，currency-货币，percentage-百分比，formula-公式，lookup-查找引用，user-成员(本服务配 property_user_c)，wwgroup-企业群(B 端 本环境不可用)&quot;,
+  &quot;enum&quot;: [
+    &quot;text&quot;,
+    &quot;number&quot;,
+    &quot;checkbox&quot;,
+    &quot;dateTime&quot;,
+    &quot;image&quot;,
+    &quot;attachment&quot;,
+    &quot;url&quot;,
+    &quot;select&quot;,
+    &quot;createdUser&quot;,
+    &quot;modifiedUser&quot;,
+    &quot;createdTime&quot;,
+    &quot;modifiedTime&quot;,
+    &quot;progress&quot;,
+    &quot;phoneNumber&quot;,
+    &quot;email&quot;,
+    &quot;singleSelect&quot;,
+    &quot;reference&quot;,
+    &quot;twoWayLinkRecords&quot;,
+    &quot;autoNumber&quot;,
+    &quot;currency&quot;,
+    &quot;percentage&quot;,
+    &quot;formula&quot;,
+    &quot;lookup&quot;,
+    &quot;user&quot;
+  ],
+  &quot;type&quot;: &quot;string&quot;
+}</pre></details>
+    <details><summary>货币属性：property_currency（完整子树；类似内容重复出现在 formatter 中）</summary><pre>{
+  &quot;description&quot;: &quot;货币类型的字段属性，包含货币种类和小数位数配置&quot;,
+  &quot;properties&quot;: {
+    &quot;currency_type&quot;: {
+      &quot;description&quot;: &quot;货币类型，枚举值：1-CNY人民币，2-USD美元，3-EUR欧元，4-GBP英镑，5-JPY日元，6-KRW韩元，7-HKD港元，8-MOP澳门元，9-TWD台币，10-AED迪拉姆，11-AUD澳元，12-BRL巴西雷亚尔，13-CAD加元，14-CHF瑞士法郎，15-IDR印尼盾，16-INR印度卢比，17-MXN墨西哥比索，18-MYR马来西亚林吉特，19-PHP菲律宾比索，20-PLN波兰兹罗提，21-RUB俄罗斯卢布，22-SGD新加坡元，23-THB泰铢，24-TRY土耳其里拉，25-VND越南盾&quot;,
+      &quot;type&quot;: &quot;integer&quot;
+    },
+    &quot;decimal_places&quot;: {
+      &quot;description&quot;: &quot;小数位数，范围0-4&quot;,
+      &quot;type&quot;: &quot;integer&quot;
+    },
+    &quot;use_separate&quot;: {
+      &quot;description&quot;: &quot;是否使用千位符&quot;,
+      &quot;type&quot;: &quot;boolean&quot;
+    }
+  },
+  &quot;type&quot;: &quot;object&quot;
+}</pre></details>
+    <details><summary>公式展示格式说明（原文，不含其庞大的属性子树）</summary><pre>展示格式设置，用于设置公式计算结果的展示格式，展示格式的类型不一定与计算结果类型一致。可选，不填则由系统自动推断格式。填写时必须同时设置 formatter.type(字段名就是 type，不是 formatter_type) 和与之匹配的 property_xxx，例如展示为人民币金额：{&quot;type&quot;: 26, &quot;property_currency&quot;: {&quot;currency_type&quot;: 1, &quot;decimal_places&quot;: 2, &quot;use_separate&quot;: true}}；只填 property_xxx 而漏填 type 会被服务端拒绝</pre></details>
+    <p class="note caution">这些说明里确实有重要契约，例如成员列必须匹配 C 端属性、某些更新会整块替换配置。<strong>随意截断描述，可能使工具更省 token，却更容易误操作。</strong></p>
+  </section>
+
+  <section id="impact">
+    <h2>04 · 它怎样放大了这次超时风险？</h2>
+    <p>单个工具约占当次 135 KB 请求的 <strong>25.8%</strong>。问题不在于它执行慢：发生超时的第一轮还没有调用任何工具，而是模型请求提前携带了全部 <strong>77 个</strong>工具定义。</p>
+    <div class="table-scroll">
+      <table>
+        <caption>当晚同一条 HTTP/2 连接上的无副作用对照</caption>
+        <thead><tr><th scope="col">请求配置</th><th scope="col">请求 / 响应</th><th scope="col">输入 tokens</th><th scope="col">两次完成时间</th></tr></thead>
+        <tbody>
+          <tr><td>全部 77 个工具</td><td class="num">135,408 / 248,595 B</td><td class="num">27,090</td><td class="num">10.904 / 8.136 秒</td></tr>
+          <tr><td>仅前 5 个工具（诊断对照）</td><td class="num">10,400 / 10,899 B</td><td class="num">2,046</td><td class="num">3.987 / 2.968 秒</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Azure Responses 的返回对象还带有 <code>tools</code> 字段，回显工具定义。成功样本中，该字段压成紧凑 JSON 仍有 <strong>130,734 B</strong>；实际 <code>output</code> 仅 <strong>309 B</strong>，没有加密推理内容。原始回包还包含空白格式和其他元数据，所以总量达到约 249 KB。</p>
+    <p>另外复现了 TCP 建连耗时约 15.5 秒，以及已经收到 HTTP 200、但响应正文在第 20 秒仍未下载完成的情况。<strong>网络抖动与大回包叠加</strong>，可以解释服务端成功而手机超时；不能把全部责任归于这个单独工具。</p>
+    <p class="muted">5 个工具仅用于隔离体积因素，不代表已经具备完成购物任务所需的能力。以上不是网络稳定性的长期统计，也不是证明所有 77 工具请求必然超时。</p>
+  </section>
+
+  <section id="recommendation">
+    <h2>05 · 更合适的处理方式</h2>
+    <ol>
+      <li><strong>先发现能力，再加载完整工具定义。</strong>购物阶段只需相关的浏览器、搜索或购物能力，不应预先加载腾讯智能表新增字段的全部参数。</li>
+      <li><strong>Skill 与 Tool 分开做渐进式披露。</strong>Skill 先暴露名称和用途，选中后读完整操作说明；Tool 先提供可检索的能力目录，选中后再给模型完整 schema。</li>
+      <li><strong>完整校验契约保留在本地。</strong>不要通过截断 schema、删除必填项或丢弃错误约束来压缩请求；模型看到的简化入口也必须有可靠的参数验证与精确定向。</li>
+      <li><strong>谨慎评估结构去重。</strong><code>$defs/$ref</code>、拆分按列类型的工具、精简重复说明可能进一步减重，但必须验证所用模型 API 的 schema 兼容性；它们不是零风险的自动替换。</li>
+    </ol>
+    <p class="note">本报告只解释现状及优化方向：没有调整工具开关、没有缩短真实 schema、没有修改 20 秒限制，也没有执行任何智能表写操作。</p>
+    <p>后续调研：<a href="codex-claude-progressive-disclosure.html">Codex 与 Claude Code 如何处理大量 Tools / Skills：渐进式披露、工具搜索与 Mochi 的缺口</a>。</p>
+  </section>
+
+  <section id="full-schema">
+    <h2>06 · 完整工具定义</h2>
+    <p><span class="badge">完整内容 · 未截断</span> 下面是 Mochi 的通用 function-tool 包装，可展开后用浏览器查找。排版增加的缩进和换行不计入上文 34,925 B。</p>
+    <details><summary>展开完整 JSON：tencent_docs_smartsheet_add_fields</summary><pre id="schema-json">{
+  &quot;type&quot;: &quot;function&quot;,
+  &quot;function&quot;: {
+    &quot;name&quot;: &quot;tencent_docs_smartsheet_add_fields&quot;,
+    &quot;description&quot;: &quot;Use the Tencent Docs smartsheet add fields operation.&quot;,
+    &quot;parameters&quot;: {
+      &quot;properties&quot;: {
+        &quot;fields&quot;: {
+          &quot;description&quot;: &quot;要添加的字段的具体内容组成的数组&quot;,
+          &quot;items&quot;: {
+            &quot;properties&quot;: {
+              &quot;before_field_id&quot;: {
+                &quot;description&quot;: &quot;可选。仅 add_fields 生效：插入到该 field_id 之前；省略则追加到列末尾。批量添加时，相同 before_field_id 的多个字段按数组顺序连续插在锚点前。须先通过 list_fields 取得目标 field_id。update_fields 忽略此字段。&quot;,
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;field_id&quot;: {
+                &quot;description&quot;: &quot;字段 ID，更新字段属性时需要填写该字段，但字段 ID 不能被更新&quot;,
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;field_title&quot;: {
+                &quot;description&quot;: &quot;需要更新为的字段标题&quot;,
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;field_type&quot;: {
+                &quot;description&quot;: &quot;字段类型。add_fields 时必传且必须同时传入对应 property（如 number 传 property_number）。⚠️ 修改已有列的类型请优先使用 update_field_type 工具（更简单：只需 target_type + 可选 extra，后端自动补 property、自动兜底 field_title、自动处理成员列 C 端 property_user_c 等），本工具的 field_type 仅建议用于 add_fields 或批量重命名场景。成员列：MCP 枚举只有 user；传 property_user 走 B 端，传 property_user_c 走 C 端（本服务为 C 端部署，务必传 property_user_c，否则 22044 &#x27;Smartsheet invalid user field&#x27;——文案字面值漏了字母 C，实际是 UserC 校验失败）。枚举：text-文本，number-数字，checkbox-复选框，dateTime-日期，image-图片，attachment-附件，url-超链接，select-多选，createdUser-创建人，modifiedUser-最后编辑人，createdTime-创建时间，modifiedTime-最后编辑时间，progress-进度，phoneNumber-电话，email-邮件，singleSelect-单选，reference-关联，twoWayLinkRecords-双向关联，autoNumber-自动编号，currency-货币，percentage-百分比，formula-公式，lookup-查找引用，user-成员(本服务配 property_user_c)，wwgroup-企业群(B 端 本环境不可用)&quot;,
+                &quot;enum&quot;: [
+                  &quot;text&quot;,
+                  &quot;number&quot;,
+                  &quot;checkbox&quot;,
+                  &quot;dateTime&quot;,
+                  &quot;image&quot;,
+                  &quot;attachment&quot;,
+                  &quot;url&quot;,
+                  &quot;select&quot;,
+                  &quot;createdUser&quot;,
+                  &quot;modifiedUser&quot;,
+                  &quot;createdTime&quot;,
+                  &quot;modifiedTime&quot;,
+                  &quot;progress&quot;,
+                  &quot;phoneNumber&quot;,
+                  &quot;email&quot;,
+                  &quot;singleSelect&quot;,
+                  &quot;reference&quot;,
+                  &quot;twoWayLinkRecords&quot;,
+                  &quot;autoNumber&quot;,
+                  &quot;currency&quot;,
+                  &quot;percentage&quot;,
+                  &quot;formula&quot;,
+                  &quot;lookup&quot;,
+                  &quot;user&quot;
+                ],
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;property_attachment&quot;: {
+                &quot;description&quot;: &quot;附件类型的字段属性，附件类型字段不需要额外的配置属性&quot;,
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_auto_number&quot;: {
+                &quot;description&quot;: &quot;自动编号类型的字段属性，包含编号类型和自定义规则配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;rules&quot;: {
+                    &quot;description&quot;: &quot;自定义规则列表，type为2时生效&quot;,
+                    &quot;items&quot;: {
+                      &quot;properties&quot;: {
+                        &quot;type&quot;: {
+                          &quot;description&quot;: &quot;规则类型，枚举值：1-自增ID，2-固定字符，3-创建时间&quot;,
+                          &quot;type&quot;: &quot;integer&quot;
+                        },
+                        &quot;value&quot;: {
+                          &quot;description&quot;: &quot;规则值，存放创建时间格式或固定字符，自增数字位数&quot;,
+                          &quot;type&quot;: &quot;string&quot;
+                        }
+                      },
+                      &quot;type&quot;: &quot;object&quot;
+                    },
+                    &quot;type&quot;: &quot;array&quot;
+                  },
+                  &quot;type&quot;: {
+                    &quot;description&quot;: &quot;编号类型，枚举值：1-自增数字类型，2-自定义类型&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_checkbox&quot;: {
+                &quot;description&quot;: &quot;复选框类型的字段属性，包含默认勾选状态配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;checked&quot;: {
+                    &quot;description&quot;: &quot;新增时是否默认勾选&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;icon_config&quot;: {
+                    &quot;description&quot;: &quot;勾选方块的外观样式（图标形状与颜色），省略表示不设置。update_fields 为整块替换：若只想改其他属性又想保留已有样式，需原样回传 list_fields 返回的 icon_config&quot;,
+                    &quot;properties&quot;: {
+                      &quot;style&quot;: {
+                        &quot;description&quot;: &quot;图标颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色；0-不设置&quot;,
+                        &quot;type&quot;: &quot;integer&quot;
+                      },
+                      &quot;type&quot;: {
+                        &quot;description&quot;: &quot;图标形状，枚举值：1-对勾，2-叉，3-星形，4-爱心，5-图钉，6-旗帜；0-不设置&quot;,
+                        &quot;type&quot;: &quot;integer&quot;
+                      }
+                    },
+                    &quot;type&quot;: &quot;object&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_created_time&quot;: {
+                &quot;description&quot;: &quot;创建时间类型的字段属性，包含时间格式配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;format&quot;: {
+                    &quot;description&quot;: &quot;创建时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_created_user&quot;: {
+                &quot;description&quot;: &quot;创建人类型的字段属性，创建人类型字段不需要额外的配置属性&quot;,
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_currency&quot;: {
+                &quot;description&quot;: &quot;货币类型的字段属性，包含货币种类和小数位数配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;currency_type&quot;: {
+                    &quot;description&quot;: &quot;货币类型，枚举值：1-CNY人民币，2-USD美元，3-EUR欧元，4-GBP英镑，5-JPY日元，6-KRW韩元，7-HKD港元，8-MOP澳门元，9-TWD台币，10-AED迪拉姆，11-AUD澳元，12-BRL巴西雷亚尔，13-CAD加元，14-CHF瑞士法郎，15-IDR印尼盾，16-INR印度卢比，17-MXN墨西哥比索，18-MYR马来西亚林吉特，19-PHP菲律宾比索，20-PLN波兰兹罗提，21-RUB俄罗斯卢布，22-SGD新加坡元，23-THB泰铢，24-TRY土耳其里拉，25-VND越南盾&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  },
+                  &quot;decimal_places&quot;: {
+                    &quot;description&quot;: &quot;小数位数，范围0-4&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  },
+                  &quot;use_separate&quot;: {
+                    &quot;description&quot;: &quot;是否使用千位符&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_date_time&quot;: {
+                &quot;description&quot;: &quot;日期时间类型的字段属性，包含格式和自动填充配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;auto_fill&quot;: {
+                    &quot;description&quot;: &quot;新建记录时，是否自动填充时间&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;format&quot;: {
+                    &quot;description&quot;: &quot;日期时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_email&quot;: {
+                &quot;description&quot;: &quot;邮件类型的字段属性，邮件类型字段不需要额外的配置属性&quot;,
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_formula&quot;: {
+                &quot;description&quot;: &quot;公式类型的字段属性，包含公式表达式模型和展示格式配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;formatter&quot;: {
+                    &quot;description&quot;: &quot;展示格式设置，用于设置公式计算结果的展示格式，展示格式的类型不一定与计算结果类型一致。可选，不填则由系统自动推断格式。填写时必须同时设置 formatter.type(字段名就是 type，不是 formatter_type) 和与之匹配的 property_xxx，例如展示为人民币金额：{\&quot;type\&quot;: 26, \&quot;property_currency\&quot;: {\&quot;currency_type\&quot;: 1, \&quot;decimal_places\&quot;: 2, \&quot;use_separate\&quot;: true}}；只填 property_xxx 而漏填 type 会被服务端拒绝&quot;,
+                    &quot;properties&quot;: {
+                      &quot;property_auto_number&quot;: {
+                        &quot;description&quot;: &quot;自动编号类型的展示格式属性，包含编号类型和自定义规则配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;rules&quot;: {
+                            &quot;description&quot;: &quot;自定义规则列表，type为2时生效&quot;,
+                            &quot;items&quot;: {
+                              &quot;properties&quot;: {
+                                &quot;type&quot;: {
+                                  &quot;description&quot;: &quot;规则类型，枚举值：1-自增ID，2-固定字符，3-创建时间&quot;,
+                                  &quot;type&quot;: &quot;integer&quot;
+                                },
+                                &quot;value&quot;: {
+                                  &quot;description&quot;: &quot;规则值，存放创建时间格式或固定字符，自增数字位数&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                }
+                              },
+                              &quot;type&quot;: &quot;object&quot;
+                            },
+                            &quot;type&quot;: &quot;array&quot;
+                          },
+                          &quot;type&quot;: {
+                            &quot;description&quot;: &quot;编号类型，枚举值：1-自增数字类型，2-自定义类型&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_checkbox&quot;: {
+                        &quot;description&quot;: &quot;复选框类型的展示格式属性，包含默认勾选状态配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;checked&quot;: {
+                            &quot;description&quot;: &quot;新增时是否默认勾选&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;icon_config&quot;: {
+                            &quot;description&quot;: &quot;勾选方块的外观样式（图标形状与颜色），省略表示不设置。update_fields 为整块替换：若只想改其他属性又想保留已有样式，需原样回传 list_fields 返回的 icon_config&quot;,
+                            &quot;properties&quot;: {
+                              &quot;style&quot;: {
+                                &quot;description&quot;: &quot;图标颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色；0-不设置&quot;,
+                                &quot;type&quot;: &quot;integer&quot;
+                              },
+                              &quot;type&quot;: {
+                                &quot;description&quot;: &quot;图标形状，枚举值：1-对勾，2-叉，3-星形，4-爱心，5-图钉，6-旗帜；0-不设置&quot;,
+                                &quot;type&quot;: &quot;integer&quot;
+                              }
+                            },
+                            &quot;type&quot;: &quot;object&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_created_time&quot;: {
+                        &quot;description&quot;: &quot;创建时间类型的展示格式属性，包含时间格式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;format&quot;: {
+                            &quot;description&quot;: &quot;创建时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_created_user&quot;: {
+                        &quot;description&quot;: &quot;创建人类型的展示格式属性，创建人类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_currency&quot;: {
+                        &quot;description&quot;: &quot;货币类型的展示格式属性，包含货币种类和小数位数配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;currency_type&quot;: {
+                            &quot;description&quot;: &quot;货币类型，枚举值：1-CNY人民币，2-USD美元，3-EUR欧元，4-GBP英镑，5-JPY日元，6-KRW韩元，7-HKD港元，8-MOP澳门元，9-TWD台币，10-AED迪拉姆，11-AUD澳元，12-BRL巴西雷亚尔，13-CAD加元，14-CHF瑞士法郎，15-IDR印尼盾，16-INR印度卢比，17-MXN墨西哥比索，18-MYR马来西亚林吉特，19-PHP菲律宾比索，20-PLN波兰兹罗提，21-RUB俄罗斯卢布，22-SGD新加坡元，23-THB泰铢，24-TRY土耳其里拉，25-VND越南盾&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          },
+                          &quot;decimal_places&quot;: {
+                            &quot;description&quot;: &quot;小数位数，范围0-4&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          },
+                          &quot;use_separate&quot;: {
+                            &quot;description&quot;: &quot;是否使用千位符&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_date_time&quot;: {
+                        &quot;description&quot;: &quot;日期时间类型的展示格式属性，包含格式和自动填充配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;auto_fill&quot;: {
+                            &quot;description&quot;: &quot;新建记录时，是否自动填充时间&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;format&quot;: {
+                            &quot;description&quot;: &quot;日期时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_email&quot;: {
+                        &quot;description&quot;: &quot;邮件类型的展示格式属性，邮件类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_image&quot;: {
+                        &quot;description&quot;: &quot;图片类型的展示格式属性，图片类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_modified_time&quot;: {
+                        &quot;description&quot;: &quot;最后编辑时间类型的展示格式属性，包含时间格式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;format&quot;: {
+                            &quot;description&quot;: &quot;最后编辑时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_modified_user&quot;: {
+                        &quot;description&quot;: &quot;最后编辑人类型的展示格式属性，最后编辑人类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_number&quot;: {
+                        &quot;description&quot;: &quot;数字类型的展示格式属性，包含精度和千位符等配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;decimal_places&quot;: {
+                            &quot;description&quot;: &quot;表示小数点的位数，即数字精度&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          },
+                          &quot;use_separate&quot;: {
+                            &quot;description&quot;: &quot;是否使用千位符，设置此属性后数字字段将以英文逗号分隔千分位，如 1,000&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_percentage&quot;: {
+                        &quot;description&quot;: &quot;百分比类型的展示格式属性，包含小数位数和千位符配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;decimal_places&quot;: {
+                            &quot;description&quot;: &quot;小数位数，范围-1到4&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          },
+                          &quot;use_separate&quot;: {
+                            &quot;description&quot;: &quot;是否使用千位符&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_phone_number&quot;: {
+                        &quot;description&quot;: &quot;电话类型的展示格式属性，电话类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_progress&quot;: {
+                        &quot;description&quot;: &quot;进度类型的展示格式属性，包含小数位数配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;decimal_places&quot;: {
+                            &quot;description&quot;: &quot;小数位数&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_reference&quot;: {
+                        &quot;description&quot;: &quot;关联类型的展示格式属性，包含关联子表、字段和多选配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;field_id&quot;: {
+                            &quot;description&quot;: &quot;关联的字段ID&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          },
+                          &quot;is_multiple&quot;: {
+                            &quot;description&quot;: &quot;是否允许多选&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;sub_id&quot;: {
+                            &quot;description&quot;: &quot;关联的子表ID，为空时表示关联本子表&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          },
+                          &quot;view_id&quot;: {
+                            &quot;description&quot;: &quot;关联视图ID&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_select&quot;: {
+                        &quot;description&quot;: &quot;多选类型的展示格式属性，包含选项和选择模式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;is_multiple&quot;: {
+                            &quot;description&quot;: &quot;是否多选，用户不需要设置该参数&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;is_quick_add&quot;: {
+                            &quot;description&quot;: &quot;是否允许填写时新增选项，用户不需要设置该参数&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;options&quot;: {
+                            &quot;description&quot;: &quot;多选选项的格式设置&quot;,
+                            &quot;items&quot;: {
+                              &quot;properties&quot;: {
+                                &quot;id&quot;: {
+                                  &quot;description&quot;: &quot;选项 ID&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                },
+                                &quot;style&quot;: {
+                                  &quot;description&quot;: &quot;选项颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色&quot;,
+                                  &quot;type&quot;: &quot;integer&quot;
+                                },
+                                &quot;text&quot;: {
+                                  &quot;description&quot;: &quot;要填写的选项内容&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                }
+                              },
+                              &quot;type&quot;: &quot;object&quot;
+                            },
+                            &quot;type&quot;: &quot;array&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_single_select&quot;: {
+                        &quot;description&quot;: &quot;单选类型的展示格式属性，包含选项和选择模式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;is_multiple&quot;: {
+                            &quot;description&quot;: &quot;是否多选，用户不需要设置该参数&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;is_quick_add&quot;: {
+                            &quot;description&quot;: &quot;是否允许填写时新增选项，用户不需要设置该参数&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;options&quot;: {
+                            &quot;description&quot;: &quot;单选选项的格式设置&quot;,
+                            &quot;items&quot;: {
+                              &quot;properties&quot;: {
+                                &quot;id&quot;: {
+                                  &quot;description&quot;: &quot;选项 ID&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                },
+                                &quot;style&quot;: {
+                                  &quot;description&quot;: &quot;选项颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色&quot;,
+                                  &quot;type&quot;: &quot;integer&quot;
+                                },
+                                &quot;text&quot;: {
+                                  &quot;description&quot;: &quot;要填写的选项内容&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                }
+                              },
+                              &quot;type&quot;: &quot;object&quot;
+                            },
+                            &quot;type&quot;: &quot;array&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_text&quot;: {
+                        &quot;description&quot;: &quot;文本类型的展示格式属性，文本类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_url&quot;: {
+                        &quot;description&quot;: &quot;超链接类型的展示格式属性，包含展示样式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;type&quot;: {
+                            &quot;description&quot;: &quot;超链接展示样式 枚举值：0-未知，1-文字，2-图标文字&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_user&quot;: {
+                        &quot;description&quot;: &quot;用户类型的展示格式属性，用户类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;type&quot;: {
+                        &quot;description&quot;: &quot;展示格式对应的列类型(FieldType)，必填且不能为0，它决定使用下方哪个 property 字段(如 26 对应 property_currency)。枚举值：1-文本，2-数字，3-勾选，4-日期，5-图片，7-用户，8-URL，9-多选，10-创建人，11-最后编辑人，12-创建时间，13-修改时间，14-进度，15-电话，16-邮箱，17-单选，18-引用，25-自动编号，26-货币，28-百分比。注意不能填19(公式)/20(查找引用)，展示格式本身不能再是公式或查找引用&quot;,
+                        &quot;type&quot;: &quot;integer&quot;
+                      }
+                    },
+                    &quot;type&quot;: &quot;object&quot;
+                  },
+                  &quot;formula_model&quot;: {
+                    &quot;description&quot;: &quot;公式表达式模型，由文本片段与列引用片段按顺序组成，不能为空&quot;,
+                    &quot;items&quot;: {
+                      &quot;properties&quot;: {
+                        &quot;field_id&quot;: {
+                          &quot;description&quot;: &quot;被引用的列ID，type为列引用类型时生效，必须为已存在的列&quot;,
+                          &quot;type&quot;: &quot;string&quot;
+                        },
+                        &quot;table_id&quot;: {
+                          &quot;description&quot;: &quot;被引用列所在的子表ID，为空时表示引用本子表&quot;,
+                          &quot;type&quot;: &quot;string&quot;
+                        },
+                        &quot;text&quot;: {
+                          &quot;description&quot;: &quot;文本片段内容，type为1时生效&quot;,
+                          &quot;type&quot;: &quot;string&quot;
+                        },
+                        &quot;type&quot;: {
+                          &quot;description&quot;: &quot;公式项类型，枚举值：1-文本片段，2-列引用，5-列引用(.列)，6-表.列引用，9-关联列引用&quot;,
+                          &quot;type&quot;: &quot;integer&quot;
+                        }
+                      },
+                      &quot;type&quot;: &quot;object&quot;
+                    },
+                    &quot;type&quot;: &quot;array&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_image&quot;: {
+                &quot;description&quot;: &quot;图片类型的字段属性，图片类型字段不需要额外的配置属性&quot;,
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_lookup&quot;: {
+                &quot;description&quot;: &quot;查找引用类型的字段属性，包含关联列、被查找列、统计类型和筛选配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;filter&quot;: {
+                    &quot;description&quot;: &quot;查找引用的筛选条件，仅在按条件查找(upgrade_type=1)时生效&quot;,
+                    &quot;properties&quot;: {
+                      &quot;conditions&quot;: {
+                        &quot;description&quot;: &quot;筛选条件列表&quot;,
+                        &quot;items&quot;: {
+                          &quot;properties&quot;: {
+                            &quot;condition_id&quot;: {
+                              &quot;description&quot;: &quot;条件ID，用于唯一标识一条筛选条件，同一 filter 内不能重复(如 cdt1、cdt2)；不填时由服务端按顺序自动生成&quot;,
+                              &quot;type&quot;: &quot;string&quot;
+                            },
+                            &quot;field_id&quot;: {
+                              &quot;description&quot;: &quot;筛选条件作用的列ID，必须为被查找目标表中已存在的列，不能为空&quot;,
+                              &quot;type&quot;: &quot;string&quot;
+                            },
+                            &quot;field_type&quot;: {
+                              &quot;description&quot;: &quot;列类型(FieldType)，枚举值：1-文本，2-数字，3-勾选，4-日期，8-URL，9-多选，12-创建时间，13-修改时间，14-进度，15-电话，16-邮箱，17-单选，18-引用，24-标题，28-百分比&quot;,
+                              &quot;type&quot;: &quot;integer&quot;
+                            },
+                            &quot;match_value&quot;: {
+                              &quot;description&quot;: &quot;匹配值。当 operator 为 9(为空)/10(不为空) 时无需设置；其余操作符必须设置，否则条件非法会被拒绝&quot;,
+                              &quot;properties&quot;: {
+                                &quot;computed_key_type&quot;: {
+                                  &quot;description&quot;: &quot;被比较值对应的列类型(FieldType)，与具体值比较时必填。枚举值：1-文本，2-数字，3-勾选，4-日期，8-URL，9-多选，12-创建时间，13-修改时间，14-进度，15-电话，16-邮箱，17-单选，18-引用，24-标题，28-百分比。它决定使用下方哪个 value 字段&quot;,
+                                  &quot;type&quot;: &quot;integer&quot;
+                                },
+                                &quot;field_id&quot;: {
+                                  &quot;description&quot;: &quot;与列比较时(value_type=1)生效，为被比较的目标表列ID，必须已存在&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                },
+                                &quot;value_bool&quot;: {
+                                  &quot;description&quot;: &quot;勾选类匹配值，用于勾选(3)&quot;,
+                                  &quot;type&quot;: &quot;boolean&quot;
+                                },
+                                &quot;value_date_time&quot;: {
+                                  &quot;description&quot;: &quot;日期时间类匹配值，用于日期(4)/创建时间(12)/修改时间(13)&quot;,
+                                  &quot;properties&quot;: {
+                                    &quot;timestamps&quot;: {
+                                      &quot;description&quot;: &quot;毫秒时间戳列表：type=1填1个，type=2(范围)填2个(起止时间)，相对类型(今天/本周等)可不填&quot;,
+                                      &quot;items&quot;: {
+                                        &quot;type&quot;: &quot;integer&quot;
+                                      },
+                                      &quot;type&quot;: &quot;array&quot;
+                                    },
+                                    &quot;type&quot;: {
+                                      &quot;description&quot;: &quot;日期匹配类型，枚举值：1-具体时间，2-具体时间范围，3-今天，4-明天，5-昨天，6-本周，7-上周，8-本月&quot;,
+                                      &quot;type&quot;: &quot;integer&quot;
+                                    }
+                                  },
+                                  &quot;type&quot;: &quot;object&quot;
+                                },
+                                &quot;value_number&quot;: {
+                                  &quot;description&quot;: &quot;数字类匹配值，用于数字(2)/进度(14)/百分比(28)&quot;,
+                                  &quot;type&quot;: &quot;number&quot;
+                                },
+                                &quot;value_selects&quot;: {
+                                  &quot;description&quot;: &quot;选项类匹配值，为选项ID列表，用于多选(9)/单选(17)/人员(7)/创建人(10)/修改人(11)等&quot;,
+                                  &quot;items&quot;: {
+                                    &quot;type&quot;: &quot;string&quot;
+                                  },
+                                  &quot;type&quot;: &quot;array&quot;
+                                },
+                                &quot;value_text&quot;: {
+                                  &quot;description&quot;: &quot;文本类匹配值，用于文本(1)/URL(8)/电话(15)/邮箱(16)/引用(18)/标题(24)&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                },
+                                &quot;value_type&quot;: {
+                                  &quot;description&quot;: &quot;匹配值类型，枚举值：0-与具体值比较，1-与目标表另一列比较&quot;,
+                                  &quot;type&quot;: &quot;integer&quot;
+                                }
+                              },
+                              &quot;type&quot;: &quot;object&quot;
+                            },
+                            &quot;operator&quot;: {
+                              &quot;description&quot;: &quot;筛选操作符，枚举值：1-等于，2-不等于，3-包含，4-不包含，5-大于，6-大于等于，7-小于，8-小于等于，9-为空，10-不为空。除9(为空)/10(不为空) 外，其余操作符必须同时设置 match_value&quot;,
+                              &quot;type&quot;: &quot;integer&quot;
+                            }
+                          },
+                          &quot;type&quot;: &quot;object&quot;
+                        },
+                        &quot;type&quot;: &quot;array&quot;
+                      },
+                      &quot;conjunction&quot;: {
+                        &quot;description&quot;: &quot;条件组合方式，枚举值：1-and，2-or&quot;,
+                        &quot;type&quot;: &quot;integer&quot;
+                      }
+                    },
+                    &quot;type&quot;: &quot;object&quot;
+                  },
+                  &quot;formatter&quot;: {
+                    &quot;description&quot;: &quot;统计格式设置，用于设置查找引用结果的展示格式，展示格式的类型不一定与计算结果类型一致。可选，不填则由系统自动推断格式。填写时必须同时设置 formatter.type(字段名就是 type，不是 formatter_type) 和与之匹配的 property_xxx，只填 property_xxx 而漏填 type 会被服务端拒绝&quot;,
+                    &quot;properties&quot;: {
+                      &quot;property_auto_number&quot;: {
+                        &quot;description&quot;: &quot;自动编号类型的展示格式属性，包含编号类型和自定义规则配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;rules&quot;: {
+                            &quot;description&quot;: &quot;自定义规则列表，type为2时生效&quot;,
+                            &quot;items&quot;: {
+                              &quot;properties&quot;: {
+                                &quot;type&quot;: {
+                                  &quot;description&quot;: &quot;规则类型，枚举值：1-自增ID，2-固定字符，3-创建时间&quot;,
+                                  &quot;type&quot;: &quot;integer&quot;
+                                },
+                                &quot;value&quot;: {
+                                  &quot;description&quot;: &quot;规则值，存放创建时间格式或固定字符，自增数字位数&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                }
+                              },
+                              &quot;type&quot;: &quot;object&quot;
+                            },
+                            &quot;type&quot;: &quot;array&quot;
+                          },
+                          &quot;type&quot;: {
+                            &quot;description&quot;: &quot;编号类型，枚举值：1-自增数字类型，2-自定义类型&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_checkbox&quot;: {
+                        &quot;description&quot;: &quot;复选框类型的展示格式属性，包含默认勾选状态配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;checked&quot;: {
+                            &quot;description&quot;: &quot;新增时是否默认勾选&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;icon_config&quot;: {
+                            &quot;description&quot;: &quot;勾选方块的外观样式（图标形状与颜色），省略表示不设置。update_fields 为整块替换：若只想改其他属性又想保留已有样式，需原样回传 list_fields 返回的 icon_config&quot;,
+                            &quot;properties&quot;: {
+                              &quot;style&quot;: {
+                                &quot;description&quot;: &quot;图标颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色；0-不设置&quot;,
+                                &quot;type&quot;: &quot;integer&quot;
+                              },
+                              &quot;type&quot;: {
+                                &quot;description&quot;: &quot;图标形状，枚举值：1-对勾，2-叉，3-星形，4-爱心，5-图钉，6-旗帜；0-不设置&quot;,
+                                &quot;type&quot;: &quot;integer&quot;
+                              }
+                            },
+                            &quot;type&quot;: &quot;object&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_created_time&quot;: {
+                        &quot;description&quot;: &quot;创建时间类型的展示格式属性，包含时间格式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;format&quot;: {
+                            &quot;description&quot;: &quot;创建时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_created_user&quot;: {
+                        &quot;description&quot;: &quot;创建人类型的展示格式属性，创建人类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_currency&quot;: {
+                        &quot;description&quot;: &quot;货币类型的展示格式属性，包含货币种类和小数位数配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;currency_type&quot;: {
+                            &quot;description&quot;: &quot;货币类型，枚举值：1-CNY人民币，2-USD美元，3-EUR欧元，4-GBP英镑，5-JPY日元，6-KRW韩元，7-HKD港元，8-MOP澳门元，9-TWD台币，10-AED迪拉姆，11-AUD澳元，12-BRL巴西雷亚尔，13-CAD加元，14-CHF瑞士法郎，15-IDR印尼盾，16-INR印度卢比，17-MXN墨西哥比索，18-MYR马来西亚林吉特，19-PHP菲律宾比索，20-PLN波兰兹罗提，21-RUB俄罗斯卢布，22-SGD新加坡元，23-THB泰铢，24-TRY土耳其里拉，25-VND越南盾&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          },
+                          &quot;decimal_places&quot;: {
+                            &quot;description&quot;: &quot;小数位数，范围0-4&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          },
+                          &quot;use_separate&quot;: {
+                            &quot;description&quot;: &quot;是否使用千位符&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_date_time&quot;: {
+                        &quot;description&quot;: &quot;日期时间类型的展示格式属性，包含格式和自动填充配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;auto_fill&quot;: {
+                            &quot;description&quot;: &quot;新建记录时，是否自动填充时间&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;format&quot;: {
+                            &quot;description&quot;: &quot;日期时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_email&quot;: {
+                        &quot;description&quot;: &quot;邮件类型的展示格式属性，邮件类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_image&quot;: {
+                        &quot;description&quot;: &quot;图片类型的展示格式属性，图片类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_modified_time&quot;: {
+                        &quot;description&quot;: &quot;最后编辑时间类型的展示格式属性，包含时间格式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;format&quot;: {
+                            &quot;description&quot;: &quot;最后编辑时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_modified_user&quot;: {
+                        &quot;description&quot;: &quot;最后编辑人类型的展示格式属性，最后编辑人类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_number&quot;: {
+                        &quot;description&quot;: &quot;数字类型的展示格式属性，包含精度和千位符等配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;decimal_places&quot;: {
+                            &quot;description&quot;: &quot;表示小数点的位数，即数字精度&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          },
+                          &quot;use_separate&quot;: {
+                            &quot;description&quot;: &quot;是否使用千位符，设置此属性后数字字段将以英文逗号分隔千分位，如 1,000&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_percentage&quot;: {
+                        &quot;description&quot;: &quot;百分比类型的展示格式属性，包含小数位数和千位符配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;decimal_places&quot;: {
+                            &quot;description&quot;: &quot;小数位数，范围-1到4&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          },
+                          &quot;use_separate&quot;: {
+                            &quot;description&quot;: &quot;是否使用千位符&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_phone_number&quot;: {
+                        &quot;description&quot;: &quot;电话类型的展示格式属性，电话类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_progress&quot;: {
+                        &quot;description&quot;: &quot;进度类型的展示格式属性，包含小数位数配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;decimal_places&quot;: {
+                            &quot;description&quot;: &quot;小数位数&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_reference&quot;: {
+                        &quot;description&quot;: &quot;关联类型的展示格式属性，包含关联子表、字段和多选配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;field_id&quot;: {
+                            &quot;description&quot;: &quot;关联的字段ID&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          },
+                          &quot;is_multiple&quot;: {
+                            &quot;description&quot;: &quot;是否允许多选&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;sub_id&quot;: {
+                            &quot;description&quot;: &quot;关联的子表ID，为空时表示关联本子表&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          },
+                          &quot;view_id&quot;: {
+                            &quot;description&quot;: &quot;关联视图ID&quot;,
+                            &quot;type&quot;: &quot;string&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_select&quot;: {
+                        &quot;description&quot;: &quot;多选类型的展示格式属性，包含选项和选择模式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;is_multiple&quot;: {
+                            &quot;description&quot;: &quot;是否多选，用户不需要设置该参数&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;is_quick_add&quot;: {
+                            &quot;description&quot;: &quot;是否允许填写时新增选项，用户不需要设置该参数&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;options&quot;: {
+                            &quot;description&quot;: &quot;多选选项的格式设置&quot;,
+                            &quot;items&quot;: {
+                              &quot;properties&quot;: {
+                                &quot;id&quot;: {
+                                  &quot;description&quot;: &quot;选项 ID&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                },
+                                &quot;style&quot;: {
+                                  &quot;description&quot;: &quot;选项颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色&quot;,
+                                  &quot;type&quot;: &quot;integer&quot;
+                                },
+                                &quot;text&quot;: {
+                                  &quot;description&quot;: &quot;要填写的选项内容&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                }
+                              },
+                              &quot;type&quot;: &quot;object&quot;
+                            },
+                            &quot;type&quot;: &quot;array&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_single_select&quot;: {
+                        &quot;description&quot;: &quot;单选类型的展示格式属性，包含选项和选择模式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;is_multiple&quot;: {
+                            &quot;description&quot;: &quot;是否多选，用户不需要设置该参数&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;is_quick_add&quot;: {
+                            &quot;description&quot;: &quot;是否允许填写时新增选项，用户不需要设置该参数&quot;,
+                            &quot;type&quot;: &quot;boolean&quot;
+                          },
+                          &quot;options&quot;: {
+                            &quot;description&quot;: &quot;单选选项的格式设置&quot;,
+                            &quot;items&quot;: {
+                              &quot;properties&quot;: {
+                                &quot;id&quot;: {
+                                  &quot;description&quot;: &quot;选项 ID&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                },
+                                &quot;style&quot;: {
+                                  &quot;description&quot;: &quot;选项颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色&quot;,
+                                  &quot;type&quot;: &quot;integer&quot;
+                                },
+                                &quot;text&quot;: {
+                                  &quot;description&quot;: &quot;要填写的选项内容&quot;,
+                                  &quot;type&quot;: &quot;string&quot;
+                                }
+                              },
+                              &quot;type&quot;: &quot;object&quot;
+                            },
+                            &quot;type&quot;: &quot;array&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_text&quot;: {
+                        &quot;description&quot;: &quot;文本类型的展示格式属性，文本类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_url&quot;: {
+                        &quot;description&quot;: &quot;超链接类型的展示格式属性，包含展示样式配置&quot;,
+                        &quot;properties&quot;: {
+                          &quot;type&quot;: {
+                            &quot;description&quot;: &quot;超链接展示样式 枚举值：0-未知，1-文字，2-图标文字&quot;,
+                            &quot;type&quot;: &quot;integer&quot;
+                          }
+                        },
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;property_user&quot;: {
+                        &quot;description&quot;: &quot;用户类型的展示格式属性，用户类型不需要额外的配置属性&quot;,
+                        &quot;type&quot;: &quot;object&quot;
+                      },
+                      &quot;type&quot;: {
+                        &quot;description&quot;: &quot;展示格式对应的列类型(FieldType)，必填且不能为0，它决定使用下方哪个 property 字段(如 26 对应 property_currency)。枚举值：1-文本，2-数字，3-勾选，4-日期，5-图片，7-用户，8-URL，9-多选，10-创建人，11-最后编辑人，12-创建时间，13-修改时间，14-进度，15-电话，16-邮箱，17-单选，18-引用，25-自动编号，26-货币，28-百分比。注意不能填19(公式)/20(查找引用)，展示格式本身不能再是公式或查找引用&quot;,
+                        &quot;type&quot;: &quot;integer&quot;
+                      }
+                    },
+                    &quot;type&quot;: &quot;object&quot;
+                  },
+                  &quot;link_records_field_id&quot;: {
+                    &quot;description&quot;: &quot;本表中的关联列ID，必须为已存在的关联列。仅在按关联查找(upgrade_type=0)时必填；按条件查找(upgrade_type=1)时无需填写&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;lookup_field_id&quot;: {
+                    &quot;description&quot;: &quot;被查找目标表中的列ID，必须为已存在的列&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;lookup_sub_id&quot;: {
+                    &quot;description&quot;: &quot;被查找目标表的子表ID，为空时表示本子表&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;rollup_type&quot;: {
+                    &quot;description&quot;: &quot;统计类型，枚举值：0-原样引用，1-去重引用，2-求和，3-计数，4-去重计数，5-平均值，6-最大值，7-最小值&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  },
+                  &quot;upgrade_type&quot;: {
+                    &quot;description&quot;: &quot;查找引用方式，枚举值：0-按关联查找(通过本表关联列做桥梁，需填写link_records_field_id)，1-按条件查找(通过 filter 筛选条件，无需 link_records_field_id)&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_modified_time&quot;: {
+                &quot;description&quot;: &quot;最后编辑时间类型的字段属性，包含时间格式配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;format&quot;: {
+                    &quot;description&quot;: &quot;最后编辑时间格式，支持格式：yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; - 2018 年 4 月 20 日，yyyy-mm-dd - 2018-04-20，yyyy/m/d - 2018/4/20，m\&quot;月\&quot;d\&quot;日\&quot; - 4 月 20 日，[$-804]yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; dddd - 2018 年 4 月 20 日 星期五，yyyy\&quot;年\&quot;m\&quot;月\&quot;d\&quot;日\&quot; hh:mm - 2018 年 4 月 20 日 14:00，yyyy-mm-dd hh:mm - 2018-04-20 14:00，m/d/yyyy - 4/20/2018，d/m/yyyy - 20/4/2018&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_modified_user&quot;: {
+                &quot;description&quot;: &quot;最后编辑人类型的字段属性，最后编辑人类型字段不需要额外的配置属性&quot;,
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_number&quot;: {
+                &quot;description&quot;: &quot;数字类型的字段属性，包含精度和千位符等配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;decimal_places&quot;: {
+                    &quot;description&quot;: &quot;表示小数点的位数，即数字精度&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  },
+                  &quot;use_separate&quot;: {
+                    &quot;description&quot;: &quot;是否使用千位符，设置此属性后数字字段将以英文逗号分隔千分位，如 1,000&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_percentage&quot;: {
+                &quot;description&quot;: &quot;百分比类型的字段属性，包含小数位数和千位符配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;decimal_places&quot;: {
+                    &quot;description&quot;: &quot;小数位数，范围-1到4&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  },
+                  &quot;use_separate&quot;: {
+                    &quot;description&quot;: &quot;是否使用千位符&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_phone_number&quot;: {
+                &quot;description&quot;: &quot;电话类型的字段属性，电话类型字段不需要额外的配置属性&quot;,
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_progress&quot;: {
+                &quot;description&quot;: &quot;进度类型的字段属性，包含小数位数配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;decimal_places&quot;: {
+                    &quot;description&quot;: &quot;小数位数&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_reference&quot;: {
+                &quot;description&quot;: &quot;关联类型的字段属性，包含关联子表、字段和多选配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;field_id&quot;: {
+                    &quot;description&quot;: &quot;关联的字段ID&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;is_multiple&quot;: {
+                    &quot;description&quot;: &quot;是否允许多选&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;sub_id&quot;: {
+                    &quot;description&quot;: &quot;关联的子表ID，为空时表示关联本子表&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;view_id&quot;: {
+                    &quot;description&quot;: &quot;关联视图ID&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_select&quot;: {
+                &quot;description&quot;: &quot;多选类型的字段属性，包含选项和选择模式配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;is_multiple&quot;: {
+                    &quot;description&quot;: &quot;是否多选，用户不需要设置该参数&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;is_quick_add&quot;: {
+                    &quot;description&quot;: &quot;是否允许填写时新增选项，用户不需要设置该参数&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;options&quot;: {
+                    &quot;description&quot;: &quot;多选选项的格式设置&quot;,
+                    &quot;items&quot;: {
+                      &quot;properties&quot;: {
+                        &quot;id&quot;: {
+                          &quot;description&quot;: &quot;选项 ID&quot;,
+                          &quot;type&quot;: &quot;string&quot;
+                        },
+                        &quot;style&quot;: {
+                          &quot;description&quot;: &quot;选项颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色&quot;,
+                          &quot;type&quot;: &quot;integer&quot;
+                        },
+                        &quot;text&quot;: {
+                          &quot;description&quot;: &quot;要填写的选项内容&quot;,
+                          &quot;type&quot;: &quot;string&quot;
+                        }
+                      },
+                      &quot;type&quot;: &quot;object&quot;
+                    },
+                    &quot;type&quot;: &quot;array&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_single_select&quot;: {
+                &quot;description&quot;: &quot;单选类型的字段属性，包含选项和选择模式配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;is_multiple&quot;: {
+                    &quot;description&quot;: &quot;是否多选，用户不需要设置该参数&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;is_quick_add&quot;: {
+                    &quot;description&quot;: &quot;是否允许填写时新增选项，用户不需要设置该参数&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;options&quot;: {
+                    &quot;description&quot;: &quot;单选选项的格式设置&quot;,
+                    &quot;items&quot;: {
+                      &quot;properties&quot;: {
+                        &quot;id&quot;: {
+                          &quot;description&quot;: &quot;选项 ID&quot;,
+                          &quot;type&quot;: &quot;string&quot;
+                        },
+                        &quot;style&quot;: {
+                          &quot;description&quot;: &quot;选项颜色，枚举值：1-红色，2-橘黄色，3-蓝色，4-绿色，5-紫色，6-粉色，7-灰色，8-白色&quot;,
+                          &quot;type&quot;: &quot;integer&quot;
+                        },
+                        &quot;text&quot;: {
+                          &quot;description&quot;: &quot;要填写的选项内容&quot;,
+                          &quot;type&quot;: &quot;string&quot;
+                        }
+                      },
+                      &quot;type&quot;: &quot;object&quot;
+                    },
+                    &quot;type&quot;: &quot;array&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_text&quot;: {
+                &quot;description&quot;: &quot;文本类型的字段属性，文本类型字段不需要额外的配置属性&quot;,
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_two_way_link_records&quot;: {
+                &quot;description&quot;: &quot;双向关联类型字段属性；新增时 sub_id 必填，back_field_id 仅在响应中返回&quot;,
+                &quot;properties&quot;: {
+                  &quot;back_field_id&quot;: {
+                    &quot;description&quot;: &quot;服务端生成的反向字段ID；请求时不得指定，仅在响应中返回&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;field_id&quot;: {
+                    &quot;description&quot;: &quot;目标表展示字段ID；可选，默认主字段&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;is_multiple&quot;: {
+                    &quot;description&quot;: &quot;是否允许多选&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;sub_id&quot;: {
+                    &quot;description&quot;: &quot;目标子表ID；首期仅支持同文档跨子表关联&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;view_id&quot;: {
+                    &quot;description&quot;: &quot;目标视图ID；可选&quot;,
+                    &quot;type&quot;: &quot;string&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_url&quot;: {
+                &quot;description&quot;: &quot;超链接类型的字段属性，包含展示样式配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;type&quot;: {
+                    &quot;description&quot;: &quot;超链接展示样式 枚举值：0-未知，1-文字，2-图标文字&quot;,
+                    &quot;type&quot;: &quot;integer&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_user&quot;: {
+                &quot;description&quot;: &quot;用户类型的字段属性，用户类型字段不需要额外的配置属性&quot;,
+                &quot;type&quot;: &quot;object&quot;
+              },
+              &quot;property_user_c&quot;: {
+                &quot;description&quot;: &quot;成员类型的字段属性，包含多选和通知配置&quot;,
+                &quot;properties&quot;: {
+                  &quot;is_multiple&quot;: {
+                    &quot;description&quot;: &quot;是否允许添加多个成员，默认 false&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  },
+                  &quot;is_notified&quot;: {
+                    &quot;description&quot;: &quot;添加成员时是否通知该成员，默认 true&quot;,
+                    &quot;type&quot;: &quot;boolean&quot;
+                  }
+                },
+                &quot;type&quot;: &quot;object&quot;
+              }
+            },
+            &quot;type&quot;: &quot;object&quot;
+          },
+          &quot;type&quot;: &quot;array&quot;
+        },
+        &quot;file_id&quot;: {
+          &quot;description&quot;: &quot;智能表格文档的唯一标识符&quot;,
+          &quot;type&quot;: &quot;string&quot;
+        },
+        &quot;sheet_id&quot;: {
+          &quot;description&quot;: &quot;工作表ID&quot;,
+          &quot;type&quot;: &quot;string&quot;
+        }
+      },
+      &quot;required&quot;: [
+        &quot;file_id&quot;,
+        &quot;sheet_id&quot;,
+        &quot;fields&quot;
+      ],
+      &quot;type&quot;: &quot;object&quot;
+    }
+  }
+}</pre></details>
+    <p class="muted">Mochi 的 Responses 适配器发送时会把 <code>function</code> 内容展平，并补充 <code>type: "function"</code> 和默认的 <code>strict: false</code>。因此这里的单工具包装大小与线上 Responses 单项大小不是完全相同的口径。</p>
+  </section>
+
+  <section id="method">
+    <h2>07 · 来源、口径与边界</h2>
+    <ul>
+      <li>采集日期：2026-11-15。来源是已配置手机的 <strong>本地 MCP 工具缓存</strong>，不是重新查询腾讯接口；不能据此声称腾讯所有部署或未来版本都相同。</li>
+      <li>仅提取 <code>smartsheet.add_fields</code> 的名称、说明与 <code>inputSchema</code>，按 <code>McpAgentTool.schema</code> 的公开包装重建。报告不含账号、服务地址、鉴权信息、真实文件 ID 或私人表格数据。</li>
+      <li>字节统计：紧凑 JSON（无缩进、无分隔符空格、中文保留），UTF-8 编码。该口径重现了手机诊断得到的 <strong>34,925 B</strong>。1 KB = 1,000 B，约等于 34.11 KiB。</li>
+      <li>子树统计包含子树内部键值和标点，不包含其父对象的键名；其余项包含这些开销。description 删除统计包含键名、字符串转义和标点差额，不只是文本长度。</li>
+      <li>字节数可由完整 JSON 复算；token 数来自当晚模型返回的 usage，不是用字数猜测。完整定义仅用于分析接口契约，不含调用实参。</li>
+    </ul>
+    <h3>紧凑包装的 SHA-256</h3>
+    <pre>07f265f9c4561b52d65cd3d48696079b83d5b587fc5554736fb89187ef782b1b</pre>
+    <h3>相关代码</h3>
+    <p><a href="../android/app/src/main/java/com/example/mochi_pet/core/mcp/McpClient.kt"><code>McpAgentTool.schema</code></a>：包装名称、说明与完整 inputSchema。<br>
+    <a href="../android/app/src/main/java/com/example/mochi_pet/MochiAgentFactory.kt"><code>createAgentRunner</code></a>：聚合已启用工具。<br>
+    <a href="../android/app/src/main/java/com/example/mochi_pet/core/agent/llm/ResponsesAdapter.kt"><code>ResponsesAdapter.encode</code></a>：把请求里的全部工具编码进 Responses 请求。</p>
+  </section>
+  <footer>独立 HTML 报告 · 无外部脚本、字体、图片或网络请求 · 支持离线阅读。该文件是诊断报告，不替代架构契约。</footer>
+</main>
+</body>
+</html>
