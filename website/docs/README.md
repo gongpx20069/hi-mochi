@@ -105,7 +105,7 @@ column; retain readable expanded disclosures in both languages.
 
 AgentLink's official website lives at `agentlink/` and `zh-CN/agentlink/`.
 Treat these as a standalone product destination, not a Mochi extension detail:
-lead with phone/terminal continuity, Android download and computer setup.
+lead with phone/browser/terminal continuity, Android download and computer setup.
 Follow with five logo-led agent cards, four everyday feature cards (including
 single-image input), progressive setup instructions, connection/data boundaries,
 and FAQ. Keep optional Mochi integration inside the FAQ rather than a competing
@@ -118,6 +118,18 @@ Its product/setup claims follow the
 AgentLink uses the `master` branch, not this repository's `main`; retain the
 correct branch in its documentation links.
 Distinguish standalone phone/terminal chat from optional scoped Mochi control.
+The Web feature follows the updated AgentLink Bridge source: stdlib `start`
+includes the loopback workspace by default, with `--no-web` as the opt-out.
+Keep a keyboard-accessible `#web-workspace` setup disclosure in both languages.
+Explain the printed local URL/access code, optional workspace-root registration,
+local/VM labels and manual drag order (not status priority), and isolated offline
+computers. Browser traffic goes through the local gateway; each VM runs its own
+updated Bridge. Never present the public website as the Web control endpoint or
+encourage tunneling the Web port. Disclose owner-private but unencrypted-at-rest
+remote credential storage, text-only first-version scope, retained shared-history
+limits, and no automatic retry of uncertain sends. APK updates do not update the
+Bridge. Keep image-input claims explicitly scoped to Android, and deploy these
+instructions in step with the corresponding Bridge source.
 Link to AgentLink's own Releases (which include previews), never Mochi APKs or
 an assumed stable `releases/latest` endpoint. Explain the running-computer
 requirement, authenticated pairing, background limits, and permission boundary.
