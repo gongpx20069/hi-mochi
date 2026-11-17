@@ -126,9 +126,12 @@ local/VM labels and manual drag order (not status priority), and isolated offlin
 computers. Browser traffic goes through the local gateway; each VM runs its own
 updated Bridge. Never present the public website as the Web control endpoint or
 encourage tunneling the Web port. Disclose owner-private but unencrypted-at-rest
-remote credential storage, text-only first-version scope, retained shared-history
+remote credential storage, retained shared-history/image-cache
 limits, and no automatic retry of uncertain sends. APK updates do not update the
-Bridge. Keep image-input claims explicitly scoped to Android, and deploy these
+Bridge. Web supports Markdown tables/links and one pasted/selected PNG/JPEG up to
+5 MiB / 16 million pixels, uploaded only on Send to an image-capable session.
+Do not conflate Web's uncompressed uploads with Android's 1 MiB compression.
+New sessions may need a text message before image capability is available. Deploy these
 instructions in step with the corresponding Bridge source.
 Link to AgentLink's own Releases (which include previews), never Mochi APKs or
 an assumed stable `releases/latest` endpoint. Explain the running-computer
