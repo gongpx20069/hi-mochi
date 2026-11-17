@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#100e16">
-    <meta name="description" content="AgentLink 官网。在 Android 手机上连接电脑里的 Copilot、Claude Code、Kimi Code、Qwen Code 与 DeepSeek Harness，与终端共享聊天、任务和审批。">
+    <meta name="description" content="AgentLink 官网。在 Android、轻量 Web 工作台和终端之间继续同一个编程助手会话。统一管理本机与 VM 聊天，查看进展并处理审批。">
     <meta property="og:type" content="website">
     <meta property="og:title" content="AgentLink — 离开电脑，也不中断工作">
-    <meta property="og:description" content="五种编程 Agent，你自己的电脑，一个随身入口。下载 AgentLink，把工作对话带在身边。">
+    <meta property="og:description" content="从手机到浏览器和终端，接着同一个对话。统一管理本机与 VM 聊天，工作仍在你自己的电脑上执行。">
     <meta property="og:url" content="https://gongpx20069.github.io/hi-mochi/zh-CN/agentlink/">
     <link rel="canonical" href="https://gongpx20069.github.io/hi-mochi/zh-CN/agentlink/">
     <link rel="alternate" hreflang="en" href="https://gongpx20069.github.io/hi-mochi/agentlink/">
@@ -38,7 +38,7 @@
           <div class="reveal">
             <span class="eyebrow"><span></span> 工作留在电脑，对话随你移动。</span>
             <h1>电脑里的 Agent。<br><em>随身的工作伙伴。</em></h1>
-            <p class="hero-lede">离开电脑，也不中断工作。用 Android 发送任务、跟进进展、处理审批；回到终端，继续的还是同一个聊天。</p>
+            <p class="hero-lede">离开电脑，也不中断工作。用 Android 发送任务、跟进进展、处理审批；回到浏览器或终端，继续的还是同一个聊天。</p>
             <div class="hero-actions"><a class="button button-primary" href="https://github.com/gongpx20069/android-agent-link/releases">下载 Android 版 ↓</a><a class="button button-secondary" href="#setup">配置电脑端 →</a></div>
             <p class="hero-note">Android 8.0+ · 开源 · 预览版<br>独立应用，无需安装 Mochi。</p>
           </div>
@@ -46,8 +46,8 @@
             <div class="stage-title"><span class="al-window-dots" aria-hidden="true">● ● ●</span> 两块屏幕 / 同一个对话<small>流程示意</small></div>
             <div class="link-screen phone-screen"><small>01 / 在手机上</small><strong>“合并之前，帮我检查一下这些改动。”</strong><span class="al-message">查看工具活动，阅读检查结果，由你决定是否批准操作。</span><div class="al-session-tags"><span>项目</span><span>Agent</span><span>会话</span></div></div>
             <div class="bridge-line"><span aria-hidden="true">↕</span> AgentLink Bridge · 身份验证 <span aria-hidden="true">↕</span></div>
-            <div class="link-screen computer-screen"><small>02 / 回到终端</small><strong><span class="al-prompt" aria-hidden="true">&gt; </span>接着刚才的对话，继续。</strong><span>同一个会话 · 同一个队列 · 同一套审批</span></div>
-            <p class="stage-caption">项目文件与 Agent 进程留在电脑上。这里展示的是 AgentLink 共享终端的工作方式，不是另一个独立的厂商 CLI。</p>
+            <div class="link-screen computer-screen"><small>02 / 浏览器或终端</small><strong><span class="al-prompt" aria-hidden="true">&gt; </span>接着刚才的对话，继续。</strong><span>同一个会话 · 同一个队列 · 同一套审批</span></div>
+            <p class="stage-caption">项目文件与 Agent 进程留在各自的电脑上。这里是 AgentLink 共享界面的流程示意，不是应用截图或另一个独立的厂商 CLI。</p>
           </div>
         </div>
       </section>
@@ -98,9 +98,9 @@
           <div class="section-heading split-heading reveal"><div><span class="kicker">02 / 把工作对话带在身边</span><h2>从一句需求，<br>到下一步决定。</h2></div><p>离开座位也能跟进工作，用图片补充上下文；回到电脑，接着同一个对话继续。</p></div>
           <div class="al-feature-grid">
             <article class="feature-card reveal"><span class="feature-label">跟进与审批</span><h3>进展，看得见。</h3><p>流式阅读回复，查看工具活动，处理审批请求，也能停止当前任务。不必一直守着终端，关键决定仍由你来做。</p></article>
-            <article class="feature-card reveal" data-image-feature><span class="feature-label">图片与描述 · 0.0.39+</span><h3>一张截图，讲得更清楚。</h3><p>添加一张 PNG/JPEG，预览后单独发送或附带文字。新图片自动压缩至不超过 1 MiB；需使用支持图片的 Agent/模型，并同时更新 App 与 Bridge。</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.zh-CN.md#发送图片">图片输入与缓存说明 ↗</a></article>
-            <article class="feature-card reveal"><span class="feature-label">切换与管理</span><h3>每个项目，各有空间。</h3><p>在一个应用里管理多台电脑和多个聊天。每个聊天有自己的 Agent、项目路径和上下文，凭据继续在电脑上配置。</p></article>
-            <article class="feature-card reveal"><span class="feature-label">回到电脑，继续</span><h3>从手机到键盘。<br>不用复制粘贴。</h3><p>可选的 AgentLink 终端与 Android 共享会话、消息、任务队列和审批。回到的是同一个聊天，而非另一个独立的厂商 CLI。</p></article>
+            <article class="feature-card reveal" data-image-feature><span class="feature-label">Android 图片 · 0.0.39+</span><h3>一张截图，讲得更清楚。</h3><p>在 Android 添加一张 PNG/JPEG，预览后单独发送或附带文字。新图片自动压缩至不超过 1 MiB；需使用支持图片的 Agent/模型，并同时更新 App 与 Bridge。</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.zh-CN.md#发送图片">图片输入与缓存说明 ↗</a></article>
+            <article class="feature-card reveal"><span class="feature-label">切换与管理</span><h3>你的电脑。<br>你的聊天顺序。</h3><p>本机和 VM 的聊天在 Web 统一展示，标注所属电脑，支持筛选与独立草稿。拖动即可排序，状态变化不会打乱顺序。每台 VM 保留自己的 Agent 和工作目录。</p></article>
+            <article class="feature-card reveal" data-web-feature><span class="feature-label">回到电脑，继续</span><h3>从手机到浏览器。<br>还是同一个对话。</h3><p>轻量 Web 工作台与 Android、可选终端共享聊天、工具活动和审批。随 Python Server 一起启动，无需新增 Node 服务或前端构建。</p><a class="text-link" href="#web-workspace">打开 Web 工作台 ↓</a></article>
           </div>
         </div>
       </section>
@@ -109,7 +109,7 @@
           <div class="section-heading reveal"><span class="kicker">03 / 开始连接</span><h2>装好两端，连接一次。</h2><p>准备一部 Android 手机、一台装有 Python 3.11+ 和 Git 的电脑，以及至少一个已安装、已认证的编程 Agent。电脑需要保持唤醒、联网，并运行 Bridge。</p></div>
           <ol class="al-setup-grid">
             <li><span class="al-step">01 / 手机</span><h3>安装 AgentLink。</h3><p>从 AgentLink Releases 下载最新 Android APK，包括预览版。更新时使用相同签名渠道覆盖安装，保留已保存的聊天。</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/releases">下载 Android APK ↗</a></li>
-            <li><span class="al-step">02 / 电脑</span><h3>启动 Bridge。</h3><p>先安装你选择的 Agent，并在电脑上登录。再启动 AgentLink Server。一个 Bridge 可以发现多个 Agent，无需分别安装多个 Server。</p><a class="text-link" href="#server-commands">Windows 快速启动 ↓</a></li>
+            <li><span class="al-step">02 / 电脑</span><h3>启动 Bridge 与 Web。</h3><p>先安装你选择的 Agent，并在电脑上登录。新版 Server 的 <code>start</code> 命令也会启动本机 Web 工作台。一个 Bridge 可以发现多个 Agent。</p><a class="text-link" href="#server-commands">Windows 快速启动 ↓</a></li>
             <li><span class="al-step">03 / 连接</span><h3>扫码，选好项目。</h3><p>打开 Machines → Scan QR，核对确认码并在电脑上批准配对。然后在 Chats 选择电脑、Agent，以及这台电脑上的项目路径。</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.md#4-pair-your-phone">查看配对指南 ↗</a></li>
           </ol>
           <details class="al-disclosure al-code-guide" id="server-commands">
@@ -118,7 +118,11 @@
 cd android-agent-link
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .\bridge
-.\.venv\Scripts\python.exe .\bridge\run.py start</code></pre><p>如果出现 Dev Tunnels 登录提示，按提示完成认证。保持终端运行，服务会显示配对二维码。下次启动时，在此仓库目录运行最后一条命令即可。</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#install">其他环境与完整配置 ↗</a></div>
+.\.venv\Scripts\python.exe .\bridge\run.py start</code></pre><p>如果出现 Dev Tunnels 登录提示，按提示完成认证。保持终端运行；新版 stdlib Server 会显示手机配对二维码、本机 Web 网址及访问码。下次运行最后一条命令即可，无需额外加 <code>--web</code>。</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/bridge/README.md#install">其他环境与完整配置 ↗</a></div>
+          </details>
+          <details class="al-disclosure" id="web-workspace">
+            <summary>浏览器工作台 · 本机与 VM 聊天</summary>
+            <div class="al-disclosure-body"><p>新版 stdlib Bridge 的 <code>start</code> 默认包含 Web。打开输出的本机网址，通常为 <code>http://127.0.0.1:4318</code>，输入 Web 访问码即可。只需后台 Server 时使用 <code>start --no-web</code>；端口冲突可用 <code>--web-port 0</code>。首次没有工作目录时，增加 <code>--workspace-root C:\Repos</code> 可允许注册其下的已有目录。</p><p>统一搜索本机与 VM 聊天，按电脑筛选，通过拖动或 Alt + 上／下排列顺序。状态变化不会重排 Web 聊天。可阅读 Markdown 表格与链接、查看工具详情、处理权限审批和问答。粘贴或选择一张 PNG/JPEG（不超过 5 MiB／1600 万像素），预览后单独发送或附带文字；仅点击发送才上传，网页不会自动压缩。新聊天可能需要先发文字建立连接，并确认 Agent／模型支持图片。历史来自 Server 保留的共享日志和图片缓存；原生历史会话选择仍用 Android 或终端。</p><p>在电脑管理中粘贴 VM 的当前配对链接，核对目标后提交，并在 VM 上确认。每台 VM 都需要新版 Bridge；不需要本地网页时可加 <code>--no-web</code>。浏览器只连接本机网关，工作仍在各台 VM 上执行。远程凭据保存在网关电脑的用户私有文件中，不是加密存储；不要把 Web 端口公开到隧道。</p><p>一台 VM 离线不会阻塞其他电脑。发送结果不确定时不会自动重试，应先检查回执再决定是否重发；关闭网页不会取消任务。仅更新 APK 不会更新电脑端 Bridge。</p><a class="text-link" href="https://github.com/gongpx20069/android-agent-link/blob/master/docs/user-guide.zh-CN.md#浏览器工作台">网页配置与使用边界 ↗</a></div>
           </details>
           <details class="al-disclosure">
             <summary>可选 · 也在终端里继续聊天</summary>

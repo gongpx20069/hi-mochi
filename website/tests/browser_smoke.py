@@ -165,6 +165,14 @@ def main() -> None:
                         assert "bridge\\run.py start" in page.locator("#server-commands pre").inner_text()
                         summary.press("Enter")
                         assert not page.locator("#server-commands").evaluate("(item) => item.open")
+                        page.locator("[data-web-feature] a").click()
+                        assert page.url.endswith("#web-workspace")
+                        web_summary = page.locator("#web-workspace summary")
+                        web_summary.focus()
+                        web_summary.press("Enter")
+                        assert page.locator("#web-workspace").evaluate("(item) => item.open")
+                        assert "start --no-web" in page.locator("#web-workspace").inner_text()
+                        assert "http://127.0.0.1:4318" in page.locator("#web-workspace").inner_text()
                     page.locator("details").evaluate_all("(items) => items.forEach(item => item.open = true)")
 
                     for width in (320, 390, 768, 1024, 1280, 1440):
@@ -301,6 +309,8 @@ def main() -> None:
                 ) == "1"
                 page.locator("#server-commands summary").click()
                 assert page.locator("#server-commands pre").is_visible()
+                page.locator("#web-workspace summary").click()
+                assert page.locator("#web-workspace .al-disclosure-body").is_visible()
                 assert page.locator("[data-agent]").count() == 5
                 assert page.locator("[data-agent] img").evaluate_all(
                     "images => images.every(image => image.complete && image.naturalWidth > 0)"
