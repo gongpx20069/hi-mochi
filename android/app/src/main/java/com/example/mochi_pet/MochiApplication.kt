@@ -70,6 +70,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 import kotlinx.coroutines.ensureActive
 
 private val Application.providerDataStore by preferencesDataStore(
@@ -285,6 +286,7 @@ class MochiApplication : Application() {
             termuxRuntime = termuxRuntime,
             webdavClient = webdavClient,
             journalEnabled = { memoryRecallStore.access().enabled },
+            prepareModelSchemas = { englishToolSchemas.warm(it) },
         )
     }
 
@@ -302,6 +304,17 @@ class MochiApplication : Application() {
 
     val openAiChatClient: OpenAiChatClient by lazy {
         OkHttpOpenAiChatClient()
+    }
+
+    val englishToolSchemas by lazy {
+        com.example.mochi_pet.core.agent.tool.EnglishToolSchemas(
+            client = openAiChatClient,
+            provider = {
+                providerRuns.register(currentCoroutineContext().job)
+                providerSettingsRepository.loadRuntimeConfig()
+            },
+            cacheDirectory = File(cacheDir, "english-tool-schemas"),
+        )
     }
 
     val agentTaskRuntime = com.example.mochi_pet.core.tasks.AgentTaskRuntime()

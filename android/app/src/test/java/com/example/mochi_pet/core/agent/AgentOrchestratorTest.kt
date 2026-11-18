@@ -41,6 +41,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentOrchestratorTest {
+    @Test fun `unprepared schema annotations cannot reach the model`() = runBlocking {
+        val tool = object : AgentTool {
+            override val name = "get_current_weather"
+            override val schema = functionToolSchema(name, "读取天气", buildJsonObject {}, emptyList())
+            override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope =
+                error("Unprepared tool must not execute")
+        }
+        val client = QueueChatClient(finalResponse("""{"reply":"Done","emotion":"neutral"}"""))
+        assertThrows(com.example.mochi_pet.core.agent.tool.ToolSchemaTranslationException::class.java) {
+            runBlocking { orchestrator(client, ToolRegistry(listOf(tool))).run(request()) }
+        }
+        assertTrue(client.requests.isEmpty())
+    }
+
     @Test fun `duplicate call IDs and unsupported call types cannot dispatch tools`() = runBlocking {
         var executions = 0
         val tool = object : AgentTool {

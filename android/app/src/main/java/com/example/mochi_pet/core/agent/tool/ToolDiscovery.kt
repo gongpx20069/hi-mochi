@@ -32,12 +32,13 @@ object ToolDisclosurePolicy {
         name = SEARCH_NAME,
         description = "Search this actor's enabled tools by capability or exact name; does not execute them. " +
             "Use for maps, documents, connected services, extensions or other tools not already supplied. " +
-            "English or Chinese queries are supported. Matched complete definitions are added to the NEXT " +
+            "Write queries in English with the service, operation and object; translate the user's wording first. " +
+            "Exact tool names are also accepted. Matched complete definitions are added to the NEXT " +
             "model request; do not call newly found tools in this same response. Refine the query on a miss.",
         properties = buildJsonObject {
             put("query", buildJsonObject {
                 put("type", "string")
-                put("description", "Needed capability or exact tool name, not just the user's topic.")
+                put("description", "English capability query (service, operation, object) or exact tool name, not just the user's topic.")
                 put("minLength", 1)
                 put("maxLength", 512)
             })

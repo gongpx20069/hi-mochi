@@ -134,8 +134,10 @@ class AgentPromptBuilder(
             appendLine("# Android presentation policy")
             appendLine("Use only tools supplied in this request.")
             appendLine(
-                "Additional enabled tools stay in a local catalog. Use tool_search with a capability or exact " +
-                    "name to load them for the next model round. Search does not execute tools. Do not invent " +
+                "Additional enabled tools stay in a local catalog. Use tool_search with an English capability " +
+                    "query (service, operation and object) or an exact tool name to load them for the next model round. " +
+                    "Translate non-English user wording yourself; do not ask the user to switch languages. " +
+                    "Search does not execute tools. Do not invent " +
                     "parameters or call newly discovered tools in the same response as the search. " +
                     "Skill instructions do not make an undisclosed tool callable; search when needed.",
             )
@@ -345,6 +347,7 @@ class AgentOrchestrator(
                 val relayImageAfterResponse = pendingRelayImage
                 pendingRelayImage = null
                 val visibleSchemas = if (finalReplyRepairAttempted) emptyList() else discovery.schemas()
+                visibleSchemas.forEach(com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage::requireEnglish)
                 val suppliedNames = visibleSchemas.mapTo(mutableSetOf(), ToolDiscovery::schemaName)
                 val response = chatClient.complete(
                     config = request.provider,

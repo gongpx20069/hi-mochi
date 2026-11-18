@@ -23,6 +23,7 @@ import com.example.mochi_pet.core.agent.tool.ModelImageRelay
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
+import com.example.mochi_pet.core.agent.llm.OpenAiChatClient
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.browser.readOnlyAgentBrowserTools
 import com.example.mochi_pet.core.extensions.ExtensionToolScope
@@ -52,6 +53,7 @@ suspend fun MochiApplication.createAgentRunner(
     includeAgentLink: Boolean = true,
     taskScheduleId: String? = null,
     taskTitle: String = "Conversation",
+    chatClient: OpenAiChatClient = openAiChatClient,
 ): AgentRunner {
     val owner = currentCoroutineContext().job
     val diagnosticLogger = taskDiagnosticLogger(taskScheduleId, taskTitle, owner)
@@ -129,9 +131,10 @@ suspend fun MochiApplication.createAgentRunner(
             },
         )
     }
+    val modelTools = englishToolSchemas.prepare(tools)
     return AgentOrchestrator(
-        chatClient = openAiChatClient,
-        toolRegistry = ToolRegistry(tools) { isAgentToolAvailable(it) },
+        chatClient = chatClient,
+        toolRegistry = ToolRegistry(modelTools) { isAgentToolAvailable(it) },
         navigationPolicy = navigationPolicy,
         uiDirectiveSink = recordingSink,
         appliedNavigationDecision = { appliedNavigation },
@@ -154,7 +157,7 @@ suspend fun MochiApplication.createAgentRunner(
                     )
                 },
             )
-            ToolRegistry(tools + DelegateAgentTool(coordinator)) { isAgentToolAvailable(it) }
+            ToolRegistry(modelTools + DelegateAgentTool(coordinator)) { isAgentToolAvailable(it) }
         },
         pipelineObserver = observer,
         diagnosticLogger = diagnosticLogger,
@@ -207,6 +210,7 @@ private suspend fun MochiApplication.executeSubagent(
         )
     }
 
+    val modelTools = englishToolSchemas.prepare(enabledTools)
     parentObserver.onStage(AgentPipelineStage.SUBAGENT, type.displayName)
     agentBrowserRuntime.setActor(type.displayName)
     return try {
@@ -224,7 +228,7 @@ private suspend fun MochiApplication.executeSubagent(
         }
         AgentOrchestrator(
             chatClient = openAiChatClient,
-            toolRegistry = ToolRegistry(enabledTools) { isAgentToolAvailable(it) },
+            toolRegistry = ToolRegistry(modelTools) { isAgentToolAvailable(it) },
             navigationPolicy = NavigationPolicy(),
             uiDirectiveSink = UiDirectiveSink { },
             skillCatalogProvider = { availableSkills },

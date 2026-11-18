@@ -473,6 +473,7 @@ class DataStoreToolCatalogRepository(
     private val restTransport: RestTransport = RestHttpTransport(),
     private val webdavClient: MochiExtensionClient = UnavailableExtensionClient,
     private val journalEnabled: suspend () -> Boolean = { false },
+    private val prepareModelSchemas: suspend (List<JsonObject>) -> Unit = {},
 ) : ToolCatalogRepository {
     private val tencentCatalogMutex = Mutex()
     private val feishuAuthorizationMutex = Mutex()
@@ -1928,6 +1929,7 @@ class DataStoreToolCatalogRepository(
     private suspend fun updateCatalog(
         transform: (PersistedToolCatalog) -> PersistedToolCatalog,
     ) {
+        var changedSchemas = emptyList<JsonObject>()
         dataStore.edit { preferences ->
             val raw = preferences[CATALOG]
             val current = if (raw.isNullOrBlank()) PersistedToolCatalog().withBuiltInServers()
@@ -1936,9 +1938,23 @@ class DataStoreToolCatalogRepository(
             } catch (error: SerializationException) {
                 throw IllegalStateException("Stored Tool configuration is invalid", error)
             }
-            preferences[CATALOG] = json.encodeToString(transform(current))
+            val updated = transform(current)
+            val previousSchemas = current.modelSchemas().toSet()
+            changedSchemas = updated.modelSchemas().filter { it !in previousSchemas }
+            preferences[CATALOG] = json.encodeToString(updated)
         }
+        // Translation is cancellable network work, never part of a DataStore transaction.
+        prepareModelSchemas(changedSchemas)
     }
+
+    private fun PersistedToolCatalog.modelSchemas(): List<JsonObject> =
+        servers.flatMap { server ->
+            server.tools.map { tool ->
+                com.example.mochi_pet.core.mcp.mcpToolSchema(mcpToolAlias(server.id, tool.definition.name), tool.definition)
+            }
+        } + restConnections.flatMap { stored ->
+            stored.connection.tools.map { com.example.mochi_pet.core.rest.restToolSchema(stored.connection, it) }
+        }
 
     private fun PersistedToolCatalog.toSummary(
         extension: MochiExtensionSnapshot,

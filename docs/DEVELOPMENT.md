@@ -128,6 +128,7 @@ Tool discovery and payload regressions:
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest --tests "*ToolDiscoveryTest" `
+  --tests "*EnglishToolSchemasTest" `
   --tests "*BaseToolSchemasTest" --tests "*AgentOrchestratorTest" `
   --tests "*ResponsesAdapterTest" --tests "*ToolCatalogTest" `
   --tests "*MochiDatabaseTest" --no-daemon
@@ -138,6 +139,32 @@ availability, Skill readiness and the actual serialized base-schema budgets.
 `BaseToolSchemasTest` prints `SCHEMA_SIZE_TOTALS` in its test output without
 executing Tools or contacting a model. Policy, workflow and measured baseline
 are owned by [Tool discovery and disclosure](architecture/TOOL_DESIGN.md).
+
+For authorized device evaluation, the opt-in `core.agent.ToolSearchDiagnosticTest`
+uses the production Agent factory with an injectable transport. After updating
+matching app/test APKs in place, `inspectAvailableCatalog` with
+`-e mochiToolRetrievalDiagnostic true` logs enabled Tool names only.
+`measureRetrievalCases` with the same opt-in reads the app-cache file
+`tool-retrieval-cases.json`: an array of objects with `group`, `query`, and
+`expected` (relevant Tool names; empty for negative queries). Label cases before
+running them. It adds exact-name cases for all enabled deferred Tools and writes
+`tool-retrieval-results.json` in app cache, including ordered Top-5 results,
+explicit unavailable-case skips and local search/continuation durations.
+Its scripted Agent transport makes no model calls and executes only `tool_search`.
+Complete English schema preparation first: an uncached non-English description
+can require a separate translation request before the registry is constructed.
+Report descriptive-query hit rates separately from exact-name checks and
+negative-query false positives; this curated sample is not production accuracy.
+
+Separately, `liveReadOnlyWeatherLoop` with
+`-e mochiToolSearchLiveDiagnostic true` consumes quota on the active saved model
+connection, using its normal foreground deadline. Its transport guard permits
+only `tool_search` and one `amap_weather` call for Shanghai adcode `310000`;
+other calls fail before dispatch. Amap must already be configured/enabled.
+It checks search, subsequent schema visibility, real Tool success and a final
+reply without changing saved connection settings or reading user history.
+No opt-in means these diagnostics are skipped. Do not clear application data,
+grant permissions or enable a provider to make them pass.
 
 App Control and Media Control regressions:
 

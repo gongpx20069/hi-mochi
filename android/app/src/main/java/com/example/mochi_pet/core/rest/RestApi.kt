@@ -273,14 +273,9 @@ fun redactRestResponse(body: JsonElement, secret: String): JsonElement {
     }
 }
 
-class RestAgentTool(
-    connection: RestConnection,
-    private val definition: RestToolDefinition,
-    private val call: suspend (JsonObject) -> JsonObject,
-) : AgentTool {
-    override val name = restToolAlias(connection.id, definition.id)
-    override val schema = functionToolSchema(
-        name,
+fun restToolSchema(connection: RestConnection, definition: RestToolDefinition): JsonObject =
+    functionToolSchema(
+        restToolAlias(connection.id, definition.id),
         "${definition.name}: ${definition.description}. Returns: " +
             definition.outputs.joinToString("; ") { "${it.name}: ${it.description}" } +
             if (definition.requiresConfirmation) " Ask the user before executing; set confirmed only after explicit approval." else "",
@@ -300,6 +295,14 @@ class RestAgentTool(
         definition.parameters.filter { it.required && it.defaultValue == null }.map { it.name } +
             if (definition.requiresConfirmation) listOf("confirmed") else emptyList(),
     )
+
+class RestAgentTool(
+    connection: RestConnection,
+    private val definition: RestToolDefinition,
+    private val call: suspend (JsonObject) -> JsonObject,
+) : AgentTool {
+    override val name = restToolAlias(connection.id, definition.id)
+    override val schema = restToolSchema(connection, definition)
 
     override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
         if (definition.requiresConfirmation && arguments["confirmed"] != JsonPrimitive(true)) {

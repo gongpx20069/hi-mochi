@@ -21,6 +21,8 @@ authorized to execute are different states.
 - `ToolCatalogRepository` owns configuration and live availability.
 - `ToolRegistry` owns immutable definitions, argument dispatch and availability
   checks; executors retain their existing live revision/permission checks.
+- `EnglishToolSchemas` owns prepared model-facing annotation copies and their
+  source-versioned derived cache, never original UI metadata or execution.
 - `AgentOrchestrator` owns one disclosure state per run, continuation history,
   cancellation and existing round limits.
 - Search metadata/indexes are derived from that registry, never another
@@ -65,8 +67,11 @@ New Tools are deferred unless explicitly added to this base policy.
 Initially the model receives base schemas, the existing lightweight Skill
 metadata, and instructions to use `tool_search` for additional capabilities.
 It does not receive every deferred Tool's name/description or any unselected
-parameter schema. The search entry explains supported use, including Chinese
-capability queries; it does not embed the entire catalog.
+parameter schema. The model writes English capability queries containing the
+service, operation and object, or an exact Tool name. It translates non-English
+user wording itself; users can continue conversing in their preferred language.
+This is schema/prompt guidance, not an ASCII or language-rejection rule.
+The search entry does not embed the entire catalog.
 
 Searching means **finding a Tool**, not executing it. For example, the query
 "Tencent Docs add spreadsheet fields" loads the matching definition; it does
@@ -105,6 +110,48 @@ a document may search for document Tools later in the same run.
 `tool_search` accepts a nonblank `query` (up to 512 characters) and optional
 integer `limit` (1-8, default 5). Unknown fields, invalid types and empty
 queries return the normal `INVALID_ARGS` envelope.
+
+### Model-facing language and preparation
+
+Tool descriptions and schema text annotations presented to the Agent are
+English. UI/catalog source metadata remains separate and unchanged. Protocol
+identifiers, property names, required lists, enum/const/default/example values,
+references and validation constraints are preserved, including Chinese literals
+required by an upstream API. This policy concerns instructions in schemas,
+not user messages, Skill content, business data or Tool results.
+Recognized annotations are `description`, `title`, `$comment`,
+`markdownDescription`, `enumDescriptions`, `x-enumDescriptions` and
+`x-enum-descriptions` at function/schema nodes. Arbitrary vendor fields are not
+guessed to be prose; integrations must use these annotation fields.
+
+`EnglishToolSchemas` prepares model-facing copies. English/Latin-script text
+and punctuation are reused without a model call; this fast path is not a
+semantic language classifier. Non-Latin text annotations use the active
+connection with a standalone translation prompt, like the journal's isolated
+generation path: only annotation IDs/texts are sent, with no persona, history,
+memory, Skills, callable Tools, or complete schema. Source text is untrusted
+translation data. The typed result must contain exactly the requested IDs and
+English text. The host replaces only those annotations in the original
+schema; it never accepts a model-generated replacement schema.
+
+MCP connection/discovery/import and REST metadata updates warm the cache after
+the configuration transaction, never inside it. Extensions, old configurations
+and evicted cache entries are prepared before main/child registry construction.
+Content-addressed app-private cache entries include the source schema and
+translation-policy version in their key; source changes require preparation
+again. Cache size and translation batches are bounded. Cancellation cannot
+publish an unfinished result, and active Provider changes cancel translation.
+The normal foreground model-request deadline remains unchanged.
+
+Preparation errors surface explicitly and block Agent loading; there is no
+fallback to untranslated instructions. Saved connection metadata is retained
+if preparation fails and may be retried before use. Invalid derived cache entries
+are removed with an explicit error; the next preparation attempt regenerates
+them. Cache misses can consume model quota; English schemas and valid cache
+hits do not. A final Agent-loop guard
+rejects unprepared non-English annotations before any model request.
+
+### Ranking and visibility budgets
 
 Search is deterministic and local:
 
@@ -211,13 +258,13 @@ Measured baseline (all 25 available; compact UTF-8 bytes):
 
 | Set | Chat Completions | Responses |
 | --- | ---: | ---: |
-| 16 entries, before adding App and Media | 15,234 bytes (14.88 KiB) | 15,266 bytes (14.91 KiB) |
-| 25 entries, including App and Media | **20,616 bytes (20.13 KiB)** | **20,666 bytes (20.18 KiB)** |
+| 16 entries, before adding App and Media | 15,365 bytes (15.00 KiB) | 15,397 bytes (15.04 KiB) |
+| 25 entries, including App and Media | **20,747 bytes (20.26 KiB)** | **20,797 bytes (20.31 KiB)** |
 | Added cost of App + Media | 5,382 bytes | 5,400 bytes |
 
 The largest individual Chat definitions are `manage_mochi_schedule`
 (1,877 bytes), `navigate_mochi_ui` (1,824), and `recall_memory` (1,704).
-`tool_search` itself is 751 bytes in Chat and 753 in Responses.
+`tool_search` itself is 882 bytes in Chat and 884 in Responses.
 Actual actor runs may send less when a base capability is unavailable.
 
 **Conclusion: keep the expanded 25-entry base set.** Its maximum measured
@@ -232,7 +279,8 @@ Acceptance covers:
 
 - All available base Tools work without search, including App and Media.
 - Unrelated document schemas are absent initially, but discoverable by
-  Chinese/English capability queries and exact names.
+  English capability queries and exact names. Non-English queries are not
+  rejected by a character-set validator.
 - Search returns its own result, the next request gains complete schemas,
   and real calls then execute on both supported APIs.
 - Invalid/no-match/budget-limited searches, undisclosed calls, same-response

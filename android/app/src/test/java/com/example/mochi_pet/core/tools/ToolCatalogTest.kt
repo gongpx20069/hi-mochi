@@ -48,6 +48,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
@@ -65,6 +66,30 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ToolCatalogTest {
+    // The fake MCP client performs no HTTP; this literal keeps URL validation DNS-free.
+    private val manualEndpoint = "https://203.0.113.1/mcp"
+
+    @Test fun `changed external schemas prepare after persistence without translating UI metadata`() = runBlocking {
+        val prepared = mutableListOf<JsonObject>()
+        client.tools = listOf(McpRemoteTool("read_record", "读取记录"))
+        val catalog = DataStoreToolCatalogRepository(
+            dataStore, PlaintextCipher, client,
+            prepareModelSchemas = {
+                prepared += it
+                withTimeout(2_000) {
+                    dataStore.edit { prefs -> prefs[stringPreferencesKey("preparation.probe")] = "complete" }
+                }
+            },
+        )
+        val summary = catalog.addManualServer(ManualMcpServerInput("Fixture", manualEndpoint, null))
+        val server = summary.servers.single { !it.builtIn }
+        assertEquals(1, prepared.size)
+        assertEquals("读取记录", prepared.single().getValue("function").jsonObject.getValue("description").jsonPrimitive.content)
+        catalog.setServerEnabled(server.id, false)
+        assertEquals(1, prepared.size)
+        assertEquals("读取记录", catalog.loadSummary().servers.single { it.id == server.id }.tools.single().description)
+    }
+
     @Test fun `disclosure availability follows live group and connection switches`() = runBlocking {
         val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
         assertTrue(catalog.isToolAvailable("app_read"))
@@ -841,7 +866,7 @@ class ToolCatalogTest {
             val manual = repository.addManualServer(
                 ManualMcpServerInput(
                     name = "Example MCP",
-                    endpoint = "https://example.com/mcp",
+                    endpoint = manualEndpoint,
                     bearerToken = "mcp-token",
                 ),
             ).servers.first { !it.builtIn }
@@ -892,7 +917,7 @@ class ToolCatalogTest {
                     manualMcpServers = listOf(
                         SharedManualMcpServer(
                             name = "Example MCP",
-                            endpoint = "https://example.com/mcp",
+                            endpoint = manualEndpoint,
                             bearerToken = "mcp-token",
                             enabledToolNames = setOf("get_content"),
                         ),
