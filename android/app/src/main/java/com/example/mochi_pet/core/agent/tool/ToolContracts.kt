@@ -5,6 +5,8 @@ import com.example.mochi_pet.core.schedule.AgentScheduleNotFoundException
 import com.example.mochi_pet.core.model.MochiSurface
 import java.time.DateTimeException
 import java.time.LocalDate
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.SerializationException
@@ -108,7 +110,10 @@ interface AgentTool {
     ): ToolResultEnvelope
 }
 
-class ToolRegistry(tools: List<AgentTool>) {
+class ToolRegistry(
+    tools: List<AgentTool>,
+    private val isAvailable: suspend (String) -> Boolean = { true },
+) {
     private val toolsByName: Map<String, AgentTool>
 
     init {
@@ -126,16 +131,28 @@ class ToolRegistry(tools: List<AgentTool>) {
 
     val names: Set<String> = toolsByName.keys
 
+    suspend fun availableSchemas(): List<JsonObject> {
+        currentCoroutineContext().ensureActive()
+        val available = toolsByName.values.filter { isAvailable(it.name) }.map(AgentTool::schema)
+        currentCoroutineContext().ensureActive()
+        return available
+    }
+
     suspend fun execute(
         name: String,
         arguments: JsonObject,
         context: ToolExecutionContext,
     ): ToolResultEnvelope {
+        currentCoroutineContext().ensureActive()
         val tool = toolsByName[name]
             ?: return ToolResultEnvelope.error(
                 ToolErrorCode.UNKNOWN_TOOL,
                 "Unknown tool: $name",
             )
+        if (!isAvailable(name)) {
+            return ToolResultEnvelope.error(ToolErrorCode.PERMISSION_DENIED, "Tool is disabled or unavailable: $name")
+        }
+        currentCoroutineContext().ensureActive()
         return try {
             tool.execute(arguments, context)
         } catch (error: com.example.mochi_pet.core.model.PlannerConflictException) {

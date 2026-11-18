@@ -53,6 +53,8 @@ or verification in earlier phases.
 - [x] Journal-managed explicit recall: journal/conversation search, complete-turn reads,
   bounded continuation, first-listed Memory Recall Skill and managed preset Tool.
 - [x] Typed ToolRegistry, JSON schemas, and result envelopes.
+- [x] [Run-local Tool discovery and progressive disclosure](architecture/TOOL_DESIGN.md)
+  on Chat Completions and Responses through ordinary `tool_search`.
 - [x] Mochi calendar/todo CRUD tools with destructive confirmation.
 - [x] Permission-gated current-location and weather Tools with explicit
   WGS-84/GCJ-02 coordinate contracts.

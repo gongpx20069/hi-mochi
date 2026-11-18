@@ -124,6 +124,21 @@ before returning to the full gates.
 Memory retrieval regression sources and diagnostic instructions are owned by
 [Memory design](architecture/MEMORY_DESIGN.md#2-diagnostics-and-verification).
 
+Tool discovery and payload regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*ToolDiscoveryTest" `
+  --tests "*BaseToolSchemasTest" --tests "*AgentOrchestratorTest" `
+  --tests "*ResponsesAdapterTest" --tests "*ToolCatalogTest" `
+  --tests "*MochiDatabaseTest" --no-daemon
+```
+
+These exercise local discovery, both ordinary-function API loops, scoped/live
+availability, Skill readiness and the actual serialized base-schema budgets.
+`BaseToolSchemasTest` prints `SCHEMA_SIZE_TOTALS` in its test output without
+executing Tools or contacting a model. Policy, workflow and measured baseline
+are owned by [Tool discovery and disclosure](architecture/TOOL_DESIGN.md).
+
 App Control and Media Control regressions:
 
 ```powershell

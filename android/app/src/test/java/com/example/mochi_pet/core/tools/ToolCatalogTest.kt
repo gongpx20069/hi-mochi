@@ -65,6 +65,22 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ToolCatalogTest {
+    @Test fun `disclosure availability follows live group and connection switches`() = runBlocking {
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        assertTrue(catalog.isToolAvailable("app_read"))
+        catalog.setAppControlEnabled(false)
+        assertFalse(catalog.isToolAvailable("app_read"))
+        assertTrue(catalog.isToolAvailable("media_read"))
+        catalog.setMediaEnabled(false)
+        assertFalse(catalog.isToolAvailable("media_read"))
+        assertFalse(catalog.isToolAvailable("amap_search_poi"))
+        catalog.configureAmap("synthetic-key", "")
+        assertTrue(catalog.isToolAvailable("amap_search_poi"))
+        catalog.setAmapEnabled(false)
+        assertFalse(catalog.isToolAvailable("amap_search_poi"))
+        assertFalse(catalog.isToolAvailable("invented_tool"))
+    }
+
     @Test fun `memory recall has no independent catalog switch`() = runBlocking {
         var enabled = false
         val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client, journalEnabled = { enabled })

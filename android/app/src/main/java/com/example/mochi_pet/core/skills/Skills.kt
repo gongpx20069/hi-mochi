@@ -302,6 +302,7 @@ private const val MAX_SKILL_CHARS = 200_000
 class LoadSkillTool(
     private val repository: SkillRepository,
     private val availableToolNames: Set<String>,
+    private val availableToolNamesProvider: suspend () -> Set<String> = { availableToolNames },
 ) : AgentTool {
     override val name: String = "load_skill"
 
@@ -339,6 +340,7 @@ class LoadSkillTool(
                 ToolErrorCode.NOT_FOUND,
                 "Skill is unavailable or disabled: $skillName",
             )
+        val availableToolNames = availableToolNamesProvider()
         val readiness = skill.readiness(availableToolNames)
         if (!readiness.isReady) {
             return ToolResultEnvelope.error(

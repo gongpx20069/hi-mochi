@@ -335,6 +335,10 @@ The native implementation now includes:
 - strict final JSON parsing and NavigationPolicy application;
 - bounded query, history, tool-result, and final-reply sizes.
 
+Base Tool selection, run-local progressive disclosure and the ordinary-function
+`tool_search` continuation on both APIs are owned by [Tool design](TOOL_DESIGN.md).
+Provider protocol selection and transport remain separate from Tool discovery.
+
 Provider metadata and encrypted API-key material are stored in Preferences
 DataStore. Android Keystore owns the AES-GCM key; Compose receives only
 `hasApiKey`, and the plaintext key is decrypted only when constructing the

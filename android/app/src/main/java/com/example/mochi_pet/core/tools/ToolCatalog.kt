@@ -446,6 +446,8 @@ interface ToolCatalogRepository {
 
     suspend fun isBuiltInEnabled(name: String): Boolean
 
+    suspend fun isToolAvailable(name: String): Boolean = isBuiltInEnabled(name)
+
     suspend fun loadEnabledMcpTools(): List<AgentTool>
 
     suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool>
@@ -1562,6 +1564,41 @@ class DataStoreToolCatalogRepository(
         val catalog = loadCatalog().withBuiltInServers()
         return catalog.loadEnabledMcpTools { _, _ ->
             true
+        }
+    }
+
+    override suspend fun isToolAvailable(name: String): Boolean {
+        currentCoroutineContext().ensureActive()
+        val catalog = loadCatalog().withBuiltInServers()
+        val descriptor = BUILT_IN_TOOLS.firstOrNull { it.name == name }
+        if (descriptor != null) {
+            return isBuiltInEnabled(name) &&
+                (!descriptor.isAmapTool() || catalog.amapEnabled && catalog.amapCredentials != null)
+        }
+        if (name in com.example.mochi_pet.core.agentlink.AGENTLINK_TOOLS) {
+            val state = agentLinkClient?.refresh() ?: return false
+            return state.enabled && state.authorized && state.connected && name in state.enabledTools
+        }
+        val extension = when {
+            name.startsWith("termux_") && catalog.termuxEnabled -> termuxClient to catalog.termuxToolsEnabled
+            name.startsWith("webdav_") && catalog.webdavEnabled -> webdavClient to catalog.webdavToolsEnabled
+            name.startsWith("mijia_") && catalog.mijiaEnabled -> extensionClient to catalog.mijiaToolsEnabled
+            else -> null
+        }
+        if (extension != null) {
+            val snapshot = extension.first.snapshot()
+            return snapshot.connected && snapshot.tools.any {
+                it.name == name && (extension.second[it.name] ?: it.defaultEnabled)
+            }
+        }
+        return catalog.servers.any { server ->
+            server.enabled && server.isConnected() && server.tools.any {
+                it.enabled && mcpToolAlias(server.id, it.definition.name) == name
+            }
+        } || catalog.restConnections.any { stored ->
+            stored.connection.enabled && stored.connection.tools.any {
+                it.enabled && com.example.mochi_pet.core.rest.restToolAlias(stored.connection.id, it.id) == name
+            }
         }
     }
 

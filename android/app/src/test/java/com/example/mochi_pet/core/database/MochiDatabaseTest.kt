@@ -222,6 +222,27 @@ class MochiDatabaseTest {
     }
 
     @Test
+    fun `skill loading uses full deferred availability and rechecks revocation`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        repository.setEnabled("builtin:feishu-knowledge", true)
+        var available = setOf("feishu_search_doc")
+        val tool = LoadSkillTool(repository, available) { available }
+        val discovery = com.example.mochi_pet.core.agent.tool.ToolDiscovery(
+            com.example.mochi_pet.core.agent.tool.ToolRegistry(listOf(tool)),
+        )
+        val names = discovery.schemas().mapTo(mutableSetOf(),
+            com.example.mochi_pet.core.agent.tool.ToolDiscovery::schemaName)
+        val context = ToolExecutionContext(LocalDate.of(2026, 11, 17), MochiSurface.Face)
+        val arguments = """{"skill_name":"feishu-knowledge"}"""
+        assertFalse("feishu_search_doc" in names)
+        val result = discovery.execute("load_skill", arguments, context, names)
+        assertEquals("ok", result.status)
+        assertTrue(result.data.toString().contains("feishu_search_doc"))
+        available = emptySet()
+        assertEquals("PERMISSION_DENIED", discovery.execute("load_skill", arguments, context, names).code)
+    }
+
+    @Test
     fun `Feishu skill stays optional and allows any enabled document tool`() = runBlocking {
         val repository = RoomSkillRepository(database.skillDao())
         val id = "builtin:feishu-knowledge"

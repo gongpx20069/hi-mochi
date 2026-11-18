@@ -41,6 +41,55 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentOrchestratorTest {
+    @Test fun `duplicate call IDs and unsupported call types cannot dispatch tools`() = runBlocking {
+        var executions = 0
+        val tool = object : AgentTool {
+            override val name = "fixture"
+            override val schema = functionToolSchema(name, "Fixture", buildJsonObject {}, emptyList())
+            override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
+                executions++
+                return ToolResultEnvelope.success()
+            }
+        }
+        val call = OpenAiToolCall("same_id", function = OpenAiFunctionCall("fixture", "{}"))
+        for (calls in listOf(listOf(call, call), listOf(call.copy(type = "custom")))) {
+            val client = QueueChatClient(OpenAiChatResponse(listOf(
+                OpenAiChoice(OpenAiChatMessage("assistant", toolCalls = calls)),
+            )))
+            assertThrows(AgentProtocolException::class.java) {
+                runBlocking { orchestrator(client, ToolRegistry(listOf(tool))).run(request()) }
+            }
+        }
+        assertEquals(0, executions)
+    }
+
+    @Test fun `search returns a result and loads exact schemas next round without executing speculative siblings`() = runBlocking {
+        var executions = 0
+        val remote = object : AgentTool {
+            override val name = "remote_document"
+            override val schema = functionToolSchema(name, "Read remote document", buildJsonObject {}, emptyList())
+            override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope {
+                executions++
+                return ToolResultEnvelope.success(buildJsonObject { put("read", true) })
+            }
+        }
+        val first = toolResponse("search", "tool_search", """{"query":"remote_document"}""")
+        val speculative = first.copy(choices = first.choices.map {
+            it.copy(message = it.message.copy(toolCalls = it.message.toolCalls.orEmpty() +
+                OpenAiToolCall("speculative", function = OpenAiFunctionCall("remote_document", "{}"))))
+        })
+        val client = QueueChatClient(speculative, toolResponse("real", "remote_document", "{}"),
+            finalResponse("""{"reply":"Done","emotion":"neutral"}"""))
+        val runner = AgentOrchestrator(client, ToolRegistry(listOf(remote)), NavigationPolicy(), {})
+        assertEquals("Done", runner.run(request()).reply)
+        assertEquals(1, executions)
+        assertEquals(1, client.requests[0].tools.size)
+        assertTrue(client.requests[1].tools.contains(remote.schema))
+        assertTrue(client.requests[1].messages.single { it.toolCallId == "search" }.content!!.contains("loaded_tools"))
+        assertTrue(client.requests[1].messages.single { it.toolCallId == "speculative" }.content!!.contains("PERMISSION_DENIED"))
+        assertEquals("real", client.requests[2].messages.last().toolCallId)
+    }
+
     @Test fun `Responses continuation survives tool execution and final reply repair within one run`() = runBlocking {
         val continuation = buildJsonArray { add(buildJsonObject { put("type", "reasoning"); put("encrypted_content", "fixture") }) }
         fun continued(response: OpenAiChatResponse) = response.copy(choices = response.choices.map {
@@ -748,6 +797,7 @@ class AgentOrchestratorTest {
             diagnosticLogger = diagnosticLogger,
             elapsedRealtimeMillis = elapsedRealtimeMillis,
             runIdProvider = runIdProvider,
+            baseToolNames = registry.names,
         )
 
     private fun request(): AgentRunRequest =

@@ -1,10 +1,22 @@
 package com.example.mochi_pet.core.agent.llm
 
+import com.example.mochi_pet.core.agent.AgentOrchestrator
+import com.example.mochi_pet.core.agent.AgentRunRequest
+import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.agent.tool.ToolRegistry
+import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
+import com.example.mochi_pet.core.agent.tool.functionToolSchema
+import com.example.mochi_pet.core.model.MochiSurface
+import com.example.mochi_pet.core.navigation.NavigationPolicy
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -16,6 +28,59 @@ import org.junit.Before
 import org.junit.Test
 
 class ResponsesAdapterTest {
+    @Test fun `ordinary tool search round trip loads schemas on Chat and Responses without native search items`() = runBlocking {
+        for (protocol in ApiProtocol.entries) {
+            var executions = 0
+            val fixture = object : AgentTool {
+                override val name = "fixture"
+                override val schema = functionToolSchema(
+                    name, "Fixture remote lookup", buildJsonObject {}, emptyList(),
+                )
+                override suspend fun execute(
+                    arguments: JsonObject,
+                    context: ToolExecutionContext,
+                ): ToolResultEnvelope {
+                    executions++
+                    return ToolResultEnvelope.success(arguments)
+                }
+            }
+            fun call(id: String, name: String, args: String): String =
+                if (protocol == ApiProtocol.RESPONSES) {
+                    """{"status":"completed","output":[{"type":"function_call","call_id":"$id","name":"$name","arguments":$args}]}"""
+                } else {
+                    """{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"$id","type":"function","function":{"name":"$name","arguments":$args}}]}}]}"""
+                }
+            server.enqueue(response(call("search", "tool_search", """"{\"query\":\"fixture\"}"""")))
+            server.enqueue(response(call("execute", "fixture", """"{}"""")))
+            server.enqueue(response(if (protocol == ApiProtocol.RESPONSES) FINAL else
+                """{"choices":[{"message":{"role":"assistant","content":"{\"reply\":\"ok\"}"}}]}"""))
+            val runner = AgentOrchestrator(
+                client, ToolRegistry(listOf(fixture)), NavigationPolicy(), {},
+            )
+            val result = runner.run(AgentRunRequest(
+                config(protocol = protocol), "Use the fixture", "neutral",
+                ToolExecutionContext(
+                    LocalDate.of(2026, 11, 17), MochiSurface.Face,
+                ),
+            ))
+            assertEquals("ok", result.reply)
+            assertEquals(1, executions)
+            val bodies = (1..3).map { Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject }
+            fun names(body: JsonObject) = body.getValue("tools").jsonArray.map {
+                val value = if (protocol == ApiProtocol.RESPONSES) it.jsonObject else it.jsonObject.getValue("function").jsonObject
+                value.getValue("name").jsonPrimitive.content
+            }.toSet()
+            assertEquals(setOf("tool_search"), names(bodies[0]))
+            assertEquals(setOf("tool_search", "fixture"), names(bodies[1]))
+            val input = bodies[1].getValue(if (protocol == ApiProtocol.RESPONSES) "input" else "messages").jsonArray
+            assertTrue(input.last().toString().contains("loaded_tools"))
+            assertEquals("search", input.last().jsonObject.getValue(
+                if (protocol == ApiProtocol.RESPONSES) "call_id" else "tool_call_id",
+            ).jsonPrimitive.content)
+            assertFalse(bodies.any { it.toString().contains("tool_search_output") })
+        }
+    }
+
     private val server = MockWebServer()
     private val client = OkHttpOpenAiChatClient()
     @Before fun start() = server.start()

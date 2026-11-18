@@ -124,11 +124,14 @@ suspend fun MochiApplication.createAgentRunner(
         tools += LoadSkillTool(
             repository = skillRepository,
             availableToolNames = tools.mapTo(mutableSetOf()) { it.name },
+            availableToolNamesProvider = {
+                tools.filter { isAgentToolAvailable(it.name) }.mapTo(mutableSetOf()) { it.name }
+            },
         )
     }
     return AgentOrchestrator(
         chatClient = openAiChatClient,
-        toolRegistry = ToolRegistry(tools),
+        toolRegistry = ToolRegistry(tools) { isAgentToolAvailable(it) },
         navigationPolicy = navigationPolicy,
         uiDirectiveSink = recordingSink,
         appliedNavigationDecision = { appliedNavigation },
@@ -151,12 +154,16 @@ suspend fun MochiApplication.createAgentRunner(
                     )
                 },
             )
-            ToolRegistry(tools + DelegateAgentTool(coordinator))
+            ToolRegistry(tools + DelegateAgentTool(coordinator)) { isAgentToolAvailable(it) }
         },
         pipelineObserver = observer,
         diagnosticLogger = diagnosticLogger,
     )
 }
+
+private suspend fun MochiApplication.isAgentToolAvailable(name: String): Boolean =
+    name in setOf("load_skill", "request_user_assistance", "delegate_agent") ||
+        toolCatalogRepository.isToolAvailable(name)
 
 private suspend fun MochiApplication.executeSubagent(
     type: SubagentType,
@@ -194,6 +201,9 @@ private suspend fun MochiApplication.executeSubagent(
             repository = skillRepository,
             availableToolNames =
                 enabledTools.mapTo(mutableSetOf()) { it.name },
+            availableToolNamesProvider = {
+                enabledTools.filter { isAgentToolAvailable(it.name) }.mapTo(mutableSetOf()) { it.name }
+            },
         )
     }
 
@@ -214,7 +224,7 @@ private suspend fun MochiApplication.executeSubagent(
         }
         AgentOrchestrator(
             chatClient = openAiChatClient,
-            toolRegistry = ToolRegistry(enabledTools),
+            toolRegistry = ToolRegistry(enabledTools) { isAgentToolAvailable(it) },
             navigationPolicy = NavigationPolicy(),
             uiDirectiveSink = UiDirectiveSink { },
             skillCatalogProvider = { availableSkills },
