@@ -176,6 +176,26 @@ reply without changing saved connection settings or reading user history.
 No opt-in means these diagnostics are skipped. Do not clear application data,
 grant permissions or enable a provider to make them pass.
 
+`core.agent.LiveToolSearchQueryDiagnosticTest#measureModelGeneratedQueries`,
+with `-e mochiLiveToolQueryDiagnostic true`, evaluates the active model's own
+search queries using the production factory and Agent prompt. Supply at most
+60 pre-labelled synthetic cases in app cache `live-tool-query-cases.json` with
+the same `group`, `query`, `expected` fields. Only the Chinese user query reaches
+the model, never the expected labels. Private persona/history/memory are omitted;
+normal enabled Skill metadata and base Tools remain visible. The guard permits
+only `load_skill` and `tool_search` and rejects an entire response containing
+any business call before dispatch. It stops at the next request boundary after
+the first search batch, without another model call or business execution.
+It preserves the model's query/limit rather than forcing search or rewriting
+queries. Reports distinguish no-search replies, blocked business calls,
+unavailable fixtures, provider errors, and the four-model-request budget.
+`live-tool-query-results.json` is checkpointed per case and marked complete at
+the end; it contains generated search queries, ordered results and separate
+factory, model, Tool and continuation timings, but no credentials, endpoint,
+full prompts, Skill contents or final reply text. This consumes model quota;
+report first-search quality separately from routing coverage and do not call
+it full business-task success or pure BM25 latency.
+
 App Control and Media Control regressions:
 
 ```powershell
