@@ -24,6 +24,7 @@ import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
 import com.example.mochi_pet.core.agent.llm.OpenAiChatClient
+import com.example.mochi_pet.core.skills.prepareForModel
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.browser.readOnlyAgentBrowserTools
 import com.example.mochi_pet.core.extensions.ExtensionToolScope
@@ -121,11 +122,12 @@ suspend fun MochiApplication.createAgentRunner(
     }
     val availableSkills = skillRepository.listEnabledMetadata(
         tools.mapTo(mutableSetOf()) { it.name },
-    )
+    ).prepareForModel(englishToolSchemas::prepareInstruction)
     if (availableSkills.isNotEmpty()) {
         tools += LoadSkillTool(
             repository = skillRepository,
             availableToolNames = tools.mapTo(mutableSetOf()) { it.name },
+            prepareText = englishToolSchemas::prepareInstruction,
             availableToolNamesProvider = {
                 tools.filter { isAgentToolAvailable(it.name) }.mapTo(mutableSetOf()) { it.name }
             },
@@ -198,10 +200,11 @@ private suspend fun MochiApplication.executeSubagent(
     enabledTools += toolCatalogRepository.loadEnabledExtensionTools(ExtensionToolScope.SUBAGENT)
     val availableSkills = skillRepository.listEnabledMetadata(
         enabledTools.mapTo(mutableSetOf()) { it.name },
-    )
+    ).prepareForModel(englishToolSchemas::prepareInstruction)
     if (availableSkills.isNotEmpty()) {
         enabledTools += LoadSkillTool(
             repository = skillRepository,
+            prepareText = englishToolSchemas::prepareInstruction,
             availableToolNames =
                 enabledTools.mapTo(mutableSetOf()) { it.name },
             availableToolNamesProvider = {

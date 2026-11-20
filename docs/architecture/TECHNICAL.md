@@ -444,6 +444,18 @@ provider. All other Skills require every declared mandatory Tool; explicitly
 optional capabilities do not block enablement. Provider-backed groups require
 the provider to be installed when applicable, connected, and enabled.
 
+Model-facing Skill descriptions and loaded instructions are English, independent
+of UI locale. Built-ins are authored in English; installed/localized source
+content stays unchanged for UI/editing. Main, scheduled and child discovery
+prepare descriptions, while `load_skill` prepares the body/source label on
+demand through the same isolated, source-keyed translation cache described in
+[Tool design](TOOL_DESIGN.md#model-facing-language-and-preparation).
+English paragraphs need no model call. Skill identity and `allowed-tools` are
+host-generated from the original declarations and current actor scope, never
+translated or inferred from translated prose. Preparation cannot enable a Skill
+or Tool; activation rechecks Skill changes and dependency revocation afterwards.
+Translation failures are explicit, with no untranslated instruction fallback.
+
 `builtin:memory-recall` is first in Skills, with discovery name `memory-recall`
 and mandatory `recall_memory`. Its enabled state comes only from Daily journal;
 independent stored overrides are ignored and direct toggles rejected. It is

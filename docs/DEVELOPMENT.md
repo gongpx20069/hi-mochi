@@ -153,6 +153,16 @@ explicit unavailable-case skips and local search/continuation durations.
 Its scripted Agent transport makes no model calls and executes only `tool_search`.
 Complete English schema preparation first: an uncached non-English description
 can require a separate translation request before the registry is constructed.
+The diagnostic also records first/cache-warm factory preparation, initial
+request preparation, Tool-phase and continuation-schema latency. The Tool phase
+includes live availability reads, not just BM25. `tool-retrieval-timings.json`
+contains a separate in-memory BM25 microbenchmark over schemas observed during
+the run (five warmup passes, twenty samples per query), with snapshot and actual
+Top-5 results for comparison. These scripted timings exclude model inference
+and business Tool execution; they are not user-facing task latency.
+With the same opt-in, `verifyEnglishSkillInputs` checks enabled Skill discovery
+and `load_skill` documents for English model-facing instructions without
+executing their workflows. Uncached translations can consume model quota.
 Report descriptive-query hit rates separately from exact-name checks and
 negative-query false positives; this curated sample is not production accuracy.
 

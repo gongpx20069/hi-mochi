@@ -118,7 +118,9 @@ English. UI/catalog source metadata remains separate and unchanged. Protocol
 identifiers, property names, required lists, enum/const/default/example values,
 references and validation constraints are preserved, including Chinese literals
 required by an upstream API. This policy concerns instructions in schemas,
-not user messages, Skill content, business data or Tool results.
+not user messages, business data or ordinary Tool results. Skill metadata and
+the instruction-bearing `load_skill` result follow the
+[English Skill contract](TECHNICAL.md#2-runtime).
 Recognized annotations are `description`, `title`, `$comment`,
 `markdownDescription`, `enumDescriptions`, `x-enumDescriptions` and
 `x-enum-descriptions` at function/schema nodes. Arbitrary vendor fields are not
@@ -129,10 +131,16 @@ and punctuation are reused without a model call; this fast path is not a
 semantic language classifier. Non-Latin text annotations use the active
 connection with a standalone translation prompt, like the journal's isolated
 generation path: only annotation IDs/texts are sent, with no persona, history,
-memory, Skills, callable Tools, or complete schema. Source text is untrusted
+memory, unrelated Skills, callable Tools, or complete schema. Skill preparation
+reuses this mechanism with its own paragraph-translation prompt and cache-key
+namespace. Source text is untrusted
 translation data. The typed result must contain exactly the requested IDs and
 English text. The host replaces only those annotations in the original
 schema; it never accepts a model-generated replacement schema.
+If an otherwise correctly identified response retains non-Latin text, one
+additional isolated request rewrites only the affected annotations. Both
+responses must satisfy the same final constraints; there is no unbounded retry
+or language-validation bypass.
 
 MCP connection/discovery/import and REST metadata updates warm the cache after
 the configuration transaction, never inside it. Extensions, old configurations

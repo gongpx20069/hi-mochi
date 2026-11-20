@@ -37,6 +37,29 @@ class EnglishToolSchemasTest {
         assertTrue(folder.root.listFiles().orEmpty().isEmpty())
     }
 
+    @Test fun `Skill preparation keeps English paragraphs unchanged and caches isolated translations`() = runBlocking {
+        val requests = mutableListOf<OpenAiChatRequest>()
+        val resolver = resolver { request ->
+            requests += request
+            translated(request)
+        }
+        val english = "# Example\n\nUse `browser_read` and https://example.invalid."
+        assertEquals(english, resolver.prepareInstruction(english))
+        assertTrue(requests.isEmpty())
+        val mixed = "$english\n\n请先读取页面。"
+        val prepared = resolver.prepareInstruction(mixed)
+        assertEquals("$english\n\nEnglish annotation", prepared)
+        assertEquals(1, requests.size)
+        val request = requests.single()
+        assertEquals(listOf("system", "user"), request.messages.map { it.role })
+        assertTrue(request.tools.isEmpty())
+        assertFalse(request.messages.last().content!!.contains("https://example.invalid"))
+        assertEquals(prepared, resolver.prepareInstruction(mixed))
+        assertEquals(1, requests.size)
+        resolver.prepareInstruction("$english\n\n请检查页面。")
+        assertEquals(2, requests.size)
+    }
+
     @Test fun `isolated translation preserves all protocol fields and reuses a source keyed cache`() = runBlocking {
         val requests = mutableListOf<OpenAiChatRequest>()
         val client: suspend (OpenAiChatRequest) -> String = { request ->
@@ -98,6 +121,31 @@ class EnglishToolSchemasTest {
             }
             assertTrue(folder.root.listFiles().orEmpty().isEmpty())
         }
+    }
+
+    @Test fun `one isolated repair rewrites only annotations with remaining non Latin text`() = runBlocking {
+        val requests = mutableListOf<OpenAiChatRequest>()
+        val resolver = resolver { request ->
+            requests += request
+            if (requests.size == 1) {
+                """{"translations":[{"id":"/function/description","text":"Read the 状态 column"},{"id":"/function/parameters/properties/状态/description","text":"Record value"}]}"""
+            } else {
+                """{"translations":[{"id":"/function/description","text":"Read the status column"}]}"""
+            }
+        }
+        val prepared = resolver.prepareSchema(schema("读取记录", "记录值"))
+        assertEquals(2, requests.size)
+        requests.forEach {
+            assertEquals(listOf("system", "user"), it.messages.map { message -> message.role })
+            assertTrue(it.tools.isEmpty())
+        }
+        val repairRows = Json.parseToJsonElement(requests.last().messages.last().content!!)
+            .jsonObject.getValue("translations").jsonArray
+        assertEquals(1, repairRows.size)
+        assertEquals("Read the 状态 column", repairRows.single().jsonObject.getValue("text").jsonPrimitive.content)
+        ToolSchemaLanguage.requireEnglish(prepared)
+        assertEquals(prepared, resolver.prepareSchema(schema("读取记录", "记录值")))
+        assertEquals(2, requests.size)
     }
 
     @Test fun `cancelled translation cannot publish a schema or leave a temporary cache`() = runBlocking {

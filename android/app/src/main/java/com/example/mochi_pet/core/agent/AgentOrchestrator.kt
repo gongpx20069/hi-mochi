@@ -216,6 +216,7 @@ class AgentPromptBuilder(
         appendLine("# Available Skills")
         appendLine("<available_skills>")
         skills.take(MAX_AVAILABLE_SKILLS).forEach { skill ->
+            com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage.requireEnglishText(skill.description)
             appendLine("  <skill>")
             appendLine("    <name>${skill.name.xmlEscape()}</name>")
             appendLine(

@@ -17,7 +17,11 @@ import com.example.mochi_pet.core.agent.llm.OpenAiToolCall
 import com.example.mochi_pet.core.agent.tool.ToolDiscovery
 import com.example.mochi_pet.core.agent.tool.ToolDisclosurePolicy
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.agent.tool.ToolSearchIndex
+import com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage
 import com.example.mochi_pet.core.model.MochiSurface
+import com.example.mochi_pet.core.skills.LoadSkillTool
+import com.example.mochi_pet.core.skills.prepareForModel
 import com.example.mochi_pet.core.tools.readyToolNames
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
@@ -50,6 +54,11 @@ class ToolSearchDiagnosticTest {
 
     @Test fun measureRetrievalCases() = runBlocking<Unit> {
         assumeTrue(arguments.getString("mochiToolRetrievalDiagnostic") == "true")
+        val measurementStarted = System.currentTimeMillis()
+        listOf("tool-retrieval-results.json", "tool-retrieval-timings.json").forEach { name ->
+            val previous = app.cacheDir.resolve(name)
+            check(!previous.exists() || previous.delete()) { "Cannot remove the previous diagnostic artifact" }
+        }
         val source = app.cacheDir.resolve("tool-retrieval-cases.json")
         check(source.length() in 1..65_536) { "A bounded, pre-labelled query fixture is required" }
         val cases = Json.parseToJsonElement(source.readText()).jsonArray.toMutableList()
@@ -64,14 +73,22 @@ class ToolSearchDiagnosticTest {
         var current = buildJsonObject {}
         var round = 0
         var started = 0L
+        var runStarted = 0L
+        var toolStarted = 0L
+        var continuationStarted = 0L
+        var initialRequestMs = 0L
         var result: JsonObject? = null
         val rows = mutableListOf<JsonObject>()
+        val observedSchemas = linkedMapOf<String, JsonObject>()
         val client = object : OpenAiChatClient {
             override suspend fun complete(config: OpenAiProviderConfig, request: OpenAiChatRequest): OpenAiChatResponse {
+                request.tools.filter { ToolDiscovery.schemaName(it) != ToolDisclosurePolicy.SEARCH_NAME }
+                    .forEach { observedSchemas[ToolDiscovery.schemaName(it)] = it }
                 val names = request.tools.mapTo(mutableSetOf(), ToolDiscovery::schemaName)
                 if (round++ == 0) {
                     check(names.all { it in ToolDisclosurePolicy.baseNames }) { "Deferred schema leaked into initial request" }
                     started = SystemClock.elapsedRealtime()
+                    initialRequestMs = started - runStarted
                     return response(OpenAiChatMessage("assistant", toolCalls = listOf(
                         OpenAiToolCall("search", function = OpenAiFunctionCall("tool_search", buildJsonObject {
                             put("query", current.getValue("query"))
@@ -92,15 +109,32 @@ class ToolSearchDiagnosticTest {
                     envelope["code"]?.let { put("code", it) }
                     put("top5", JsonArray(found.map(::JsonPrimitive)))
                     put("elapsed_ms", SystemClock.elapsedRealtime() - started)
+                    put("initial_request_ms", initialRequestMs)
+                    put("tool_phase_ms", continuationStarted - toolStarted)
+                    put("next_request_ms", SystemClock.elapsedRealtime() - continuationStarted)
                 }
                 return response(OpenAiChatMessage("assistant", """{"reply":"diagnostic","emotion":"neutral"}"""))
             }
         }
-        val runner = app.createAgentRunner(
-            sink = { error("Retrieval must not navigate") }, observer = AgentPipelineObserver { _, _ -> },
+        suspend fun createRunner() = app.createAgentRunner(
+            sink = { error("Retrieval must not navigate") }, observer = AgentPipelineObserver { stage, detail ->
+                if (stage == AgentPipelineStage.TOOL && detail == "tool_search") toolStarted = SystemClock.elapsedRealtime()
+                if (stage == AgentPipelineStage.SUMMARY) continuationStarted = SystemClock.elapsedRealtime()
+            },
             onWeatherLoaded = { error("Retrieval must not execute weather") },
             includeBrowser = true, taskTitle = "Tool retrieval diagnostic", chatClient = client,
         )
+        val cache = app.cacheDir.resolve("english-tool-schemas")
+        val cacheEntriesBefore = cache.listFiles { file -> file.extension == "json" }.orEmpty().size
+        val preparationStarted = SystemClock.elapsedRealtime()
+        Log.i(TAG, "preparation_started cache_entries=$cacheEntriesBefore")
+        createRunner()
+        val firstPreparationMs = SystemClock.elapsedRealtime() - preparationStarted
+        Log.i(TAG, "first_preparation_complete elapsed_ms=$firstPreparationMs")
+        val warmPreparationStarted = SystemClock.elapsedRealtime()
+        val runner = createRunner()
+        val warmPreparationMs = SystemClock.elapsedRealtime() - warmPreparationStarted
+        Log.i(TAG, "warm_preparation_complete elapsed_ms=$warmPreparationMs")
         val config = OpenAiProviderConfig(endpoint = "https://example.invalid", apiKey = "unused", model = "local")
         for (case in cases) {
             current = case.jsonObject
@@ -114,12 +148,78 @@ class ToolSearchDiagnosticTest {
             }
             round = 0
             result = null
+            toolStarted = 0L
+            continuationStarted = 0L
+            runStarted = SystemClock.elapsedRealtime()
             withTimeout(30_000) { runner.run(runRequest(config, "Run the local retrieval diagnostic.")) }
-            rows += checkNotNull(result)
+            rows += buildJsonObject {
+                checkNotNull(result).forEach { (key, value) -> put(key, value) }
+                put("run_ms", SystemClock.elapsedRealtime() - runStarted)
+            }
+            app.cacheDir.resolve("tool-retrieval-results.json").writeText(JsonArray(rows).toString())
+            if (rows.size % 10 == 0) Log.i(TAG, "retrieval_progress cases=${rows.size}/${cases.size}")
         }
         val report = JsonArray(rows).toString()
         app.cacheDir.resolve("tool-retrieval-results.json").writeText(report)
+        val indexStarted = SystemClock.elapsedRealtimeNanos()
+        val index = ToolSearchIndex(observedSchemas.values.toList())
+        val indexBuildMs = (SystemClock.elapsedRealtimeNanos() - indexStarted) / 1_000_000.0
+        val measuredRows = rows.filter { it["top5"] != null }
+        repeat(5) {
+            measuredRows.forEach { index.search(it.getValue("query").jsonPrimitive.content) }
+        }
+        val indexRows = measuredRows.map { row ->
+            val query = row.getValue("query").jsonPrimitive.content
+            val samples = List(20) {
+                val before = SystemClock.elapsedRealtimeNanos()
+                index.search(query)
+                JsonPrimitive((SystemClock.elapsedRealtimeNanos() - before) / 1_000_000.0)
+            }
+            buildJsonObject {
+                put("group", row.getValue("group"))
+                put("query", query)
+                put("samples_ms", JsonArray(samples))
+                put("snapshot_top5", JsonArray(index.search(query).take(5).map(::JsonPrimitive)))
+                put("actual_top5", row.getValue("top5"))
+            }
+        }
+        app.cacheDir.resolve("tool-retrieval-timings.json").writeText(buildJsonObject {
+            put("measurement_started_epoch_ms", measurementStarted)
+            put("first_factory_ms", firstPreparationMs)
+            put("warm_factory_ms", warmPreparationMs)
+            put("cache_entries_before", cacheEntriesBefore)
+            put("cache_entries_after", cache.listFiles { file -> file.extension == "json" }.orEmpty().size)
+            put("catalog_ready_count", ready.size)
+            put("observed_schema_count", observedSchemas.size)
+            put("index_build_ms", indexBuildMs)
+            put("index_warmup_passes", 5)
+            put("index_samples", JsonArray(indexRows))
+        }.toString())
         Log.i(TAG, "retrieval_complete cases=${rows.size} catalog=${ready.size} scripted_agent_model_calls=0 business_calls=0")
+    }
+
+    @Test fun verifyEnglishSkillInputs() = runBlocking<Unit> {
+        assumeTrue(arguments.getString("mochiToolRetrievalDiagnostic") == "true")
+        suspend fun available() = app.toolCatalogRepository.loadSummary().readyToolNames() +
+            setOf("load_skill", "request_user_assistance", "delegate_agent")
+        val metadata = app.skillRepository.listEnabledMetadata(available())
+            .prepareForModel(app.englishToolSchemas::prepareInstruction)
+        val loader = LoadSkillTool(
+            repository = app.skillRepository,
+            availableToolNames = available(),
+            prepareText = app.englishToolSchemas::prepareInstruction,
+            availableToolNamesProvider = { available() },
+        )
+        metadata.forEach { skill ->
+            ToolSchemaLanguage.requireEnglishText(skill.description)
+            val result = loader.execute(
+                buildJsonObject { put("skill_name", skill.name) },
+                ToolExecutionContext(LocalDate.now(), MochiSurface.Conversation),
+            )
+            check(result.status == "ok") { "Enabled Skill failed instruction preparation" }
+            ToolSchemaLanguage.requireEnglishText(result.data!!.jsonObject.getValue("content").jsonPrimitive.content)
+        }
+        Log.i(TAG, "english_skills_complete count=${metadata.size} business_calls=0")
     }
 
     @Test fun liveReadOnlyWeatherLoop() = runBlocking<Unit> {

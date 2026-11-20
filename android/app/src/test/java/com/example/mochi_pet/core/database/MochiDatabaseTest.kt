@@ -14,6 +14,8 @@ import com.example.mochi_pet.core.skills.RoomSkillRepository
 import com.example.mochi_pet.core.skills.SkillOrigin
 import com.example.mochi_pet.core.skills.requiredToolNames
 import com.example.mochi_pet.core.skills.readiness
+import com.example.mochi_pet.core.skills.prepareForModel
+import com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage
 import com.example.mochi_pet.core.tools.ToolCatalogSummary
 import com.example.mochi_pet.core.tools.McpServerSummary
 import com.example.mochi_pet.core.tools.McpToolSummary
@@ -142,6 +144,60 @@ class MochiDatabaseTest {
         assertEquals(true, upgraded.content.contains("unverified result"))
         assertFalse(upgraded.content.contains("older extension"))
         assertEquals(false, upgraded.content.contains("Old acceptance-only instructions"))
+    }
+
+    @Test
+    fun `built in Skill instructions and metadata are English without translation`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao(), journalEnabled = { true })
+        val builtIns = repository.listSkills().filter { it.origin == SkillOrigin.BUILT_IN }
+        builtIns.filter { it.id != "builtin:memory-recall" }.forEach { repository.setEnabled(it.id, true) }
+        val available = builtIns.flatMap { it.requiredToolNames }.toSet() +
+            setOf("notion_search", "tencent_docs_get_content", "feishu_search_doc")
+        repository.listEnabledMetadata().forEach {
+            assertTrue(it.name, ToolSchemaLanguage.isEnglishText(it.description))
+        }
+        builtIns.forEach { skill ->
+            assertTrue(skill.id, ToolSchemaLanguage.isEnglishText(skill.content))
+            val name = skill.id.substringAfter("builtin:")
+            if (skill.readiness(available).isReady) {
+                val result = LoadSkillTool(repository, available).execute(
+                    buildJsonObject { put("skill_name", name) },
+                    ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation),
+                )
+                assertEquals(name, "ok", result.status)
+                assertTrue(name, ToolSchemaLanguage.isEnglishText(result.data!!.jsonObject.getValue("content").jsonPrimitive.content))
+            }
+        }
+    }
+
+    @Test
+    fun `market Skill model copies preserve source dependency declarations and recheck revocation`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val original = repository.install(DownloadedSkill(
+            marketId = "fixture/skills/english-view", name = "english-view",
+            description = "读取页面", content = "---\nname: english-view\nallowed-tools: browser_read\n---\n# 读取\n先读取页面。",
+            source = "本地", sourceUrl = "https://example.invalid/SKILL.md", version = "1", digest = "fixture",
+        ))
+        repository.setEnabled(original.id, true)
+        val translations = mapOf("读取页面" to "Read a page", "本地" to "Local", "# 读取\n先读取页面。" to "# Read\nRead the page first.")
+        val prepare: suspend (String) -> String = { translations[it] ?: ToolSchemaLanguage.requireEnglishText(it) }
+        val metadata = repository.listEnabledMetadata(setOf("browser_read")).prepareForModel(prepare)
+            .single { it.name == "english-view" }
+        assertEquals("Read a page", metadata.description)
+        val args = buildJsonObject { put("skill_name", "english-view") }
+        val context = ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation)
+        val result = LoadSkillTool(repository, setOf("browser_read"), prepareText = prepare).execute(args, context)
+        val document = result.data!!.jsonObject.getValue("content").jsonPrimitive.content
+        assertTrue(document.contains("allowed-tools: browser_read"))
+        assertTrue(document.contains("# Read\nRead the page first."))
+        assertTrue(ToolSchemaLanguage.isEnglishText(document))
+        assertEquals(original.content, repository.loadEnabledSkill("english-view")!!.content)
+        assertEquals(original.description, repository.listSkills().single { it.id == original.id }.description)
+        val revoked = LoadSkillTool(repository, setOf("browser_read"), prepareText = {
+            repository.setEnabled(original.id, false)
+            prepare(it)
+        }).execute(args, context)
+        assertEquals("STALE_REF", revoked.code)
     }
 
     @Test
