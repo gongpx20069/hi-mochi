@@ -239,11 +239,11 @@ class AgentPromptBuilder(
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
 
-    private companion object {
-        const val MAX_AVAILABLE_SKILLS = 100
-        const val MAX_PERSONA_SECTION_CHARS = 50_000
-        const val MAX_RECALLED_MEMORY_LINES = 64
-        const val MAX_MEMORY_LINE_CHARS = 20_000
+    companion object {
+        internal const val MAX_AVAILABLE_SKILLS = 100
+        private const val MAX_PERSONA_SECTION_CHARS = 50_000
+        private const val MAX_RECALLED_MEMORY_LINES = 64
+        private const val MAX_MEMORY_LINE_CHARS = 20_000
     }
 }
 
@@ -270,6 +270,7 @@ class AgentOrchestrator(
         { System.nanoTime() / 1_000_000L },
     private val runIdProvider: () -> String = { UUID.randomUUID().toString() },
     private val baseToolNames: Set<String> = ToolDisclosurePolicy.baseNames,
+    private val skillProvider: suspend (String) -> com.example.mochi_pet.core.skills.MochiSkill? = { null },
 ) : AgentRunner {
     init {
         require(maxToolRounds in 1..MAX_TOOL_ROUNDS) {
@@ -290,7 +291,10 @@ class AgentOrchestrator(
         }
         val activeToolRegistry =
             toolRegistryProvider?.invoke(promptRequest) ?: toolRegistry
-        val discovery = ToolDiscovery(activeToolRegistry, baseToolNames)
+        val skillNames = promptRequest.availableSkills.take(AgentPromptBuilder.MAX_AVAILABLE_SKILLS).mapTo(mutableSetOf()) { it.name }
+        val discovery = ToolDiscovery(activeToolRegistry, baseToolNames, skillProvider = { name ->
+            if (name in skillNames) skillProvider(name) else null
+        })
         val runId = runIdProvider()
         val runStartedAt = elapsedRealtimeMillis()
         var modelRounds = 0

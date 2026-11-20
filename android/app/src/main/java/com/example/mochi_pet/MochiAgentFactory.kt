@@ -140,6 +140,7 @@ suspend fun MochiApplication.createAgentRunner(
         uiDirectiveSink = recordingSink,
         appliedNavigationDecision = { appliedNavigation },
         skillCatalogProvider = { availableSkills },
+        skillProvider = skillRepository::loadEnabledSkill,
         toolRegistryProvider = { parentRequest ->
             val coordinator = SerialSubagentCoordinator(
                 executor = SubagentExecutor { type, task, context, modelImage ->
@@ -238,6 +239,7 @@ private suspend fun MochiApplication.executeSubagent(
             navigationPolicy = NavigationPolicy(),
             uiDirectiveSink = UiDirectiveSink { },
             skillCatalogProvider = { availableSkills },
+            skillProvider = skillRepository::loadEnabledSkill,
             maxToolRounds = 30,
             pipelineObserver = AgentPipelineObserver { stage, detail ->
                 parentObserver.onStage(

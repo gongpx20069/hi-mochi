@@ -15,6 +15,7 @@ import com.example.mochi_pet.core.skills.SkillOrigin
 import com.example.mochi_pet.core.skills.requiredToolNames
 import com.example.mochi_pet.core.skills.readiness
 import com.example.mochi_pet.core.skills.prepareForModel
+import com.example.mochi_pet.core.skills.resolveTools
 import com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage
 import com.example.mochi_pet.core.tools.ToolCatalogSummary
 import com.example.mochi_pet.core.tools.McpServerSummary
@@ -213,6 +214,68 @@ class MochiDatabaseTest {
             ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation),
         )
         assertEquals("STALE_REF", result.code)
+    }
+
+    @Test
+    fun `Skill relation resolution shares readiness and headers across mandatory optional and provider tools`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val names = setOf("webdav_list", "webdav_read", "webdav_write", "notion_search", "notion_update_page", "unrelated")
+        for ((name, expected) in mapOf(
+            "webdav-files" to setOf("webdav_list", "webdav_read", "webdav_write"),
+            "notion-knowledge" to setOf("notion_search", "notion_update_page"),
+        )) {
+            repository.setEnabled("builtin:$name", true)
+            val skill = repository.loadEnabledSkill(name)!!
+            val resolved = skill.resolveTools(names)
+            assertEquals(expected, resolved.toolNames)
+            assertTrue(resolved.readiness.isReady)
+            assertEquals(resolved.readiness, skill.readiness(names))
+            val result = LoadSkillTool(repository, names).execute(
+                buildJsonObject { put("skill_name", name) },
+                ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation),
+            )
+            val document = result.data!!.jsonObject.getValue("content").jsonPrimitive.content
+            assertTrue(document.contains("allowed-tools: ${expected.sorted().joinToString(" ")}"))
+            assertFalse(skill.resolveTools(emptySet()).readiness.isReady)
+        }
+    }
+
+    @Test
+    fun `duplicate enabled Skill names cannot silently select a different tools scope`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        for (index in 1..2) {
+            val installed = repository.install(DownloadedSkill(
+                marketId = "fixture/duplicate-$index", name = "duplicate", description = "Read",
+                content = "---\nname: duplicate\nallowed-tools: remote_$index\n---\nRead.",
+                source = "fixture", sourceUrl = "https://example.invalid/SKILL.md", version = "1", digest = "fixture-$index",
+            ))
+            repository.setEnabled(installed.id, true)
+        }
+        assertThrows(com.example.mochi_pet.core.agent.tool.ToolInputException::class.java) {
+            runBlocking { repository.loadEnabledSkill("duplicate") }
+        }
+        repository.setEnabled("fixture/duplicate-2", false)
+        assertEquals(setOf("remote_1"), repository.loadEnabledSkill("duplicate")!!.resolveTools(setOf("remote_1", "remote_2")).toolNames)
+    }
+
+    @Test
+    fun `named Skill lookup does not read unrelated journal permissions and never caches revocation`() = runBlocking {
+        var permissionReads = 0
+        var journal = true
+        val repository = RoomSkillRepository(database.skillDao(), journalEnabled = {
+            permissionReads++
+            journal
+        })
+        repository.setEnabled("builtin:notion-knowledge", true)
+        assertTrue(repository.loadEnabledSkill("notion-knowledge") != null)
+        assertEquals(0, permissionReads)
+        repository.setEnabled("builtin:notion-knowledge", false)
+        assertEquals(null, repository.loadEnabledSkill("notion-knowledge"))
+        assertEquals(0, permissionReads)
+        assertTrue(repository.loadEnabledSkill("memory-recall") != null)
+        journal = false
+        assertEquals(null, repository.loadEnabledSkill("memory-recall"))
+        assertEquals(2, permissionReads)
     }
 
     @Test

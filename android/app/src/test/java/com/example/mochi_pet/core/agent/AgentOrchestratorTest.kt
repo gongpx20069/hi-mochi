@@ -41,6 +41,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentOrchestratorTest {
+    @Test fun `search cannot resolve a Skill absent from this actors visible metadata`() = runBlocking {
+        val client = QueueChatClient(
+            toolResponse("search", "tool_search", """{"query":"document","skill_name":"other-actor"}"""),
+            finalResponse("""{"reply":"Unavailable","emotion":"neutral"}"""),
+        )
+        val runner = AgentOrchestrator(client, ToolRegistry(emptyList()), NavigationPolicy(), {},
+            skillProvider = { error("An unlisted Skill must not be resolved") })
+        runner.run(request())
+        assertTrue(client.requests[1].messages.single { it.toolCallId == "search" }.content!!.contains("NOT_FOUND"))
+        assertEquals(1, client.requests[1].tools.size)
+    }
+
     @Test fun `unprepared schema annotations cannot reach the model`() = runBlocking {
         val tool = object : AgentTool {
             override val name = "get_current_weather"

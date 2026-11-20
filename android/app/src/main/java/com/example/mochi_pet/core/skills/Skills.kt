@@ -75,6 +75,11 @@ data class SkillReadiness(
         get() = missingRequirements.isEmpty()
 }
 
+data class SkillToolResolution(
+    val readiness: SkillReadiness,
+    val toolNames: Set<String>,
+)
+
 interface SkillRepository {
     suspend fun listSkills(): List<MochiSkill>
 
@@ -113,19 +118,15 @@ class RoomSkillRepository(
             it.id in RETIRED_BUILT_IN_SKILL_IDS
         }
         val overrides = activeStored.associateBy(SkillEntity::id)
-        return BUILT_IN_SKILLS.map { skill ->
-            val legacyEnabled = BUILT_IN_SKILL_ID_ALIASES[skill.id]
-                ?.firstNotNullOfOrNull { legacyId ->
-                    overrides[legacyId]?.enabled
-                }
-            skill.copy(
-                enabled = if (skill.id == MEMORY_RECALL_SKILL) journalEnabled() else overrides[skill.id]?.enabled
-                    ?: legacyEnabled
-                    ?: skill.enabled,
-            )
-        } + activeStored
+        return BUILT_IN_SKILLS.map { it.withEnablement(overrides) } + activeStored
             .filterNot { it.id in BUILT_IN_SKILL_IDS }
             .map(SkillEntity::toDomain)
+    }
+
+    private suspend fun MochiSkill.withEnablement(overrides: Map<String, SkillEntity>): MochiSkill {
+        val legacyEnabled = BUILT_IN_SKILL_ID_ALIASES[id]?.firstNotNullOfOrNull { overrides[it]?.enabled }
+        return copy(enabled = if (id == MEMORY_RECALL_SKILL) journalEnabled() else
+            overrides[id]?.enabled ?: legacyEnabled ?: enabled)
     }
 
     override suspend fun listEnabledMetadata(
@@ -140,10 +141,16 @@ class RoomSkillRepository(
             }
             .map(MochiSkill::toAgentSkillMetadata)
 
-    override suspend fun loadEnabledSkill(name: String): MochiSkill? =
-        listSkills().firstOrNull {
-            it.enabled && it.standardName == name
-        }
+    override suspend fun loadEnabledSkill(name: String): MochiSkill? {
+        val stored = skillDao.listAll().filterNot { it.id in RETIRED_BUILT_IN_SKILL_IDS }
+        val overrides = stored.associateBy(SkillEntity::id)
+        val matches = BUILT_IN_SKILLS.filter { it.standardName == name }
+            .map { it.withEnablement(overrides) }.filter(MochiSkill::enabled) +
+            stored.filter { it.enabled && it.id !in BUILT_IN_SKILL_IDS }
+                .map(SkillEntity::toDomain).filter { it.standardName == name }
+        if (matches.size > 1) throw ToolInputException("Ambiguous Skill name: $name. Rename or disable duplicate Skills.")
+        return matches.singleOrNull()
+    }
 
     override suspend fun install(download: DownloadedSkill): MochiSkill {
         val now = clock.instant()
@@ -349,7 +356,8 @@ class LoadSkillTool(
                 "Skill is unavailable or disabled: $skillName",
             )
         val availableToolNames = availableToolNamesProvider()
-        val readiness = skill.readiness(availableToolNames)
+        val resolution = skill.resolveTools(availableToolNames)
+        val readiness = resolution.readiness
         if (!readiness.isReady) {
             return ToolResultEnvelope.error(
                 ToolErrorCode.PERMISSION_DENIED,
@@ -357,9 +365,9 @@ class LoadSkillTool(
                     readiness.missingRequirements.sorted().joinToString(),
             )
         }
-        val document = skill.standardDocument(availableToolNames, prepareText)
+        val document = skill.standardDocument(resolution.toolNames, prepareText)
         if (repository.loadEnabledSkill(skillName) != skill ||
-            availableToolNamesProvider() != availableToolNames
+            skill.resolveTools(availableToolNamesProvider()) != resolution
         ) {
             return ToolResultEnvelope.error(ToolErrorCode.STALE_REF, "Skill or its available Tools changed during preparation; load it again.")
         }
@@ -382,7 +390,7 @@ private val MochiSkill.standardName: String
     }
 
 private suspend fun MochiSkill.standardDocument(
-    availableToolNames: Set<String>,
+    resolvedToolNames: Set<String>,
     prepareText: suspend (String) -> String,
 ): String {
     val modelDescription = ToolSchemaLanguage.requireEnglishText(prepareText(description))
@@ -400,10 +408,7 @@ private suspend fun MochiSkill.standardDocument(
         appendLine(
             "  source: \"${modelSource.yamlEscape()}\"",
         )
-        val permittedTools = requiredToolNames.intersect(availableToolNames) +
-            providerToolNames(availableToolNames) +
-            OPTIONAL_BUILT_IN_SKILL_TOOLS[id].orEmpty().intersect(availableToolNames)
-        permittedTools.takeIf { it.isNotEmpty() }?.let { tools ->
+        resolvedToolNames.takeIf { it.isNotEmpty() }?.let { tools ->
             appendLine("allowed-tools: ${tools.sorted().joinToString(" ")}")
         }
         appendLine("---")
@@ -452,31 +457,26 @@ private fun String.toSkillSlug(): String =
 private fun String.yamlEscape(): String =
     replace("\\", "\\\\").replace("\"", "\\\"")
 
-private fun isValidSkillName(value: String): Boolean =
-    value.length in 1..64 &&
-        Regex("[a-z0-9]+(?:-[a-z0-9]+)*").matches(value)
+private val SKILL_NAME_PATTERN = Regex("[a-z0-9]+(?:-[a-z0-9]+)*")
+
+internal fun isValidSkillName(value: String): Boolean =
+    value.length in 1..64 && SKILL_NAME_PATTERN.matches(value)
 
 private fun parseFrontmatterField(
     content: String,
     field: String,
 ): String? {
-    val lines = content.removePrefix("\uFEFF").lines()
-    if (lines.firstOrNull()?.trim() != "---") {
-        return null
-    }
-    val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
-    if (end < 0) {
-        return null
-    }
-    return lines.subList(1, end + 1)
-        .firstNotNullOfOrNull { line ->
-            val separator = line.indexOf(':')
-            if (separator <= 0 || line.substring(0, separator).trim() != field) {
-                null
-            } else {
-                line.substring(separator + 1).trim().trim('"', '\'')
-            }
+    val lines = content.removePrefix("\uFEFF").lineSequence().iterator()
+    if (!lines.hasNext() || lines.next().trim() != "---") return null
+    var value: String? = null
+    for (line in lines) {
+        if (line.trim() == "---") return value
+        val separator = line.indexOf(':')
+        if (value == null && separator > 0 && line.substring(0, separator).trim() == field) {
+            value = line.substring(separator + 1).trim().trim('"', '\'')
         }
+    }
+    return null
 }
 
 private fun stripFrontmatter(content: String): String {
@@ -492,11 +492,19 @@ private const val INVALID_SKILL_TOOLS = "Invalid Skill tool declaration"
 private data class DeclaredSkillTools(val names: Set<String>, val error: String? = null)
 
 private fun declaredSkillTools(content: String): DeclaredSkillTools {
-    val lines = content.removePrefix("\uFEFF").lines()
-    if (lines.firstOrNull()?.trim() != "---") return DeclaredSkillTools(emptySet())
-    val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
-    if (end < 0) return DeclaredSkillTools(emptySet(), INVALID_SKILL_TOOLS)
-    val fields = lines.subList(1, end + 1).joinToString("\n").trimIndent().lines()
+    val lines = content.removePrefix("\uFEFF").lineSequence().iterator()
+    if (!lines.hasNext() || lines.next().trim() != "---") return DeclaredSkillTools(emptySet())
+    val header = mutableListOf<String>()
+    var closed = false
+    for (line in lines) {
+        if (line.trim() == "---") {
+            closed = true
+            break
+        }
+        header += line
+    }
+    if (!closed) return DeclaredSkillTools(emptySet(), INVALID_SKILL_TOOLS)
+    val fields = header.joinToString("\n").trimIndent().lines()
     val key = Regex("""^(?:allowed-tools|"allowed-tools"|'allowed-tools')\s*:""")
     val declarations = fields.indices.filter { key.containsMatchIn(fields[it]) }
     if (declarations.isEmpty()) return DeclaredSkillTools(emptySet())
@@ -609,13 +617,21 @@ private fun MochiSkill.providerToolNames(available: Set<String>): Set<String> =
 
 fun MochiSkill.readiness(
     availableToolNames: Set<String>,
-): SkillReadiness {
+): SkillReadiness = resolveTools(availableToolNames).readiness
+
+fun MochiSkill.resolveTools(availableToolNames: Set<String>): SkillToolResolution {
+    val declared = declaredSkillTools(content)
+    val required = BUILT_IN_SKILL_TOOLS[id] ?: declared.names
     val providerTools = providerToolNames(availableToolNames)
-    return SkillReadiness(
-        requiredTools = requiredToolNames,
-        readyTools = requiredToolNames.intersect(availableToolNames) + providerTools,
-        anyToolRequirements = DOCUMENT_SKILL_PROVIDERS[id]?.first?.let { mapOf(it to providerTools) }.orEmpty(),
-        declarationError = declaredSkillTools(content).error,
+    val readyTools = required.intersect(availableToolNames) + providerTools
+    return SkillToolResolution(
+        readiness = SkillReadiness(
+            requiredTools = required,
+            readyTools = readyTools,
+            anyToolRequirements = DOCUMENT_SKILL_PROVIDERS[id]?.first?.let { mapOf(it to providerTools) }.orEmpty(),
+            declarationError = declared.error,
+        ),
+        toolNames = readyTools + OPTIONAL_BUILT_IN_SKILL_TOOLS[id].orEmpty().intersect(availableToolNames),
     )
 }
 

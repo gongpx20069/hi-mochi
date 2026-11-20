@@ -31,7 +31,7 @@ android/
 - An Android 8.0 or newer device or emulator
 
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
-The wrapper pins Gradle 9.9.1 with its official distribution SHA-256.
+The wrapper pins Gradle 9.9.2 with its official distribution SHA-256.
 The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
 and serialization 1.13.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply
@@ -136,9 +136,10 @@ Tool discovery and payload regressions:
 ```
 
 These exercise local discovery, both ordinary-function API loops, scoped/live
-availability, Skill readiness and the actual serialized base-schema budgets.
+availability, shared Skill relations, scoped-search revocation/cancellation,
+Skill readiness and the actual serialized base-schema budgets.
 `BaseToolSchemasTest` prints `SCHEMA_SIZE_TOTALS` in its test output without
-executing Tools or contacting a model. Policy, workflow and measured baseline
+executing Tools or contacting a model. Policy, workflow and current measurements
 are owned by [Tool discovery and disclosure](architecture/TOOL_DESIGN.md).
 
 For authorized device evaluation, the opt-in `core.agent.ToolSearchDiagnosticTest`
@@ -146,9 +147,11 @@ uses the production Agent factory with an injectable transport. After updating
 matching app/test APKs in place, `inspectAvailableCatalog` with
 `-e mochiToolRetrievalDiagnostic true` logs enabled Tool names only.
 `measureRetrievalCases` with the same opt-in reads the app-cache file
-`tool-retrieval-cases.json`: an array of objects with `group`, `query`, and
-`expected` (relevant Tool names; empty for negative queries). Label cases before
-running them. It adds exact-name cases for all enabled deferred Tools and writes
+`tool-retrieval-cases.json`: an array of objects with `group`, `query`,
+optional `skill_name`, and `expected` (relevant Tool names; empty for negative
+queries). If absent, it uses the checked-in instrumentation asset
+`tool-search-english-cases.json`. Label cases before running them.
+It adds exact-name cases for all enabled deferred Tools and writes
 `tool-retrieval-results.json` in app cache, including ordered Top-5 results,
 explicit unavailable-case skips and local search/continuation durations.
 Its scripted Agent transport makes no model calls and executes only `tool_search`.
@@ -161,6 +164,14 @@ contains a separate in-memory BM25 microbenchmark over schemas observed during
 the run (five warmup passes, twenty samples per query), with snapshot and actual
 Top-5 results for comparison. These scripted timings exclude model inference
 and business Tool execution; they are not user-facing task latency.
+Add `-e mochiCompareSkillScopes true` for paired global/scoped queries,
+alternating execution order between pairs. Explicit queries use pre-labelled
+Skill names; generated exact-name checks choose the smallest available
+associated Skill scope (name breaks ties). Queries without a scope run once
+globally. Reports include candidate counts, search-result bytes and next-request
+Tool-array bytes. A counterfactual byte count adds descriptions from those same
+matched schemas to quantify avoided duplicate result text. These are UTF-8
+payload sizes, not model token counts.
 With the same opt-in, `verifyEnglishSkillInputs` checks enabled Skill discovery
 and `load_skill` documents for English model-facing instructions without
 executing their workflows. Uncached translations can consume model quota.
@@ -170,7 +181,7 @@ negative-query false positives; this curated sample is not production accuracy.
 Separately, `liveReadOnlyWeatherLoop` with
 `-e mochiToolSearchLiveDiagnostic true` consumes quota on the active saved model
 connection, using its normal foreground deadline. Its transport guard permits
-only `tool_search` and one `amap_weather` call for Shanghai adcode `310000`;
+`load_skill`, `tool_search` and one `amap_weather` call for Shanghai adcode `310000`;
 other calls fail before dispatch. Amap must already be configured/enabled.
 It checks search, subsequent schema visibility, real Tool success and a final
 reply without changing saved connection settings or reading user history.
@@ -181,7 +192,9 @@ grant permissions or enable a provider to make them pass.
 with `-e mochiLiveToolQueryDiagnostic true`, evaluates the active model's own
 search queries using the production factory and Agent prompt. Supply at most
 60 pre-labelled synthetic cases in app cache `live-tool-query-cases.json` with
-the same `group`, `query`, `expected` fields. Only the Chinese user query reaches
+the same `group`, `query`, `expected` fields, or use the checked-in
+`tool-search-chinese-cases.json` instrumentation asset when that file is absent.
+Only the Chinese user query reaches
 the model, never the expected labels. Private persona/history/memory are omitted;
 normal enabled Skill metadata and base Tools remain visible. The guard permits
 only `load_skill` and `tool_search` and rejects an entire response containing

@@ -443,6 +443,8 @@ Knowledge require **any one** enabled Tool from their connected, enabled
 provider. All other Skills require every declared mandatory Tool; explicitly
 optional capabilities do not block enablement. Provider-backed groups require
 the provider to be installed when applicable, connected, and enabled.
+Name-based loading rejects multiple enabled Skills with the same standard name;
+the user must rename or disable duplicates rather than silently selecting one.
 
 Model-facing Skill descriptions and loaded instructions are English, independent
 of UI locale. Built-ins are authored in English; installed/localized source
@@ -492,6 +494,13 @@ Tools present in the calling registry, including writes when available.
 Other Skills declare their mandatory Tools plus available, explicitly listed
 optional Tools (for example assistance, location or navigation). The header
 never synthesizes a missing alias or changes Tool enablement.
+`MochiSkill.resolveTools` is the shared, pure relation resolver for readiness,
+this header and Skill-scoped discovery. It returns readiness separately from
+all associated available names: optional Tools affect the search/header set
+but never become mandatory prerequisites. It reads original declarations and
+the caller's full available registry, not translated prose or disclosed schemas.
+The optional `tool_search.skill_name` contract is owned by
+[Tool design](TOOL_DESIGN.md#skill-scoped-search).
 
 The default-on `app-assistant` (App Assistant) Skill provides short, generic
 instructions for selected-app operation, safe popup dismissal, verification and

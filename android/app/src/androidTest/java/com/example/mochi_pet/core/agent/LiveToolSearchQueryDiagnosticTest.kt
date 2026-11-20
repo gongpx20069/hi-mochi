@@ -45,8 +45,11 @@ class LiveToolSearchQueryDiagnosticTest {
         assumeTrue(InstrumentationRegistry.getArguments().getString("mochiLiveToolQueryDiagnostic") == "true")
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MochiApplication
         val source = app.cacheDir.resolve("live-tool-query-cases.json")
-        check(source.length() in 1..65_536) { "A bounded pre-labelled synthetic query fixture is required" }
-        val cases = Json.parseToJsonElement(source.readText()).jsonArray
+        val sourceText = if (source.exists()) source.readText() else
+            InstrumentationRegistry.getInstrumentation().context.assets.open("tool-search-chinese-cases.json")
+                .bufferedReader().use { it.readText() }
+        check(sourceText.length in 1..65_536) { "A bounded pre-labelled synthetic query fixture is required" }
+        val cases = Json.parseToJsonElement(sourceText).jsonArray
         check(cases.size in 1..60) { "Live evaluation allows at most sixty cases" }
         val before = app.providerSettingsRepository.loadProfiles()
         val config = app.providerSettingsRepository.loadRuntimeConfig().forForegroundRequest()
@@ -123,6 +126,8 @@ class LiveToolSearchQueryDiagnosticTest {
                                 put("status", envelope.getValue("status"))
                                 envelope["code"]?.let { put("code", it) }
                                 put("returned_tools", JsonArray(found.map(::JsonPrimitive)))
+                                (envelope["data"] as? JsonObject)?.get("candidate_count")?.let { put("candidate_count", it) }
+                                put("result_bytes", envelope.toString().toByteArray(Charsets.UTF_8).size)
                             }
                         }
                         throw DiagnosticStop("searched")

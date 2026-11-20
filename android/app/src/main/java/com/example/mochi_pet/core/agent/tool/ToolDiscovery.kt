@@ -1,5 +1,8 @@
 package com.example.mochi_pet.core.agent.tool
 
+import com.example.mochi_pet.core.skills.MochiSkill
+import com.example.mochi_pet.core.skills.isValidSkillName
+import com.example.mochi_pet.core.skills.resolveTools
 import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.ln
@@ -30,11 +33,10 @@ object ToolDisclosurePolicy {
 
     val searchSchema = functionToolSchema(
         name = SEARCH_NAME,
-        description = "Search this actor's enabled tools by capability or exact name; does not execute them. " +
-            "Use for maps, documents, connected services, extensions or other tools not already supplied. " +
-            "Write queries in English with the service, operation and object; translate the user's wording first. " +
-            "Exact tool names are also accepted. Matched complete definitions are added to the NEXT " +
-            "model request; do not call newly found tools in this same response. Refine the query on a miss.",
+        description = "Find this actor's available tools, without executing them. Query in English by service, " +
+            "operation and object, or exact tool name; translate the user's wording first. " +
+            "For capability searches within a known Skill, set skill_name. Complete definitions arrive in the NEXT request; " +
+            "do not call newly found tools in this response.",
         properties = buildJsonObject {
             put("query", buildJsonObject {
                 put("type", "string")
@@ -47,6 +49,14 @@ object ToolDisclosurePolicy {
                 put("minimum", 1)
                 put("maximum", 8)
                 put("description", "Maximum matching tools to load; default 5.")
+            })
+            put("skill_name", buildJsonObject {
+                put("type", "string")
+                put("description", "Optional exact Skill name from Available Skills (same as load_skill), to narrow capability searches. " +
+                    "Omit for exact Tool-name lookups or cross-Skill/unknown workflows. No global fallback. " +
+                    "Does not require load_skill.")
+                put("minLength", 1)
+                put("maxLength", 64)
             })
         },
         required = listOf("query"),
@@ -63,6 +73,7 @@ class ToolDiscovery(
     private val registry: ToolRegistry,
     baseNames: Set<String> = ToolDisclosurePolicy.baseNames,
     private val maxVisibleBytes: Int = ToolDisclosurePolicy.MAX_VISIBLE_BYTES,
+    private val skillProvider: suspend (String) -> MochiSkill? = { null },
 ) {
     private val loaded = registry.names.intersect(baseNames).toMutableSet()
     private val index = ToolSearchIndex(registry.schemas)
@@ -114,7 +125,7 @@ class ToolDiscovery(
     }
 
     private suspend fun search(arguments: JsonObject): ToolResultEnvelope {
-        if (arguments.keys.any { it !in setOf("query", "limit") }) throw ToolInputException("Unexpected search fields")
+        if (arguments.keys.any { it !in setOf("query", "limit", "skill_name") }) throw ToolInputException("Unexpected search fields")
         val query = (arguments["query"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()
             ?: throw ToolInputException("query must be a string")
         if (query.isBlank() || query.length > 512) throw ToolInputException("query must contain 1-512 characters")
@@ -122,14 +133,33 @@ class ToolDiscovery(
             (arguments["limit"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
                 ?.takeIf { it in 1..8 } ?: throw ToolInputException("limit must be an integer from 1 to 8")
         } else 5
+        val skillName = if ("skill_name" in arguments) {
+            (arguments["skill_name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?.takeIf(::isValidSkillName)
+                ?: throw ToolInputException("skill_name must be an exact listed Skill name, 1-64 lowercase letters, digits or hyphens")
+        } else null
+        val skill = skillName?.let {
+            skillProvider(it)?.takeIf(MochiSkill::enabled)
+                ?: return ToolResultEnvelope.error(ToolErrorCode.NOT_FOUND, "Skill is unavailable in this actor: $it")
+        }
         val available = registry.availableSchemas().associateBy(::schemaName)
         loaded.retainAll(available.keys)
-        val ranked = index.search(query).filter { it in available }
+        val resolution = skill?.resolveTools(available.keys)
+        if (resolution != null && !resolution.readiness.isReady) {
+            return ToolResultEnvelope.error(ToolErrorCode.PERMISSION_DENIED, "Skill requirements are unavailable; check its Tool settings.")
+        }
+        val candidates = resolution?.toolNames ?: available.keys
+        val scopeData = buildJsonObject {
+            skillName?.let { put("skill_name", it) }
+            put("candidate_count", candidates.size)
+        }
+        val ranked = index.search(query, candidates)
         if (ranked.isEmpty()) {
             return ToolResultEnvelope.error(
                 ToolErrorCode.NOT_FOUND,
-                "No available tool matched. Try a capability, service name, English synonym or exact tool name.",
-            )
+                if (skillName == null) "No available tool matched. Try a service, operation, English synonym or exact tool name."
+                else "No associated tool matched this Skill scope. Refine the query or omit skill_name for a separate broader search.",
+            ).copy(data = scopeData)
         }
         val selected = mutableListOf<JsonObject>()
         val omitted = mutableListOf<JsonObject>()
@@ -149,6 +179,11 @@ class ToolDiscovery(
         }
         // Recheck after suspending availability reads before publishing any selection.
         val live = registry.availableSchemas().mapTo(mutableSetOf(), ::schemaName)
+        if (skillName != null &&
+            (skillProvider(skillName) != skill || skill?.resolveTools(live) != resolution)
+        ) {
+            return ToolResultEnvelope.error(ToolErrorCode.STALE_REF, "Skill or its associated Tools changed during search; search again.")
+        }
         currentCoroutineContext().ensureActive()
         loaded.retainAll(live)
         val accepted = selected.filter { schemaName(it) in live }
@@ -163,16 +198,15 @@ class ToolDiscovery(
         }
         loaded += accepted.map(::schemaName)
         return ToolResultEnvelope.success(buildJsonObject {
+            scopeData.forEach { (key, value) -> put(key, value) }
             put("loaded_tools", JsonArray(accepted.map { schema ->
-                val function = schema.getValue("function").jsonObject
                 buildJsonObject {
                     put("name", schemaName(schema))
-                    put("description", function["description"]?.jsonPrimitive?.content.orEmpty().take(256))
                 }
             }))
             put("omitted_for_budget", JsonArray(omitted))
             put("more_matches", ranked.size > limit)
-            put("notice", "Complete definitions are supplied in the next request's tools. Search does not execute them.")
+            put("notice", "Use loaded tools in the next request.")
         })
     }
 
@@ -194,9 +228,9 @@ internal class ToolSearchIndex(schemas: List<JsonObject>) {
     private val averageLength = entries.map { it.length }.average().takeIf { it.isFinite() } ?: 1.0
     private val documentFrequency = entries.flatMap { it.counts.keys }.groupingBy { it }.eachCount()
 
-    fun search(query: String): List<String> {
+    fun search(query: String, candidates: Set<String>? = null): List<String> {
         val terms = tokens(query).toSet()
-        return entries.map { entry ->
+        return entries.asSequence().filter { candidates == null || it.name in candidates }.map { entry ->
             val exact = entry.name.equals(query, ignoreCase = true)
             val score = terms.sumOf { term ->
                 val count = entry.counts[term]?.toDouble() ?: return@sumOf 0.0
@@ -209,7 +243,7 @@ internal class ToolSearchIndex(schemas: List<JsonObject>) {
         }.filter { it.second || it.third > 0.0 }
             .sortedWith(compareByDescending<Triple<String, Boolean, Double>> { it.second }
                 .thenByDescending { it.third }.thenBy { it.first })
-            .map { it.first }
+            .map { it.first }.toList()
     }
 
     private fun tokens(value: String): List<String> {

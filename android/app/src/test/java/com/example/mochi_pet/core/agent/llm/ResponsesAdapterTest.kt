@@ -9,6 +9,10 @@ import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
 import com.example.mochi_pet.core.agent.tool.functionToolSchema
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.navigation.NavigationPolicy
+import com.example.mochi_pet.core.skills.AgentSkillMetadata
+import com.example.mochi_pet.core.skills.MochiSkill
+import com.example.mochi_pet.core.skills.SkillOrigin
+import java.time.Instant
 import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
@@ -28,7 +32,7 @@ import org.junit.Before
 import org.junit.Test
 
 class ResponsesAdapterTest {
-    @Test fun `ordinary tool search round trip loads schemas on Chat and Responses without native search items`() = runBlocking {
+    @Test fun `Skill scoped search round trip loads schemas on Chat and Responses without native search items`() = runBlocking {
         for (protocol in ApiProtocol.entries) {
             var executions = 0
             val fixture = object : AgentTool {
@@ -50,12 +54,22 @@ class ResponsesAdapterTest {
                 } else {
                     """{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"$id","type":"function","function":{"name":"$name","arguments":$args}}]}}]}"""
                 }
-            server.enqueue(response(call("search", "tool_search", """"{\"query\":\"fixture\"}"""")))
+            server.enqueue(response(call("search", "tool_search", """"{\"query\":\"fixture\",\"skill_name\":\"fixture-skill\"}"""")))
             server.enqueue(response(call("execute", "fixture", """"{}"""")))
             server.enqueue(response(if (protocol == ApiProtocol.RESPONSES) FINAL else
                 """{"choices":[{"message":{"role":"assistant","content":"{\"reply\":\"ok\"}"}}]}"""))
             val runner = AgentOrchestrator(
                 client, ToolRegistry(listOf(fixture)), NavigationPolicy(), {},
+                skillCatalogProvider = { listOf(AgentSkillMetadata("fixture-skill", "Fixture", "builtin://fixture-skill")) },
+                skillProvider = {
+                    MochiSkill(
+                        id = "fixture-skill", name = "fixture-skill", description = "Fixture",
+                        content = "---\nname: fixture-skill\nallowed-tools: fixture\n---\nRead.",
+                        origin = SkillOrigin.MARKET, source = "fixture", sourceUrl = "",
+                        upstreamDigest = "fixture", localDigest = "fixture", enabled = true, modified = false,
+                        updateAvailable = false, installedAt = Instant.EPOCH, updatedAt = Instant.EPOCH,
+                    )
+                },
             )
             val result = runner.run(AgentRunRequest(
                 config(protocol = protocol), "Use the fixture", "neutral",
@@ -74,6 +88,7 @@ class ResponsesAdapterTest {
             assertEquals(setOf("tool_search", "fixture"), names(bodies[1]))
             val input = bodies[1].getValue(if (protocol == ApiProtocol.RESPONSES) "input" else "messages").jsonArray
             assertTrue(input.last().toString().contains("loaded_tools"))
+            assertTrue(input.last().toString().contains("fixture-skill"))
             assertEquals("search", input.last().jsonObject.getValue(
                 if (protocol == ApiProtocol.RESPONSES) "call_id" else "tool_call_id",
             ).jsonPrimitive.content)

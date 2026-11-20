@@ -22,6 +22,7 @@ import com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.skills.LoadSkillTool
 import com.example.mochi_pet.core.skills.prepareForModel
+import com.example.mochi_pet.core.skills.resolveTools
 import com.example.mochi_pet.core.tools.readyToolNames
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
@@ -60,16 +61,39 @@ class ToolSearchDiagnosticTest {
             check(!previous.exists() || previous.delete()) { "Cannot remove the previous diagnostic artifact" }
         }
         val source = app.cacheDir.resolve("tool-retrieval-cases.json")
-        check(source.length() in 1..65_536) { "A bounded, pre-labelled query fixture is required" }
-        val cases = Json.parseToJsonElement(source.readText()).jsonArray.toMutableList()
+        val sourceText = if (source.exists()) source.readText() else
+            InstrumentationRegistry.getInstrumentation().context.assets.open("tool-search-english-cases.json")
+                .bufferedReader().use { it.readText() }
+        check(sourceText.length in 1..65_536) { "A bounded, pre-labelled query fixture is required" }
+        val cases = Json.parseToJsonElement(sourceText).jsonArray.map { it.jsonObject }.toMutableList()
         val ready = app.toolCatalogRepository.loadSummary().readyToolNames()
+        val compareScopes = arguments.getString("mochiCompareSkillScopes") == "true"
+        val actorReady = ready + setOf("load_skill", "request_user_assistance", "delegate_agent")
+        val scopes = app.skillRepository.listEnabledMetadata(actorReady).associate { metadata ->
+            metadata.name to checkNotNull(app.skillRepository.loadEnabledSkill(metadata.name)).resolveTools(actorReady).toolNames
+        }
         (ready - ToolDisclosurePolicy.baseNames).sorted().forEach { name ->
             cases += buildJsonObject {
                 put("group", "exact")
                 put("query", name)
                 put("expected", JsonArray(listOf(JsonPrimitive(name))))
+                if (compareScopes) {
+                    scopes.entries.filter { name in it.value }.minWithOrNull(
+                        compareBy<Map.Entry<String, Set<String>>> { it.value.size }.thenBy { it.key },
+                    )?.let { put("skill_name", it.key) }
+                }
             }
         }
+        val measurements = if (compareScopes) cases.flatMapIndexed { caseIndex, case ->
+            val global = buildJsonObject {
+                case.filterKeys { it != "skill_name" }.forEach { (key, value) -> put(key, value) }
+                put("variant", "global")
+            }
+            if ("skill_name" !in case) listOf(global) else listOf(global, buildJsonObject {
+                case.forEach { (key, value) -> put(key, value) }
+                put("variant", "scoped")
+            }).let { if (caseIndex % 2 == 0) it else it.reversed() }
+        } else cases
         var current = buildJsonObject {}
         var round = 0
         var started = 0L
@@ -82,17 +106,19 @@ class ToolSearchDiagnosticTest {
         val observedSchemas = linkedMapOf<String, JsonObject>()
         val client = object : OpenAiChatClient {
             override suspend fun complete(config: OpenAiProviderConfig, request: OpenAiChatRequest): OpenAiChatResponse {
+                val requestReadyAt = SystemClock.elapsedRealtime()
                 request.tools.filter { ToolDiscovery.schemaName(it) != ToolDisclosurePolicy.SEARCH_NAME }
                     .forEach { observedSchemas[ToolDiscovery.schemaName(it)] = it }
                 val names = request.tools.mapTo(mutableSetOf(), ToolDiscovery::schemaName)
                 if (round++ == 0) {
                     check(names.all { it in ToolDisclosurePolicy.baseNames }) { "Deferred schema leaked into initial request" }
-                    started = SystemClock.elapsedRealtime()
+                    started = requestReadyAt
                     initialRequestMs = started - runStarted
                     return response(OpenAiChatMessage("assistant", toolCalls = listOf(
                         OpenAiToolCall("search", function = OpenAiFunctionCall("tool_search", buildJsonObject {
                             put("query", current.getValue("query"))
                             put("limit", 5)
+                            current["skill_name"]?.let { put("skill_name", it) }
                         }.toString())),
                     )))
                 }
@@ -103,15 +129,28 @@ class ToolSearchDiagnosticTest {
                 val found = (envelope["data"] as? JsonObject)?.get("loaded_tools")?.jsonArray
                     ?.map { it.jsonObject.getValue("name").jsonPrimitive.content }.orEmpty()
                 check(found.all { it in names }) { "Search results did not become callable on the next request" }
+                val data = envelope["data"] as? JsonObject
+                val duplicatedDescriptions = if (data == null || "loaded_tools" !in data) envelope else
+                    JsonObject(envelope + ("data" to JsonObject(data + ("loaded_tools" to JsonArray(found.map { name ->
+                        val schema = request.tools.single { ToolDiscovery.schemaName(it) == name }
+                        buildJsonObject {
+                            put("name", name)
+                            put("description", schema.getValue("function").jsonObject["description"]?.jsonPrimitive?.content.orEmpty().take(256))
+                        }
+                    })))))
                 result = buildJsonObject {
                     current.forEach { (key, value) -> put(key, value) }
                     put("status", envelope.getValue("status"))
                     envelope["code"]?.let { put("code", it) }
                     put("top5", JsonArray(found.map(::JsonPrimitive)))
-                    put("elapsed_ms", SystemClock.elapsedRealtime() - started)
+                    put("elapsed_ms", requestReadyAt - started)
                     put("initial_request_ms", initialRequestMs)
                     put("tool_phase_ms", continuationStarted - toolStarted)
-                    put("next_request_ms", SystemClock.elapsedRealtime() - continuationStarted)
+                    put("next_request_ms", requestReadyAt - continuationStarted)
+                    put("next_tools_bytes", ToolDisclosurePolicy.arrayBytes(request.tools))
+                    put("result_bytes", envelope.toString().toByteArray(Charsets.UTF_8).size)
+                    put("result_with_descriptions_bytes", duplicatedDescriptions.toString().toByteArray(Charsets.UTF_8).size)
+                    (envelope["data"] as? JsonObject)?.get("candidate_count")?.let { put("candidate_count", it) }
                 }
                 return response(OpenAiChatMessage("assistant", """{"reply":"diagnostic","emotion":"neutral"}"""))
             }
@@ -136,7 +175,7 @@ class ToolSearchDiagnosticTest {
         val warmPreparationMs = SystemClock.elapsedRealtime() - warmPreparationStarted
         Log.i(TAG, "warm_preparation_complete elapsed_ms=$warmPreparationMs")
         val config = OpenAiProviderConfig(endpoint = "https://example.invalid", apiKey = "unused", model = "local")
-        for (case in cases) {
+        for (case in measurements) {
             current = case.jsonObject
             val expected = current.getValue("expected").jsonArray.map { it.jsonPrimitive.content }
             if (expected.isNotEmpty() && expected.none { it in ready }) {
@@ -157,7 +196,7 @@ class ToolSearchDiagnosticTest {
                 put("run_ms", SystemClock.elapsedRealtime() - runStarted)
             }
             app.cacheDir.resolve("tool-retrieval-results.json").writeText(JsonArray(rows).toString())
-            if (rows.size % 10 == 0) Log.i(TAG, "retrieval_progress cases=${rows.size}/${cases.size}")
+            if (rows.size % 10 == 0) Log.i(TAG, "retrieval_progress cases=${rows.size}/${measurements.size}")
         }
         val report = JsonArray(rows).toString()
         app.cacheDir.resolve("tool-retrieval-results.json").writeText(report)
@@ -165,21 +204,24 @@ class ToolSearchDiagnosticTest {
         val index = ToolSearchIndex(observedSchemas.values.toList())
         val indexBuildMs = (SystemClock.elapsedRealtimeNanos() - indexStarted) / 1_000_000.0
         val measuredRows = rows.filter { it["top5"] != null }
+        fun candidates(row: JsonObject): Set<String>? =
+            row["skill_name"]?.jsonPrimitive?.content?.let { scopes[it].orEmpty() }
         repeat(5) {
-            measuredRows.forEach { index.search(it.getValue("query").jsonPrimitive.content) }
+            measuredRows.forEach { index.search(it.getValue("query").jsonPrimitive.content, candidates(it)) }
         }
         val indexRows = measuredRows.map { row ->
             val query = row.getValue("query").jsonPrimitive.content
             val samples = List(20) {
                 val before = SystemClock.elapsedRealtimeNanos()
-                index.search(query)
+                index.search(query, candidates(row))
                 JsonPrimitive((SystemClock.elapsedRealtimeNanos() - before) / 1_000_000.0)
             }
             buildJsonObject {
                 put("group", row.getValue("group"))
                 put("query", query)
+                row["skill_name"]?.let { put("skill_name", it) }
                 put("samples_ms", JsonArray(samples))
-                put("snapshot_top5", JsonArray(index.search(query).take(5).map(::JsonPrimitive)))
+                put("snapshot_top5", JsonArray(index.search(query, candidates(row)).take(5).map(::JsonPrimitive)))
                 put("actual_top5", row.getValue("top5"))
             }
         }
@@ -244,7 +286,7 @@ class ToolSearchDiagnosticTest {
                 val started = SystemClock.elapsedRealtime()
                 val response = app.openAiChatClient.complete(config, request)
                 response.choices.single().message.toolCalls.orEmpty().forEach { call ->
-                    check(call.type == "function" && call.function.name in setOf("tool_search", "amap_weather")) {
+                    check(call.type == "function" && call.function.name in setOf("load_skill", "tool_search", "amap_weather")) {
                         "Model requested an operation outside the diagnostic read-only allowlist"
                     }
                     when (call.function.name) {

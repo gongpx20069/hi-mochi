@@ -27,6 +27,8 @@ authorized to execute are different states.
   cancellation and existing round limits.
 - Search metadata/indexes are derived from that registry, never another
   actor's registry. They contain no credentials or user documents.
+- `MochiSkill.resolveTools` owns shared relation resolution for Skill readiness,
+  loaded `allowed-tools` headers and Skill-scoped search.
 - Skill readiness uses the full authorized registry, not the disclosed subset.
   Reading a Skill never enables a Tool or automatically loads a whole provider.
 
@@ -107,9 +109,66 @@ a document may search for document Tools later in the same run.
 
 ## 4. Search and budgets
 
-`tool_search` accepts a nonblank `query` (up to 512 characters) and optional
-integer `limit` (1-8, default 5). Unknown fields, invalid types and empty
-queries return the normal `INVALID_ARGS` envelope.
+`tool_search` accepts a nonblank `query` (up to 512 characters), optional
+integer `limit` (1-8, default 5), and optional `skill_name`. Unknown fields,
+invalid types and empty queries return the normal `INVALID_ARGS` envelope.
+
+### Skill-scoped search
+
+`skill_name` is the exact standard name from this actor's visible Skill
+metadata, identical to the name used by `load_skill`: 1-64 lowercase ASCII
+letters/digits with single separating hyphens. It is a hard candidate filter,
+not a ranking hint, authorization grant or request to load every associated
+schema. Omission searches all currently available actor-owned Tools.
+
+The English parameter description tells the model when and how to scope:
+
+> Optional exact Skill name from Available Skills (same as load_skill), to narrow
+> capability searches. Omit for exact Tool-name lookups or cross-Skill/unknown
+> workflows. No global fallback. Does not require load_skill.
+
+Exact-name lookups already rank first and do not need a Skill lookup; omitting
+redundant scope avoids extra arguments and repository reads. If supplied anyway,
+the scope still applies strictly.
+
+For example:
+
+```json
+{"query":"Add fields to a smart table","skill_name":"tencent-docs-knowledge","limit":5}
+```
+
+The shared relation resolver combines original mandatory declarations,
+explicit optional Tools and provider-associated names, intersected with the
+actor's live available registry. Mandatory/any-provider readiness remains a
+separate check; optional Tools never block readiness. Installed Skills without
+Tool declarations have an empty scope, not unrestricted search. The host does
+not infer associations from translated instructions or maintain a second map.
+
+The model may read a Skill first for workflow guidance, but scoped search does
+not force an additional `load_skill` round or translate its body. The last-read
+Skill never implicitly changes later searches. The run gates lookup on its
+visible Skill metadata and reloads the enabled original Skill before search
+and before publication; relation changes or Skill edits/revocation during the
+search return `STALE_REF` without loading new definitions.
+Named lookup reads current overrides without rebuilding every Skill or reading
+unrelated journal permissions. Name/dependency parsing stops at the closing
+frontmatter delimiter instead of splitting instruction bodies. Neither
+optimization caches live enablement.
+
+| Condition | Result |
+| --- | --- |
+| Malformed/ambiguous name or invalid argument | `INVALID_ARGS` |
+| Unknown, disabled or actor-unlisted Skill | `NOT_FOUND` |
+| Skill's mandatory/provider requirements unavailable | `PERMISSION_DENIED` |
+| Empty association set or no lexical match in scope | `NOT_FOUND`; explicit suggestion to refine or omit scope |
+| Skill or resolved relationship changes while searching | `STALE_REF` |
+
+No error silently falls back to global search. Exact names also obey the
+scope; the model must make a separate broader search if appropriate. Scope
+does not hide previously loaded Tools or replace execution-time authorization.
+Results include `candidate_count` and, when specified, `skill_name`; names of
+matches are returned once, without repeating descriptions already supplied in
+the next request's full schemas.
 
 ### Model-facing language and preparation
 
@@ -163,15 +222,23 @@ rejects unprepared non-English annotations before any model request.
 
 Search is deterministic and local:
 
-1. Filter to the current registry and live enabled/connected candidates.
+1. Filter to the current registry, live enabled/connected candidates and the
+   optional resolved Skill scope.
 2. Prefer exact names; split identifier separators/camel case and normalize
    case/Unicode. Index names and descriptions, not nested parameter prose.
 3. Rank lexical matches with BM25 and a name boost. Include Chinese character
    bigrams and a small shared Chinese/English capability vocabulary. It is not
    an embedding model and must not pretend to understand arbitrary synonyms.
 4. Select ranked complete definitions subject to count and serialized-byte
-   budgets. Ties use stable names. Return loaded names, descriptions and
+   budgets. Ties use stable names. Return loaded names and
    explicit no-match/omitted-budget information.
+
+One immutable index is built per run. Scoped search skips excluded entries
+before scoring and Top-K selection, while retaining full-registry document
+frequencies and length statistics. It does not rebuild per-Skill indexes or
+filter an already truncated global Top-K; eligible Tools keep their original
+relative BM25 ordering. There are no embeddings, extra inference requests or
+cross-run permission caches.
 
 Budgets count compact UTF-8 JSON, including array separators, not characters
 or a fixed number of bytes per token. The next request's visible Tool array
@@ -244,21 +311,7 @@ Search shares existing Tool-round limits and cancellation. It is not business
 evidence for cards. A timeout does not imply a write failed; existing executor
 readback/idempotency rules remain authoritative.
 
-## 6. Native Responses search: deferred follow-up
-
-Native client search is **not part of this implementation**. It would declare
-`type: tool_search`, `execution: client`, receive `tool_search_call`, and return
-definitions in `tool_search_output.tools` inside the next `input`. Those
-definitions need not be duplicated in top-level `tools`. It requires typed
-search items, namespace mapping and deployment compatibility verification.
-
-Hosted search is different again: it declares the candidate definitions
-up front with `defer_loading`. Saving model context does not remove that
-initial upload. See [Azure Responses tool search](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/tool-search).
-Do not pass either native protocol into the ordinary function path or change
-Provider settings based on a timeout.
-
-## 7. Measurement and acceptance
+## 6. Measurement and acceptance
 
 The base-schema measurement must construct the real Kotlin Tool definitions,
 not approximate source-code lengths. Record the ordinary Chat array and the
@@ -269,23 +322,20 @@ Do not convert byte counts into claimed model token usage without tokenization.
 `BaseToolSchemasTest` constructs all real foreground base definitions with
 fail-fast dependencies, asserts exact membership of the base policy, and
 serializes both protocol arrays without executing any Tool or calling a model.
-Measured baseline (all 25 available; compact UTF-8 bytes):
+Current measurement (all 25 available; compact UTF-8 bytes):
 
 | Set | Chat Completions | Responses |
 | --- | ---: | ---: |
-| 16 entries, before adding App and Media | 15,365 bytes (15.00 KiB) | 15,397 bytes (15.04 KiB) |
-| 25 entries, including App and Media | **20,747 bytes (20.26 KiB)** | **20,797 bytes (20.31 KiB)** |
-| Added cost of App + Media | 5,382 bytes | 5,400 bytes |
+| Complete 25-entry base set | **20,902 bytes (20.41 KiB)** | **20,952 bytes (20.46 KiB)** |
+| `tool_search` definition | 1,037 bytes | 1,039 bytes |
 
 The largest individual Chat definitions are `manage_mochi_schedule`
 (1,877 bytes), `navigate_mochi_ui` (1,824), and `recall_memory` (1,704).
-`tool_search` itself is 882 bytes in Chat and 884 in Responses.
 Actual actor runs may send less when a base capability is unavailable.
 
-**Conclusion: keep the expanded 25-entry base set.** Its maximum measured
-array occupies about 63% of the 32 KiB regression budget and avoids a discovery
-round for common Browser, App and Media tasks. The nine added App/Media entries
-cost only about 5.3 KiB. Large or uncommon provider schemas stay deferred.
+The base array occupies about 64% of the 32 KiB regression budget and avoids a
+discovery round for common Browser, App and Media tasks. Large or uncommon
+provider schemas stay deferred.
 This is a payload-size decision, not a measured token, accuracy or end-to-end
 latency guarantee. The regression test fails if either protocol's actual base
 array crosses 32 KiB; rerun it when a base schema changes.
@@ -301,102 +351,106 @@ Acceptance covers:
 - Invalid/no-match/budget-limited searches, undisclosed calls, same-response
   speculative calls, cancellation, revocation and separate runs fail safely.
 - Skill readiness remains based on full scoped availability.
+- Optional Skill scope uses the shared relationship resolver, filters before
+  Top-K, never widens silently, and rechecks edits/revocation before publication.
+- Search results omit descriptions duplicated in next-request schemas.
 - Payload-size regression checks protect the base budget; end-to-end
   task latency/selection quality still need real deployment/device evaluation.
 
 Small schemas reduce transfer overhead; they do not fix TCP/TLS delays or
 guarantee every model request finishes before the unchanged foreground limit.
 
-### Phone retrieval and latency measurements
+### Device measurements
 
-Measured on 2026-11-20 on a Xiaomi M2012K11AC (alioth, ARM64), with existing
-connections and permissions unchanged, app version 1.0.20, 74 catalog-ready
-Tools and 77 observed registry schemas. English translation caches were warm.
-The pre-optimization runtime was `baa7dd3`; the optimized build batches catalog
-availability reads without changing BM25, query fixtures, ranking weights,
-disclosure budgets or the model-request deadline. Device diagnostic entry
-points and report formats are in [Development](../DEVELOPMENT.md).
+Measured on 2026-11-21 with a Xiaomi M2012K11AC (alioth, ARM64), debug app
+version 1.0.20, unchanged connections/permissions and warm English caches.
+There were 74 catalog-ready Tools and 77 observed registry schemas.
+Fixtures and opt-in reproduction instructions are in
+[Development](../DEVELOPMENT.md). No private history/persona/memory is used.
 
-**Fixed-query retrieval.** The scripted transport executes only `tool_search`,
-using 44 pre-labelled English queries plus 53 generated exact-name checks.
-Top-1/Top-5 mean the single designated target ranks first/within five, not
-exhaustive relevance precision or production task accuracy.
+**Paired retrieval:** 44 fixed English queries plus 53 generated exact names;
+89 positive queries run both globally and with Skill scope, alternating pair
+order. Eight no-dedicated-integration negatives run globally, for 186 searches.
+Every observed ranking agrees with the in-memory index; global ranking is
+unchanged. Top-1/Top-5 mean one designated target ranks first/within five,
+not exhaustive relevance precision or business-task success.
 
-| Query group | Cases | Top-1 target hits | Top-5 target hits |
+| Query group | Cases | Global Top-1 / Top-5 | Scoped Top-1 / Top-5 |
 | --- | ---: | ---: | ---: |
-| Explicit service + operation + object | 24 | 23/24 (95.8%) | 24/24 (100%) |
-| Manually authored natural paraphrases | 12 | 1/12 (8.3%) | 7/12 (58.3%) |
-| Exact deferred Tool names | 53 | 53/53 (100%) | 53/53 (100%) |
+| Explicit service + operation + object | 24 | 23/24 / 24/24 | 23/24 / 24/24 |
+| Manually authored natural paraphrases | 12 | 1/12 / 7/12 | 2/12 / 8/12 |
+| Exact deferred names | 53 | 53/53 / 53/53 | 53/53 / 53/53 |
 
-The paraphrases are not queries generated by the main model. They expose
-lexical mismatches such as "columns" versus "fields" and "rows" versus
-"records"; their hit rate is not the Chinese-user-to-Agent success rate.
-Of eight queries without a matching dedicated integration, six still returned
-generic or unrelated candidates. Browser/App workarounds may exist, but a
-nonempty search result must not be interpreted as dedicated service support.
+Across the 36 descriptive queries, Top-5 target recall is **86.1% globally
+and 88.9% scoped**. Scope removes cross-provider interference, not within-provider
+lexical mismatches such as "columns"/"fields" and "rows"/"records".
+The manually authored paraphrases are not queries generated by the main model.
+Six of eight negative queries return generic/unrelated candidates; a nonempty
+result is not proof of dedicated service support. Browser/App workarounds may
+exist. This curated set is not a production accuracy estimate.
 
-All **97 ordered Top-5 lists**, case statuses and labels were identical before
-and after batching. Each run's in-memory snapshot also reproduced all 97
-actual search rankings.
+For the same 36 descriptive-query pairs:
 
-| Local phase | Before median / P95 | Batched median / P95 |
+| Metric | Global median / P95 | Scoped median / P95 |
 | --- | ---: | ---: |
-| Search response through next request's schema readiness | 8,680 / 8,763.6 ms | **38 / 48.4 ms** |
-| Scripted Agent run, excluding factory | 11,745 / 11,834.8 ms | 83 / 110.4 ms |
-| Warm in-memory BM25 only | 0.669 / 1.018 ms | 0.107 / 0.154 ms |
+| Eligible candidates | 77 / 77 | 23.5 / 35 |
+| Warm BM25 scoring | 0.131 / 0.170 ms | 0.102 / 0.137 ms |
+| Search through next request's schema readiness | 41 / 51.25 ms | 57 / 67 ms |
+| Search result envelope | 359 / 396 bytes | 375 / 434 bytes |
+| Next-request Tool array | 27,404 / 71,743 bytes | 27,393.5 / 71,743 bytes |
 
-Search/continuation timings cover 97 cases and include live availability and
-schema preparation, but no model inference or business execution. Pure BM25
-has five warmup passes and 1,940 timed samples. Phone load, scheduling, GC and
-thermal state were not controlled; the microbenchmark difference is not an
-algorithm improvement. First/cache-warm factory times were 736/615 ms before
-and 842/535 ms after, so no factory speedup is established.
+BM25 measurements use five warmup passes and 720 timed samples per variant.
+Host timings include current permission/schema checks and, for scope, fresh
+Skill resolution and revalidation; they exclude factory work, model inference
+and business execution. Scoping saves scoring work but adds about 16 ms to
+the measured median host path. Exact-name queries should omit redundant scope.
+Phone scheduling, GC and thermal state are not controlled; these are observations,
+not latency guarantees.
 
-The dominant removed cost was repeated whole-catalog JSON decoding for every
-candidate in every availability pass, not BM25 scoring. Batched registry
-discovery and Skill readiness now read one catalog snapshot per pass.
-Regression tests count these reads, restrict results to actor-owned names,
-and verify revocation both before search publication and before execution.
-Skill loading also rejects a changed available-Tool set after asynchronous
-English preparation, including optional-Tool revocation. Phone checks of all
-13 enabled Skills passed after this change.
+**Payload:** for the same 36 descriptive queries, the current result envelopes
+total 12,316 bytes globally and 13,385 bytes scoped. Adding duplicate descriptions
+from the returned schemas to those same results would produce 35,018 and
+35,987 bytes respectively: omitting duplication saves **64.8% / 62.8%**.
+The next-request Tool arrays total 1,186,072 / 1,188,623 bytes; this set does not
+establish schema-payload savings from scope alone. These are compact UTF-8 bytes,
+not tokenizer counts or billed tokens. Scope narrows eligible Tools but does
+not guarantee fewer matches, smaller definitions or a faster overall turn.
 
-**Chinese request to model-generated query.** A separate pre-optimization run
-used the active `gpt-6.1-terra` connection, Responses and the unchanged
-20-second request deadline: 44 synthetic Chinese tasks, 65 model requests,
-no private persona/history/memory and no business execution. Only `load_skill`
-and `tool_search` were permitted; measurement stopped at the next request
-boundary after the first search batch.
+**Chinese request to main-model query:** 44 synthetic tasks on the active
+`gpt-6.1-terra` connection, Responses, with the normal 20-second request
+deadline. The diagnostic permits only `load_skill`/`tool_search` and stops at
+the next request boundary after the first search batch, before business execution.
 
 | Observed route | Positive tasks (36) | No-dedicated-integration tasks (8) |
 | --- | ---: | ---: |
-| Reached search | 12 | 8 |
-| Provider error around the 20-second deadline | 11 | 0 |
-| Requested assistance; intercepted before dispatch | 7 | 0 |
-| Replied without search | 6 | 0 |
+| Reached search | 17 | 8 |
+| Assistance/location call intercepted before dispatch | 15 | 0 |
+| Replied without search | 4 | 0 |
+| Provider error or timeout | 0 | 0 |
 
-All 26 emitted search queries were English. The 18 queries from searched
-positive tasks comprised 14 exact names and four capability phrases; all
-18 retrieved their query-level intended Tool at rank one. This **18/18**
-conditional result excludes tasks that never searched. The original task's
-final target appeared in the first batch for **10/12** searched positive
-tasks; the other two first searched file-location prerequisites, not the
-wrong Tool for their emitted query. Neither metric proves business completion.
+All **25 search queries were English**; six of the 17 positive queries used a
+valid related Skill scope, with no scope errors or out-of-scope results.
+All seven exact-name positive queries ranked their named Tool first.
+The original task's final target appeared in the first batch for **12/17**
+searched positive tasks (11 at rank one). Four other tasks first searched a
+file-location prerequisite; one compound table-search/update query missed its
+final update Tool. These are distinct from scope-selection errors. Missing
+document identifiers can legitimately require assistance or prerequisite
+lookup; conditional retrieval hits do not establish success across all 36 tasks.
+Six of eight negative queries returned generic/unrelated candidates.
 
-Across the 20 searched cases, Agent-start-to-results latency was
-23,015.5 ms median / 39,732.4 ms P95, excluding factory preparation.
-Search-response-to-next-request latency was 8,883.5 / 20,745.4 ms, including
-same-response Skill loads and multiple searches. Individual model requests
-across all 65 requests took 4,732 / 20,021.8 ms. Stage medians are not additive.
-Six of eight negative tasks returned generic or unrelated candidates.
-Missing document IDs can legitimately require assistance or a prerequisite
-lookup; these routes are not automatically Agent failures.
+| Live phase | Samples | Median / P95 |
+| --- | ---: | ---: |
+| Individual model request | 69 | 2,638 / 3,908.6 ms |
+| Search response through next request readiness | 25 | 146 / 261.8 ms |
+| Agent start through search results, excluding factory | 25 | 3,576 / 5,895.4 ms |
+| Factory preparation for searched cases | 25 | 472 / 561.8 ms |
 
-The live-model figures are **pre-optimization**, not a measurement of current
-end-to-end latency. The optimized local rerun isolates the host improvement;
-it does not establish improved model routing, eliminate provider timeouts,
-or fix lexical no-match behavior. Retain BM25 and English capability-query
-guidance. Follow-up retrieval work should evaluate service-aware candidate
-filtering and calibrated no-match handling against both positive and negative
-fixtures before changing ranking; no embedding model is required by these
-measurements.
+Live host timings can include same-response Skill loads and multiple searches;
+model/network conditions and phone scheduling vary. Stage medians are not
+additive, and the zero observed timeouts do not guarantee future requests.
+
+Phone verification also covers all 13 enabled Skills' English model inputs and
+a guarded live chain through search, next-request schema disclosure, one public
+Shanghai Amap weather call and a successful final reply. This does not certify
+arbitrary provider writes or full business-task accuracy.
