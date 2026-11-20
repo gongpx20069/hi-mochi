@@ -201,6 +201,21 @@ class MochiDatabaseTest {
     }
 
     @Test
+    fun `optional Skill tools revoked during translation cannot remain in the returned header`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        var available = setOf("app_read", "media_read")
+        val tool = LoadSkillTool(repository, available, prepareText = {
+            available = setOf("app_read")
+            it
+        }, availableToolNamesProvider = { available })
+        val result = tool.execute(
+            buildJsonObject { put("skill_name", "app-assistant") },
+            ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation),
+        )
+        assertEquals("STALE_REF", result.code)
+    }
+
+    @Test
     fun `market skill can be installed and locally edited`() = runBlocking {
         val repository = RoomSkillRepository(database.skillDao())
         repository.install(

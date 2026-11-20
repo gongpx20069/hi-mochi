@@ -448,6 +448,9 @@ interface ToolCatalogRepository {
 
     suspend fun isToolAvailable(name: String): Boolean = isBuiltInEnabled(name)
 
+    suspend fun availableToolNames(names: Set<String>): Set<String> =
+        names.filterTo(mutableSetOf()) { isToolAvailable(it) }
+
     suspend fun loadEnabledMcpTools(): List<AgentTool>
 
     suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool>
@@ -1548,17 +1551,20 @@ class DataStoreToolCatalogRepository(
         if (name == "recall_memory") return journalEnabled()
         val descriptor = BUILT_IN_TOOLS.firstOrNull { it.name == name }
             ?: return false
-        val catalog = loadCatalog()
-        if (descriptor.isAgentBrowserTool() && !catalog.agentBrowserEnabled) {
+        return loadCatalog().isBuiltInEnabled(descriptor)
+    }
+
+    private fun PersistedToolCatalog.isBuiltInEnabled(descriptor: BuiltInToolDescriptor): Boolean {
+        if (descriptor.isAgentBrowserTool() && !agentBrowserEnabled) {
             return false
         }
-        if (descriptor.isMediaTool() && !catalog.mediaEnabled) {
+        if (descriptor.isMediaTool() && !mediaEnabled) {
             return false
         }
-        if (descriptor.isAppControlTool() && catalog.appControlEnabled != true) {
+        if (descriptor.isAppControlTool() && appControlEnabled != true) {
             return false
         }
-        return catalog.builtInEnabled[name] ?: descriptor.defaultEnabled
+        return builtInEnabled[descriptor.name] ?: descriptor.defaultEnabled
     }
 
     override suspend fun loadEnabledMcpTools(): List<AgentTool> {
@@ -1568,39 +1574,67 @@ class DataStoreToolCatalogRepository(
         }
     }
 
-    override suspend fun isToolAvailable(name: String): Boolean {
+    override suspend fun isToolAvailable(name: String): Boolean =
+        name in availableToolNames(setOf(name))
+
+    override suspend fun availableToolNames(names: Set<String>): Set<String> {
         currentCoroutineContext().ensureActive()
-        val catalog = loadCatalog().withBuiltInServers()
-        val descriptor = BUILT_IN_TOOLS.firstOrNull { it.name == name }
-        if (descriptor != null) {
-            return isBuiltInEnabled(name) &&
-                (!descriptor.isAmapTool() || catalog.amapEnabled && catalog.amapCredentials != null)
-        }
-        if (name in com.example.mochi_pet.core.agentlink.AGENTLINK_TOOLS) {
-            val state = agentLinkClient?.refresh() ?: return false
-            return state.enabled && state.authorized && state.connected && name in state.enabledTools
-        }
-        val extension = when {
-            name.startsWith("termux_") && catalog.termuxEnabled -> termuxClient to catalog.termuxToolsEnabled
-            name.startsWith("webdav_") && catalog.webdavEnabled -> webdavClient to catalog.webdavToolsEnabled
-            name.startsWith("mijia_") && catalog.mijiaEnabled -> extensionClient to catalog.mijiaToolsEnabled
-            else -> null
-        }
-        if (extension != null) {
-            val snapshot = extension.first.snapshot()
-            return snapshot.connected && snapshot.tools.any {
-                it.name == name && (extension.second[it.name] ?: it.defaultEnabled)
+        if (names.isEmpty()) return emptySet()
+        val catalog = loadCatalog()
+        val remaining = names.toMutableSet()
+        val available = mutableSetOf<String>()
+        for (descriptor in BUILT_IN_TOOLS) {
+            if (!remaining.remove(descriptor.name)) continue
+            val enabled = if (descriptor.name == "recall_memory") journalEnabled() else catalog.isBuiltInEnabled(descriptor)
+            if (enabled && (!descriptor.isAmapTool() || catalog.amapEnabled && catalog.amapCredentials != null)) {
+                available += descriptor.name
             }
         }
-        return catalog.servers.any { server ->
-            server.enabled && server.isConnected() && server.tools.any {
-                it.enabled && mcpToolAlias(server.id, it.definition.name) == name
-            }
-        } || catalog.restConnections.any { stored ->
-            stored.connection.enabled && stored.connection.tools.any {
-                it.enabled && com.example.mochi_pet.core.rest.restToolAlias(stored.connection.id, it.id) == name
+        val agentLinkNames = remaining.intersect(com.example.mochi_pet.core.agentlink.AGENTLINK_TOOLS.toSet())
+        if (agentLinkNames.isNotEmpty()) {
+            remaining -= agentLinkNames
+            val state = agentLinkClient?.refresh()
+            if (state != null && state.enabled && state.authorized && state.connected) {
+                available += agentLinkNames.intersect(state.enabledTools)
             }
         }
+        suspend fun includeExtension(
+            prefix: String,
+            enabled: Boolean,
+            client: MochiExtensionClient,
+            switches: Map<String, Boolean>,
+        ) {
+            if (!enabled) return
+            val requested = remaining.filterTo(mutableSetOf()) { it.startsWith(prefix) }
+            if (requested.isEmpty()) return
+            remaining -= requested
+            val snapshot = client.snapshot()
+            if (snapshot.connected) {
+                available += snapshot.tools.filter { it.name in requested && (switches[it.name] ?: it.defaultEnabled) }
+                    .map { it.name }
+            }
+        }
+        includeExtension("termux_", catalog.termuxEnabled, termuxClient, catalog.termuxToolsEnabled)
+        includeExtension("webdav_", catalog.webdavEnabled, webdavClient, catalog.webdavToolsEnabled)
+        includeExtension("mijia_", catalog.mijiaEnabled, extensionClient, catalog.mijiaToolsEnabled)
+        for (server in catalog.servers) {
+            if (!server.enabled || !server.isConnected()) continue
+            for (tool in server.tools) {
+                if (!tool.enabled) continue
+                val name = mcpToolAlias(server.id, tool.definition.name)
+                if (name in remaining) available += name
+            }
+        }
+        for (stored in catalog.restConnections) {
+            if (!stored.connection.enabled) continue
+            for (tool in stored.connection.tools) {
+                if (!tool.enabled) continue
+                val name = com.example.mochi_pet.core.rest.restToolAlias(stored.connection.id, tool.id)
+                if (name in remaining) available += name
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        return available
     }
 
     override suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool> {

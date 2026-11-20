@@ -39,6 +39,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
@@ -68,6 +69,44 @@ import org.robolectric.annotation.Config
 class ToolCatalogTest {
     // The fake MCP client performs no HTTP; this literal keeps URL validation DNS-free.
     private val manualEndpoint = "https://203.0.113.1/mcp"
+
+    @Test fun `availability batches read one catalog and one extension snapshot without retaining permission`() = runBlocking {
+        repository.configureAmap("synthetic-key", "")
+        repository.configureTencentDocs("synthetic-token")
+        var reads = 0
+        var journal = true
+        val countedStore = object : DataStore<Preferences> by dataStore {
+            override val data = dataStore.data.onStart { reads++ }
+        }
+        val extension = RecordingExtensionClient(TrustedExtension.WEBDAV)
+        val catalog = DataStoreToolCatalogRepository(
+            countedStore, PlaintextCipher, client, webdavClient = extension, journalEnabled = { journal },
+        )
+        catalog.setWebdavEnabled(true)
+        val names = setOf("app_read", "media_read", "recall_memory", "amap_weather",
+            "tencent_docs_get_content", "webdav_list", "webdav_read", "invented")
+        reads = 0
+        extension.snapshotCalls = 0
+        assertEquals(names - "invented", catalog.availableToolNames(names))
+        assertEquals(1, reads)
+        assertEquals(1, extension.snapshotCalls)
+        repository.setAppControlEnabled(false)
+        repository.setAmapEnabled(false)
+        repository.setServerEnabled(TENCENT_DOCS_SERVER_ID, false)
+        journal = false
+        extension.connected = false
+        reads = 0
+        assertEquals(setOf("media_read"), catalog.availableToolNames(names))
+        assertEquals(1, reads)
+        reads = 0
+        assertFalse(catalog.isToolAvailable("app_read"))
+        assertEquals(1, reads)
+        reads = 0
+        val snapshots = extension.snapshotCalls
+        assertEquals(emptySet<String>(), catalog.availableToolNames(emptySet()))
+        assertEquals(0, reads)
+        assertEquals(snapshots, extension.snapshotCalls)
+    }
 
     @Test fun `changed external schemas prepare after persistence without translating UI metadata`() = runBlocking {
         val prepared = mutableListOf<JsonObject>()
@@ -386,6 +425,7 @@ class ToolCatalogTest {
         var connected = true
         var waitForCancellation = false
         var cancelled = false
+        var snapshotCalls = 0
         val started = CompletableDeferred<Unit>()
         val executions = mutableListOf<ExtensionToolScope>()
         private val tools = when (identity) {
@@ -403,7 +443,7 @@ class ToolCatalogTest {
                 if (connected) ExtensionConnectionStatus.CONNECTED else ExtensionConnectionStatus.DISCONNECTED,
                 null, null, 0, 0,
             ),
-        )
+        ).also { snapshotCalls++ }
 
         override fun agentTool(definition: ExtensionToolDefinition, scope: ExtensionToolScope) = object : AgentTool {
             override val name = definition.name

@@ -91,16 +91,15 @@ suspend fun MochiApplication.createAgentRunner(
             readOnlyAgentBrowserTools(agentBrowserRuntime)
         }
     }
-    val enabledBuiltIns = builtInTools.filter { tool ->
-        toolCatalogRepository.isBuiltInEnabled(tool.name)
-    }.toMutableList()
+    val enabledBuiltInNames = toolCatalogRepository.availableToolNames(builtInTools.mapTo(mutableSetOf()) { it.name })
+    val enabledBuiltIns = builtInTools.filter { it.name in enabledBuiltInNames }.toMutableList()
     toolCatalogRepository.loadAmapCredentials()?.let { credentials ->
-        enabledBuiltIns += amapMapTools(
+        val mapTools = amapMapTools(
             client = amapMapsClient,
             credentials = credentials,
-        ).filter { tool ->
-            toolCatalogRepository.isBuiltInEnabled(tool.name)
-        }
+        )
+        val availableMaps = toolCatalogRepository.availableToolNames(mapTools.mapTo(mutableSetOf()) { it.name })
+        enabledBuiltIns += mapTools.filter { it.name in availableMaps }
     }
     val tools = (
         enabledBuiltIns +
@@ -129,14 +128,14 @@ suspend fun MochiApplication.createAgentRunner(
             availableToolNames = tools.mapTo(mutableSetOf()) { it.name },
             prepareText = englishToolSchemas::prepareInstruction,
             availableToolNamesProvider = {
-                tools.filter { isAgentToolAvailable(it.name) }.mapTo(mutableSetOf()) { it.name }
+                availableAgentToolNames(tools.mapTo(mutableSetOf()) { it.name })
             },
         )
     }
     val modelTools = englishToolSchemas.prepare(tools)
     return AgentOrchestrator(
         chatClient = chatClient,
-        toolRegistry = ToolRegistry(modelTools) { isAgentToolAvailable(it) },
+        toolRegistry = ToolRegistry(modelTools, ::availableAgentToolNames) { isAgentToolAvailable(it) },
         navigationPolicy = navigationPolicy,
         uiDirectiveSink = recordingSink,
         appliedNavigationDecision = { appliedNavigation },
@@ -159,7 +158,7 @@ suspend fun MochiApplication.createAgentRunner(
                     )
                 },
             )
-            ToolRegistry(modelTools + DelegateAgentTool(coordinator)) { isAgentToolAvailable(it) }
+            ToolRegistry(modelTools + DelegateAgentTool(coordinator), ::availableAgentToolNames) { isAgentToolAvailable(it) }
         },
         pipelineObserver = observer,
         diagnosticLogger = diagnosticLogger,
@@ -169,6 +168,11 @@ suspend fun MochiApplication.createAgentRunner(
 private suspend fun MochiApplication.isAgentToolAvailable(name: String): Boolean =
     name in setOf("load_skill", "request_user_assistance", "delegate_agent") ||
         toolCatalogRepository.isToolAvailable(name)
+
+private suspend fun MochiApplication.availableAgentToolNames(names: Set<String>): Set<String> {
+    val runtimeNames = names.intersect(setOf("load_skill", "request_user_assistance", "delegate_agent"))
+    return runtimeNames + toolCatalogRepository.availableToolNames(names - runtimeNames)
+}
 
 private suspend fun MochiApplication.executeSubagent(
     type: SubagentType,
@@ -193,9 +197,8 @@ private suspend fun MochiApplication.executeSubagent(
     if (type == SubagentType.ANALYST) {
         tools += SandboxedJavaScriptTool(javaScriptExecutor)
     }
-    val enabledTools = tools.filter { tool ->
-        toolCatalogRepository.isBuiltInEnabled(tool.name)
-    }.toMutableList()
+    val enabledNames = toolCatalogRepository.availableToolNames(tools.mapTo(mutableSetOf()) { it.name })
+    val enabledTools = tools.filter { it.name in enabledNames }.toMutableList()
     enabledTools += toolCatalogRepository.loadEnabledReadOnlyMcpTools()
     enabledTools += toolCatalogRepository.loadEnabledExtensionTools(ExtensionToolScope.SUBAGENT)
     val availableSkills = skillRepository.listEnabledMetadata(
@@ -208,7 +211,7 @@ private suspend fun MochiApplication.executeSubagent(
             availableToolNames =
                 enabledTools.mapTo(mutableSetOf()) { it.name },
             availableToolNamesProvider = {
-                enabledTools.filter { isAgentToolAvailable(it.name) }.mapTo(mutableSetOf()) { it.name }
+                availableAgentToolNames(enabledTools.mapTo(mutableSetOf()) { it.name })
             },
         )
     }
@@ -231,7 +234,7 @@ private suspend fun MochiApplication.executeSubagent(
         }
         AgentOrchestrator(
             chatClient = openAiChatClient,
-            toolRegistry = ToolRegistry(modelTools) { isAgentToolAvailable(it) },
+            toolRegistry = ToolRegistry(modelTools, ::availableAgentToolNames) { isAgentToolAvailable(it) },
             navigationPolicy = NavigationPolicy(),
             uiDirectiveSink = UiDirectiveSink { },
             skillCatalogProvider = { availableSkills },

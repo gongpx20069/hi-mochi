@@ -359,7 +359,7 @@ class LoadSkillTool(
         }
         val document = skill.standardDocument(availableToolNames, prepareText)
         if (repository.loadEnabledSkill(skillName) != skill ||
-            !skill.readiness(availableToolNamesProvider()).isReady
+            availableToolNamesProvider() != availableToolNames
         ) {
             return ToolResultEnvelope.error(ToolErrorCode.STALE_REF, "Skill or its available Tools changed during preparation; load it again.")
         }

@@ -112,6 +112,7 @@ interface AgentTool {
 
 class ToolRegistry(
     tools: List<AgentTool>,
+    private val availableNames: (suspend (Set<String>) -> Set<String>)? = null,
     private val isAvailable: suspend (String) -> Boolean = { true },
 ) {
     private val toolsByName: Map<String, AgentTool>
@@ -133,9 +134,9 @@ class ToolRegistry(
 
     suspend fun availableSchemas(): List<JsonObject> {
         currentCoroutineContext().ensureActive()
-        val available = toolsByName.values.filter { isAvailable(it.name) }.map(AgentTool::schema)
+        val snapshot = availableNames?.invoke(names) ?: names.filterTo(mutableSetOf()) { isAvailable(it) }
         currentCoroutineContext().ensureActive()
-        return available
+        return toolsByName.filterKeys { it in snapshot }.values.map(AgentTool::schema)
     }
 
     suspend fun execute(

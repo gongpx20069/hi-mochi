@@ -15,6 +15,38 @@ import org.junit.Test
 class ToolDiscoveryTest {
     private val context = ToolExecutionContext(LocalDate.of(2026, 11, 17), MochiSurface.Face)
 
+    @Test fun `batch availability is scoped and execution still checks live permission`() = runBlocking {
+        val tools = (1..80).map { fixture("remote_$it", "Read data") }
+        var batches = 0
+        var individualChecks = 0
+        var enabled = true
+        val registry = ToolRegistry(tools, availableNames = { requested ->
+            batches++
+            assertEquals(tools.map { it.name }.toSet(), requested)
+            requested + "another_actors_tool"
+        }, isAvailable = {
+            individualChecks++
+            enabled
+        })
+        assertEquals(80, registry.availableSchemas().size)
+        assertEquals(1, batches)
+        assertEquals(0, individualChecks)
+        enabled = false
+        assertEquals("PERMISSION_DENIED", registry.execute("remote_1", "{}", context).code)
+        assertEquals(1, individualChecks)
+    }
+
+    @Test fun `search rechecks a batch snapshot before publishing newly discovered tools`() = runBlocking {
+        val tool = fixture("remote_read", "Read")
+        var batches = 0
+        val discovery = ToolDiscovery(ToolRegistry(listOf(tool), availableNames = { requested ->
+            if (++batches == 1) requested else emptySet()
+        }))
+        assertEquals("PERMISSION_DENIED", search(discovery, """{"query":"remote_read"}""").code)
+        assertEquals(2, batches)
+        assertEquals(setOf("tool_search"), discovery.names())
+    }
+
     @Test fun `base apps and media are visible but document schemas require search`() = runBlocking {
         val app = fixture("app_read", "Read apps")
         val media = fixture("media_control", "Playback")

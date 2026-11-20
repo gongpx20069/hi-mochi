@@ -48,6 +48,7 @@ API 37 shared-memory emulation; this does not change the APK runtime.
 Host UI tests pin Espresso 3.8.0-alpha01 and Test Core 1.8.0-alpha01: Espresso
 3.7.0 reflects on the removed `InputManager.getInstance()` API on Android 17.
 These are test-only dependencies, not production application libraries.
+Host and extension JVM tests use Robolectric 4.18.1; keep their pins aligned.
 Keep machine-specific SDK paths in `android/local.properties`; do not commit
 that file. The first build downloads the pinned sherpa-onnx Android AAR from
 its upstream GitHub release and verifies its SHA-256 before use.
