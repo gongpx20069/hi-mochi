@@ -9,10 +9,12 @@ import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolInputException
 import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
 import com.example.mochi_pet.core.agent.tool.functionToolSchema
+import com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -47,6 +49,12 @@ data class AgentSkillMetadata(
     val location: String,
 )
 
+suspend fun List<AgentSkillMetadata>.prepareForModel(
+    prepareText: suspend (String) -> String,
+): List<AgentSkillMetadata> = map { skill ->
+    skill.copy(description = ToolSchemaLanguage.requireEnglishText(prepareText(skill.description)))
+}
+
 data class SkillReadiness(
     val requiredTools: Set<String>,
     val readyTools: Set<String>,
@@ -67,6 +75,11 @@ data class SkillReadiness(
     val isReady: Boolean
         get() = missingRequirements.isEmpty()
 }
+
+data class SkillToolResolution(
+    val readiness: SkillReadiness,
+    val toolNames: Set<String>,
+)
 
 interface SkillRepository {
     suspend fun listSkills(): List<MochiSkill>
@@ -106,19 +119,15 @@ class RoomSkillRepository(
             it.id in RETIRED_BUILT_IN_SKILL_IDS
         }
         val overrides = activeStored.associateBy(SkillEntity::id)
-        return BUILT_IN_SKILLS.map { skill ->
-            val legacyEnabled = BUILT_IN_SKILL_ID_ALIASES[skill.id]
-                ?.firstNotNullOfOrNull { legacyId ->
-                    overrides[legacyId]?.enabled
-                }
-            skill.copy(
-                enabled = if (skill.id == MEMORY_RECALL_SKILL) journalEnabled() else overrides[skill.id]?.enabled
-                    ?: legacyEnabled
-                    ?: skill.enabled,
-            )
-        } + activeStored
+        return BUILT_IN_SKILLS.map { it.withEnablement(overrides) } + activeStored
             .filterNot { it.id in BUILT_IN_SKILL_IDS }
             .map(SkillEntity::toDomain)
+    }
+
+    private suspend fun MochiSkill.withEnablement(overrides: Map<String, SkillEntity>): MochiSkill {
+        val legacyEnabled = BUILT_IN_SKILL_ID_ALIASES[id]?.firstNotNullOfOrNull { overrides[it]?.enabled }
+        return copy(enabled = if (id == MEMORY_RECALL_SKILL) journalEnabled() else
+            overrides[id]?.enabled ?: legacyEnabled ?: enabled)
     }
 
     override suspend fun listEnabledMetadata(
@@ -133,10 +142,16 @@ class RoomSkillRepository(
             }
             .map(MochiSkill::toAgentSkillMetadata)
 
-    override suspend fun loadEnabledSkill(name: String): MochiSkill? =
-        listSkills().firstOrNull {
-            it.enabled && it.standardName == name
-        }
+    override suspend fun loadEnabledSkill(name: String): MochiSkill? {
+        val stored = skillDao.listAll().filterNot { it.id in RETIRED_BUILT_IN_SKILL_IDS }
+        val overrides = stored.associateBy(SkillEntity::id)
+        val matches = BUILT_IN_SKILLS.filter { it.standardName == name }
+            .map { it.withEnablement(overrides) }.filter(MochiSkill::enabled) +
+            stored.filter { it.enabled && it.id !in BUILT_IN_SKILL_IDS }
+                .map(SkillEntity::toDomain).filter { it.standardName == name }
+        if (matches.size > 1) throw ToolInputException("Ambiguous Skill name: $name. Rename or disable duplicate Skills.")
+        return matches.singleOrNull()
+    }
 
     override suspend fun install(download: DownloadedSkill): MochiSkill {
         val now = clock.instant()
@@ -302,14 +317,16 @@ private const val MAX_SKILL_CHARS = 200_000
 class LoadSkillTool(
     private val repository: SkillRepository,
     private val availableToolNames: Set<String>,
+    private val prepareText: suspend (String) -> String = { ToolSchemaLanguage.requireEnglishText(it) },
+    private val availableToolNamesProvider: suspend () -> Set<String> = { availableToolNames },
 ) : AgentTool {
     override val name: String = "load_skill"
 
     override val schema: JsonObject = functionToolSchema(
         name = name,
         description =
-            "Load the full instructions for one enabled Agent Skill. " +
-                "Use only a skill name listed in available_skills.",
+            "Load an enabled Skill's instructions and related Tool directory. " +
+                "Use an exact available_skills name; reuse prior results instead of reloading.",
         properties = buildJsonObject {
             put(
                 "skill_name",
@@ -318,6 +335,11 @@ class LoadSkillTool(
                     put("description", "Exact enabled skill name")
                 },
             )
+            put("tool_cursor", buildJsonObject {
+                put("type", "string")
+                put("description", "Optional next_tool_cursor from this Skill's result; returns only the next related-tool directory page.")
+                put("maxLength", 74)
+            })
         },
         required = listOf("skill_name"),
     )
@@ -326,20 +348,21 @@ class LoadSkillTool(
         arguments: JsonObject,
         context: ToolExecutionContext,
     ): ToolResultEnvelope {
-        val skillName = arguments["skill_name"]
-            ?.jsonPrimitive
-            ?.content
-            ?.trim()
-            .orEmpty()
-        if (skillName.isEmpty()) {
-            throw ToolInputException("skill_name is required")
-        }
+        if (arguments.keys.any { it !in setOf("skill_name", "tool_cursor") }) throw ToolInputException("Unexpected load_skill fields")
+        val skillName = (arguments["skill_name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?.takeIf(::isValidSkillName) ?: throw ToolInputException("skill_name must be an exact listed Skill name")
+        val cursor = if ("tool_cursor" in arguments) {
+            (arguments["tool_cursor"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: throw ToolInputException("tool_cursor must be a string")
+        } else null
         val skill = repository.loadEnabledSkill(skillName)
             ?: return ToolResultEnvelope.error(
                 ToolErrorCode.NOT_FOUND,
                 "Skill is unavailable or disabled: $skillName",
             )
-        val readiness = skill.readiness(availableToolNames)
+        val availableToolNames = availableToolNamesProvider()
+        val resolution = skill.resolveTools(availableToolNames)
+        val readiness = resolution.readiness
         if (!readiness.isReady) {
             return ToolResultEnvelope.error(
                 ToolErrorCode.PERMISSION_DENIED,
@@ -347,11 +370,24 @@ class LoadSkillTool(
                     readiness.missingRequirements.sorted().joinToString(),
             )
         }
+        val directory = try {
+            SkillToolDirectory.page(skill, resolution.toolNames, context.toolDirectory, cursor)
+        } catch (_: SkillToolDirectoryChangedException) {
+            return ToolResultEnvelope.error(ToolErrorCode.STALE_REF, "Skill or Tool directory changed; load the Skill again without tool_cursor.")
+        }
+        val document = if (cursor == null) skill.standardDocument(resolution.toolNames, prepareText) else ""
+        if (repository.loadEnabledSkill(skillName) != skill ||
+            skill.resolveTools(availableToolNamesProvider()) != resolution
+        ) {
+            return ToolResultEnvelope.error(ToolErrorCode.STALE_REF, "Skill or its available Tools changed during preparation; load it again.")
+        }
         return ToolResultEnvelope.success(
             buildJsonObject {
                 put("name", skill.standardName)
                 put("location", skill.toAgentSkillMetadata().location)
-                put("content", skill.standardDocument(availableToolNames))
+                put("content", document + directory.content)
+                if (directory.totalCount > 0) put("related_tool_count", directory.totalCount)
+                directory.nextCursor?.let { put("next_tool_cursor", it) }
             },
         )
     }
@@ -365,29 +401,33 @@ private val MochiSkill.standardName: String
             ?: name.toSkillSlug()
     }
 
-private fun MochiSkill.standardDocument(availableToolNames: Set<String>): String =
-    buildString {
+private suspend fun MochiSkill.standardDocument(
+    resolvedToolNames: Set<String>,
+    prepareText: suspend (String) -> String,
+): String {
+    val modelDescription = ToolSchemaLanguage.requireEnglishText(prepareText(description))
+    val modelSource = ToolSchemaLanguage.requireEnglishText(prepareText(source.ifBlank { "local" }))
+    val modelBody = ToolSchemaLanguage.requireEnglishText(prepareText(stripFrontmatter(content).trim()))
+    return buildString {
         appendLine("---")
         appendLine("name: $standardName")
         appendLine(
             "description: \"" +
-                description.replace("\n", " ").trim().yamlEscape() +
+                modelDescription.replace("\n", " ").trim().yamlEscape() +
                 "\"",
         )
         appendLine("metadata:")
         appendLine(
-            "  source: \"${source.ifBlank { "local" }.yamlEscape()}\"",
+            "  source: \"${modelSource.yamlEscape()}\"",
         )
-        val permittedTools = requiredToolNames.intersect(availableToolNames) +
-            providerToolNames(availableToolNames) +
-            OPTIONAL_BUILT_IN_SKILL_TOOLS[id].orEmpty().intersect(availableToolNames)
-        permittedTools.takeIf { it.isNotEmpty() }?.let { tools ->
+        resolvedToolNames.takeIf { it.isNotEmpty() }?.let { tools ->
             appendLine("allowed-tools: ${tools.sorted().joinToString(" ")}")
         }
         appendLine("---")
         appendLine()
-        append(stripFrontmatter(content).trim())
+        append(modelBody)
     }
+}
 
 val MochiSkill.requiredToolNames: Set<String>
     get() = BUILT_IN_SKILL_TOOLS[id]
@@ -429,31 +469,26 @@ private fun String.toSkillSlug(): String =
 private fun String.yamlEscape(): String =
     replace("\\", "\\\\").replace("\"", "\\\"")
 
-private fun isValidSkillName(value: String): Boolean =
-    value.length in 1..64 &&
-        Regex("[a-z0-9]+(?:-[a-z0-9]+)*").matches(value)
+private val SKILL_NAME_PATTERN = Regex("[a-z0-9]+(?:-[a-z0-9]+)*")
+
+internal fun isValidSkillName(value: String): Boolean =
+    value.length in 1..64 && SKILL_NAME_PATTERN.matches(value)
 
 private fun parseFrontmatterField(
     content: String,
     field: String,
 ): String? {
-    val lines = content.removePrefix("\uFEFF").lines()
-    if (lines.firstOrNull()?.trim() != "---") {
-        return null
-    }
-    val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
-    if (end < 0) {
-        return null
-    }
-    return lines.subList(1, end + 1)
-        .firstNotNullOfOrNull { line ->
-            val separator = line.indexOf(':')
-            if (separator <= 0 || line.substring(0, separator).trim() != field) {
-                null
-            } else {
-                line.substring(separator + 1).trim().trim('"', '\'')
-            }
+    val lines = content.removePrefix("\uFEFF").lineSequence().iterator()
+    if (!lines.hasNext() || lines.next().trim() != "---") return null
+    var value: String? = null
+    for (line in lines) {
+        if (line.trim() == "---") return value
+        val separator = line.indexOf(':')
+        if (value == null && separator > 0 && line.substring(0, separator).trim() == field) {
+            value = line.substring(separator + 1).trim().trim('"', '\'')
         }
+    }
+    return null
 }
 
 private fun stripFrontmatter(content: String): String {
@@ -469,11 +504,19 @@ private const val INVALID_SKILL_TOOLS = "Invalid Skill tool declaration"
 private data class DeclaredSkillTools(val names: Set<String>, val error: String? = null)
 
 private fun declaredSkillTools(content: String): DeclaredSkillTools {
-    val lines = content.removePrefix("\uFEFF").lines()
-    if (lines.firstOrNull()?.trim() != "---") return DeclaredSkillTools(emptySet())
-    val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
-    if (end < 0) return DeclaredSkillTools(emptySet(), INVALID_SKILL_TOOLS)
-    val fields = lines.subList(1, end + 1).joinToString("\n").trimIndent().lines()
+    val lines = content.removePrefix("\uFEFF").lineSequence().iterator()
+    if (!lines.hasNext() || lines.next().trim() != "---") return DeclaredSkillTools(emptySet())
+    val header = mutableListOf<String>()
+    var closed = false
+    for (line in lines) {
+        if (line.trim() == "---") {
+            closed = true
+            break
+        }
+        header += line
+    }
+    if (!closed) return DeclaredSkillTools(emptySet(), INVALID_SKILL_TOOLS)
+    val fields = header.joinToString("\n").trimIndent().lines()
     val key = Regex("""^(?:allowed-tools|"allowed-tools"|'allowed-tools')\s*:""")
     val declarations = fields.indices.filter { key.containsMatchIn(fields[it]) }
     if (declarations.isEmpty()) return DeclaredSkillTools(emptySet())
@@ -586,13 +629,21 @@ private fun MochiSkill.providerToolNames(available: Set<String>): Set<String> =
 
 fun MochiSkill.readiness(
     availableToolNames: Set<String>,
-): SkillReadiness {
+): SkillReadiness = resolveTools(availableToolNames).readiness
+
+fun MochiSkill.resolveTools(availableToolNames: Set<String>): SkillToolResolution {
+    val declared = declaredSkillTools(content)
+    val required = BUILT_IN_SKILL_TOOLS[id] ?: declared.names
     val providerTools = providerToolNames(availableToolNames)
-    return SkillReadiness(
-        requiredTools = requiredToolNames,
-        readyTools = requiredToolNames.intersect(availableToolNames) + providerTools,
-        anyToolRequirements = DOCUMENT_SKILL_PROVIDERS[id]?.first?.let { mapOf(it to providerTools) }.orEmpty(),
-        declarationError = declaredSkillTools(content).error,
+    val readyTools = required.intersect(availableToolNames) + providerTools
+    return SkillToolResolution(
+        readiness = SkillReadiness(
+            requiredTools = required,
+            readyTools = readyTools,
+            anyToolRequirements = DOCUMENT_SKILL_PROVIDERS[id]?.first?.let { mapOf(it to providerTools) }.orEmpty(),
+            declarationError = declared.error,
+        ),
+        toolNames = readyTools + OPTIONAL_BUILT_IN_SKILL_TOOLS[id].orEmpty().intersect(availableToolNames),
     )
 }
 
@@ -630,8 +681,8 @@ private val BUILT_IN_SKILLS = listOf(
             This Skill teaches the workflow; it does not enable Tools or permissions.
 
             - If app_* Tools are missing, ask the user to open Tools > App Control
-              (应用操作) and enable the group and needed Tools. Use Allowed apps
-              (允许操作的应用) to select the target and App assistance (应用操作辅助)
+              and enable the group and needed Tools. Use Allowed apps
+              to select the target and App assistance
               for manual accessibility authorization. Do not invent unavailable calls.
               Scheduled/child runs cannot use these Tools; resume in a foreground chat.
             - Discover apps with app_read, open the selected app with app_navigate,
@@ -646,8 +697,8 @@ private val BUILT_IN_SKILLS = listOf(
               stop and explain repeated failures instead of looping or guessing.
             - Verify the requested result, not just a successful click. For music,
               use available media_read to confirm exact title, artist and playing state.
-              If missing, explain Tools > Media Control (媒体控制) and Player access
-              (播放器访问); never claim verified playback without evidence.
+              If missing, explain Tools > Media Control and Player access;
+              never claim verified playback without evidence.
             - Before your final reply, attempt app_navigate action=return whether the
               task succeeded, failed, was blocked, or a Tool returned an error. Return
               to Mochi as it was immediately before opening the external app: keep its
@@ -657,7 +708,7 @@ private val BUILT_IN_SKILLS = listOf(
             - Confirm returnedToMochi=true before claiming you returned. If returning
               is unavailable or fails, report that separately from the task outcome;
               do not loop or replay the task. For blocked background launches, point
-              to App Control > Background pop-up permission (后台弹出界面).
+              to App Control > Background pop-up permission.
               Unreadable screens or necessary login/payment/authorization need manual
               handling. These are Agent instructions, not guaranteed runtime cleanup
               after cancellation, process death, or Android restrictions.
@@ -1008,8 +1059,8 @@ private val BUILT_IN_SKILLS = listOf(
 
             Default Skill for finding/comparing products, listings, displayed prices,
             sellers, variants, promotions and sales indicators through Agent Browser.
-            Honor requested marketplaces, including 拼多多/Pinduoduo/PDD/多多,
-            京东, 淘宝, 天猫, 苏宁, Amazon and brand stores. Not for order tracking,
+            Honor requested marketplaces, including Pinduoduo/PDD,
+            JD.com, Taobao, Tmall, Suning, Amazon and brand stores. Not for order tracking,
             refunds, customer service, account operations or payment.
 
             ## Workflow
@@ -1020,7 +1071,7 @@ private val BUILT_IN_SKILLS = listOf(
                constraints and the named marketplace's official domain.
             2. URL-encode the query for `browser_navigate`:
                `https://www.bing.com/search?q=<query>`. For Pinduoduo use
-               `site:mobile.yangkeduo.com/goods.html <query> 拼多多`, or normal H5
+               `site:mobile.yangkeduo.com/goods.html <query> Pinduoduo`, or normal H5
                search with an existing session. For an unrestricted comparison,
                seek at least two independent official retailer/marketplace/brand
                sources when available, not affiliate redirects, coupon aggregators,
@@ -1148,7 +1199,7 @@ private val BUILT_IN_SKILLS = listOf(
                - financial-analysis summary and displayed income, balance-sheet,
                  cash-flow, per-share, valuation, or growth fields;
                - company profile and the next earnings date when displayed.
-            4. When crowd commentary is requested, treat the page's `股评` section
+            4. When crowd commentary is requested, treat the page's stock commentary section
                separately from factual market data. Record its selected period, bullish/bearish percentages,
                sample size, source, author, and post time when visible. Summarize
                recurring themes only; never treat anonymous posts, leverage

@@ -4,6 +4,11 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.agent.tool.AgentTool
+import com.example.mochi_pet.core.agent.tool.ToolDirectorySnapshot
+import com.example.mochi_pet.core.agent.tool.ToolDiscovery
+import com.example.mochi_pet.core.agent.tool.ToolRegistry
+import com.example.mochi_pet.core.agent.tool.functionToolSchema
 import com.example.mochi_pet.core.database.entity.CalendarEventEntity
 import com.example.mochi_pet.core.database.entity.SkillEntity
 import com.example.mochi_pet.core.database.entity.TodoEntity
@@ -12,8 +17,12 @@ import com.example.mochi_pet.core.skills.DownloadedSkill
 import com.example.mochi_pet.core.skills.LoadSkillTool
 import com.example.mochi_pet.core.skills.RoomSkillRepository
 import com.example.mochi_pet.core.skills.SkillOrigin
+import com.example.mochi_pet.core.skills.SkillToolDirectory
 import com.example.mochi_pet.core.skills.requiredToolNames
 import com.example.mochi_pet.core.skills.readiness
+import com.example.mochi_pet.core.skills.prepareForModel
+import com.example.mochi_pet.core.skills.resolveTools
+import com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage
 import com.example.mochi_pet.core.tools.ToolCatalogSummary
 import com.example.mochi_pet.core.tools.McpServerSummary
 import com.example.mochi_pet.core.tools.McpToolSummary
@@ -23,6 +32,7 @@ import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -145,6 +155,235 @@ class MochiDatabaseTest {
     }
 
     @Test
+    fun `built in Skill instructions and metadata are English without translation`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao(), journalEnabled = { true })
+        val builtIns = repository.listSkills().filter { it.origin == SkillOrigin.BUILT_IN }
+        builtIns.filter { it.id != "builtin:memory-recall" }.forEach { repository.setEnabled(it.id, true) }
+        val available = builtIns.flatMap { it.requiredToolNames }.toSet() +
+            setOf("notion_search", "tencent_docs_get_content", "feishu_search_doc")
+        repository.listEnabledMetadata().forEach {
+            assertTrue(it.name, ToolSchemaLanguage.isEnglishText(it.description))
+        }
+        builtIns.forEach { skill ->
+            assertTrue(skill.id, ToolSchemaLanguage.isEnglishText(skill.content))
+            val name = skill.id.substringAfter("builtin:")
+            if (skill.readiness(available).isReady) {
+                val result = LoadSkillTool(repository, available).execute(
+                    buildJsonObject { put("skill_name", name) },
+                    ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation),
+                )
+                assertEquals(name, "ok", result.status)
+                assertTrue(name, ToolSchemaLanguage.isEnglishText(result.data!!.jsonObject.getValue("content").jsonPrimitive.content))
+            }
+        }
+    }
+
+    @Test
+    fun `market Skill model copies preserve source dependency declarations and recheck revocation`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val original = repository.install(DownloadedSkill(
+            marketId = "fixture/skills/english-view", name = "english-view",
+            description = "读取页面", content = "---\nname: english-view\nallowed-tools: browser_read\n---\n# 读取\n先读取页面。",
+            source = "本地", sourceUrl = "https://example.invalid/SKILL.md", version = "1", digest = "fixture",
+        ))
+        repository.setEnabled(original.id, true)
+        val translations = mapOf("读取页面" to "Read a page", "本地" to "Local", "# 读取\n先读取页面。" to "# Read\nRead the page first.")
+        val prepare: suspend (String) -> String = { translations[it] ?: ToolSchemaLanguage.requireEnglishText(it) }
+        val metadata = repository.listEnabledMetadata(setOf("browser_read")).prepareForModel(prepare)
+            .single { it.name == "english-view" }
+        assertEquals("Read a page", metadata.description)
+        val args = buildJsonObject { put("skill_name", "english-view") }
+        val context = ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation)
+        val result = LoadSkillTool(repository, setOf("browser_read"), prepareText = prepare).execute(args, context)
+        val document = result.data!!.jsonObject.getValue("content").jsonPrimitive.content
+        assertTrue(document.contains("allowed-tools: browser_read"))
+        assertTrue(document.contains("# Read\nRead the page first."))
+        assertTrue(ToolSchemaLanguage.isEnglishText(document))
+        assertEquals(original.content, repository.loadEnabledSkill("english-view")!!.content)
+        assertEquals(original.description, repository.listSkills().single { it.id == original.id }.description)
+        val revoked = LoadSkillTool(repository, setOf("browser_read"), prepareText = {
+            repository.setEnabled(original.id, false)
+            prepare(it)
+        }).execute(args, context)
+        assertEquals("STALE_REF", revoked.code)
+    }
+
+    @Test
+    fun `optional Skill tools revoked during translation cannot remain in the returned header`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        var available = setOf("app_read", "media_read")
+        val tool = LoadSkillTool(repository, available, prepareText = {
+            available = setOf("app_read")
+            it
+        }, availableToolNamesProvider = { available })
+        val result = tool.execute(
+            buildJsonObject { put("skill_name", "app-assistant") },
+            ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation),
+        )
+        assertEquals("STALE_REF", result.code)
+    }
+
+    @Test
+    fun `Skill relation resolution shares readiness and headers across mandatory optional and provider tools`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val names = setOf("webdav_list", "webdav_read", "webdav_write", "notion_search", "notion_update_page", "unrelated")
+        for ((name, expected) in mapOf(
+            "webdav-files" to setOf("webdav_list", "webdav_read", "webdav_write"),
+            "notion-knowledge" to setOf("notion_search", "notion_update_page"),
+        )) {
+            repository.setEnabled("builtin:$name", true)
+            val skill = repository.loadEnabledSkill(name)!!
+            val resolved = skill.resolveTools(names)
+            assertEquals(expected, resolved.toolNames)
+            assertTrue(resolved.readiness.isReady)
+            assertEquals(resolved.readiness, skill.readiness(names))
+            val result = LoadSkillTool(repository, names).execute(
+                buildJsonObject { put("skill_name", name) },
+                ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation),
+            )
+            val document = result.data!!.jsonObject.getValue("content").jsonPrimitive.content
+            assertTrue(document.contains("allowed-tools: ${expected.sorted().joinToString(" ")}"))
+            assertFalse(skill.resolveTools(emptySet()).readiness.isReady)
+        }
+    }
+
+    @Test
+    fun `Skill directory uses current actor definitions and skips schemas already supplied`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        repository.setEnabled("builtin:notion-knowledge", true)
+        var enabled = setOf("notion_search", "notion_update_page", "load_skill")
+        val load = LoadSkillTool(repository, enabled, availableToolNamesProvider = { enabled })
+        fun tool(name: String) = object : AgentTool {
+            override val name = name
+            override val schema = functionToolSchema(name, "Read or update a Notion page.", buildJsonObject {}, emptyList())
+            override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext) =
+                error("The directory must not execute a business Tool")
+        }
+        val registry = ToolRegistry(
+            listOf(load, tool("notion_search"), tool("notion_update_page"), tool("notion_disabled"), tool("unrelated")),
+            availableNames = { it.intersect(enabled) },
+        )
+        val discovery = ToolDiscovery(registry)
+        val context = ToolExecutionContext(LocalDate.of(2026, 8, 5), MochiSurface.Conversation)
+        val supplied = discovery.schemas().mapTo(mutableSetOf(), ToolDiscovery::schemaName)
+        suspend fun document(names: Set<String>) = discovery.execute(
+            "load_skill", """{"skill_name":"notion-knowledge"}""", context, names,
+        ).data!!.jsonObject.getValue("content").jsonPrimitive.content
+        val first = document(supplied)
+        assertTrue(first.contains("notion_search: Read or update"))
+        assertTrue(first.contains("notion_update_page: Read or update"))
+        assertFalse(first.contains("notion_disabled"))
+        assertFalse(first.substringAfter(SkillToolDirectory.HEADING).contains("unrelated"))
+        discovery.execute("tool_search", """{"query":"notion_search","limit":1}""", context, supplied)
+        assertTrue(document(supplied).contains("notion_search:"))
+        val next = document(discovery.schemas().mapTo(mutableSetOf(), ToolDiscovery::schemaName))
+        assertFalse(next.contains("notion_search:"))
+        assertTrue(next.contains("notion_update_page:"))
+        enabled = enabled - "notion_update_page"
+        assertFalse(document(supplied).substringAfter(SkillToolDirectory.HEADING).contains("notion_update_page"))
+    }
+
+    @Test
+    fun `Skills using only base Tools return no redundant directory`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        val names = setOf("app_read", "app_input", "media_read")
+        val result = LoadSkillTool(repository, names).execute(
+            buildJsonObject { put("skill_name", "app-assistant") },
+            ToolExecutionContext(
+                LocalDate.of(2026, 8, 5), MochiSurface.Conversation,
+                toolDirectory = ToolDirectorySnapshot(
+                    names.associateWith { "Already available base Tool." }, names,
+                ),
+            ),
+        )
+        assertEquals("ok", result.status)
+        val data = result.data!!.jsonObject
+        assertFalse(data.getValue("content").jsonPrimitive.content.contains(SkillToolDirectory.HEADING))
+        assertFalse(data.containsKey("related_tool_count"))
+        assertFalse(data.containsKey("next_tool_cursor"))
+    }
+
+    @Test
+    fun `Skill directory pages are bounded complete and reject changed snapshots`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        repository.setEnabled("builtin:notion-knowledge", true)
+        val descriptions = (1..250).associate { "notion_tool_${it.toString().padStart(3, '0')}" to "Read ".repeat(30) }
+        var available = descriptions.keys
+        var preparations = 0
+        val load = LoadSkillTool(repository, available, prepareText = { preparations++; it }, availableToolNamesProvider = { available })
+        val context = ToolExecutionContext(
+            LocalDate.of(2026, 8, 5), MochiSurface.Conversation,
+            toolDirectory = ToolDirectorySnapshot(descriptions, emptySet()),
+        )
+        suspend fun page(cursor: String? = null, executionContext: ToolExecutionContext = context) = load.execute(
+            buildJsonObject { put("skill_name", "notion-knowledge"); cursor?.let { put("tool_cursor", it) } }, executionContext,
+        )
+        val first = page().data!!.jsonObject
+        val firstCursor = first.getValue("next_tool_cursor").jsonPrimitive.content
+        val initialPreparations = preparations
+        val seen = mutableListOf<String>()
+        var data = first
+        while (true) {
+            val content = data.getValue("content").jsonPrimitive.content
+            val directory = SkillToolDirectory.HEADING + content.substringAfter(SkillToolDirectory.HEADING)
+            assertTrue(directory.toByteArray(Charsets.UTF_8).size <= 12 * 1024)
+            seen += directory.lines().filter { it.startsWith("notion_tool_") }.map { it.substringBefore(':') }
+            val cursor = data["next_tool_cursor"]?.jsonPrimitive?.content ?: break
+            data = page(cursor).data!!.jsonObject
+            assertTrue(data.getValue("content").jsonPrimitive.content.startsWith(SkillToolDirectory.HEADING))
+        }
+        assertEquals(descriptions.keys.sorted(), seen)
+        assertEquals(initialPreparations, preparations)
+        assertEquals("STALE_REF", page(firstCursor, context.copy(toolDirectory =
+            ToolDirectorySnapshot(descriptions, setOf(descriptions.keys.first())))).code)
+        assertEquals("STALE_REF", page(firstCursor, context.copy(toolDirectory =
+            ToolDirectorySnapshot(descriptions + (descriptions.keys.first() to "Changed operation."), emptySet()))).code)
+        assertThrows(com.example.mochi_pet.core.agent.tool.ToolInputException::class.java) {
+            runBlocking { page("invalid") }
+        }
+        available = available - descriptions.keys.last()
+        assertEquals("STALE_REF", page(firstCursor).code)
+    }
+
+    @Test
+    fun `duplicate enabled Skill names cannot silently select a different tools scope`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        for (index in 1..2) {
+            val installed = repository.install(DownloadedSkill(
+                marketId = "fixture/duplicate-$index", name = "duplicate", description = "Read",
+                content = "---\nname: duplicate\nallowed-tools: remote_$index\n---\nRead.",
+                source = "fixture", sourceUrl = "https://example.invalid/SKILL.md", version = "1", digest = "fixture-$index",
+            ))
+            repository.setEnabled(installed.id, true)
+        }
+        assertThrows(com.example.mochi_pet.core.agent.tool.ToolInputException::class.java) {
+            runBlocking { repository.loadEnabledSkill("duplicate") }
+        }
+        repository.setEnabled("fixture/duplicate-2", false)
+        assertEquals(setOf("remote_1"), repository.loadEnabledSkill("duplicate")!!.resolveTools(setOf("remote_1", "remote_2")).toolNames)
+    }
+
+    @Test
+    fun `named Skill lookup does not read unrelated journal permissions and never caches revocation`() = runBlocking {
+        var permissionReads = 0
+        var journal = true
+        val repository = RoomSkillRepository(database.skillDao(), journalEnabled = {
+            permissionReads++
+            journal
+        })
+        repository.setEnabled("builtin:notion-knowledge", true)
+        assertTrue(repository.loadEnabledSkill("notion-knowledge") != null)
+        assertEquals(0, permissionReads)
+        repository.setEnabled("builtin:notion-knowledge", false)
+        assertEquals(null, repository.loadEnabledSkill("notion-knowledge"))
+        assertEquals(0, permissionReads)
+        assertTrue(repository.loadEnabledSkill("memory-recall") != null)
+        journal = false
+        assertEquals(null, repository.loadEnabledSkill("memory-recall"))
+        assertEquals(2, permissionReads)
+    }
+
+    @Test
     fun `market skill can be installed and locally edited`() = runBlocking {
         val repository = RoomSkillRepository(database.skillDao())
         repository.install(
@@ -219,6 +458,27 @@ class MochiDatabaseTest {
             assertFalse(repository.listEnabledMetadata(available - search).any { it.name == "tencent-docs-knowledge" })
             assertEquals("error", LoadSkillTool(repository, available - search).execute(arguments, context).status)
         }
+    }
+
+    @Test
+    fun `skill loading uses full deferred availability and rechecks revocation`() = runBlocking {
+        val repository = RoomSkillRepository(database.skillDao())
+        repository.setEnabled("builtin:feishu-knowledge", true)
+        var available = setOf("feishu_search_doc")
+        val tool = LoadSkillTool(repository, available) { available }
+        val discovery = com.example.mochi_pet.core.agent.tool.ToolDiscovery(
+            com.example.mochi_pet.core.agent.tool.ToolRegistry(listOf(tool)),
+        )
+        val names = discovery.schemas().mapTo(mutableSetOf(),
+            com.example.mochi_pet.core.agent.tool.ToolDiscovery::schemaName)
+        val context = ToolExecutionContext(LocalDate.of(2026, 11, 17), MochiSurface.Face)
+        val arguments = """{"skill_name":"feishu-knowledge"}"""
+        assertFalse("feishu_search_doc" in names)
+        val result = discovery.execute("load_skill", arguments, context, names)
+        assertEquals("ok", result.status)
+        assertTrue(result.data.toString().contains("feishu_search_doc"))
+        available = emptySet()
+        assertEquals("PERMISSION_DENIED", discovery.execute("load_skill", arguments, context, names).code)
     }
 
     @Test

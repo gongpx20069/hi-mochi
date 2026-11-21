@@ -79,7 +79,7 @@ class AzureResponsesDiagnosticTest {
         val agent = AgentOrchestrator(
             chatClient = client, toolRegistry = ToolRegistry(listOf(tool)),
             navigationPolicy = NavigationPolicy(), uiDirectiveSink = { error("Fixture must not navigate") },
-            maxToolRounds = 1,
+            maxToolRounds = 2,
         )
         val reply = withTimeout(90_000) {
             agent.run(AgentRunRequest(

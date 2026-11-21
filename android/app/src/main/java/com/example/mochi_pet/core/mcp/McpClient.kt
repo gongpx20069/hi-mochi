@@ -421,13 +421,8 @@ open class McpStreamableHttpClient(
     }
 }
 
-class McpAgentTool(
-    override val name: String,
-    private val remoteTool: McpRemoteTool,
-    private val server: suspend () -> McpServerRuntime?,
-    private val client: McpStreamableHttpClient,
-) : AgentTool {
-    override val schema: JsonObject = buildJsonObject {
+fun mcpToolSchema(name: String, remoteTool: McpRemoteTool): JsonObject =
+    buildJsonObject {
         put("type", "function")
         put(
             "function",
@@ -443,6 +438,14 @@ class McpAgentTool(
             },
         )
     }
+
+class McpAgentTool(
+    override val name: String,
+    private val remoteTool: McpRemoteTool,
+    private val server: suspend () -> McpServerRuntime?,
+    private val client: McpStreamableHttpClient,
+) : AgentTool {
+    override val schema: JsonObject = mcpToolSchema(name, remoteTool)
 
     override suspend fun execute(
         arguments: JsonObject,

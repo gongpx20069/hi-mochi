@@ -31,7 +31,7 @@ android/
 - An Android 8.0 or newer device or emulator
 
 Use the checked-in Gradle wrapper. A global Gradle installation is not needed.
-The wrapper pins Gradle 9.9.1 with its official distribution SHA-256.
+The wrapper pins Gradle 9.9.2 with its official distribution SHA-256.
 The build uses AGP 9.1.1 with built-in Kotlin, Kotlin 2.4.10 compiler plugins,
 and serialization 1.13.0 across the host and extensions. The root buildscript
 pins KGP because AGP's default compiler is older; do not reapply
@@ -48,6 +48,7 @@ API 37 shared-memory emulation; this does not change the APK runtime.
 Host UI tests pin Espresso 3.8.0-alpha01 and Test Core 1.8.0-alpha01: Espresso
 3.7.0 reflects on the removed `InputManager.getInstance()` API on Android 17.
 These are test-only dependencies, not production application libraries.
+Host and extension JVM tests use Robolectric 4.18.1; keep their pins aligned.
 Keep machine-specific SDK paths in `android/local.properties`; do not commit
 that file. The first build downloads the pinned sherpa-onnx Android AAR from
 its upstream GitHub release and verifies its SHA-256 before use.
@@ -123,6 +124,149 @@ before returning to the full gates.
 
 Memory retrieval regression sources and diagnostic instructions are owned by
 [Memory design](architecture/MEMORY_DESIGN.md#2-diagnostics-and-verification).
+
+Tool discovery and payload regressions:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "*ToolDiscoveryTest" `
+  --tests "*EnglishToolSchemasTest" `
+  --tests "*BaseToolSchemasTest" --tests "*AgentOrchestratorTest" `
+  --tests "*ResponsesAdapterTest" --tests "*ToolCatalogTest" `
+  --tests "*MochiDatabaseTest" --no-daemon
+```
+
+These exercise local discovery, both ordinary-function API loops, scoped/live
+availability, shared Skill relations, scoped-search revocation/cancellation,
+Skill readiness and the actual serialized base-schema budgets.
+`BaseToolSchemasTest` prints `SCHEMA_SIZE_TOTALS` in its test output without
+executing Tools or contacting a model. Policy, workflow and current measurements
+are owned by [Tool discovery and disclosure](architecture/TOOL_DESIGN.md).
+
+For authorized device evaluation, the opt-in `core.agent.ToolSearchDiagnosticTest`
+uses the production Agent factory with an injectable transport. After updating
+matching app/test APKs in place, `inspectAvailableCatalog` with
+`-e mochiToolRetrievalDiagnostic true` logs enabled Tool names only.
+`measureRetrievalCases` with the same opt-in reads the app-cache file
+`tool-retrieval-cases.json`: an array of objects with `group`, `query`,
+optional `skill_name`, and `expected` (relevant Tool names; empty for negative
+queries). If absent, it uses the checked-in instrumentation asset
+`tool-search-english-cases.json`. Label cases before running them.
+It adds exact-name cases for all enabled deferred Tools and writes
+`tool-retrieval-results.json` in app cache, including ordered Top-5 results,
+explicit unavailable-case skips and local search/continuation durations.
+Its scripted Agent transport makes no model calls and executes only `tool_search`.
+Complete English schema preparation first: an uncached non-English description
+can require a separate translation request before the registry is constructed.
+The diagnostic also records first/cache-warm factory preparation, initial
+request preparation, Tool-phase and continuation-schema latency. The Tool phase
+includes live availability reads, not just BM25. `tool-retrieval-timings.json`
+contains a separate in-memory BM25 microbenchmark over schemas observed during
+the run (five warmup passes, twenty samples per query), with snapshot and actual
+Top-5 results for comparison. These scripted timings exclude model inference
+and business Tool execution; they are not user-facing task latency.
+Add `-e mochiCompareSkillScopes true` for paired global/scoped queries,
+alternating execution order between pairs. Explicit queries use pre-labelled
+Skill names; generated exact-name checks choose the smallest available
+associated Skill scope (name breaks ties). Queries without a scope run once
+globally. Reports include candidate counts, search-result bytes and next-request
+Tool-array bytes. A counterfactual byte count adds descriptions from those same
+matched schemas to quantify avoided duplicate result text. These are UTF-8
+payload sizes, not model token counts.
+The scripted run also writes `tool-description-audit.json` containing only
+observed English Tool names/descriptions and Skill associations, and
+`skill-directory-measurements.json` with per-Skill appendix bytes and pure
+directory-render timings (five warmups, one hundred samples). These artifacts
+exclude parameters, credentials, prompts and business data. Base-only Skills
+must have zero appendix bytes.
+With the same opt-in, `verifyEnglishSkillInputs` checks enabled Skill discovery
+and `load_skill` documents for English model-facing instructions without
+executing their workflows. Uncached translations can consume model quota.
+Report descriptive-query hit rates separately from exact-name checks and
+negative-query false positives; this curated sample is not production accuracy.
+
+Separately, `liveReadOnlyWeatherLoop` with
+`-e mochiToolSearchLiveDiagnostic true` consumes quota on the active saved model
+connection, using its normal foreground deadline. Its transport guard permits
+`load_skill`, `tool_search` and one `amap_weather` call for Shanghai adcode `310000`;
+other calls fail before dispatch. Amap must already be configured/enabled.
+It checks search, subsequent schema visibility, real Tool success and a final
+reply without changing saved connection settings or reading user history.
+No opt-in means these diagnostics are skipped. Do not clear application data,
+grant permissions or enable a provider to make them pass.
+
+`core.agent.LiveToolSearchQueryDiagnosticTest#measureModelGeneratedQueries`,
+with `-e mochiLiveToolQueryDiagnostic true`, evaluates the active model's own
+search queries using the production factory and Agent prompt. Supply at most
+60 pre-labelled synthetic cases in app cache `live-tool-query-cases.json` with
+the same `group`, `query`, `expected` fields, or use the checked-in
+`tool-search-chinese-cases.json` instrumentation asset when that file is absent.
+Only the Chinese user query reaches
+the model, never the expected labels. Private persona/history/memory are omitted;
+normal enabled Skill metadata and base Tools remain visible. The guard permits
+only `load_skill` and `tool_search` and rejects an entire response containing
+any business call before dispatch. It stops at the next request boundary after
+the first search batch, without another model call or business execution.
+It preserves the model's query/limit rather than forcing search or rewriting
+queries. Reports distinguish no-search replies, blocked business calls,
+unavailable fixtures, provider errors, and the four-model-request budget.
+`live-tool-query-results.json` is checkpointed per case and marked complete at
+the end; it contains generated search queries, ordered results and separate
+factory, model, Tool and continuation timings, but no credentials, endpoint,
+full prompts, Skill contents or final reply text. This consumes model quota;
+report first-search quality separately from routing coverage and do not call
+it full business-task success or pure BM25 latency.
+
+Add `-e mochiCompareSkillDirectories true` to that live diagnostic for three
+transport-level ablations of each identical fixture: no Skill metadata/loading
+or Skill search scope; normal Skills without directory descriptions; and
+normal Skills with directories. Variant order rotates per fixture. The first
+two variants remove only the relevant model-facing metadata/schema fields and
+directory content, never change saved settings or enable Tools. All variants
+use the same production registry and live checks; host timings therefore
+include directory preparation even when the transport removes its text.
+Reports include serialized Chat-request representation bytes (not wire bytes
+for every protocol or billed tokens), unique appendix bytes, routing coverage,
+first-search targets and latency. Report conditional Top-1/Top-5 separately
+from all-case coverage, negatives and prerequisite searches. A single run does
+not measure model variance or prove universal accuracy.
+Use `-e mochiCapabilitySelectionOnly true` for the controlled capability-selection
+comparison: every variant receives the same instruction to find the final
+operation without execution, prerequisite lookups or requests for missing
+business arguments. Expected labels remain hidden. Keep this measurement
+separate from natural task routing, where assistance and prerequisite lookups
+can be correct behavior.
+
+`core.agent.AuthorizedShoppingDiagnosticTest#researchSwitchAndSaveDocument`
+requires `-e mochiAuthorizedSwitchShopping true` and explicit authorization
+for that real task. It compares new non-Japanese Switch 2 listings in the
+already user-selected Taobao app, may create/read a new Tencent Smart Canvas,
+and may add one verified qualifying item to the cart. It never orders or pays,
+changes permissions/settings, edits unrelated documents or bypasses filtered
+controls. The guard restricts app operations to the discovered Taobao ID.
+Document edits require the exact file ID created by this task, or explicitly
+supplied for continuation with `-e mochiShoppingDocumentId`. Creation is disabled
+when continuing an existing task document. Read-only document discovery and
+structural readers support verification. Login, unreadable screens or absent
+authorization are blockers, not successful purchases. The fixture preserves
+the production accessibility service and starts a real foreground Activity.
+`authorized-shopping-results.json` records result statuses, timing and the
+final task report; do not commit personal/account data. A finished diagnostic
+does not establish success: verify the report's price evidence, document
+readback and cart readback independently. This test consumes model quota and
+has real, explicitly authorized side effects; it is never part of CI.
+`inspectShoppingPrerequisites` with the same opt-in reads only production
+`app_read` and writes selection/accessibility booleans to
+`shopping-prerequisites.json`. It never enables an app or grants accessibility.
+For an explicitly requested web alternative, add `-e mochiShoppingBrowser true`:
+the fixture owns a real browser turn, reuses existing website sessions and
+allows native user assistance for necessary manual login. Browser clicks must
+reference observed controls; recognized checkout/payment/purchase controls are
+blocked before dispatch. App permissions are not bypassed; web access has its
+own authentication, site-access policy and Skill restrictions.
+`-e mochiRecoverShoppingDocument true` permits only read-only lookup/readback
+of the task's exact document title; use it after an interrupted run rather
+than replaying creation. `documentWriteGuardRejectsOtherFiles` is a deterministic
+no-business-call check for the diagnostic's write-target guard.
 
 App Control and Media Control regressions:
 
@@ -393,6 +537,39 @@ or business data. Logs contain only request durations and counts.
 Only with explicit permission, `-e mochiEnableResponses true` switches that
 connection's protocol after success, preserving its key and all other settings.
 Without the diagnostic opt-in, the test is skipped.
+
+`core.agent.llm.AzureTransportDiagnosticTest#measureRealResponseCompression`
+adds payload-free, test-only transport observations. Run it with
+`-e mochiAzureTransportDiagnostic true`, the same explicit
+`mochiAzureResourceHost`/`mochiAzureDeployment` arguments, and an already active
+Azure Responses connection. It does not enable a provider, change protocol or
+timeout settings, or export the Keystore-backed credential.
+
+The fixture captures the current base schemas and the base set plus the
+already-enabled `tencent_docs_smartsheet_add_fields` definition through a
+scripted, local `tool_search`. No captured Agent prompt is sent to a provider.
+The live requests use only a fixed synthetic prompt and zero, base, or
+base-plus-large Tool definitions. Returned calls are never dispatched.
+Two repetitions alternate default OkHttp gzip negotiation and explicit
+`Accept-Encoding: identity`, for twelve non-streaming requests with the normal
+20-second deadline. These share a test-owned connection pool; the first request
+can include cold-connection cost, so raw variant timings are not a causal
+compression benchmark.
+
+`azure-transport-results.json` is checkpointed in app cache. It contains a
+bounded DNS/connection/TLS/upload/response event timeline, connection-attempt and
+exchange counts, sanitized encoding/protocol categories, request bytes,
+pre-decompression network-body bytes and post-decompression bytes. Network-body
+counts exclude HTTP headers/framing and TLS overhead. Multi-exchange counters
+are cumulative; the encoding fields describe the last exchange, so compare
+compression ratios only on successful single-exchange samples.
+Failures remain in the report; each schema set must have at least one success
+under both variants for the fixture to pass. It records no URLs, IP addresses,
+headers beyond encoding categories, keys, prompts, output text or Tool arguments.
+This diagnostic consumes model quota and is never part of CI.
+`byteCountersDistinguishCompressedAndDecodedBodies` checks the counters against
+synthetic gzip data without a provider. Current observations are summarized in
+[Technical design](architecture/TECHNICAL.md#transport-observations).
 
 Speech profile regressions additionally cover `SpeechSettingsRepositoryTest`,
 `SpeechSynthesisSettingsTest`, `CloudSpeechRuntimeTest`, and `WakeBriefingTest`:

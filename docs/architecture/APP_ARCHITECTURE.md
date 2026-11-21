@@ -38,7 +38,7 @@ run in local JVM tests.
 | Component | Owns |
 | --- | --- |
 | `VoiceSessionController` | interaction ID, cancellation, voice phases |
-| `AgentOrchestrator` | prompt/model/tool loop and round limits |
+| `AgentOrchestrator` | prompt/model/tool loop, round limits and run-local Tool disclosure |
 | `SerialSubagentCoordinator` | one active child, per-run delegation count, cancellation propagation |
 | `PromptBuilder` | persona files, memory recall, skill catalog, time context |
 | `PersonaRepository` | app-private SOUL/USER/AGENTS files and atomic updates |
@@ -82,6 +82,10 @@ run in local JVM tests.
 
 No Composable may call the LLM, database DAO, SpeechRecognizer, TextToSpeech,
 or Android content provider directly.
+
+Tool visibility and search-state invariants are defined in
+[Tool design](TOOL_DESIGN.md); executor availability and Skill readiness
+must not be derived from the model's currently disclosed subset.
 
 ## 3. State model
 

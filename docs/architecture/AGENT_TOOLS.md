@@ -4,6 +4,11 @@ Kotlin schemas and typed executors under
 `android/app/src/main/java/com/example/mochi_pet/core/agent/tool/` are the
 authoritative implementation.
 
+Model visibility, the base Tool set and `tool_search` workflow are defined
+only in [Tool discovery and disclosure](TOOL_DESIGN.md). The inventories
+below describe supported execution capabilities, not schemas sent on every
+model request. Provider default-enabled switches are not default disclosure.
+
 ## 1. Common contract
 
 Every tool returns one typed JSON envelope:

@@ -18,7 +18,8 @@ contains the product and engineering source of truth.
 | --- | --- |
 | [`architecture/TECHNICAL.md`](architecture/TECHNICAL.md) | Runtime, providers, Skills, and platform design |
 | [`architecture/APP_ARCHITECTURE.md`](architecture/APP_ARCHITECTURE.md) | Modules, state ownership, persistence, and dependencies |
-| [`architecture/AGENT_TOOLS.md`](architecture/AGENT_TOOLS.md) | Tool schemas, MCP, safety, and UI directives |
+| [`architecture/TOOL_DESIGN.md`](architecture/TOOL_DESIGN.md) | Base Tools, progressive disclosure, local tool search, and API workflow |
+| [`architecture/AGENT_TOOLS.md`](architecture/AGENT_TOOLS.md) | Individual Tool execution contracts, MCP allowlists, safety, and UI directives |
 | [`architecture/EXTENSIONS.md`](architecture/EXTENSIONS.md) | Signed optional APK extensions, Binder contracts, and attachment safety |
 | [`architecture/AGENT_BROWSER.md`](architecture/AGENT_BROWSER.md) | Visible per-turn browser Tools, lifecycle, and safety |
 | [`architecture/CARD_PRESENTATION.md`](architecture/CARD_PRESENTATION.md) | Trusted Agent card evidence and rendering |
