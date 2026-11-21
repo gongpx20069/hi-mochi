@@ -457,6 +457,12 @@ host-generated from the original declarations and current actor scope, never
 translated or inferred from translated prose. Preparation cannot enable a Skill
 or Tool; activation rechecks Skill changes and dependency revocation afterwards.
 Translation failures are explicit, with no untranslated instruction fallback.
+Loaded Skill content includes a bounded English name/description directory
+for associated, available Tools whose schemas were not supplied in the invoking
+request. Base-only Skills add nothing. The 100-character excerpts, 12 KiB
+directory pages, live filtering and continuation contract are owned by
+[Tool design](TOOL_DESIGN.md#skill-tool-directories); full schemas remain
+unchanged and must be loaded before execution.
 
 `builtin:memory-recall` is first in Skills, with discovery name `memory-recall`
 and mandatory `recall_memory`. Its enabled state comes only from Daily journal;

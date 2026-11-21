@@ -77,6 +77,9 @@ class ToolDiscovery(
 ) {
     private val loaded = registry.names.intersect(baseNames).toMutableSet()
     private val index = ToolSearchIndex(registry.schemas)
+    private val descriptions = registry.schemas.associate { schema ->
+        schemaName(schema) to schema.getValue("function").jsonObject["description"]?.jsonPrimitive?.content.orEmpty()
+    }
     private val searchRegistry = ToolRegistry(listOf(object : AgentTool {
         override val name = ToolDisclosurePolicy.SEARCH_NAME
         override val schema = ToolDisclosurePolicy.searchSchema
@@ -120,7 +123,9 @@ class ToolDiscovery(
         return if (name == ToolDisclosurePolicy.SEARCH_NAME) {
             searchRegistry.execute(name, argumentsJson, context)
         } else {
-            registry.execute(name, argumentsJson, context)
+            registry.execute(name, argumentsJson, context.copy(
+                toolDirectory = if (name == "load_skill") ToolDirectorySnapshot(descriptions, suppliedNames) else null,
+            ))
         }
     }
 

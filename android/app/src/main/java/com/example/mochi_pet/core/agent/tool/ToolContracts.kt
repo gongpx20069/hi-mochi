@@ -96,6 +96,12 @@ data class ToolExecutionContext(
     val currentSurface: MochiSurface,
     val modelImageInputAllowed: Boolean = false,
     val modelImageRelay: ModelImageRelay = ModelImageRelay(),
+    val toolDirectory: ToolDirectorySnapshot? = null,
+)
+
+data class ToolDirectorySnapshot(
+    val descriptions: Map<String, String>,
+    val suppliedNames: Set<String>,
 )
 
 class ToolInputException(message: String) : IllegalArgumentException(message)

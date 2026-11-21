@@ -170,6 +170,51 @@ Results include `candidate_count` and, when specified, `skill_name`; names of
 matches are returned once, without repeating descriptions already supplied in
 the next request's full schemas.
 
+### Skill Tool directories
+
+`load_skill` returns its normal `name`, `location` and `content`. On the first
+page, `content` contains the full English Skill document followed by a related
+Tool directory. The directory includes only `resolveTools` associations that
+are available to this actor and whose full definitions were **not supplied in
+the invoking model request**. A Skill using only available base Tools has no
+appendix or empty heading. The existing `allowed-tools` header is unchanged.
+
+Each directory line is `name: description`. Names are complete; descriptions
+come from the prepared English schema's top-level description, never another
+translation or summary request. Whitespace is collapsed. Descriptions of at
+most 100 Unicode code points are preserved; longer descriptions use at most
+97 code points, ending at a word boundary when possible, followed by `...`.
+The inclusive cap is 100 code points, not bytes or tokens. Full schemas and
+their safety/argument constraints are never truncated by this directory.
+
+The appendix explicitly says that entries are not callable schemas. The model
+selects a name, calls `tool_search` with that exact name and `limit=1`, then
+waits for the next request's full definition before executing. Capability
+queries can still use BM25 with optional Skill scope. Initial Skill metadata
+does not contain the directory, and loading a Skill never executes its Tools.
+
+Entries are name-sorted. Each appendix page, including its heading and notice,
+is bounded to 12 KiB UTF-8. A partial page includes `next_tool_cursor` alongside
+`content`; passing it as `load_skill.tool_cursor` with the same `skill_name`
+returns only the next directory page, not the Skill body again. The cursor
+binds to the original Skill and current rendered directory contents. Skill
+changes or changes to directory membership, excerpts or relevant disclosure
+invalidate it with `STALE_REF`;
+the caller must load again without the cursor. Malformed cursors return
+`INVALID_ARGS`; pages never silently omit remaining entries.
+
+The run-owned discovery layer supplies immutable actor definitions and the
+actual request's supplied names. No global directory/permission cache or new
+relationship map is maintained. `load_skill` retains its live Skill and
+relationship revalidation before publication; search and execution keep their
+own independent checks. Directory inclusion is not permission to execute.
+
+The result remains in same-run Tool history. Later rounds do not append the
+directory again automatically, but still carry the earlier result. Loading a
+schema later does not rewrite old results to remove its directory line.
+Reuse a previously loaded Skill unless its instructions or availability need
+refreshing. This feature does not implement conversation-history compaction.
+
 ### Model-facing language and preparation
 
 Tool descriptions and schema text annotations presented to the Agent are
@@ -326,14 +371,14 @@ Current measurement (all 25 available; compact UTF-8 bytes):
 
 | Set | Chat Completions | Responses |
 | --- | ---: | ---: |
-| Complete 25-entry base set | **20,902 bytes (20.41 KiB)** | **20,952 bytes (20.46 KiB)** |
+| Complete 25-entry base set | **21,105 bytes (20.61 KiB)** | **21,155 bytes (20.66 KiB)** |
 | `tool_search` definition | 1,037 bytes | 1,039 bytes |
 
 The largest individual Chat definitions are `manage_mochi_schedule`
 (1,877 bytes), `navigate_mochi_ui` (1,824), and `recall_memory` (1,704).
 Actual actor runs may send less when a base capability is unavailable.
 
-The base array occupies about 64% of the 32 KiB regression budget and avoids a
+The base array occupies about 65% of the 32 KiB regression budget and avoids a
 discovery round for common Browser, App and Media tasks. Large or uncommon
 provider schemas stay deferred.
 This is a payload-size decision, not a measured token, accuracy or end-to-end
@@ -354,6 +399,9 @@ Acceptance covers:
 - Optional Skill scope uses the shared relationship resolver, filters before
   Top-K, never widens silently, and rechecks edits/revocation before publication.
 - Search results omit descriptions duplicated in next-request schemas.
+- Skill directories include only related, available, undisclosed Tools;
+  base-only Skills have no appendix. Excerpts respect the 100-code-point cap,
+  complete definitions remain unchanged, and bounded pages reject stale cursors.
 - Payload-size regression checks protect the base budget; end-to-end
   task latency/selection quality still need real deployment/device evaluation.
 
@@ -368,11 +416,50 @@ There were 74 catalog-ready Tools and 77 observed registry schemas.
 Fixtures and opt-in reproduction instructions are in
 [Development](../DEVELOPMENT.md). No private history/persona/memory is used.
 
+**Description budget:** the current phone audit covers all 77 observed English
+definitions, including 53 deferred Tools. Shipped optional extension and
+AgentLink descriptions were also inspected; unconfigured remote catalogs are
+not represented by phone measurements. Using the same whitespace/word-boundary
+rule gives:
+
+| Description cap | Deferred descriptions preserved in full | Combined excerpt bytes, excluding names/headings |
+| --- | ---: | ---: |
+| 60 characters | 33/53 | 2,795 |
+| 80 characters | 36/53 | 3,155 |
+| 100 characters | 38/53 | 3,514 |
+
+The 100-character cap preserves the complete 92-character Amap route description
+and 100-character place-search description. Tencent's routine descriptions
+are mostly already below the cap; reducing to 80 saves only 70 bytes across its
+35 directory lines and 359 excerpt bytes across all deferred Tools. These are
+size/completeness observations, not a model-accuracy ablation of the three
+lengths. Even 100 characters can omit multi-operation details and constraints;
+the exact name and subsequently loaded full schema remain authoritative.
+
+The current appendices include their heading/notice, but exclude the Skill
+body and JSON envelope. All fit on one page:
+
+| Skill | Deferred entries | Appendix UTF-8 bytes | Pure render median / P95 |
+| --- | ---: | ---: | ---: |
+| Tencent Docs | 35 | 3,441 (3.36 KiB) | 0.975 / 1.144 ms |
+| Notion | 12 | 1,588 (1.55 KiB) | 2.365 / 3.741 ms |
+| Travel planning | 5 | 632 (0.62 KiB) | 0.327 / 0.356 ms |
+| Merchant discovery | 2 | 436 (0.43 KiB) | 0.257 / 0.395 ms |
+| Nine base-only Skills | 0 each | 0 each | Each P95 below 0.04 ms |
+
+Renderer measurements use five warmups and 100 samples per Skill, including
+normalization/truncation and cursor revision work. They exclude live relation
+resolution, Skill translation, model inference and network latency; they are
+not whole-`load_skill` timings. Long source descriptions still require scanning
+before truncation, so entry count alone does not predict render time.
+
 **Paired retrieval:** 44 fixed English queries plus 53 generated exact names;
 89 positive queries run both globally and with Skill scope, alternating pair
 order. Eight no-dedicated-integration negatives run globally, for 186 searches.
-Every observed ranking agrees with the in-memory index; global ranking is
-unchanged. Top-1/Top-5 mean one designated target ranks first/within five,
+Every observed ranking agrees with the in-memory index. All positive global
+rankings remain unchanged by the directory addition; one negative query's
+unrelated candidates change as the loader description changes corpus statistics.
+Top-1/Top-5 mean one designated target ranks first/within five,
 not exhaustive relevance precision or business-task success.
 
 | Query group | Cases | Global Top-1 / Top-5 | Scoped Top-1 / Top-5 |
@@ -394,15 +481,15 @@ For the same 36 descriptive-query pairs:
 | Metric | Global median / P95 | Scoped median / P95 |
 | --- | ---: | ---: |
 | Eligible candidates | 77 / 77 | 23.5 / 35 |
-| Warm BM25 scoring | 0.131 / 0.170 ms | 0.102 / 0.137 ms |
-| Search through next request's schema readiness | 41 / 51.25 ms | 57 / 67 ms |
+| Warm BM25 scoring | 0.130 / 0.166 ms | 0.102 / 0.137 ms |
+| Search through next request's schema readiness | 41 / 51 ms | 61.5 / 74.75 ms |
 | Search result envelope | 359 / 396 bytes | 375 / 434 bytes |
-| Next-request Tool array | 27,404 / 71,743 bytes | 27,393.5 / 71,743 bytes |
+| Next-request Tool array | 27,607 / 71,946 bytes | 27,596.5 / 71,946 bytes |
 
 BM25 measurements use five warmup passes and 720 timed samples per variant.
 Host timings include current permission/schema checks and, for scope, fresh
 Skill resolution and revalidation; they exclude factory work, model inference
-and business execution. Scoping saves scoring work but adds about 16 ms to
+and business execution. Scoping saves scoring work but adds about 20.5 ms to
 the measured median host path. Exact-name queries should omit redundant scope.
 Phone scheduling, GC and thermal state are not controlled; these are observations,
 not latency guarantees.
@@ -411,46 +498,72 @@ not latency guarantees.
 total 12,316 bytes globally and 13,385 bytes scoped. Adding duplicate descriptions
 from the returned schemas to those same results would produce 35,018 and
 35,987 bytes respectively: omitting duplication saves **64.8% / 62.8%**.
-The next-request Tool arrays total 1,186,072 / 1,188,623 bytes; this set does not
+The next-request Tool arrays total 1,193,380 / 1,195,931 bytes; this set does not
 establish schema-payload savings from scope alone. These are compact UTF-8 bytes,
 not tokenizer counts or billed tokens. Scope narrows eligible Tools but does
 not guarantee fewer matches, smaller definitions or a faster overall turn.
 
-**Chinese request to main-model query:** 44 synthetic tasks on the active
-`gpt-6.1-terra` connection, Responses, with the normal 20-second request
-deadline. The diagnostic permits only `load_skill`/`tool_search` and stops at
-the next request boundary after the first search batch, before business execution.
+**Chinese request to main-model query:** 44 synthetic fixtures per arm,
+132 measurements on the active `gpt-6.1-terra` connection, Responses, with the
+normal 20-second request deadline. Each arm receives the same capability-only
+instruction followed by the Chinese request; labels remain hidden. The model
+selects the final operation without missing-ID assistance or prerequisite
+lookups. Only `load_skill`/`tool_search` can execute; observation stops at the
+next request boundary after the first search batch.
 
-| Observed route | Positive tasks (36) | No-dedicated-integration tasks (8) |
-| --- | ---: | ---: |
-| Reached search | 17 | 8 |
-| Assistance/location call intercepted before dispatch | 15 | 0 |
-| Replied without search | 4 | 0 |
-| Provider error or timeout | 0 | 0 |
+Variant order rotates per fixture. Transport ablations remove Skills entirely,
+retain Skills without the directory, or use the production directory. They
+share the production registry/live checks; baseline host timings still include
+directory preparation before its text is removed. This measures controlled
+capability selection, not natural routing or completed business-task accuracy.
 
-All **25 search queries were English**; six of the 17 positive queries used a
-valid related Skill scope, with no scope errors or out-of-scope results.
-All seven exact-name positive queries ranked their named Tool first.
-The original task's final target appeared in the first batch for **12/17**
-searched positive tasks (11 at rank one). Four other tasks first searched a
-file-location prerequisite; one compound table-search/update query missed its
-final update Tool. These are distinct from scope-selection errors. Missing
-document identifiers can legitimately require assistance or prerequisite
-lookup; conditional retrieval hits do not establish success across all 36 tasks.
-Six of eight negative queries returned generic/unrelated candidates.
+| Metric | No Skills | Skills only | Skills + directory |
+| --- | ---: | ---: | ---: |
+| Positive cases reaching search | 35/36 | 36/36 | 36/36 |
+| Top-1 final target, all positive cases | 31/36 | 32/36 | 32/36 |
+| Top-5 final target, all positive cases | 34/36 (94.4%) | 35/36 (97.2%) | 36/36 (100%) |
+| Provider failures | 1 | 0 | 0 |
+| Negative queries returning generic/unrelated candidates | 6/8 | 6/8 | 6/8 |
+| English search queries | 43/43 | 44/44 | 44/44 |
+| Cases requesting a Skill / receiving directory text | 0 / 0 | 10 / 0 | 8 / 3 |
+| Total model requests | 44 | 49 | 47 |
+| Total serialized request-representation bytes | 1,057,824 | 1,391,614 | 1,337,781 |
 
-| Live phase | Samples | Median / P95 |
-| --- | ---: | ---: |
-| Individual model request | 69 | 2,638 / 3,908.6 ms |
-| Search response through next request readiness | 25 | 146 / 261.8 ms |
-| Agent start through search results, excluding factory | 25 | 3,576 / 5,895.4 ms |
-| Factory preparation for searched cases | 25 | 472 / 561.8 ms |
+The no-Skills failure was a network exception after 20,019 ms; it remains in
+the all-positive denominator. Conditional on reaching search, its Top-1/Top-5
+are 31/35 and 34/35. No cases replied without search or attempted business calls.
+The four Tencent paraphrases hit 3/4, 3/4 and 4/4 respectively; appending a row
+missed in the first two arms. All three cases that actually received a
+directory selected an exact name and hit rank one. The row-query improvement
+occurred without directory exposure, so it must not be attributed to reading
+the appendix. This single small run does not isolate causal benefit or model
+variance. Negative-query precision remains a limitation in every arm.
 
-Live host timings can include same-response Skill loads and multiple searches;
-model/network conditions and phone scheduling vary. Stage medians are not
-additive, and the zero observed timeouts do not guarantee future requests.
+| Live latency, median / P95 | No Skills | Skills only | Skills + directory |
+| --- | ---: | ---: | ---: |
+| Individual model request | 2,332 / 3,346.65 ms | 2,329 / 3,396.6 ms | 2,246 / 3,126.5 ms |
+| Search response through next request readiness | 67 / 86.1 ms | 71.5 / 143.55 ms | 68.5 / 131.05 ms |
+| Agent start through search results, excluding factory | 2,490 / 3,347.6 ms | 2,699.5 / 4,651.85 ms | 2,467 / 3,738.55 ms |
 
-Phone verification also covers all 13 enabled Skills' English model inputs and
-a guarded live chain through search, next-request schema disclosure, one public
-Shanghai Amap weather call and a successful final reply. This does not certify
-arbitrary provider writes or full business-task accuracy.
+Model-request samples are 44/49/47; search-path samples are 43/44/44 and exclude
+the failed case. Live host timings can include same-response Skill loads and
+multiple searches; stage medians are not additive. Directory-arm aggregate
+request representation is 3.9% smaller than Skills-only because the observed
+run uses two fewer model requests, not because descriptions are free.
+Skills-only and directory arms both exceed the no-Skills payload. These counts
+serialize the shared Chat request representation, not Responses wire bytes or
+billed tokens. No tokens/s, server threads/memory, throughput or sustained
+latency improvement is established by this client-side experiment.
+
+| Connected-phone validation | Observed result |
+| --- | --- |
+| English Skill inputs | All 13 enabled Skills pass |
+| Live read-only weather | Search, next-request schema, one Shanghai Amap call and final reply pass |
+| Authorized browser/document task | Taobao search pages read; Tencent Smart Canvas created, updated and read back |
+| Product qualification and cart | Detail pages did not open; no verified qualifying minimum price/product link, and no cart addition |
+
+The shopping goal remains blocked, not a passed purchase workflow. Search-page
+prices in the task document are explicitly unverified. No order or payment was
+made; the document-target guard also passes a separate no-business-call test.
+Account data, real document identifiers and shopping evidence stay out of the
+repository. This does not certify arbitrary provider writes.

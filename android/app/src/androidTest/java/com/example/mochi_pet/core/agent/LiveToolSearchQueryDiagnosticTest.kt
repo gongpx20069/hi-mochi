@@ -17,6 +17,7 @@ import com.example.mochi_pet.core.agent.tool.ToolDisclosurePolicy
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolSchemaLanguage
 import com.example.mochi_pet.core.model.MochiSurface
+import com.example.mochi_pet.core.skills.SkillToolDirectory
 import com.example.mochi_pet.core.tools.readyToolNames
 import java.time.LocalDate
 import kotlinx.coroutines.TimeoutCancellationException
@@ -49,8 +50,19 @@ class LiveToolSearchQueryDiagnosticTest {
             InstrumentationRegistry.getInstrumentation().context.assets.open("tool-search-chinese-cases.json")
                 .bufferedReader().use { it.readText() }
         check(sourceText.length in 1..65_536) { "A bounded pre-labelled synthetic query fixture is required" }
-        val cases = Json.parseToJsonElement(sourceText).jsonArray
-        check(cases.size in 1..60) { "Live evaluation allows at most sixty cases" }
+        val fixtures = Json.parseToJsonElement(sourceText).jsonArray
+        check(fixtures.size in 1..60) { "Live evaluation allows at most sixty cases" }
+        val compare = InstrumentationRegistry.getArguments().getString("mochiCompareSkillDirectories") == "true"
+        val selectionOnly = InstrumentationRegistry.getArguments().getString("mochiCapabilitySelectionOnly") == "true"
+        val variants = if (compare) listOf("no_skills", "skills_only", "skill_directory") else listOf("skill_directory")
+        val cases = fixtures.flatMapIndexed { index, fixture ->
+            variants.indices.map { order ->
+                buildJsonObject {
+                    fixture.jsonObject.forEach { (key, item) -> put(key, item) }
+                    put("variant", variants[(index + order) % variants.size])
+                }
+            }
+        }
         val before = app.providerSettingsRepository.loadProfiles()
         val config = app.providerSettingsRepository.loadRuntimeConfig().forForegroundRequest()
         val ready = app.toolCatalogRepository.loadSummary().readyToolNames()
@@ -65,7 +77,10 @@ class LiveToolSearchQueryDiagnosticTest {
                 put("protocol", config.apiProtocol.name)
                 put("model_timeout_seconds", config.timeoutSeconds)
                 put("catalog_ready_count", ready.size)
-                put("case_count", cases.size)
+                put("case_count", fixtures.size)
+                put("measurement_count", cases.size)
+                put("comparison", compare)
+                put("evaluation_mode", if (selectionOnly) "capability_selection" else "natural_task_routing")
                 put("private_history_persona_memory_included", false)
                 put("business_calls_executed", 0)
                 put("rows", JsonArray(rows))
@@ -75,6 +90,7 @@ class LiveToolSearchQueryDiagnosticTest {
         for (value in cases) {
             val case = value.jsonObject
             val query = case.getValue("query").jsonPrimitive.content
+            val variant = case.getValue("variant").jsonPrimitive.content
             val expected = case.getValue("expected").jsonArray.map { it.jsonPrimitive.content }
             if (expected.isNotEmpty() && expected.none { it in ready }) {
                 rows += buildJsonObject {
@@ -86,6 +102,8 @@ class LiveToolSearchQueryDiagnosticTest {
             }
             val modelDurations = mutableListOf<Long>()
             val requestedNames = mutableListOf<String>()
+            val requestBytes = mutableListOf<Int>()
+            val directoryBytes = linkedMapOf<String, Int>()
             val searchCalls = linkedMapOf<String, OpenAiToolCall>()
             val searchResults = mutableListOf<JsonObject>()
             val toolDurations = mutableMapOf<String, Long>()
@@ -133,9 +151,23 @@ class LiveToolSearchQueryDiagnosticTest {
                         throw DiagnosticStop("searched")
                     }
                     if (++modelRounds > 4) throw DiagnosticStop("model_round_limit")
+                    val modelRequest = variantRequest(request, variant)
+                    if (variant == "no_skills") {
+                        check(modelRequest.tools.none { ToolDiscovery.schemaName(it) == "load_skill" })
+                        check(modelRequest.messages.none { it.role == "system" && "# Available Skills" in it.content.orEmpty() })
+                    }
+                    requestBytes += Json.encodeToString(OpenAiChatRequest.serializer(), modelRequest).toByteArray(Charsets.UTF_8).size
+                    modelRequest.messages.filter { it.role == "tool" && it.name == "load_skill" }.forEach { message ->
+                        val data = Json.parseToJsonElement(checkNotNull(message.content)).jsonObject["data"] as? JsonObject
+                        val content = data?.get("content")?.jsonPrimitive?.content.orEmpty()
+                        if (SkillToolDirectory.HEADING in content) {
+                            directoryBytes[checkNotNull(message.toolCallId)] =
+                                (SkillToolDirectory.HEADING + content.substringAfter(SkillToolDirectory.HEADING)).toByteArray(Charsets.UTF_8).size
+                        }
+                    }
                     val modelStarted = SystemClock.elapsedRealtime()
                     val response = try {
-                        app.openAiChatClient.complete(config, request)
+                        app.openAiChatClient.complete(config, modelRequest)
                     } finally {
                         modelDurations += SystemClock.elapsedRealtime() - modelStarted
                     }
@@ -146,6 +178,11 @@ class LiveToolSearchQueryDiagnosticTest {
                     if (calls.any { it.type != "function" || it.function.name !in setOf("load_skill", "tool_search") }) {
                         throw DiagnosticStop("blocked_business_call")
                     }
+                    if (variant == "no_skills" && calls.any {
+                            it.function.name == "load_skill" ||
+                                "skill_name" in Json.parseToJsonElement(it.function.arguments).jsonObject
+                        }
+                    ) throw DiagnosticStop("unavailable_skill_requested")
                     calls.filter { it.function.name == "tool_search" }.forEach { searchCalls[it.id] = it }
                     if (searchCalls.isNotEmpty()) lastSearchResponseAt = SystemClock.elapsedRealtime()
                     return response
@@ -178,7 +215,14 @@ class LiveToolSearchQueryDiagnosticTest {
             val status = try {
                 withTimeout(120_000) {
                     runner.run(AgentRunRequest(
-                        provider = config, query = query, currentEmotion = "neutral",
+                        provider = config,
+                        query = if (selectionOnly) {
+                            "Identify the single Tool for the final requested operation below, without executing it. " +
+                                "Use tool_search to load its definition. You may read a relevant Skill. " +
+                                "Do not ask for IDs, location or missing business arguments, and do not search for prerequisite operations: " +
+                                "this is capability discovery only. If no dedicated integration exists, report that instead of a workaround.\n$query"
+                        } else query,
+                        currentEmotion = "neutral",
                         context = ToolExecutionContext(LocalDate.now(), MochiSurface.Conversation),
                     ))
                 }
@@ -201,6 +245,8 @@ class LiveToolSearchQueryDiagnosticTest {
                 put("initial_request_ms", firstModelAt - runStarted)
                 put("initial_tools_count", initialToolCount)
                 put("model_request_ms", JsonArray(modelDurations.map(::JsonPrimitive)))
+                put("model_request_bytes", JsonArray(requestBytes.map(::JsonPrimitive)))
+                put("skill_directory_bytes", JsonArray(directoryBytes.values.map(::JsonPrimitive)))
                 put("requested_tools", JsonArray(requestedNames.map(::JsonPrimitive)))
                 put("searches", JsonArray(searchResults))
                 put("tool_phase_ms", buildJsonObject { toolDurations.forEach { (name, ms) -> put(name, ms) } })
@@ -218,5 +264,44 @@ class LiveToolSearchQueryDiagnosticTest {
         check(before == app.providerSettingsRepository.loadProfiles()) { "Provider configuration changed during evaluation" }
         save(true)
         Log.i("MochiToolSearch", "live_query_complete cases=${rows.size} business_calls=0")
+    }
+
+    private fun variantRequest(request: OpenAiChatRequest, variant: String): OpenAiChatRequest {
+        if (variant == "skill_directory") return request
+        val tools = request.tools.filterNot { variant == "no_skills" && ToolDiscovery.schemaName(it) == "load_skill" }.map { schema ->
+            val function = schema.getValue("function").jsonObject
+            val name = ToolDiscovery.schemaName(schema)
+            val removed = when {
+                name == "load_skill" -> "tool_cursor"
+                variant == "no_skills" && name == "tool_search" -> "skill_name"
+                else -> return@map schema
+            }
+            val parameters = function.getValue("parameters").jsonObject
+            val updated = JsonObject(parameters + ("properties" to JsonObject(parameters.getValue("properties").jsonObject - removed)))
+            val description = if (name == "load_skill") {
+                "Load the full instructions for one enabled Agent Skill. Use only a skill name listed in available_skills."
+            } else if (variant == "no_skills") {
+                function.getValue("description").jsonPrimitive.content.replace(
+                    "For capability searches within a known Skill, set skill_name. ", "",
+                )
+            } else function.getValue("description").jsonPrimitive.content
+            JsonObject(schema + ("function" to JsonObject(function + ("parameters" to updated) + ("description" to JsonPrimitive(description)))))
+        }
+        val messages = request.messages.map { message ->
+            when {
+                variant == "no_skills" && message.role == "system" -> message.copy(content =
+                    checkNotNull(message.content).replace(Regex("# Available Skills\\n.*?(?=# Android presentation policy)", RegexOption.DOT_MATCHES_ALL), ""))
+                message.role == "tool" && message.name == "load_skill" -> {
+                    val envelope = Json.parseToJsonElement(checkNotNull(message.content)).jsonObject
+                    val data = envelope["data"] as? JsonObject ?: return@map message
+                    val content = data.getValue("content").jsonPrimitive.content.substringBefore(SkillToolDirectory.HEADING)
+                    message.copy(content = JsonObject(envelope + ("data" to JsonObject(
+                        data - "next_tool_cursor" - "related_tool_count" + ("content" to JsonPrimitive(content)),
+                    ))).toString())
+                }
+                else -> message
+            }
+        }
+        return request.copy(messages = messages, tools = tools)
     }
 }

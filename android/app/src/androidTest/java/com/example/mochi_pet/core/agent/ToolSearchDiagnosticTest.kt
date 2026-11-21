@@ -23,6 +23,8 @@ import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.skills.LoadSkillTool
 import com.example.mochi_pet.core.skills.prepareForModel
 import com.example.mochi_pet.core.skills.resolveTools
+import com.example.mochi_pet.core.skills.SkillToolDirectory
+import com.example.mochi_pet.core.agent.tool.ToolDirectorySnapshot
 import com.example.mochi_pet.core.tools.readyToolNames
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
@@ -200,6 +202,40 @@ class ToolSearchDiagnosticTest {
         }
         val report = JsonArray(rows).toString()
         app.cacheDir.resolve("tool-retrieval-results.json").writeText(report)
+        app.cacheDir.resolve("tool-description-audit.json").writeText(buildJsonObject {
+            put("tools", JsonArray(observedSchemas.values.map { schema ->
+                val function = schema.getValue("function").jsonObject
+                buildJsonObject {
+                    put("name", function.getValue("name"))
+                    put("description", function.getValue("description"))
+                }
+            }))
+            put("skills", buildJsonObject {
+                scopes.forEach { (name, tools) -> put(name, JsonArray(tools.sorted().map(::JsonPrimitive))) }
+            })
+        }.toString())
+        val descriptions = observedSchemas.mapValues { (_, schema) ->
+            schema.getValue("function").jsonObject.getValue("description").jsonPrimitive.content
+        }
+        val snapshot = ToolDirectorySnapshot(descriptions, ToolDisclosurePolicy.baseNames)
+        val directoryMeasurements = scopes.map { (name, toolNames) ->
+            val skill = checkNotNull(app.skillRepository.loadEnabledSkill(name))
+            repeat(5) { SkillToolDirectory.page(skill, toolNames, snapshot, null) }
+            val samples = List(100) {
+                val before = SystemClock.elapsedRealtimeNanos()
+                SkillToolDirectory.page(skill, toolNames, snapshot, null)
+                JsonPrimitive((SystemClock.elapsedRealtimeNanos() - before) / 1_000_000.0)
+            }
+            val page = SkillToolDirectory.page(skill, toolNames, snapshot, null)
+            check(page.nextCursor == null) { "This catalog measurement expects one directory page per Skill" }
+            buildJsonObject {
+                put("skill_name", name)
+                put("tool_count", page.totalCount)
+                put("appendix_bytes", page.content.toByteArray(Charsets.UTF_8).size)
+                put("render_samples_ms", JsonArray(samples))
+            }
+        }
+        app.cacheDir.resolve("skill-directory-measurements.json").writeText(JsonArray(directoryMeasurements).toString())
         val indexStarted = SystemClock.elapsedRealtimeNanos()
         val index = ToolSearchIndex(observedSchemas.values.toList())
         val indexBuildMs = (SystemClock.elapsedRealtimeNanos() - indexStarted) / 1_000_000.0

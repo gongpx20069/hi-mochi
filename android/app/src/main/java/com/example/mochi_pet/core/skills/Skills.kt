@@ -14,6 +14,7 @@ import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -324,8 +325,8 @@ class LoadSkillTool(
     override val schema: JsonObject = functionToolSchema(
         name = name,
         description =
-            "Load the full instructions for one enabled Agent Skill. " +
-                "Use only a skill name listed in available_skills.",
+            "Load an enabled Skill's instructions and related Tool directory. " +
+                "Use an exact available_skills name; reuse prior results instead of reloading.",
         properties = buildJsonObject {
             put(
                 "skill_name",
@@ -334,6 +335,11 @@ class LoadSkillTool(
                     put("description", "Exact enabled skill name")
                 },
             )
+            put("tool_cursor", buildJsonObject {
+                put("type", "string")
+                put("description", "Optional next_tool_cursor from this Skill's result; returns only the next related-tool directory page.")
+                put("maxLength", 74)
+            })
         },
         required = listOf("skill_name"),
     )
@@ -342,14 +348,13 @@ class LoadSkillTool(
         arguments: JsonObject,
         context: ToolExecutionContext,
     ): ToolResultEnvelope {
-        val skillName = arguments["skill_name"]
-            ?.jsonPrimitive
-            ?.content
-            ?.trim()
-            .orEmpty()
-        if (skillName.isEmpty()) {
-            throw ToolInputException("skill_name is required")
-        }
+        if (arguments.keys.any { it !in setOf("skill_name", "tool_cursor") }) throw ToolInputException("Unexpected load_skill fields")
+        val skillName = (arguments["skill_name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?.takeIf(::isValidSkillName) ?: throw ToolInputException("skill_name must be an exact listed Skill name")
+        val cursor = if ("tool_cursor" in arguments) {
+            (arguments["tool_cursor"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: throw ToolInputException("tool_cursor must be a string")
+        } else null
         val skill = repository.loadEnabledSkill(skillName)
             ?: return ToolResultEnvelope.error(
                 ToolErrorCode.NOT_FOUND,
@@ -365,7 +370,12 @@ class LoadSkillTool(
                     readiness.missingRequirements.sorted().joinToString(),
             )
         }
-        val document = skill.standardDocument(resolution.toolNames, prepareText)
+        val directory = try {
+            SkillToolDirectory.page(skill, resolution.toolNames, context.toolDirectory, cursor)
+        } catch (_: SkillToolDirectoryChangedException) {
+            return ToolResultEnvelope.error(ToolErrorCode.STALE_REF, "Skill or Tool directory changed; load the Skill again without tool_cursor.")
+        }
+        val document = if (cursor == null) skill.standardDocument(resolution.toolNames, prepareText) else ""
         if (repository.loadEnabledSkill(skillName) != skill ||
             skill.resolveTools(availableToolNamesProvider()) != resolution
         ) {
@@ -375,7 +385,9 @@ class LoadSkillTool(
             buildJsonObject {
                 put("name", skill.standardName)
                 put("location", skill.toAgentSkillMetadata().location)
-                put("content", document)
+                put("content", document + directory.content)
+                if (directory.totalCount > 0) put("related_tool_count", directory.totalCount)
+                directory.nextCursor?.let { put("next_tool_cursor", it) }
             },
         )
     }

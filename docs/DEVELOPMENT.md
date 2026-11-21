@@ -172,6 +172,12 @@ globally. Reports include candidate counts, search-result bytes and next-request
 Tool-array bytes. A counterfactual byte count adds descriptions from those same
 matched schemas to quantify avoided duplicate result text. These are UTF-8
 payload sizes, not model token counts.
+The scripted run also writes `tool-description-audit.json` containing only
+observed English Tool names/descriptions and Skill associations, and
+`skill-directory-measurements.json` with per-Skill appendix bytes and pure
+directory-render timings (five warmups, one hundred samples). These artifacts
+exclude parameters, credentials, prompts and business data. Base-only Skills
+must have zero appendix bytes.
 With the same opt-in, `verifyEnglishSkillInputs` checks enabled Skill discovery
 and `load_skill` documents for English model-facing instructions without
 executing their workflows. Uncached translations can consume model quota.
@@ -209,6 +215,58 @@ factory, model, Tool and continuation timings, but no credentials, endpoint,
 full prompts, Skill contents or final reply text. This consumes model quota;
 report first-search quality separately from routing coverage and do not call
 it full business-task success or pure BM25 latency.
+
+Add `-e mochiCompareSkillDirectories true` to that live diagnostic for three
+transport-level ablations of each identical fixture: no Skill metadata/loading
+or Skill search scope; normal Skills without directory descriptions; and
+normal Skills with directories. Variant order rotates per fixture. The first
+two variants remove only the relevant model-facing metadata/schema fields and
+directory content, never change saved settings or enable Tools. All variants
+use the same production registry and live checks; host timings therefore
+include directory preparation even when the transport removes its text.
+Reports include serialized Chat-request representation bytes (not wire bytes
+for every protocol or billed tokens), unique appendix bytes, routing coverage,
+first-search targets and latency. Report conditional Top-1/Top-5 separately
+from all-case coverage, negatives and prerequisite searches. A single run does
+not measure model variance or prove universal accuracy.
+Use `-e mochiCapabilitySelectionOnly true` for the controlled capability-selection
+comparison: every variant receives the same instruction to find the final
+operation without execution, prerequisite lookups or requests for missing
+business arguments. Expected labels remain hidden. Keep this measurement
+separate from natural task routing, where assistance and prerequisite lookups
+can be correct behavior.
+
+`core.agent.AuthorizedShoppingDiagnosticTest#researchSwitchAndSaveDocument`
+requires `-e mochiAuthorizedSwitchShopping true` and explicit authorization
+for that real task. It compares new non-Japanese Switch 2 listings in the
+already user-selected Taobao app, may create/read a new Tencent Smart Canvas,
+and may add one verified qualifying item to the cart. It never orders or pays,
+changes permissions/settings, edits unrelated documents or bypasses filtered
+controls. The guard restricts app operations to the discovered Taobao ID.
+Document edits require the exact file ID created by this task, or explicitly
+supplied for continuation with `-e mochiShoppingDocumentId`. Creation is disabled
+when continuing an existing task document. Read-only document discovery and
+structural readers support verification. Login, unreadable screens or absent
+authorization are blockers, not successful purchases. The fixture preserves
+the production accessibility service and starts a real foreground Activity.
+`authorized-shopping-results.json` records result statuses, timing and the
+final task report; do not commit personal/account data. A finished diagnostic
+does not establish success: verify the report's price evidence, document
+readback and cart readback independently. This test consumes model quota and
+has real, explicitly authorized side effects; it is never part of CI.
+`inspectShoppingPrerequisites` with the same opt-in reads only production
+`app_read` and writes selection/accessibility booleans to
+`shopping-prerequisites.json`. It never enables an app or grants accessibility.
+For an explicitly requested web alternative, add `-e mochiShoppingBrowser true`:
+the fixture owns a real browser turn, reuses existing website sessions and
+allows native user assistance for necessary manual login. Browser clicks must
+reference observed controls; recognized checkout/payment/purchase controls are
+blocked before dispatch. App permissions are not bypassed; web access has its
+own authentication, site-access policy and Skill restrictions.
+`-e mochiRecoverShoppingDocument true` permits only read-only lookup/readback
+of the task's exact document title; use it after an interrupted run rather
+than replaying creation. `documentWriteGuardRejectsOtherFiles` is a deterministic
+no-business-call check for the diagnostic's write-target guard.
 
 App Control and Media Control regressions:
 
