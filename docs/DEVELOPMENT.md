@@ -538,6 +538,39 @@ Only with explicit permission, `-e mochiEnableResponses true` switches that
 connection's protocol after success, preserving its key and all other settings.
 Without the diagnostic opt-in, the test is skipped.
 
+`core.agent.llm.AzureTransportDiagnosticTest#measureRealResponseCompression`
+adds payload-free, test-only transport observations. Run it with
+`-e mochiAzureTransportDiagnostic true`, the same explicit
+`mochiAzureResourceHost`/`mochiAzureDeployment` arguments, and an already active
+Azure Responses connection. It does not enable a provider, change protocol or
+timeout settings, or export the Keystore-backed credential.
+
+The fixture captures the current base schemas and the base set plus the
+already-enabled `tencent_docs_smartsheet_add_fields` definition through a
+scripted, local `tool_search`. No captured Agent prompt is sent to a provider.
+The live requests use only a fixed synthetic prompt and zero, base, or
+base-plus-large Tool definitions. Returned calls are never dispatched.
+Two repetitions alternate default OkHttp gzip negotiation and explicit
+`Accept-Encoding: identity`, for twelve non-streaming requests with the normal
+20-second deadline. These share a test-owned connection pool; the first request
+can include cold-connection cost, so raw variant timings are not a causal
+compression benchmark.
+
+`azure-transport-results.json` is checkpointed in app cache. It contains a
+bounded DNS/connection/TLS/upload/response event timeline, connection-attempt and
+exchange counts, sanitized encoding/protocol categories, request bytes,
+pre-decompression network-body bytes and post-decompression bytes. Network-body
+counts exclude HTTP headers/framing and TLS overhead. Multi-exchange counters
+are cumulative; the encoding fields describe the last exchange, so compare
+compression ratios only on successful single-exchange samples.
+Failures remain in the report; each schema set must have at least one success
+under both variants for the fixture to pass. It records no URLs, IP addresses,
+headers beyond encoding categories, keys, prompts, output text or Tool arguments.
+This diagnostic consumes model quota and is never part of CI.
+`byteCountersDistinguishCompressedAndDecodedBodies` checks the counters against
+synthetic gzip data without a provider. Current observations are summarized in
+[Technical design](architecture/TECHNICAL.md#transport-observations).
+
 Speech profile regressions additionally cover `SpeechSettingsRepositoryTest`,
 `SpeechSynthesisSettingsTest`, `CloudSpeechRuntimeTest`, and `WakeBriefingTest`:
 legacy active/inactive migration, isolated same-provider accounts, non-overwriting

@@ -389,6 +389,43 @@ error; intermediate commentary alone is not a final reply.
 Provider errors are bounded and redact the configured key. Endpoints must be
 absolute HTTP(S) URLs without embedded credentials.
 
+### Transport observations
+
+The client uses non-streaming requests and OkHttp's default transparent gzip
+negotiation/decompression. Its derived clients share the base connection pool.
+There is no custom response-compression switch, forced HTTP/1.1/IPv4 route,
+streaming fallback or application retry. These defaults do not guarantee that
+a provider compresses a particular response.
+
+The opt-in, test-only transport diagnostic measures encoding before OkHttp's
+transparent decompression, separately counts encoded/decoded body bytes and
+records a bounded phase timeline without payloads or credentials.
+[Development](../DEVELOPMENT.md) owns its invocation and safety boundaries.
+
+On 2026-11-21, the connected Xiaomi ARM64 phone used its active Azure
+`gpt-6.1-terra` Responses deployment and the normal 20-second deadline.
+Twelve requests compared default gzip negotiation with explicit identity,
+with two repetitions per schema set/variant. Eleven completed successfully
+over HTTP/2; five successes requested gzip and six requested identity.
+All eleven were uncompressed: encoded and decoded body sizes were identical.
+
+| Tool set | Successful / attempted | Request body | Response body, encoded = decoded |
+| --- | ---: | ---: | ---: |
+| No Tools | 3/4 | 171 B | 3,582 B |
+| Current 25 base Tools | 4/4 | 21,324 B | 35,830 B |
+| Base plus one large Tencent definition | 4/4 | 61,440 B | 105,404 B |
+
+The failed zero-Tool request reached its deadline during TCP connection, before
+uploading a body. Another zero-Tool request spent 15,597 ms connecting TCP and
+1,418 ms in TLS, finishing in 19,589 ms. Connected large-body samples spent
+about 2.0-5.9 seconds consuming their response bodies. Both connection delay
+and body transfer therefore matter; Tool volume is not the sole failure cause.
+These observations establish no gzip benefit on this tested deployment/path,
+not a universal lack of Azure/OpenAI/Kimi support or a long-term failure rate.
+No additional production compression behavior is justified by this sample.
+
+### Request deadlines
+
 Foreground text and voice cap each model HTTP request at 20 seconds, including
 Tool continuations, final-response repair and delegated model/image requests.
 A shorter configured Provider timeout is preserved. Scheduled Agents and their
