@@ -335,6 +335,10 @@ The native implementation now includes:
 - strict final JSON parsing and NavigationPolicy application;
 - bounded query, history, tool-result, and final-reply sizes.
 
+Base Tool selection, run-local progressive disclosure and the ordinary-function
+`tool_search` continuation on both APIs are owned by [Tool design](TOOL_DESIGN.md).
+Provider protocol selection and transport remain separate from Tool discovery.
+
 Provider metadata and encrypted API-key material are stored in Preferences
 DataStore. Android Keystore owns the AES-GCM key; Compose receives only
 `hasApiKey`, and the plaintext key is decrypted only when constructing the
@@ -384,6 +388,43 @@ error; intermediate commentary alone is not a final reply.
 
 Provider errors are bounded and redact the configured key. Endpoints must be
 absolute HTTP(S) URLs without embedded credentials.
+
+### Transport observations
+
+The client uses non-streaming requests and OkHttp's default transparent gzip
+negotiation/decompression. Its derived clients share the base connection pool.
+There is no custom response-compression switch, forced HTTP/1.1/IPv4 route,
+streaming fallback or application retry. These defaults do not guarantee that
+a provider compresses a particular response.
+
+The opt-in, test-only transport diagnostic measures encoding before OkHttp's
+transparent decompression, separately counts encoded/decoded body bytes and
+records a bounded phase timeline without payloads or credentials.
+[Development](../DEVELOPMENT.md) owns its invocation and safety boundaries.
+
+On 2026-11-21, the connected Xiaomi ARM64 phone used its active Azure
+`gpt-6.1-terra` Responses deployment and the normal 20-second deadline.
+Twelve requests compared default gzip negotiation with explicit identity,
+with two repetitions per schema set/variant. Eleven completed successfully
+over HTTP/2; five successes requested gzip and six requested identity.
+All eleven were uncompressed: encoded and decoded body sizes were identical.
+
+| Tool set | Successful / attempted | Request body | Response body, encoded = decoded |
+| --- | ---: | ---: | ---: |
+| No Tools | 3/4 | 171 B | 3,582 B |
+| Current 25 base Tools | 4/4 | 21,324 B | 35,830 B |
+| Base plus one large Tencent definition | 4/4 | 61,440 B | 105,404 B |
+
+The failed zero-Tool request reached its deadline during TCP connection, before
+uploading a body. Another zero-Tool request spent 15,597 ms connecting TCP and
+1,418 ms in TLS, finishing in 19,589 ms. Connected large-body samples spent
+about 2.0-5.9 seconds consuming their response bodies. Both connection delay
+and body transfer therefore matter; Tool volume is not the sole failure cause.
+These observations establish no gzip benefit on this tested deployment/path,
+not a universal lack of Azure/OpenAI/Kimi support or a long-term failure rate.
+No additional production compression behavior is justified by this sample.
+
+### Request deadlines
 
 Foreground text and voice cap each model HTTP request at 20 seconds, including
 Tool continuations, final-response repair and delegated model/image requests.
@@ -439,6 +480,26 @@ Knowledge require **any one** enabled Tool from their connected, enabled
 provider. All other Skills require every declared mandatory Tool; explicitly
 optional capabilities do not block enablement. Provider-backed groups require
 the provider to be installed when applicable, connected, and enabled.
+Name-based loading rejects multiple enabled Skills with the same standard name;
+the user must rename or disable duplicates rather than silently selecting one.
+
+Model-facing Skill descriptions and loaded instructions are English, independent
+of UI locale. Built-ins are authored in English; installed/localized source
+content stays unchanged for UI/editing. Main, scheduled and child discovery
+prepare descriptions, while `load_skill` prepares the body/source label on
+demand through the same isolated, source-keyed translation cache described in
+[Tool design](TOOL_DESIGN.md#model-facing-language-and-preparation).
+English paragraphs need no model call. Skill identity and `allowed-tools` are
+host-generated from the original declarations and current actor scope, never
+translated or inferred from translated prose. Preparation cannot enable a Skill
+or Tool; activation rechecks Skill changes and dependency revocation afterwards.
+Translation failures are explicit, with no untranslated instruction fallback.
+Loaded Skill content includes a bounded English name/description directory
+for associated, available Tools whose schemas were not supplied in the invoking
+request. Base-only Skills add nothing. The 100-character excerpts, 12 KiB
+directory pages, live filtering and continuation contract are owned by
+[Tool design](TOOL_DESIGN.md#skill-tool-directories); full schemas remain
+unchanged and must be loaded before execution.
 
 `builtin:memory-recall` is first in Skills, with discovery name `memory-recall`
 and mandatory `recall_memory`. Its enabled state comes only from Daily journal;
@@ -476,6 +537,13 @@ Tools present in the calling registry, including writes when available.
 Other Skills declare their mandatory Tools plus available, explicitly listed
 optional Tools (for example assistance, location or navigation). The header
 never synthesizes a missing alias or changes Tool enablement.
+`MochiSkill.resolveTools` is the shared, pure relation resolver for readiness,
+this header and Skill-scoped discovery. It returns readiness separately from
+all associated available names: optional Tools affect the search/header set
+but never become mandatory prerequisites. It reads original declarations and
+the caller's full available registry, not translated prose or disclosed schemas.
+The optional `tool_search.skill_name` contract is owned by
+[Tool design](TOOL_DESIGN.md#skill-scoped-search).
 
 The default-on `app-assistant` (App Assistant) Skill provides short, generic
 instructions for selected-app operation, safe popup dismissal, verification and

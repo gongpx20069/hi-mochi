@@ -446,6 +446,11 @@ interface ToolCatalogRepository {
 
     suspend fun isBuiltInEnabled(name: String): Boolean
 
+    suspend fun isToolAvailable(name: String): Boolean = isBuiltInEnabled(name)
+
+    suspend fun availableToolNames(names: Set<String>): Set<String> =
+        names.filterTo(mutableSetOf()) { isToolAvailable(it) }
+
     suspend fun loadEnabledMcpTools(): List<AgentTool>
 
     suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool>
@@ -471,6 +476,7 @@ class DataStoreToolCatalogRepository(
     private val restTransport: RestTransport = RestHttpTransport(),
     private val webdavClient: MochiExtensionClient = UnavailableExtensionClient,
     private val journalEnabled: suspend () -> Boolean = { false },
+    private val prepareModelSchemas: suspend (List<JsonObject>) -> Unit = {},
 ) : ToolCatalogRepository {
     private val tencentCatalogMutex = Mutex()
     private val feishuAuthorizationMutex = Mutex()
@@ -1545,17 +1551,20 @@ class DataStoreToolCatalogRepository(
         if (name == "recall_memory") return journalEnabled()
         val descriptor = BUILT_IN_TOOLS.firstOrNull { it.name == name }
             ?: return false
-        val catalog = loadCatalog()
-        if (descriptor.isAgentBrowserTool() && !catalog.agentBrowserEnabled) {
+        return loadCatalog().isBuiltInEnabled(descriptor)
+    }
+
+    private fun PersistedToolCatalog.isBuiltInEnabled(descriptor: BuiltInToolDescriptor): Boolean {
+        if (descriptor.isAgentBrowserTool() && !agentBrowserEnabled) {
             return false
         }
-        if (descriptor.isMediaTool() && !catalog.mediaEnabled) {
+        if (descriptor.isMediaTool() && !mediaEnabled) {
             return false
         }
-        if (descriptor.isAppControlTool() && catalog.appControlEnabled != true) {
+        if (descriptor.isAppControlTool() && appControlEnabled != true) {
             return false
         }
-        return catalog.builtInEnabled[name] ?: descriptor.defaultEnabled
+        return builtInEnabled[descriptor.name] ?: descriptor.defaultEnabled
     }
 
     override suspend fun loadEnabledMcpTools(): List<AgentTool> {
@@ -1563,6 +1572,69 @@ class DataStoreToolCatalogRepository(
         return catalog.loadEnabledMcpTools { _, _ ->
             true
         }
+    }
+
+    override suspend fun isToolAvailable(name: String): Boolean =
+        name in availableToolNames(setOf(name))
+
+    override suspend fun availableToolNames(names: Set<String>): Set<String> {
+        currentCoroutineContext().ensureActive()
+        if (names.isEmpty()) return emptySet()
+        val catalog = loadCatalog()
+        val remaining = names.toMutableSet()
+        val available = mutableSetOf<String>()
+        for (descriptor in BUILT_IN_TOOLS) {
+            if (!remaining.remove(descriptor.name)) continue
+            val enabled = if (descriptor.name == "recall_memory") journalEnabled() else catalog.isBuiltInEnabled(descriptor)
+            if (enabled && (!descriptor.isAmapTool() || catalog.amapEnabled && catalog.amapCredentials != null)) {
+                available += descriptor.name
+            }
+        }
+        val agentLinkNames = remaining.intersect(com.example.mochi_pet.core.agentlink.AGENTLINK_TOOLS.toSet())
+        if (agentLinkNames.isNotEmpty()) {
+            remaining -= agentLinkNames
+            val state = agentLinkClient?.refresh()
+            if (state != null && state.enabled && state.authorized && state.connected) {
+                available += agentLinkNames.intersect(state.enabledTools)
+            }
+        }
+        suspend fun includeExtension(
+            prefix: String,
+            enabled: Boolean,
+            client: MochiExtensionClient,
+            switches: Map<String, Boolean>,
+        ) {
+            if (!enabled) return
+            val requested = remaining.filterTo(mutableSetOf()) { it.startsWith(prefix) }
+            if (requested.isEmpty()) return
+            remaining -= requested
+            val snapshot = client.snapshot()
+            if (snapshot.connected) {
+                available += snapshot.tools.filter { it.name in requested && (switches[it.name] ?: it.defaultEnabled) }
+                    .map { it.name }
+            }
+        }
+        includeExtension("termux_", catalog.termuxEnabled, termuxClient, catalog.termuxToolsEnabled)
+        includeExtension("webdav_", catalog.webdavEnabled, webdavClient, catalog.webdavToolsEnabled)
+        includeExtension("mijia_", catalog.mijiaEnabled, extensionClient, catalog.mijiaToolsEnabled)
+        for (server in catalog.servers) {
+            if (!server.enabled || !server.isConnected()) continue
+            for (tool in server.tools) {
+                if (!tool.enabled) continue
+                val name = mcpToolAlias(server.id, tool.definition.name)
+                if (name in remaining) available += name
+            }
+        }
+        for (stored in catalog.restConnections) {
+            if (!stored.connection.enabled) continue
+            for (tool in stored.connection.tools) {
+                if (!tool.enabled) continue
+                val name = com.example.mochi_pet.core.rest.restToolAlias(stored.connection.id, tool.id)
+                if (name in remaining) available += name
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        return available
     }
 
     override suspend fun loadEnabledReadOnlyMcpTools(): List<AgentTool> {
@@ -1891,6 +1963,7 @@ class DataStoreToolCatalogRepository(
     private suspend fun updateCatalog(
         transform: (PersistedToolCatalog) -> PersistedToolCatalog,
     ) {
+        var changedSchemas = emptyList<JsonObject>()
         dataStore.edit { preferences ->
             val raw = preferences[CATALOG]
             val current = if (raw.isNullOrBlank()) PersistedToolCatalog().withBuiltInServers()
@@ -1899,9 +1972,23 @@ class DataStoreToolCatalogRepository(
             } catch (error: SerializationException) {
                 throw IllegalStateException("Stored Tool configuration is invalid", error)
             }
-            preferences[CATALOG] = json.encodeToString(transform(current))
+            val updated = transform(current)
+            val previousSchemas = current.modelSchemas().toSet()
+            changedSchemas = updated.modelSchemas().filter { it !in previousSchemas }
+            preferences[CATALOG] = json.encodeToString(updated)
         }
+        // Translation is cancellable network work, never part of a DataStore transaction.
+        prepareModelSchemas(changedSchemas)
     }
+
+    private fun PersistedToolCatalog.modelSchemas(): List<JsonObject> =
+        servers.flatMap { server ->
+            server.tools.map { tool ->
+                com.example.mochi_pet.core.mcp.mcpToolSchema(mcpToolAlias(server.id, tool.definition.name), tool.definition)
+            }
+        } + restConnections.flatMap { stored ->
+            stored.connection.tools.map { com.example.mochi_pet.core.rest.restToolSchema(stored.connection, it) }
+        }
 
     private fun PersistedToolCatalog.toSummary(
         extension: MochiExtensionSnapshot,

@@ -23,6 +23,8 @@ import com.example.mochi_pet.core.agent.tool.ModelImageRelay
 import com.example.mochi_pet.core.agent.tool.SandboxedJavaScriptTool
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolRegistry
+import com.example.mochi_pet.core.agent.llm.OpenAiChatClient
+import com.example.mochi_pet.core.skills.prepareForModel
 import com.example.mochi_pet.core.browser.agentBrowserTools
 import com.example.mochi_pet.core.browser.readOnlyAgentBrowserTools
 import com.example.mochi_pet.core.extensions.ExtensionToolScope
@@ -52,6 +54,7 @@ suspend fun MochiApplication.createAgentRunner(
     includeAgentLink: Boolean = true,
     taskScheduleId: String? = null,
     taskTitle: String = "Conversation",
+    chatClient: OpenAiChatClient = openAiChatClient,
 ): AgentRunner {
     val owner = currentCoroutineContext().job
     val diagnosticLogger = taskDiagnosticLogger(taskScheduleId, taskTitle, owner)
@@ -88,16 +91,15 @@ suspend fun MochiApplication.createAgentRunner(
             readOnlyAgentBrowserTools(agentBrowserRuntime)
         }
     }
-    val enabledBuiltIns = builtInTools.filter { tool ->
-        toolCatalogRepository.isBuiltInEnabled(tool.name)
-    }.toMutableList()
+    val enabledBuiltInNames = toolCatalogRepository.availableToolNames(builtInTools.mapTo(mutableSetOf()) { it.name })
+    val enabledBuiltIns = builtInTools.filter { it.name in enabledBuiltInNames }.toMutableList()
     toolCatalogRepository.loadAmapCredentials()?.let { credentials ->
-        enabledBuiltIns += amapMapTools(
+        val mapTools = amapMapTools(
             client = amapMapsClient,
             credentials = credentials,
-        ).filter { tool ->
-            toolCatalogRepository.isBuiltInEnabled(tool.name)
-        }
+        )
+        val availableMaps = toolCatalogRepository.availableToolNames(mapTools.mapTo(mutableSetOf()) { it.name })
+        enabledBuiltIns += mapTools.filter { it.name in availableMaps }
     }
     val tools = (
         enabledBuiltIns +
@@ -119,20 +121,26 @@ suspend fun MochiApplication.createAgentRunner(
     }
     val availableSkills = skillRepository.listEnabledMetadata(
         tools.mapTo(mutableSetOf()) { it.name },
-    )
+    ).prepareForModel(englishToolSchemas::prepareInstruction)
     if (availableSkills.isNotEmpty()) {
         tools += LoadSkillTool(
             repository = skillRepository,
             availableToolNames = tools.mapTo(mutableSetOf()) { it.name },
+            prepareText = englishToolSchemas::prepareInstruction,
+            availableToolNamesProvider = {
+                availableAgentToolNames(tools.mapTo(mutableSetOf()) { it.name })
+            },
         )
     }
+    val modelTools = englishToolSchemas.prepare(tools)
     return AgentOrchestrator(
-        chatClient = openAiChatClient,
-        toolRegistry = ToolRegistry(tools),
+        chatClient = chatClient,
+        toolRegistry = ToolRegistry(modelTools, ::availableAgentToolNames) { isAgentToolAvailable(it) },
         navigationPolicy = navigationPolicy,
         uiDirectiveSink = recordingSink,
         appliedNavigationDecision = { appliedNavigation },
         skillCatalogProvider = { availableSkills },
+        skillProvider = skillRepository::loadEnabledSkill,
         toolRegistryProvider = { parentRequest ->
             val coordinator = SerialSubagentCoordinator(
                 executor = SubagentExecutor { type, task, context, modelImage ->
@@ -151,11 +159,20 @@ suspend fun MochiApplication.createAgentRunner(
                     )
                 },
             )
-            ToolRegistry(tools + DelegateAgentTool(coordinator))
+            ToolRegistry(modelTools + DelegateAgentTool(coordinator), ::availableAgentToolNames) { isAgentToolAvailable(it) }
         },
         pipelineObserver = observer,
         diagnosticLogger = diagnosticLogger,
     )
+}
+
+private suspend fun MochiApplication.isAgentToolAvailable(name: String): Boolean =
+    name in setOf("load_skill", "request_user_assistance", "delegate_agent") ||
+        toolCatalogRepository.isToolAvailable(name)
+
+private suspend fun MochiApplication.availableAgentToolNames(names: Set<String>): Set<String> {
+    val runtimeNames = names.intersect(setOf("load_skill", "request_user_assistance", "delegate_agent"))
+    return runtimeNames + toolCatalogRepository.availableToolNames(names - runtimeNames)
 }
 
 private suspend fun MochiApplication.executeSubagent(
@@ -181,22 +198,26 @@ private suspend fun MochiApplication.executeSubagent(
     if (type == SubagentType.ANALYST) {
         tools += SandboxedJavaScriptTool(javaScriptExecutor)
     }
-    val enabledTools = tools.filter { tool ->
-        toolCatalogRepository.isBuiltInEnabled(tool.name)
-    }.toMutableList()
+    val enabledNames = toolCatalogRepository.availableToolNames(tools.mapTo(mutableSetOf()) { it.name })
+    val enabledTools = tools.filter { it.name in enabledNames }.toMutableList()
     enabledTools += toolCatalogRepository.loadEnabledReadOnlyMcpTools()
     enabledTools += toolCatalogRepository.loadEnabledExtensionTools(ExtensionToolScope.SUBAGENT)
     val availableSkills = skillRepository.listEnabledMetadata(
         enabledTools.mapTo(mutableSetOf()) { it.name },
-    )
+    ).prepareForModel(englishToolSchemas::prepareInstruction)
     if (availableSkills.isNotEmpty()) {
         enabledTools += LoadSkillTool(
             repository = skillRepository,
+            prepareText = englishToolSchemas::prepareInstruction,
             availableToolNames =
                 enabledTools.mapTo(mutableSetOf()) { it.name },
+            availableToolNamesProvider = {
+                availableAgentToolNames(enabledTools.mapTo(mutableSetOf()) { it.name })
+            },
         )
     }
 
+    val modelTools = englishToolSchemas.prepare(enabledTools)
     parentObserver.onStage(AgentPipelineStage.SUBAGENT, type.displayName)
     agentBrowserRuntime.setActor(type.displayName)
     return try {
@@ -214,10 +235,11 @@ private suspend fun MochiApplication.executeSubagent(
         }
         AgentOrchestrator(
             chatClient = openAiChatClient,
-            toolRegistry = ToolRegistry(enabledTools),
+            toolRegistry = ToolRegistry(modelTools, ::availableAgentToolNames) { isAgentToolAvailable(it) },
             navigationPolicy = NavigationPolicy(),
             uiDirectiveSink = UiDirectiveSink { },
             skillCatalogProvider = { availableSkills },
+            skillProvider = skillRepository::loadEnabledSkill,
             maxToolRounds = 30,
             pipelineObserver = AgentPipelineObserver { stage, detail ->
                 parentObserver.onStage(

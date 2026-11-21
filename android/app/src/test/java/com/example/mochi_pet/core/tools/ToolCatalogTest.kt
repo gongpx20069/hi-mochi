@@ -39,6 +39,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
@@ -48,6 +49,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
@@ -65,6 +67,84 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class ToolCatalogTest {
+    // The fake MCP client performs no HTTP; this literal keeps URL validation DNS-free.
+    private val manualEndpoint = "https://203.0.113.1/mcp"
+
+    @Test fun `availability batches read one catalog and one extension snapshot without retaining permission`() = runBlocking {
+        repository.configureAmap("synthetic-key", "")
+        repository.configureTencentDocs("synthetic-token")
+        var reads = 0
+        var journal = true
+        val countedStore = object : DataStore<Preferences> by dataStore {
+            override val data = dataStore.data.onStart { reads++ }
+        }
+        val extension = RecordingExtensionClient(TrustedExtension.WEBDAV)
+        val catalog = DataStoreToolCatalogRepository(
+            countedStore, PlaintextCipher, client, webdavClient = extension, journalEnabled = { journal },
+        )
+        catalog.setWebdavEnabled(true)
+        val names = setOf("app_read", "media_read", "recall_memory", "amap_weather",
+            "tencent_docs_get_content", "webdav_list", "webdav_read", "invented")
+        reads = 0
+        extension.snapshotCalls = 0
+        assertEquals(names - "invented", catalog.availableToolNames(names))
+        assertEquals(1, reads)
+        assertEquals(1, extension.snapshotCalls)
+        repository.setAppControlEnabled(false)
+        repository.setAmapEnabled(false)
+        repository.setServerEnabled(TENCENT_DOCS_SERVER_ID, false)
+        journal = false
+        extension.connected = false
+        reads = 0
+        assertEquals(setOf("media_read"), catalog.availableToolNames(names))
+        assertEquals(1, reads)
+        reads = 0
+        assertFalse(catalog.isToolAvailable("app_read"))
+        assertEquals(1, reads)
+        reads = 0
+        val snapshots = extension.snapshotCalls
+        assertEquals(emptySet<String>(), catalog.availableToolNames(emptySet()))
+        assertEquals(0, reads)
+        assertEquals(snapshots, extension.snapshotCalls)
+    }
+
+    @Test fun `changed external schemas prepare after persistence without translating UI metadata`() = runBlocking {
+        val prepared = mutableListOf<JsonObject>()
+        client.tools = listOf(McpRemoteTool("read_record", "读取记录"))
+        val catalog = DataStoreToolCatalogRepository(
+            dataStore, PlaintextCipher, client,
+            prepareModelSchemas = {
+                prepared += it
+                withTimeout(2_000) {
+                    dataStore.edit { prefs -> prefs[stringPreferencesKey("preparation.probe")] = "complete" }
+                }
+            },
+        )
+        val summary = catalog.addManualServer(ManualMcpServerInput("Fixture", manualEndpoint, null))
+        val server = summary.servers.single { !it.builtIn }
+        assertEquals(1, prepared.size)
+        assertEquals("读取记录", prepared.single().getValue("function").jsonObject.getValue("description").jsonPrimitive.content)
+        catalog.setServerEnabled(server.id, false)
+        assertEquals(1, prepared.size)
+        assertEquals("读取记录", catalog.loadSummary().servers.single { it.id == server.id }.tools.single().description)
+    }
+
+    @Test fun `disclosure availability follows live group and connection switches`() = runBlocking {
+        val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client)
+        assertTrue(catalog.isToolAvailable("app_read"))
+        catalog.setAppControlEnabled(false)
+        assertFalse(catalog.isToolAvailable("app_read"))
+        assertTrue(catalog.isToolAvailable("media_read"))
+        catalog.setMediaEnabled(false)
+        assertFalse(catalog.isToolAvailable("media_read"))
+        assertFalse(catalog.isToolAvailable("amap_search_poi"))
+        catalog.configureAmap("synthetic-key", "")
+        assertTrue(catalog.isToolAvailable("amap_search_poi"))
+        catalog.setAmapEnabled(false)
+        assertFalse(catalog.isToolAvailable("amap_search_poi"))
+        assertFalse(catalog.isToolAvailable("invented_tool"))
+    }
+
     @Test fun `memory recall has no independent catalog switch`() = runBlocking {
         var enabled = false
         val catalog = DataStoreToolCatalogRepository(dataStore, PlaintextCipher, client, journalEnabled = { enabled })
@@ -345,6 +425,7 @@ class ToolCatalogTest {
         var connected = true
         var waitForCancellation = false
         var cancelled = false
+        var snapshotCalls = 0
         val started = CompletableDeferred<Unit>()
         val executions = mutableListOf<ExtensionToolScope>()
         private val tools = when (identity) {
@@ -362,7 +443,7 @@ class ToolCatalogTest {
                 if (connected) ExtensionConnectionStatus.CONNECTED else ExtensionConnectionStatus.DISCONNECTED,
                 null, null, 0, 0,
             ),
-        )
+        ).also { snapshotCalls++ }
 
         override fun agentTool(definition: ExtensionToolDefinition, scope: ExtensionToolScope) = object : AgentTool {
             override val name = definition.name
@@ -825,7 +906,7 @@ class ToolCatalogTest {
             val manual = repository.addManualServer(
                 ManualMcpServerInput(
                     name = "Example MCP",
-                    endpoint = "https://example.com/mcp",
+                    endpoint = manualEndpoint,
                     bearerToken = "mcp-token",
                 ),
             ).servers.first { !it.builtIn }
@@ -876,7 +957,7 @@ class ToolCatalogTest {
                     manualMcpServers = listOf(
                         SharedManualMcpServer(
                             name = "Example MCP",
-                            endpoint = "https://example.com/mcp",
+                            endpoint = manualEndpoint,
                             bearerToken = "mcp-token",
                             enabledToolNames = setOf("get_content"),
                         ),
