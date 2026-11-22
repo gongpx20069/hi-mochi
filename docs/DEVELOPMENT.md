@@ -274,6 +274,28 @@ That explicitly limits this diagnostic to two candidate details and tells the
 Agent to reserve its normal round budget for SKU verification, cart
 deduplication and readback. It does not change production Agent planning or
 establish that an unrestricted shopping task fits the same budget.
+For an authorized SKU-state investigation, add `-e mochiShoppingSelectionDiagnostic true`.
+It records bounded before/after state attributes and computed colors for clicked
+controls on Taobao item pages, alongside their model-visible snapshot entries.
+It does not change clicks, expose diagnostic JavaScript to the model, or capture
+editable values, cookies, page source or screenshots. These local diagnostic
+artifacts must not be committed.
+`-e mochiShoppingSelectionOnly true` restricts the cart-only fixture to two
+product-detail selection checks and rejects add-to-cart controls. Use it to
+validate state extraction when a prior add has not yet been read back.
+After an interrupted add attempt, `-e mochiShoppingCartReadback true` with cart-only
+browser mode runs readback without click/input Tools. It permits navigation only
+to the previously observed cart URL, never re-adds an item, and reports missing
+SKU/quantity evidence explicitly.
+`inspectCartReadiness` with the shopping opt-in performs no clicks or model
+requests. It samples only loading/login/target-presence booleans, frame visibility
+and sanitized resource timing/status metadata over sixty seconds to distinguish
+unready cart content from a completed document; no cart listing is exported.
+With `mochiShoppingAssistVerification=true`, this readiness diagnostic requests
+native manual assistance after its first sample, then observes again. It does
+not depend on a model connection or interpret a completed handoff as verification
+success. Interactive diagnostics keep only their Activity screen awake and
+record `awaiting_user` before handoff.
 `inspectMarketplaceSearchActivation` with the shopping opt-in records only
 search-form targets and geometry/obstruction flags, never input values or page
 text. Add `-e mochiShoppingAssistVerification true` only when the user is ready

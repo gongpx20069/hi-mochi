@@ -136,9 +136,22 @@ semantic tag. Labels and numeric text remain associated (for example,
 Native/ARIA controls, explicit click handlers, pointer-style custom controls
 and scrollable regions receive references; options expose at most 20 labels per
 select with a shared 2,000-character budget and explicit truncation indicators.
+Selection states preserve native/ARIA true, false and mixed values, including
+toggle-button `aria-pressed`. Custom controls may additionally expose bounded
+`state_hints` from their own explicit selection data attributes or conventional
+selected/checked/pressed class tokens (including scoped CSS-module and BEM forms).
+Hints carry their source and never override native/ARIA state, inherit a
+container's state, expose raw classes, or infer selection from color alone.
+An absent hint means unknown, not unselected. The Agent checks existing state
+before clicking an option that could toggle off, then verifies the resulting
+selection summary and price; hints alone do not establish a SKU or business success.
 Open shadow roots are traversed. At most 12,000 DOM elements, 220 text blocks,
 100 controls and 8,000 Markdown characters are returned, with truncation flags.
 Frame contents and closed shadow roots remain unsupported and are reported.
+Up to eight nearby visible frames expose sanitized URLs and viewport bounds in
+`embedded_frames`, with an explicit truncation flag. Their contents are not read,
+even if same-origin. This lets the Agent distinguish an opaque embedded blocker
+from an empty page and request user assistance without bypassing frame isolation.
 All editable values, hidden/script content and unrestricted page source are never
 included. `browser_click`, `browser_input`, and element scrolling continue to
 target the separate opaque references. Snapshot page/link URLs omit user info,

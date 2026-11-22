@@ -16,6 +16,7 @@ import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.model.MochiSurface
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -35,6 +36,69 @@ import kotlin.coroutines.resume
 
 @RunWith(AndroidJUnit4::class)
 class AuthorizedShoppingDiagnosticTest {
+    @Test fun inspectCartReadiness() = runBlocking<Unit> {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("mochiAuthorizedSwitchShopping") == "true")
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MochiApplication
+        ActivityScenario.launch(MainActivity::class.java).onActivity {
+            it.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }.use {
+            val runtime = app.agentBrowserRuntime
+            runtime.beginTurn(wait = false)
+            try {
+                runtime.navigate("goto", "https://cart.taobao.com/cart.htm", mode = "desktop", waitSeconds = 0)
+                val page = runtime.ensureWebView()
+                val samples = mutableListOf<JsonObject>()
+                for (pause in listOf(5_000L, 15_000L, 40_000L)) {
+                    delay(pause)
+                    val encoded = withTimeout(5_000) {
+                        withContext(Dispatchers.Main) {
+                            suspendCancellableCoroutine<String> { continuation ->
+                                page.evaluateJavascript("""
+                                    (() => {
+                                      const path = raw => { try { const u = new URL(raw, location.href); return u.origin + u.pathname; } catch { return ''; } };
+                                      const text = document.body?.innerText || '';
+                                      return JSON.stringify({
+                                        ready:document.readyState,
+                                        loading_message:text.includes('奋力加载'),
+                                        target_shop_visible:text.includes('鑫喆数码'),
+                                        target_product_visible:text.includes('Switch 2') || text.includes('Switch2'),
+                                        login_prompt:/请登录|扫码登录|密码登录/.test(text),
+                                        verification_prompt:/安全验证|请完成验证|滑动验证/.test(text),
+                                        frames:[...document.querySelectorAll('iframe')].slice(0,10).map(f => ({
+                                          path:path(f.src), visible:!!(f.getBoundingClientRect().width && f.getBoundingClientRect().height),
+                                          readable:!!f.contentDocument
+                                        })),
+                                        resources:performance.getEntriesByType('resource').slice(-40).map(r => ({
+                                          path:path(r.name), type:r.initiatorType, duration:Math.round(r.duration), status:r.responseStatus
+                                        }))
+                                      });
+                                    })()
+                                """.trimIndent()) { if (continuation.isActive) continuation.resume(it) }
+                            }
+                        }
+                    }
+                    samples += Json.parseToJsonElement(Json.parseToJsonElement(encoded).jsonPrimitive.content).jsonObject
+                    app.cacheDir.resolve("cart-readiness.json").writeText(JsonArray(samples).toString())
+                    if (samples.size == 1 &&
+                        InstrumentationRegistry.getArguments().getString("mochiShoppingAssistVerification") == "true") {
+                        runtime.read(waitSeconds = 5)
+                        app.cacheDir.resolve("shopping-verification-status.json").writeText("""{"status":"awaiting_user","page":"cart"}""")
+                        val answer = runtime.requestAssistance(
+                            "购物车可能有网站验证，请在此页面手动处理；完成后交还控制权。只核查已有商品，不要再次加购、修改数量、下单或付款。",
+                            browser = true, options = emptyList(),
+                        )
+                        app.cacheDir.resolve("shopping-verification-status.json").writeText(buildJsonObject {
+                            put("status", answer.outcome)
+                            put("page", "cart")
+                        }.toString())
+                    }
+                }
+            } finally {
+                runtime.closeTurn()
+            }
+        }
+    }
+
     @Test fun inspectMarketplaceSearchActivation() = runBlocking<Unit> {
         assumeTrue(InstrumentationRegistry.getArguments().getString("mochiAuthorizedSwitchShopping") == "true")
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MochiApplication
@@ -158,9 +222,13 @@ class AuthorizedShoppingDiagnosticTest {
         val browserMode = InstrumentationRegistry.getArguments().getString("mochiShoppingBrowser") == "true"
         val cartOnly = InstrumentationRegistry.getArguments().getString("mochiShoppingCartOnly") == "true"
         val cartAcceptance = InstrumentationRegistry.getArguments().getString("mochiShoppingCartAcceptance") == "true"
+        val cartReadback = InstrumentationRegistry.getArguments().getString("mochiShoppingCartReadback") == "true"
+        val selectionOnly = InstrumentationRegistry.getArguments().getString("mochiShoppingSelectionOnly") == "true"
         val recoverDocument = InstrumentationRegistry.getArguments().getString("mochiRecoverShoppingDocument") == "true"
         check(!cartOnly || (browserMode && !recoverDocument))
         check(!cartAcceptance || cartOnly)
+        check(!cartReadback || cartOnly)
+        check(!selectionOnly || (cartOnly && !cartReadback))
         val documentId = InstrumentationRegistry.getArguments().getString("mochiShoppingDocumentId")
         var writableDocumentId = documentId
         val documentReaders = setOf(
@@ -169,6 +237,42 @@ class AuthorizedShoppingDiagnosticTest {
         )
         var browserElements = emptyMap<String, String>()
         val clickedControls = mutableMapOf<String, String>()
+        val selectionDiagnostic = InstrumentationRegistry.getArguments().getString("mochiShoppingSelectionDiagnostic") == "true"
+        val selectionObservations = mutableListOf<JsonObject>()
+        suspend fun inspectSelection(id: String, phase: String, label: String) {
+            if (!selectionDiagnostic || label.length > 80) return
+            val page = app.agentBrowserRuntime.ensureWebView()
+            val encoded = withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine<String> { continuation ->
+                    page.evaluateJavascript("""
+                        (() => {
+                          if (!['item.taobao.com','detail.tmall.com'].includes(location.hostname) || location.pathname !== '/item.htm') return null;
+                          const label = ${kotlinx.serialization.json.JsonPrimitive(label)};
+                          const describe = e => {
+                            const s = getComputedStyle(e);
+                            return {tag:e.tagName, classes:String(e.className).slice(0,300),
+                              role:e.getAttribute('role'), selected:e.getAttribute('aria-selected'),
+                              checked:e.getAttribute('aria-checked'), pressed:e.getAttribute('aria-pressed'),
+                              data_state:e.getAttribute('data-state'), data_selected:e.getAttribute('data-selected'),
+                              color:s.color, background:s.backgroundColor, border:s.borderColor,
+                              border_width:s.borderWidth, outline:s.outlineStyle};
+                          };
+                          return JSON.stringify([...document.querySelectorAll('button,a,div,span,li,label')]
+                            .slice(0,12000).filter(e => e.textContent.replace(/\s+/g,' ').trim() === label &&
+                              e.getBoundingClientRect().width && e.getBoundingClientRect().height).slice(0,8)
+                            .map(e => ({node:describe(e), ancestors:[e.parentElement,e.parentElement?.parentElement]
+                              .filter(Boolean).map(describe)})));
+                        })()
+                    """.trimIndent()) { if (continuation.isActive) continuation.resume(it) }
+                }
+            }
+            if (encoded != "null") selectionObservations += buildJsonObject {
+                put("call_id", id)
+                put("phase", phase)
+                put("label", label)
+                put("nodes", Json.parseToJsonElement(Json.parseToJsonElement(encoded).jsonPrimitive.content))
+            }
+        }
         val forbiddenCommerce = Regex("立即购买|立即支付|付款|提交订单|结算|领券|开通会员|联系卖家|buy now|pay now|checkout|place order", RegexOption.IGNORE_CASE)
         var requestCount = 0
         val started = SystemClock.elapsedRealtime()
@@ -180,9 +284,12 @@ class AuthorizedShoppingDiagnosticTest {
             put("taobao_discovered", taobaoId != null)
             put("browser_mode", browserMode)
             put("cart_acceptance", cartAcceptance)
+            put("cart_readback", cartReadback)
+            put("selection_only", selectionOnly)
             blockedAppCall?.let { put("blocked_app_call", it) }
             put("tool_results", JsonArray(results.values.toList()))
             put("model_ms", JsonArray(modelMs.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            if (selectionDiagnostic) put("selection_observations", JsonArray(selectionObservations))
             reply?.let { put("reply", it) }
         }.toString())
         val allowed = (if (recoverDocument) setOf(
@@ -192,7 +299,9 @@ class AuthorizedShoppingDiagnosticTest {
             if (documentId == null) "tencent_docs_create_smartcanvas_by_mdx" else "tencent_docs_smartcanvas_edit",
             "tencent_docs_smartcanvas_edit",
         )) + documentReaders + if (browserMode && !recoverDocument) setOf("browser_read", "browser_navigate", "browser_click", "browser_input", "browser_scroll", "request_user_assistance") else emptySet()
-        val permitted = if (cartOnly) allowed.filterNot { it.startsWith("tencent_docs_") || it.startsWith("app_") }.toSet() else allowed
+        val permitted = if (cartReadback) setOf(
+            "load_skill", "tool_search", "browser_read", "browser_navigate", "browser_scroll", "request_user_assistance",
+        ) else if (cartOnly) allowed.filterNot { it.startsWith("tencent_docs_") || it.startsWith("app_") }.toSet() else allowed
         val client = object : OpenAiChatClient {
             override suspend fun complete(config: OpenAiProviderConfig, request: OpenAiChatRequest): OpenAiChatResponse {
                 request.messages.filter { it.role == "tool" }.forEach { message ->
@@ -230,6 +339,19 @@ class AuthorizedShoppingDiagnosticTest {
                         }
                         clickedControls[id]?.let { put("clicked_control", it) }
                     }
+                    if (selectionDiagnostic) clickedControls[id]?.let { label ->
+                        inspectSelection(id, "after", label)
+                        data?.get("interactive_elements")?.jsonArray?.filter {
+                            it.jsonObject["name"]?.jsonPrimitive?.content == label
+                        }?.let { controls ->
+                            selectionObservations += buildJsonObject {
+                                put("call_id", id)
+                                put("phase", "snapshot")
+                                put("label", label)
+                                put("controls", JsonArray(controls))
+                            }
+                        }
+                    }
                 }
                 save("running")
                 requestCount++
@@ -242,6 +364,13 @@ class AuthorizedShoppingDiagnosticTest {
                         "Shopping boundary blocked ${call.function.name}; no sibling calls dispatched"
                     }
                     requireDocumentTarget(call.function.name, call.function.arguments, writableDocumentId)
+                    if (cartReadback && call.function.name == "browser_navigate") {
+                        val args = Json.parseToJsonElement(call.function.arguments).jsonObject
+                        check(args["operation"]?.jsonPrimitive?.content == "goto" &&
+                            args["url"]?.jsonPrimitive?.content == "https://cart.taobao.com/cart.htm") {
+                            "Cart recovery may only open the previously observed cart URL"
+                        }
+                    }
                     if (call.function.name.startsWith("app_")) {
                         val args = Json.parseToJsonElement(call.function.arguments).jsonObject
                         val id = args["app_id"]?.jsonPrimitive?.content
@@ -258,14 +387,24 @@ class AuthorizedShoppingDiagnosticTest {
                         check(label != null && !forbiddenCommerce.containsMatchIn(label)) {
                             "Unobserved or forbidden commerce control; no sibling calls dispatched"
                         }
+                        check(!selectionOnly || !Regex("加入购物车|添加购物车|加购|add to cart", RegexOption.IGNORE_CASE)
+                            .containsMatchIn(label.substringBefore(" 多人加购"))) {
+                            "Selection-only diagnosis must not add another item"
+                        }
                         clickedControls[call.id] = label
+                        inspectSelection(call.id, "before", label)
                     }
+                }
+                if (response.choices.single().message.toolCalls.orEmpty().any { it.function.name == "request_user_assistance" }) {
+                    save("awaiting_user")
                 }
                 return response
             }
         }
         save("launching_activity")
-        ActivityScenario.launch(MainActivity::class.java).use {
+        ActivityScenario.launch(MainActivity::class.java).onActivity {
+            it.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }.use {
             save("creating_runner")
             val runner = app.createAgentRunner(
                 sink = { error("Shopping must not change Mochi navigation") },
@@ -280,7 +419,14 @@ class AuthorizedShoppingDiagnosticTest {
                 val reply = withTimeout(12 * 60_000L) {
                     runner.run(AgentRunRequest(
                         provider = config,
-                        query = if (recoverDocument) {
+                        query = if (cartReadback) {
+                            "只读恢复刚才的购物任务：刚才在鑫喆数码专营店选择“【港版】Switch 2游戏机【单机 多语言版】”，" +
+                                "显示3598元并点击加入购物车一次，页面提示成功，但回读中断。绝对不要再次加购、修改数量、删除商品、结算或付款。" +
+                                "直接使用browser_navigate goto打开此前已实际访问的https://cart.taobao.com/cart.htm，" +
+                                "读取并必要时滚动购物车，核实该店铺、商品、SKU和页面显示价格，数量只在页面可见时报告。" +
+                                "只报告这个目标商品的证据，不输出购物车其他商品或个人信息。不打开商品详情，不使用browser_click或browser_input。" +
+                                "如果数量或SKU不可见，明确说明缺失证据。登录或验证码只能请求用户协助。"
+                        } else if (recoverDocument) {
                             "只读核查：刚才这个任务创建了一份腾讯智能文档，标题为“Switch 2 非日版全新主机比价”。" +
                                 "按这个准确标题查找，读取匹配文档并报告其链接、实际内容、已记录价格和商品来源。" +
                                 "若有多个匹配，分别列出链接和创建时间，不要自行选择修改。不要创建、编辑或删除任何文档，不要访问淘宝。"
@@ -288,7 +434,9 @@ class AuthorizedShoppingDiagnosticTest {
                             "继续用户已授权的真实购物任务，本次只完成商品核验与加购，不读写文档。" +
                                 "使用Mochi内置浏览器访问淘宝，搜索全新一手、非日版Nintendo Switch 2整机。" +
                                 "比较当前可核验的候选价格，检查版本、成色、实际SKU与运费，排除配件、二手、日版、定金和虚假低价规格。" +
-                                "只将已核实的候选中最低价合格商品加入购物车一次，并读购物车核实商品和SKU；若相同SKU已经存在，不重复添加。" +
+                                (if (selectionOnly) "本轮仅测试规格选择与核验：只检查两个商品详情，优先核查已默认选中的选项，不要将已选项点成取消。" +
+                                    "此前已有一次加购提示但未能回读确认，本轮绝对禁止加购、访问购物车或触发其他业务写入；请报告规格状态和对应价格是否可核实。"
+                                else "只将已核实的候选中最低价合格商品加入购物车一次，并读购物车核实商品和SKU；若相同SKU已经存在，不重复添加。") +
                                 "不声称未经证实的全网最低。绝不下单、付款、领券、开通会员、联系卖家或读取个人收货地址。" +
                                 "不使用淘宝App，不改变设置。若必须登录或完成验证码，立即请求用户在浏览器协助，不获取密码或验证码、不绕过验证。" +
                                 "页面操作未确认时只能继续读取，不重复点击。没有证据不得声称核验或加购成功，最终报告实际状态与阻碍。" +

@@ -860,6 +860,7 @@ class AgentBrowserRuntime(
                             ?.jsonPrimitive
                             ?.contentOrNull == "true",
                     )
+                    put("embedded_frames", page.booleanValue("frames_truncated"))
                 },
             )
             put(
@@ -1517,6 +1518,29 @@ class AgentBrowserRuntime(
                 }
                 return {options, options_truncated: truncated};
               };
+              const selectionPatterns = ['selected', 'checked', 'pressed'].map(state => ({
+                state, pattern:new RegExp('^(?:(?:is|state)[-_])?' + state + '(?:$|--|__)|(?:--|__)' + state + '$')
+              }));
+              const selectionHints = (el, states) => {
+                const hints = [];
+                const classes = Array.from(el.classList).slice(0, 32)
+                  .map(token => token.replace(/([a-z0-9])([A-Z])/g, '${'$'}1-${'$'}2').toLowerCase());
+                for (const {state, pattern} of selectionPatterns) {
+                  if (states.some(value => value === state || value.startsWith(state + '='))) continue;
+                  const data = el.getAttribute('data-' + state);
+                  if (data === 'true' || data === 'false') {
+                    hints.push({state: data === 'true' ? state : state + '=false', source: 'data-' + state});
+                    continue;
+                  }
+                  const dataState = el.getAttribute('data-state');
+                  if (dataState === state || dataState === 'un' + state) {
+                    hints.push({state: dataState === state ? state : state + '=false', source: 'data-state'});
+                    continue;
+                  }
+                  if (classes.some(token => pattern.test(token))) hints.push({state, source:'class'});
+                }
+                return hints;
+              };
               const interactiveElements = interactiveCandidates
                 .slice(0, $MAX_INTERACTIVE_ELEMENTS)
                 .map(el => {
@@ -1531,17 +1555,22 @@ class AgentBrowserRuntime(
                   if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') {
                     states.push('disabled');
                   }
-                  if (el.checked || el.getAttribute('aria-checked') === 'true') {
-                    states.push('checked');
-                  }
-                  if (el.selected || el.getAttribute('aria-selected') === 'true') {
-                    states.push('selected');
+                  for (const [state, native] of [
+                    ['checked', el instanceof HTMLInputElement && ['checkbox','radio'].includes(el.type)
+                      ? (el.type === 'checkbox' && el.indeterminate ? 'mixed' : String(el.checked)) : null],
+                    ['selected', el instanceof HTMLOptionElement ? String(el.selected) : null],
+                    ['pressed', null]
+                  ]) {
+                    const aria = el.getAttribute('aria-' + state);
+                    const value = native ?? ((state === 'selected' ? ['true','false'] : ['true','false','mixed']).includes(aria) ? aria : null);
+                    if (value !== null) states.push(value === 'true' ? state : state + '=' + value);
                   }
                   if (el.required || el.getAttribute('aria-required') === 'true') {
                     states.push('required');
                   }
                   const expanded = el.getAttribute('aria-expanded');
                   if (expanded !== null) states.push(`expanded=${'$'}{expanded}`);
+                  const hints = selectionHints(el, states);
                   return {
                     ref,
                     tag: el.tagName.toLowerCase(),
@@ -1551,6 +1580,7 @@ class AgentBrowserRuntime(
                     ...(el instanceof HTMLSelectElement ? selectOptions(el) : {}),
                     href: el.href ? safeLink(el.href).slice(0, 1000) : '',
                     states,
+                    ...(hints.length ? {state_hints: hints} : {}),
                     visibility:
                       rect.bottom >= 0 && rect.top <= viewportHeight
                         ? 'viewport'
@@ -1644,6 +1674,15 @@ class AgentBrowserRuntime(
                 document.body?.scrollHeight || 0,
                 viewportHeight
               );
+              const frames = visibleElements.filter(el => el.matches('iframe'));
+              const embeddedFrames = frames.slice(0, 8).map(el => {
+                const rect = el.getBoundingClientRect();
+                return {
+                  url:el.hasAttribute('srcdoc') ? '' : safeLink(el.src).slice(0, 1000),
+                  visibility:rect.bottom >= 0 && rect.top <= viewportHeight ? 'viewport' : 'nearby',
+                  bounds:[Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height)]
+                };
+              });
               return JSON.stringify({
                 ok: true,
                 url: location.href,
@@ -1669,6 +1708,8 @@ class AgentBrowserRuntime(
                 blocks,
                 blocks_truncated: blockCandidates.length > 220 || textTruncated || scanTruncated,
                 interactive_elements: interactiveElements,
+                embedded_frames: embeddedFrames,
+                frames_truncated: frames.length > embeddedFrames.length || scanTruncated,
                 elements_truncated:
                   interactiveCandidates.length > interactiveElements.length || scanTruncated,
                 limitations: {

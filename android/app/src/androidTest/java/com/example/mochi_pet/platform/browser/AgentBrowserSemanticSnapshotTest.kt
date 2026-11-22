@@ -38,6 +38,95 @@ import kotlin.coroutines.resume
 @RunWith(AndroidJUnit4::class)
 class AgentBrowserSemanticSnapshotTest {
     @Test
+    fun customSelectionHintsTrackTogglesWithoutInventingSemanticState() = fixture { runtime, page ->
+        script(page, """
+            document.body.innerHTML = '<style>[role=button]{padding:8px}</style>' +
+              '<div role="button" id="choice" class="isSelected--fixture private-class-marker">Scoped choice</div>' +
+              '<div role="button" class="option--selected">BEM choice</div>' +
+              '<div role="button" class="selected" data-selected="false">Data choice</div>' +
+              '<div role="button" data-state="checked">Data toggle</div>' +
+              '<div class="isSelected--container"><button>Unrelated child</button></div>' +
+              '<div role="button" class="unselected not-selected selectedish" style="color:red">Unknown choice</div>';
+            document.getElementById('choice').onclick = e => e.currentTarget.classList.toggle('isSelected--fixture');
+        """.trimIndent())
+        val before = runtime.snapshot()
+        val controls = before.getValue("interactive_elements").jsonArray.map { it.jsonObject }
+            .associateBy { it.getValue("name").jsonPrimitive.content }
+        for (name in listOf("Scoped choice", "BEM choice")) {
+            val control = controls.getValue(name)
+            assertTrue(control.getValue("states").jsonArray.isEmpty())
+            val hint = control.getValue("state_hints").jsonArray.single().jsonObject
+            assertEquals("selected", hint.getValue("state").jsonPrimitive.content)
+            assertEquals("class", hint.getValue("source").jsonPrimitive.content)
+        }
+        val data = controls.getValue("Data choice").getValue("state_hints").jsonArray.single().jsonObject
+        assertEquals("selected=false", data.getValue("state").jsonPrimitive.content)
+        assertEquals("data-selected", data.getValue("source").jsonPrimitive.content)
+        assertEquals("checked", controls.getValue("Data toggle").getValue("state_hints")
+            .jsonArray.single().jsonObject.getValue("state").jsonPrimitive.content)
+        for (name in listOf("Unrelated child", "Unknown choice")) assertFalse(controls.getValue(name).containsKey("state_hints"))
+        assertFalse(before.toString().contains("private-class-marker"))
+        val choice = ref(before, "Scoped choice")
+        runtime.click(choice, waitSeconds = 0)
+        val after = runtime.snapshot()
+        assertEquals(choice, ref(after, "Scoped choice"))
+        assertFalse(after.getValue("interactive_elements").jsonArray.map { it.jsonObject }
+            .single { it.getValue("name").jsonPrimitive.content == "Scoped choice" }.containsKey("state_hints"))
+    }
+
+    @Test
+    fun nativeAndAriaSelectionStatesOverrideClassHintsAndPreserveFalseAndMixed() = fixture { runtime, page ->
+        script(page, """
+            document.body.innerHTML = '<input id="native" type="checkbox" aria-label="Native toggle" aria-checked="false" checked>' +
+              '<input id="mixed" type="checkbox" aria-label="Mixed native toggle">' +
+              '<button aria-pressed="false" class="isPressed--fixture">Pressed toggle</button>' +
+              '<div role="checkbox" aria-checked="mixed">Mixed ARIA toggle</div>' +
+              '<div role="option" aria-selected="false" class="selected">Unselected option</div>';
+            document.getElementById('mixed').indeterminate = true;
+        """.trimIndent())
+        val controls = runtime.snapshot().getValue("interactive_elements").jsonArray.map { it.jsonObject }
+            .associateBy { it.getValue("name").jsonPrimitive.content }
+        for ((name, state) in mapOf(
+            "Native toggle" to "checked",
+            "Mixed native toggle" to "checked=mixed",
+            "Pressed toggle" to "pressed=false",
+            "Mixed ARIA toggle" to "checked=mixed",
+            "Unselected option" to "selected=false",
+        )) {
+            assertEquals(listOf(state), controls.getValue(name).getValue("states").jsonArray.map { it.jsonPrimitive.content })
+            assertFalse(controls.getValue(name).containsKey("state_hints"))
+        }
+        script(page, "document.getElementById('native').checked=false")
+        val unchecked = runtime.snapshot().getValue("interactive_elements").jsonArray.map { it.jsonObject }
+            .single { it.getValue("name").jsonPrimitive.content == "Native toggle" }
+        assertEquals("checked=false", unchecked.getValue("states").jsonArray.single().jsonPrimitive.content)
+    }
+
+    @Test
+    fun visibleFrameMetadataExplainsOpaqueContentWithoutReadingIt() = fixture { runtime, page ->
+        withContext(Dispatchers.Main) {
+            page.webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) =
+                    WebResourceResponse("text/html", "UTF-8", "<p>private-frame-content</p>".byteInputStream())
+            }
+        }
+        script(page, """
+            document.body.innerHTML = '<h1>Frame host</h1>' +
+              '<iframe src="https://example.com/embedded?code=private-frame-token#fragment"></iframe>' +
+              '<iframe style="display:none" src="https://example.com/hidden-frame"></iframe>' +
+              '<iframe srcdoc="<p>private-srcdoc-content</p>" src="https://example.com/ignored-source"></iframe>';
+        """.trimIndent())
+        val result = runtime.snapshot()
+        val frames = result.getValue("embedded_frames").jsonArray.map { it.jsonObject }
+        assertEquals(listOf("https://example.com/embedded", ""), frames.map { it.getValue("url").jsonPrimitive.content })
+        assertTrue(frames.all { it.getValue("bounds").jsonArray.size == 4 })
+        assertFalse(result.getValue("truncation").jsonObject.getValue("embedded_frames").jsonPrimitive.boolean)
+        for (privateText in listOf("private-frame-token", "private-frame-content", "private-srcdoc-content", "hidden-frame", "ignored-source")) {
+            assertFalse(privateText, result.toString().contains(privateText))
+        }
+    }
+
+    @Test
     fun readsUnmarkedStatisticsAndKeepsReferencesBoundToNodes() = fixture { runtime, page ->
         val initial = runtime.snapshot()
         assertEquals("mochi-semantic-v3", initial["format"]?.jsonPrimitive?.content)
@@ -278,19 +367,19 @@ class AgentBrowserSemanticSnapshotTest {
             }
         }
         runtime.navigate("goto", "$origin/search", mode = "mobile", waitSeconds = 0)
-        runtime.snapshot()
+        runtime.snapshot("$origin/search")
         runtime.click(ref(runtime.snapshot(), "Open details"), waitSeconds = 0)
-        runtime.snapshot()
+        runtime.snapshot("$origin/detail")
         runtime.click(ref(runtime.snapshot(), "Choose SKU"), waitSeconds = 0)
         runtime.snapshot()
         val detailIndex = withContext(Dispatchers.Main) { page.copyBackForwardList().currentIndex }
         runtime.navigate("back", null, waitSeconds = 0)
-        val back = runtime.snapshot()
+        val back = runtime.snapshot("$origin/search")
         assertEquals("$origin/search", back.getValue("url").jsonPrimitive.content)
         assertEquals(detailIndex - 1, withContext(Dispatchers.Main) { page.copyBackForwardList().currentIndex })
         assertTrue(withContext(Dispatchers.Main) { page.canGoForward() })
         runtime.navigate("forward", null, waitSeconds = 0)
-        assertEquals("$origin/detail", runtime.snapshot().getValue("url").jsonPrimitive.content)
+        assertEquals("$origin/detail", runtime.snapshot("$origin/detail").getValue("url").jsonPrimitive.content)
         assertEquals(detailIndex, withContext(Dispatchers.Main) { page.copyBackForwardList().currentIndex })
         for ((operation, mode) in listOf("reload" to "auto", "goto" to "desktop")) {
             var rejected = false
@@ -504,11 +593,12 @@ class AgentBrowserSemanticSnapshotTest {
         assertFalse(runtime.state.value.active)
     }
 
-    private suspend fun AgentBrowserRuntime.snapshot(): JsonObject {
+    private suspend fun AgentBrowserRuntime.snapshot(expectedUrl: String? = null): JsonObject {
         while (true) {
             // Finish the pending observation without opening another long-poll window.
             val result = read(waitSeconds = 0)
-            if (result.getValue("snapshot_fresh").jsonPrimitive.boolean) return result
+            if (result.getValue("snapshot_fresh").jsonPrimitive.boolean &&
+                (expectedUrl == null || result.getValue("url").jsonPrimitive.content == expectedUrl)) return result
             delay(50)
         }
     }

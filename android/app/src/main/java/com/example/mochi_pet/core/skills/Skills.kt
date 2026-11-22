@@ -1001,6 +1001,20 @@ private val BUILT_IN_SKILLS = listOf(
             - A pending observation must be read before another click/input/scroll.
               Explicit navigation abandons the old observation without undoing
               any submitted action. Renderer/session failures are errors, not loading.
+            - Read control `states` before choosing options: clicking an already
+              selected option can deselect it. `state_hints` are control-local
+              class/data cues, not native/ARIA confirmation; an absent hint does
+              not mean unselected. Compare fresh states and the page's resulting
+              option summary/price. Do not blindly toggle every requested option
+              or treat a hint alone as proof of the final SKU or transaction.
+            - If a result-panel link does not navigate, use another observed
+              site link or a previously observed destination to verify the result,
+              without replaying the submitted action.
+            - `embedded_frames` reports visible frame URLs and bounds, not their
+              contents. A completed document or missing main-page verification
+              text does not prove the embedded content is ready or unobstructed.
+              If a frame blocks the task, request available user assistance
+              rather than treating unreadable content as an empty result.
             - Choose another source or report the blocker when observations stop
               making progress; do not keep spending model calls on unchanged pages.
 
