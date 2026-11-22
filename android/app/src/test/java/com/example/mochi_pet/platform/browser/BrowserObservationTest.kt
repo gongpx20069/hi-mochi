@@ -3,6 +3,8 @@ package com.example.mochi_pet.platform.browser
 import android.app.Application
 import android.graphics.Rect
 import android.os.Looper
+import android.os.Handler
+import android.os.Message
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import androidx.test.core.app.ApplicationProvider
@@ -162,6 +164,27 @@ class BrowserObservationTest {
             assertEquals("Browser renderer stopped", read.await().message)
             callback.onReceiveValue(snapshot("Late"))
             assertFalse(runtime.state.value.active)
+        }
+    }
+
+    @Test fun `form resubmission is rejected and its error survives a readable snapshot`() = runBlocking {
+        withBrowser { runtime, page ->
+            val read = async(Dispatchers.Main.immediate) { BrowserReadTool(runtime).execute(empty, context) }
+            val decisions = mutableListOf<Int>()
+            val handler = Handler(Looper.getMainLooper()) { decisions += it.what; true }
+            shadowOf(page).webViewClient.onFormResubmission(
+                page, Message.obtain(handler, 1), Message.obtain(handler, 2),
+            )
+            idle(0)
+            assertEquals(listOf(1), decisions)
+            assertEquals("error", read.await().status)
+            assertTrue(runtime.state.value.error.orEmpty().contains("Form resubmission"))
+            BrowserReadTool(runtime).execute(buildJsonObject { put("wait_seconds", 0) }, context)
+            shadowOf(page).lastEvaluatedJavascriptCallback.onReceiveValue(snapshot("Current page"))
+            val observed = BrowserReadTool(runtime).execute(buildJsonObject { put("wait_seconds", 0) }, context)
+            assertTrue(observed.data!!.jsonObject["page_error"]!!.jsonPrimitive.content.contains("Form resubmission"))
+            shadowOf(page).webViewClient.onPageStarted(page, "https://example.com/safe", null)
+            assertNull(runtime.state.value.error)
         }
     }
 

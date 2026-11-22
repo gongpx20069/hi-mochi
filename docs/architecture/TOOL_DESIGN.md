@@ -33,7 +33,7 @@ authorized to execute are different states.
   Reading a Skill never enables a Tool or automatically loads a whole provider.
 
 No Room/DataStore migration, additional network dependency, or change to the
-20-second foreground model-request deadline is required.
+foreground model-request deadline is required.
 
 ## 2. Base Tools
 
@@ -505,7 +505,7 @@ not guarantee fewer matches, smaller definitions or a faster overall turn.
 
 **Chinese request to main-model query:** 44 synthetic fixtures per arm,
 132 measurements on the active `gpt-6.1-terra` connection, Responses, with the
-normal 20-second request deadline. Each arm receives the same capability-only
+then-current 20-second request deadline. Each arm receives the same capability-only
 instruction followed by the Chinese request; labels remain hidden. The model
 selects the final operation without missing-ID assistance or prerequisite
 lookups. Only `load_skill`/`tool_search` can execute; observation stops at the

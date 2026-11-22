@@ -2,7 +2,11 @@ package com.example.mochi_pet.platform.browser
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import android.graphics.Bitmap
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -67,6 +71,274 @@ class AgentBrowserSemanticSnapshotTest {
         runtime.click(ref(runtime.snapshot(), "Reply fixture"), waitSeconds = 0)
         val result = runtime.snapshot()
         assertCommentPublishVisible(page, result)
+    }
+
+    @Test
+    fun followsLinkAncestorsAndBaseTargetsInOneWindow() = fixture { runtime, page ->
+        val navigation = interceptNavigation(page)
+        script(page, """
+            document.body.innerHTML = '<style>a{display:block;padding:12px}span[role]{display:inline-block;padding:4px}</style>' +
+              '<a id="direct" href="https://example.com/direct?item=fixture" target="_blank">Direct link</a>' +
+              '<a id="nested" href="https://example.com/nested" target="product-window"><span role="button">Nested title</span></a>' +
+              '<a id="inherited" href="https://example.com/inherited"><span role="button">Inherited title</span></a>' +
+              '<a id="shadow" href="https://example.com/shadow" target="_BLANK"><span id="shadow-host"></span></a>' +
+              '<a id="slotted" href="https://example.com/slotted" target="_blank"><span id="slot-host"><span slot="label" role="button">Slotted title</span></span></a>';
+            const base = document.createElement('base');
+            base.target = '_blank';
+            document.head.append(base);
+            document.getElementById('shadow-host').attachShadow({mode:'open'}).innerHTML =
+              '<span role="button" style="display:inline-block;padding:4px">Shadow title</span>';
+            document.getElementById('slot-host').attachShadow({mode:'open'}).innerHTML = '<slot name="label"></slot>';
+            window.fixtureClicks = 0;
+            document.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+              window.fixtureClicks++;
+              a.dataset.targetDuringClick = a.getAttribute('target');
+            }));
+        """.trimIndent())
+        val cases = listOf(
+            Triple("direct", "Direct link", "\"_blank\""),
+            Triple("nested", "Nested title", "\"product-window\""),
+            Triple("inherited", "Inherited title", "null"),
+            Triple("shadow", "Shadow title", "\"_BLANK\""),
+            Triple("slotted", "Slotted title", "\"_blank\""),
+        )
+        cases.forEachIndexed { index, (id, label, originalTarget) ->
+            val target = runtime.snapshot().getValue("interactive_elements").jsonArray.map { it.jsonObject }
+                .first { it["name"]?.jsonPrimitive?.content == label &&
+                    it["role"]?.jsonPrimitive?.content == if (id == "direct") "link" else "button" }
+            assertEquals(if (id == "direct") "a" else "span", target.getValue("tag").jsonPrimitive.content)
+            runtime.click(target.getValue("ref").jsonPrimitive.content, waitSeconds = 0)
+            runtime.snapshot()
+            assertEquals("Exactly one navigation for $label", index + 1, navigation.size)
+            assertEquals("https://example.com/$id" + if (id == "direct") "?item=fixture" else "", navigation.last())
+            assertEquals((index + 1).toString(), script(page, "window.fixtureClicks"))
+            assertEquals("\"_self\"", script(page, "document.getElementById('$id').dataset.targetDuringClick"))
+            assertEquals(originalTarget, script(page, "document.getElementById('$id').getAttribute('target')"))
+        }
+    }
+
+    @Test
+    fun cancelledLinksAndIndependentControlsDoNotForceNavigation() = fixture { runtime, page ->
+        val navigation = interceptNavigation(page)
+        script(page, """
+            document.body.innerHTML = '<style>a,div[role]{display:block;padding:12px}</style>' +
+              '<a id="cancelled" href="https://example.com/cancelled" target="_blank">Cancelled link</a>' +
+              '<a id="outer" href="https://example.com/outer" target="_blank"><button id="save">Save locally</button></a>' +
+              '<div role="button" aria-label="Unlinked container">Container <a href="https://example.com/child">Child link</a></div>';
+            window.fixtureClicks = 0;
+            document.body.addEventListener('click', () => { window.fixtureClicks++; });
+            document.getElementById('cancelled').addEventListener('click', e => e.preventDefault());
+            document.getElementById('save').addEventListener('click', e => { e.preventDefault(); e.target.textContent = 'Saved locally'; });
+        """.trimIndent())
+        for (label in listOf("Cancelled link", "Save locally", "Unlinked container")) {
+            runtime.click(ref(runtime.snapshot(), label), waitSeconds = 0)
+            runtime.snapshot()
+        }
+        assertTrue("No forced navigation after cancellation or container clicks", navigation.isEmpty())
+        assertEquals("3", script(page, "window.fixtureClicks"))
+        assertEquals("\"Saved locally\"", script(page, "document.getElementById('save').textContent"))
+        assertEquals("\"_blank\"", script(page, "document.getElementById('cancelled').getAttribute('target')"))
+        assertEquals("\"_blank\"", script(page, "document.getElementById('outer').getAttribute('target')"))
+    }
+
+    @Test
+    fun URLFallbackTitlesAreSanitizedInSnapshotsAndNativeState() = fixture { runtime, page ->
+        script(page, "document.title = 'https://example.com/login?code=synthetic-navigation-token#fragment'")
+        val snapshot = runtime.snapshot()
+        assertEquals("https://example.com/login", snapshot.getValue("title").jsonPrimitive.content)
+        assertEquals("https://example.com/login", runtime.state.value.title)
+        assertFalse(snapshot.toString().contains("synthetic-navigation-token"))
+    }
+
+    private suspend fun interceptNavigation(page: WebView): MutableList<String> {
+        val navigation = mutableListOf<String>()
+        withContext(Dispatchers.Main) {
+            page.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    if (request.isForMainFrame) navigation += request.url.toString()
+                    return true
+                }
+            }
+        }
+        return navigation
+    }
+
+    @Test
+    fun formTargetsRespectSubmitterOverridesValidationAndCancellation() = fixture { runtime, page ->
+        val navigation = interceptNavigation(page)
+        script(page, """
+            document.body.innerHTML = '<form id="search" action="https://example.com/search" target="_blank">' +
+              '<input name="q" value="fixture" required aria-label="Search terms">' +
+              '<button id="nested-submit"><span role="button">Submit nested title</span></button></form>' +
+              '<button id="external" form="search" formtarget="results">Submit outside form</button>' +
+              '<form action="https://example.com/inherited"><button>Submit inherited target</button></form>' +
+              '<form action="https://example.com/invalid" target="_blank"><input required><button>Invalid submit</button></form>';
+            const base = document.createElement('base'); base.target = '_blank'; document.head.append(base);
+            window.fixtureSubmits = 0;
+            document.addEventListener('submit', () => { window.fixtureSubmits++; });
+        """.trimIndent())
+        for (label in listOf("Submit nested title", "Submit outside form", "Submit inherited target")) {
+            runtime.click(ref(runtime.snapshot(), label), waitSeconds = 0)
+            runtime.snapshot()
+        }
+        assertEquals(listOf("https://example.com/search?q=fixture", "https://example.com/search?q=fixture",
+            "https://example.com/inherited?"), navigation)
+        assertEquals("3", script(page, "window.fixtureSubmits"))
+        assertEquals("null", script(page, "document.getElementById('nested-submit').getAttribute('formtarget')"))
+        assertEquals("\"results\"", script(page, "document.getElementById('external').getAttribute('formtarget')"))
+        assertEquals("\"_blank\"", script(page, "document.getElementById('search').target"))
+        runtime.click(ref(runtime.snapshot(), "Invalid submit"), waitSeconds = 0)
+        runtime.snapshot()
+        assertEquals(3, navigation.size)
+        script(page, "document.getElementById('search').addEventListener('submit', e => e.preventDefault())")
+        runtime.click(ref(runtime.snapshot(), "Submit outside form"), waitSeconds = 0)
+        runtime.snapshot()
+        assertEquals(3, navigation.size)
+        assertEquals("4", script(page, "window.fixtureSubmits"))
+    }
+
+    @Test
+    fun enterUsesCurrentWindowAndHonorsCancelledKeyEvents() = fixture { runtime, page ->
+        val navigation = interceptNavigation(page)
+        script(page, """
+            document.body.innerHTML = '<form id="search" action="https://example.com/search" target="_blank">' +
+              '<input name="q" value="fixture" aria-label="Search terms"></form>';
+            window.fixtureSubmits = 0;
+            document.addEventListener('submit', () => { window.fixtureSubmits++; });
+        """.trimIndent())
+        val input = ref(runtime.snapshot(), "Search terms")
+        runtime.input("key", input, null, null, "Enter", false, waitSeconds = 0)
+        runtime.snapshot()
+        assertEquals(listOf("https://example.com/search?q=fixture"), navigation)
+        assertEquals("\"_blank\"", script(page, "document.getElementById('search').target"))
+        script(page, "document.querySelector('input').addEventListener('keydown', e => e.preventDefault())")
+        runtime.input("key", input, null, null, "Enter", false, waitSeconds = 0)
+        runtime.snapshot()
+        assertEquals(1, navigation.size)
+        assertEquals("1", script(page, "window.fixtureSubmits"))
+    }
+
+    @Test
+    fun linkNavigationReplacesTheDocumentAndInvalidatesOldReferences() = fixture { runtime, page ->
+        script(page, """
+            document.body.innerHTML = '<a href="https://example.com/fixture-next" target="_blank"><span role="button">Open next document</span></a>';
+        """.trimIndent())
+        val oldRef = ref(runtime.snapshot(), "Open next document")
+        withContext(Dispatchers.Main) {
+            val delegate = page.webViewClient
+            page.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = false
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) = WebResourceResponse(
+                    "text/html", "UTF-8",
+                    "<html><body><h1>New document</h1><button>New control</button></body></html>".byteInputStream(),
+                )
+                override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) =
+                    delegate.onPageStarted(view, url, favicon)
+                override fun onPageFinished(view: WebView, url: String) = delegate.onPageFinished(view, url)
+            }
+        }
+        runtime.click(oldRef, waitSeconds = 0)
+        withTimeout(10_000) {
+            var result = runtime.snapshot()
+            while (!result.getValue("markdown").jsonPrimitive.content.contains("New document")) {
+                result = runtime.snapshot()
+            }
+            assertEquals("https://example.com/fixture-next", result.getValue("url").jsonPrimitive.content)
+            assertFalse(oldRef == ref(result, "New control"))
+        }
+        assertRejected { runtime.click(oldRef, waitSeconds = 0); runtime.snapshot() }
+    }
+
+    @Test
+    fun historyAfterInteractionKeepsNativeCursorAndStillBlocksReloadAndModeChanges() = fixture { runtime, page ->
+        val origin = "https://93.184.216.34"
+        withContext(Dispatchers.Main) {
+            val delegate = page.webViewClient
+            page.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) =
+                    delegate.shouldOverrideUrlLoading(view, request)
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) = WebResourceResponse(
+                    "text/html", "UTF-8",
+                    ("<html><body><h1>${request.url.path}</h1>" +
+                        "<a href='$origin/detail' target='_blank'><span role='button'>Open details</span></a>" +
+                        "<button onclick=\"this.textContent='Selected'\">Choose SKU</button></body></html>").byteInputStream(),
+                )
+                override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) =
+                    delegate.onPageStarted(view, url, favicon)
+                override fun onPageFinished(view: WebView, url: String) = delegate.onPageFinished(view, url)
+            }
+        }
+        runtime.navigate("goto", "$origin/search", mode = "mobile", waitSeconds = 0)
+        runtime.snapshot()
+        runtime.click(ref(runtime.snapshot(), "Open details"), waitSeconds = 0)
+        runtime.snapshot()
+        runtime.click(ref(runtime.snapshot(), "Choose SKU"), waitSeconds = 0)
+        runtime.snapshot()
+        val detailIndex = withContext(Dispatchers.Main) { page.copyBackForwardList().currentIndex }
+        runtime.navigate("back", null, waitSeconds = 0)
+        val back = runtime.snapshot()
+        assertEquals("$origin/search", back.getValue("url").jsonPrimitive.content)
+        assertEquals(detailIndex - 1, withContext(Dispatchers.Main) { page.copyBackForwardList().currentIndex })
+        assertTrue(withContext(Dispatchers.Main) { page.canGoForward() })
+        runtime.navigate("forward", null, waitSeconds = 0)
+        assertEquals("$origin/detail", runtime.snapshot().getValue("url").jsonPrimitive.content)
+        assertEquals(detailIndex, withContext(Dispatchers.Main) { page.copyBackForwardList().currentIndex })
+        for ((operation, mode) in listOf("reload" to "auto", "goto" to "desktop")) {
+            var rejected = false
+            try {
+                runtime.navigate(operation, "$origin/search", mode = mode, waitSeconds = 0)
+                runtime.snapshot()
+            } catch (_: IllegalArgumentException) {
+                rejected = true
+            }
+            assertTrue("Interaction must still block $operation / $mode", rejected)
+        }
+    }
+
+    @Test
+    fun inputRejectsControlsThatBecomeHiddenDisabledOrCovered() = fixture { runtime, page ->
+        script(page, """
+            document.body.innerHTML = '<div id="group"><input aria-label="Editable fixture" value="unchanged"></div>' +
+              '<select aria-label="Select fixture"><option value="a">First</option><option value="b">Second</option></select>' +
+              '<button id="disabled-parent"><span role="button">Nested disabled control</span></button>';
+        """.trimIndent())
+        val initial = runtime.snapshot()
+        val input = ref(initial, "Editable fixture")
+        val select = ref(initial, "Select fixture")
+        val nested = ref(initial, "Nested disabled control")
+        script(page, "document.getElementById('group').hidden = true")
+        assertRejected { runtime.input("type", input, "must not enter", null, null, true, waitSeconds = 0); runtime.snapshot() }
+        script(page, "document.getElementById('group').hidden = false; document.getElementById('group').setAttribute('aria-disabled','true')")
+        assertRejected { runtime.input("type", input, "must not enter", null, null, true, waitSeconds = 0); runtime.snapshot() }
+        script(page, """
+            document.getElementById('group').removeAttribute('aria-disabled');
+            document.getElementById('disabled-parent').disabled = true;
+        """.trimIndent())
+        assertRejected { runtime.click(nested, waitSeconds = 0); runtime.snapshot() }
+        script(page, """
+            const cover = document.createElement('div');
+            cover.style.cssText = 'position:fixed;inset:0;z-index:99999;background:white';
+            document.body.append(cover);
+        """.trimIndent())
+        assertRejected { runtime.input("type", input, "must not enter", null, null, true, waitSeconds = 0); runtime.snapshot() }
+        assertRejected { runtime.input("select", select, null, "b", null, true, waitSeconds = 0); runtime.snapshot() }
+        assertEquals("\"unchanged\"", script(page, "document.querySelector('input').value"))
+        assertEquals("\"a\"", script(page, "document.querySelector('select').value"))
+    }
+
+    @Test
+    fun nestedScrollingUsesTheContainerViewport() = fixture { runtime, page ->
+        script(page, """
+            document.body.innerHTML = '<div id="list" aria-label="Scroll fixture" style="height:120px;overflow:auto">' +
+              '<div style="height:1200px">Scrollable content</div></div>';
+        """.trimIndent())
+        val list = ref(runtime.snapshot(), "Scroll fixture")
+        for ((amount, expected) in listOf("half_page" to 60, "start" to 0, "page" to 108, "end" to 1080)) {
+            runtime.scroll("down", amount, list, waitSeconds = 0)
+            runtime.snapshot()
+            assertEquals(expected.toString(), script(page, "Math.round(document.getElementById('list').scrollTop)"))
+        }
+        assertEquals("0", script(page, "Math.round(document.scrollingElement.scrollTop)"))
     }
 
     private suspend fun installCommentEditor(page: WebView) {

@@ -99,10 +99,14 @@ may receive connected, enabled Termux Tools, with enabled Skill discovery
 following Tool readiness. Foreground, scheduled, and child calls execute
 automatically without per-command confirmation or a separate background flag.
 See `EXTENSIONS.md` for revocation and scope. Child
-research is bounded to 30 Tool rounds. Reaching that bound returns a typed Tool
+research is bounded to 100 Tool rounds, matching the default for Main and
+scheduled runs. A round is one model response requesting Tools, not one
+individual Tool call. After 100 Tool rounds a final response remains allowed,
+but another Tool round is rejected before dispatch. Reaching the child bound returns a typed Tool
 error to the Main Agent instead of failing the entire conversation. Both child
-roles are instructed to use their isolated context and larger round budget for
-deeper investigation than the Main Agent performs directly.
+roles are instructed to use their isolated context and separate round budget
+for focused investigation. Delegation counts, HTTP deadlines and cancellation
+behavior are unchanged; a larger round budget does not authorize action replay.
 
 Main and child orchestrators emit structured `MochiAgent` Logcat diagnostics
 for run start, model rounds, Tool start/finish, completion, cancellation, and
@@ -328,7 +332,7 @@ The native implementation now includes:
 - serializable OpenAI-compatible chat messages, tool calls, and responses;
 - one OkHttp transport with Chat Completions and stateless Responses adapters,
   cancellation and bounded responses;
-- `AgentOrchestrator` with 20 Tool rounds for the Main Agent;
+- `AgentOrchestrator` with up to 100 Tool rounds per Main, scheduled or child run;
 - one bounded, Tool-disabled repair round when a provider final response does
   not satisfy the Mochi JSON contract;
 - ToolRegistry execution and `role="tool"` continuation messages;
@@ -403,7 +407,7 @@ records a bounded phase timeline without payloads or credentials.
 [Development](../DEVELOPMENT.md) owns its invocation and safety boundaries.
 
 On 2026-11-21, the connected Xiaomi ARM64 phone used its active Azure
-`gpt-6.1-terra` Responses deployment and the normal 20-second deadline.
+`gpt-6.1-terra` Responses deployment and the then-current 20-second deadline.
 Twelve requests compared default gzip negotiation with explicit identity,
 with two repetitions per schema set/variant. Eleven completed successfully
 over HTTP/2; five successes requested gzip and six requested identity.
@@ -426,7 +430,7 @@ No additional production compression behavior is justified by this sample.
 
 ### Request deadlines
 
-Foreground text and voice cap each model HTTP request at 20 seconds, including
+Foreground text and voice cap each model HTTP request at 30 seconds, including
 Tool continuations, final-response repair and delegated model/image requests.
 A shorter configured Provider timeout is preserved. Scheduled Agents and their
 children retain the configured Provider timeout (60 seconds by default), as do
@@ -434,6 +438,8 @@ explicit configuration probes. This is a per-request deadline, not a whole-task
 or Tool-execution deadline. Timing out fails the request without an application
 retry or replay of previous Tool actions. The stored Provider setting and
 Provider-share data are unchanged; Settings explains the foreground cap.
+The 30-second cap provides more time for connection and response transfer; it
+does not establish or fix the underlying cause of observed network stalls.
 
 The native Conversation surface sends text through `AgentOrchestrator`, applies
 validated UI directives, supports cancellation, and rejects stale results from

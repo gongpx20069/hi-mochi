@@ -685,8 +685,12 @@ Two focused Browser Skills cover product discovery and ratings:
   product pages when possible and labels search snippets as unverified. For an
   explicit Pinduoduo request it searches indexed public
   `mobile.yangkeduo.com/goods.html` pages, or uses normal H5 search with a working
-  session. It must not import cookies, claim coupons, add to cart, order,
-  or pay.
+  session. It is read-only unless the user explicitly requests adding a verified
+  item to a cart. That action requires matching the SKU, condition, region,
+  displayed price and shipping conditions, checking for an existing matching
+  SKU, adding at most once and reading the cart to verify. Unconfirmed additions
+  are not replayed. It must not import cookies, claim coupons, order, select
+  addresses or pay.
 - Douban Ratings always starts at
   `https://m.douban.com/home_guide`, searches through visible page controls,
   and verifies the matching detail page before reporting scores, rating counts,

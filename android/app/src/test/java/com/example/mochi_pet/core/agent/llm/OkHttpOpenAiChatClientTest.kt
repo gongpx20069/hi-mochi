@@ -94,7 +94,7 @@ class OkHttpOpenAiChatClientTest {
 
     @Test
     fun `foreground timeout preserves shorter limits and all provider options`() {
-        for (timeout in listOf(1L, 10L, 20L, 60L, 300L)) {
+        for (timeout in listOf(1L, 10L, 20L, 25L, 30L, 31L, 60L, 300L)) {
             val original = OpenAiProviderConfig(
                 providerType = ProviderType.AZURE_OPENAI,
                 endpoint = server.url("/").toString(),
@@ -107,7 +107,7 @@ class OkHttpOpenAiChatClientTest {
             )
             val foreground = original.forForegroundRequest()
 
-            assertEquals(minOf(timeout, 20L), foreground.timeoutSeconds)
+            assertEquals(minOf(timeout, 30L), foreground.timeoutSeconds)
             assertEquals(timeout, original.timeoutSeconds)
             assertEquals(original.providerType, foreground.providerType)
             assertEquals(original.endpoint, foreground.endpoint)
@@ -119,8 +119,8 @@ class OkHttpOpenAiChatClientTest {
         }
     }
 
-    @Test(timeout = 30_000)
-    fun `stalled foreground request times out at twenty seconds without replay`() {
+    @Test(timeout = 45_000)
+    fun `stalled foreground request times out at thirty seconds without replay`() {
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
         val start = System.nanoTime()
 
@@ -134,7 +134,7 @@ class OkHttpOpenAiChatClientTest {
         }
 
         val elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
-        assertTrue("Elapsed: $elapsed ms", elapsed in 19_000L..25_000L)
+        assertTrue("Elapsed: $elapsed ms", elapsed in 29_000L..35_000L)
         assertTrue(error.cause is InterruptedIOException)
         assertEquals(1, server.requestCount)
     }

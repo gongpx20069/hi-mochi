@@ -76,8 +76,15 @@ mode derives its UA from the installed Chromium version, requests a wide
 viewport (980 CSS pixels), and sets desktop client hints when supported.
 It remains Android WebView, not desktop Chrome or an anti-detection bypass.
 Mode changes invalidate references, are limited to four per turn, and cannot
-follow page interaction; reload/history are also blocked after interaction to
-avoid replaying submissions. History navigation accepts only `auto`.
+follow page interaction; reload is also blocked after interaction to avoid
+replaying submissions. Back/forward remain available after interaction and
+accept only `auto`. The runtime validates the actual history destination against
+the public-HTTPS policy and rechecks it before moving the native history cursor;
+it does not reconstruct a URL from the sanitized snapshot. If WebView requests
+form-data resubmission, the runtime selects "do not resend" and reports the
+blocked navigation. Normal history movement does not authorize replaying a POST
+or an unconfirmed action. Native navigation errors remain visible until a new
+navigation starts.
 
 Foreground Main also receives `request_user_assistance(kind, message, options)`.
 This native Tool is available independently of Browser enablement for questions;
@@ -134,7 +141,26 @@ included. `browser_click`, `browser_input`, and element scrolling continue to
 target the separate opaque references. Snapshot page/link URLs omit user info,
 query strings and fragments; opaque element references retain their targets.
 References are held in a document-local identity map, not cloned DOM attributes.
-Clicks recheck visibility, disabled/inert state and center-point occlusion.
+Clicks and referenced input actions share visibility, ancestor disabled/inert
+state and center-point occlusion checks. A previously observed control that
+becomes hidden or covered must not be edited through its old reference.
+Element scrolling uses that container's viewport height, not the full page's
+height, for page/half-page movement.
+Link activation follows the clicked node's composed ancestor chain, including
+assigned slots and open shadow roots. A link's effective new-window target
+(including named targets and inherited `base target`) is temporarily routed to
+the current window for that single click; its exact target attribute is restored
+after dispatch. The original node receives the click, so page handlers and
+`preventDefault` still apply. The browser never guesses a child link from an
+unlinked container or forces navigation after a cancelled event. Form submit
+controls use the same single-window rule with submitter `formtarget`, associated
+form `target` and `base target` precedence, including controls outside their
+associated form. Enter submission scopes the form target similarly and honors
+cancelled keydown/submit events. Form validation and page handlers remain active;
+neither submission nor navigation is replayed. Automatic script popups remain
+blocked. Action acknowledgement is not navigation evidence.
+URL-valued page titles use the same query, fragment and user-info removal as
+snapshot URLs, including scheme-less native title fallbacks during navigation.
 Typing uses native value setters and composed input/change events; custom
 contenteditable controls and selection by option label are supported.
 Before click or input actions, the runtime requests native WebView input focus
@@ -366,19 +392,35 @@ Local deletion does not delete remote accounts or revoke remote authorization.
 ## 7. Failure behavior
 
 - Stale references return `STALE_REF` and require a fresh snapshot.
-- Blocked navigation returns `NAVIGATION_BLOCKED`.
+- Public-URL policy rejection returns `PERMISSION_DENIED`; DNS/host failures
+  return `PROVIDER_ERROR`. Native navigation failures remain in `page_error`.
+- Refused form resubmission returns `CONFLICT` when it interrupts the pending
+  operation and remains visible on later reads.
 - Safe Browsing and SSL failures stop navigation without an Agent bypass.
-- Renderer termination destroys the WebView and returns `RENDERER_GONE`;
+- Renderer termination destroys the WebView and returns `CONFLICT`;
   Mochi never replays a form submission automatically.
 - Human login/CAPTCHA can trigger Agent-requested assistance; unsupported system
   permissions and external authentication flows do not gain a bypass.
-- Timeouts and cancellation close the per-turn browser session.
+- Observation-window expiry leaves the page running. Agent failure, task
+  cancellation and turn closure release the per-turn browser session.
 - Tool results remain bounded and never include cookies, credentials, request
   headers, full form values, or unrestricted page source.
 
 ## 8. Delivery
 
 The implementation uses one per-turn WebView and the five Tools above.
+Deterministic coverage includes nested links, named/base targets, open shadow
+roots and slots; form overrides, validation and cancelled events; navigation
+after interaction without form replay; stale/hidden/covered controls; container
+scrolling; and observation cancellation, renderer loss and human handoff.
+Tests use controlled documents and do not establish compatibility with every
+site. Real task acceptance separately requires verified page, SKU and cart
+evidence, not just successful Tool acknowledgements.
+
+Frame contents, closed shadow roots, canvas-only controls, native trusted-user
+gestures, automatic script popups and full browser keyboard shortcuts are not
+general automation capabilities. Use supported DOM controls or human assistance
+where allowed; do not invent references or bypass site/platform restrictions.
 Tabs, downloads/uploads, structured extraction, isolated named accounts,
 raw-password storage, process-death task resumption, and visual
 fallback are later capabilities and require separate product and security

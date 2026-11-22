@@ -263,7 +263,7 @@ class MochiHomeViewModelTest {
 
             if (voiceInput) viewModel.startVoiceInput() else viewModel.sendConversation("Hello")
 
-            assertEquals(listOf(20L), timeouts)
+            assertEquals(listOf(30L), timeouts)
             kotlinx.coroutines.runBlocking {
                 assertEquals(60L, settings.loadRuntimeConfig().timeoutSeconds)
             }

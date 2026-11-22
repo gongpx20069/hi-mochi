@@ -56,6 +56,7 @@ class BrowserNavigateTool(
                 "Auto reuses the site's last mode, otherwise defaults to desktop. " +
                 "Choose mobile when the site needs it; do not ask the user to configure presentation. " +
                 "Do not switch modes or reload after filling or submitting a form. " +
+                "Back/forward remain available; form-data resubmission is blocked, never retried. " +
                 "If human login or verification is required, ask the main Agent to request user assistance.",
         properties = buildJsonObject {
             put(

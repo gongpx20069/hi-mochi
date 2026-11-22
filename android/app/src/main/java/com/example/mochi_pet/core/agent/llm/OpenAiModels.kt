@@ -49,7 +49,7 @@ class OpenAiProviderConfig(
             apiKey = apiKey,
             model = model,
             apiVersion = apiVersion,
-            timeoutSeconds = minOf(timeoutSeconds, 20L),
+            timeoutSeconds = minOf(timeoutSeconds, 30L),
             maxResponseBytes = maxResponseBytes,
             imageInputEnabled = imageInputEnabled,
             apiProtocol = apiProtocol,

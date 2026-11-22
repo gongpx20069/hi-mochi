@@ -249,8 +249,9 @@ when continuing an existing task document. Read-only document discovery and
 structural readers support verification. Login, unreadable screens or absent
 authorization are blockers, not successful purchases. The fixture preserves
 the production accessibility service and starts a real foreground Activity.
-`authorized-shopping-results.json` records result statuses, timing and the
-final task report; do not commit personal/account data. A finished diagnostic
+`authorized-shopping-results.json` records result statuses, timing, bounded
+model-visible browser observations, clicked labels and the final task report;
+do not commit personal/account data. A finished diagnostic
 does not establish success: verify the report's price evidence, document
 readback and cart readback independently. This test consumes model quota and
 has real, explicitly authorized side effects; it is never part of CI.
@@ -263,6 +264,22 @@ allows native user assistance for necessary manual login. Browser clicks must
 reference observed controls; recognized checkout/payment/purchase controls are
 blocked before dispatch. App permissions are not bypassed; web access has its
 own authentication, site-access policy and Skill restrictions.
+Add `-e mochiShoppingCartOnly true` with browser mode to isolate the authorized
+product-verification/cart stage without document or app operations. It retains
+the normal Agent round limit, verifies the selected SKU, forbids checkout and
+asks the Agent not to re-add an already present matching SKU. This stage is not
+evidence that document delivery or a broader price comparison also completed.
+For bounded browser acceptance, also add `-e mochiShoppingCartAcceptance true`.
+That explicitly limits this diagnostic to two candidate details and tells the
+Agent to reserve its normal round budget for SKU verification, cart
+deduplication and readback. It does not change production Agent planning or
+establish that an unrestricted shopping task fits the same budget.
+`inspectMarketplaceSearchActivation` with the shopping opt-in records only
+search-form targets and geometry/obstruction flags, never input values or page
+text. Add `-e mochiShoppingAssistVerification true` only when the user is ready
+to complete website verification on the phone. This uses the production browser
+handoff and inspects the page again afterward; a completed handoff alone is not
+proof that website verification succeeded.
 `-e mochiRecoverShoppingDocument true` permits only read-only lookup/readback
 of the task's exact document title; use it after an interrupted run rather
 than replaying creation. `documentWriteGuardRejectsOtherFiles` is a deterministic
@@ -531,7 +548,7 @@ only when its host and deployment match explicit instrumentation arguments:
 `-e mochiResponsesDiagnostic true -e mochiAzureResourceHost <host>
 -e mochiAzureDeployment <deployment>`. It sends a fixed synthetic Agent prompt,
 executes only a local no-side-effect fixture tool, and checks the final reply
-through the production Agent loop with the normal 20-second foreground deadline.
+through the production Agent loop with the normal 30-second foreground deadline.
 It consumes model quota, but sends no user history/persona, real Tool definitions,
 or business data. Logs contain only request durations and counts.
 Only with explicit permission, `-e mochiEnableResponses true` switches that
@@ -552,7 +569,7 @@ The live requests use only a fixed synthetic prompt and zero, base, or
 base-plus-large Tool definitions. Returned calls are never dispatched.
 Two repetitions alternate default OkHttp gzip negotiation and explicit
 `Accept-Encoding: identity`, for twelve non-streaming requests with the normal
-20-second deadline. These share a test-owned connection pool; the first request
+30-second deadline. These share a test-owned connection pool; the first request
 can include cold-connection cost, so raw variant timings are not a causal
 compression benchmark.
 

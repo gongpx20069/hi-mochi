@@ -260,7 +260,7 @@ internal fun ProviderConnectionDialog(
                     Text("Responses supports reasoning with tools. Choose only a protocol supported by this endpoint and model; Mochi never switches automatically.")
                     OutlinedTextField(timeout, { timeout = it.filter(Char::isDigit) },
                         label = { Text("Timeout seconds") }, enabled = !state.isSaving,
-                        supportingText = { Text("Per AI request. Chat and voice use at most 20 seconds; scheduled agents use this value.") })
+                        supportingText = { Text("Per AI request. Chat and voice use at most 30 seconds; scheduled agents use this value.") })
                     Row {
                         Text("Multimodal input", modifier = Modifier.weight(1f))
                         Switch(images, { images = it }, enabled = !state.isSaving)

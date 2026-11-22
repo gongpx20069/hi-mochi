@@ -443,7 +443,10 @@ a permission status, and an unconfirmed return is an explicit Tool error.
   optional and usable only in registries that expose them. Saved enablement
   is preserved across upgrades without showing duplicate Skills.
 - Specialized Skills retain separate provider and action boundaries. Product
-  Search opens supplied product links before searching; stock analysis collects
+  Search opens supplied product links before searching. It is read-only by
+  default; an explicit user request may add a verified matching SKU to a cart
+  once, with duplicate and cart-readback checks. It never orders, selects
+  addresses or pays. Stock analysis collects
   only requested companies/fields. Planner records and their reminders, future
   Agent schedules, and UI-only navigation must not create duplicate actions.
 
