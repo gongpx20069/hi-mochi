@@ -7,8 +7,17 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.example.mochi_pet.core.browser.UserAssistanceAnswer
+import java.io.ByteArrayInputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -339,6 +348,70 @@ class AgentBrowserSemanticSnapshotTest {
             assertEquals(expected.toString(), script(page, "Math.round(document.getElementById('list').scrollTop)"))
         }
         assertEquals("0", script(page, "Math.round(document.scrollingElement.scrollTop)"))
+    }
+
+    @Test
+    fun handoffKeepsDelayedScriptsAndFramesFunctional() = fixture { runtime, page ->
+        for (frame in listOf(false, true)) coroutineScope {
+            val requested = CompletableDeferred<Unit>()
+            val release = CountDownLatch(1)
+            try {
+                withContext(Dispatchers.Main) {
+                    val original = page.webViewClient
+                    val target = if (frame) "parent" else "window"
+                    val handler = """
+                        $target.document.getElementById('handoff-probe').onclick = () => {
+                          $target.document.getElementById('handoff-probe').textContent = 'Handoff action completed';
+                        };
+                        $target.document.getElementById('handoff-probe').textContent = 'Handoff action ready';
+                    """.trimIndent()
+                    val resource = if (frame) "<iframe src='/handoff-resource'></iframe>"
+                        else "<script src='/handoff-resource'></script>"
+                    page.webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) =
+                            original.onPageStarted(view, url, favicon)
+                        override fun onPageFinished(view: WebView, url: String) =
+                            original.onPageFinished(view, url)
+                        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse {
+                            val body = when (request.url.path) {
+                                "/handoff" -> "<!doctype html><button id='handoff-probe'>Handoff action waiting</button>$resource"
+                                "/handoff-resource" -> {
+                                    requested.complete(Unit)
+                                    check(release.await(30, TimeUnit.SECONDS)) { "Handoff fixture resource was not released" }
+                                    if (frame) "<!doctype html><script>$handler</script>" else handler
+                                }
+                                else -> ""
+                            }
+                            val mime = if (!frame && request.url.path == "/handoff-resource") "application/javascript" else "text/html"
+                            return WebResourceResponse(mime, "UTF-8", ByteArrayInputStream(body.toByteArray()))
+                        }
+                    }
+                    page.loadUrl("https://93.184.215.14/handoff")
+                }
+                withTimeout(10_000) { requested.await() }
+                val oldRef = ref(runtime.snapshot(), "Handoff action waiting")
+                val handoff = async { runtime.requestAssistance("Use the synthetic page", true, emptyList()) }
+                val request = withTimeout(5_000) { runtime.assistance.request.filterNotNull().first() }
+                assertTrue(runtime.state.value.userControl)
+                release.countDown()
+                withTimeout(10_000) {
+                    while (script(page, "document.getElementById('handoff-probe').textContent") != "\"Handoff action ready\"") delay(50)
+                }
+                script(page, "document.getElementById('handoff-probe').click()")
+                val outcome = if (frame) "cancelled" else "completed"
+                runtime.assistance.respond(request.id, UserAssistanceAnswer(outcome))
+                assertEquals(outcome, handoff.await().outcome)
+                assertFalse(runtime.state.value.userControl)
+                assertRejected { runtime.click(oldRef, waitSeconds = 0); runtime.snapshot() }
+                assertTrue(runtime.snapshot().getValue("markdown").jsonPrimitive.content.contains("Handoff action completed"))
+                assertEquals("\"/handoff\"", script(page, "location.pathname"))
+            } finally {
+                release.countDown()
+                runtime.assistance.request.value?.let {
+                    runtime.assistance.respond(it.id, UserAssistanceAnswer("cancelled"))
+                }
+            }
+        }
     }
 
     private suspend fun installCommentEditor(page: WebView) {

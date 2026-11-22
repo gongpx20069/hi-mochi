@@ -50,6 +50,9 @@ without undoing submitted actions. Document changes discard old snapshots;
 late callbacks cannot overwrite a new document. User cancellation/turn closure
 release pending observations and renderer termination fails them immediately.
 Human assistance cancels background observations and drops cached snapshots.
+It does not stop WebView loading: pending scripts, frames and page requests must
+continue so the page remains functional under user control. Only Agent
+observations and operations are paused; handoff does not reload or replay the page.
 Browser handoff requires first observing a pending mutation, so a queued action
 cannot overlap user control; an answered handoff always requires a fresh read.
 

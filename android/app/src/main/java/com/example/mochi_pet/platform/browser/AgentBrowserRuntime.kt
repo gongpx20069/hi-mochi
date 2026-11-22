@@ -978,7 +978,6 @@ class AgentBrowserRuntime(
                     throw AgentBrowserException("Observe the pending page action before handing over the browser.")
                 }
                 val current = webView ?: throw AgentBrowserException("Open a page before requesting browser assistance.")
-                current.stopLoading()
                 modeLocked = true
                 current.url?.toHttpUrlOrNull()?.let { "${it.scheme}://${it.host}" }
                     ?: throw AgentBrowserException("No website is open.")
