@@ -142,170 +142,64 @@ Skill readiness and the actual serialized base-schema budgets.
 executing Tools or contacting a model. Policy, workflow and current measurements
 are owned by [Tool discovery and disclosure](architecture/TOOL_DESIGN.md).
 
-For authorized device evaluation, the opt-in `core.agent.ToolSearchDiagnosticTest`
-uses the production Agent factory with an injectable transport. After updating
-matching app/test APKs in place, `inspectAvailableCatalog` with
-`-e mochiToolRetrievalDiagnostic true` logs enabled Tool names only.
-`measureRetrievalCases` with the same opt-in reads the app-cache file
-`tool-retrieval-cases.json`: an array of objects with `group`, `query`,
-optional `skill_name`, and `expected` (relevant Tool names; empty for negative
-queries). If absent, it uses the checked-in instrumentation asset
-`tool-search-english-cases.json`. Label cases before running them.
-It adds exact-name cases for all enabled deferred Tools and writes
-`tool-retrieval-results.json` in app cache, including ordered Top-5 results,
-explicit unavailable-case skips and local search/continuation durations.
-Its scripted Agent transport makes no model calls and executes only `tool_search`.
-Complete English schema preparation first: an uncached non-English description
-can require a separate translation request before the registry is constructed.
-The diagnostic also records first/cache-warm factory preparation, initial
-request preparation, Tool-phase and continuation-schema latency. The Tool phase
-includes live availability reads, not just BM25. `tool-retrieval-timings.json`
-contains a separate in-memory BM25 microbenchmark over schemas observed during
-the run (five warmup passes, twenty samples per query), with snapshot and actual
-Top-5 results for comparison. These scripted timings exclude model inference
-and business Tool execution; they are not user-facing task latency.
-Add `-e mochiCompareSkillScopes true` for paired global/scoped queries,
-alternating execution order between pairs. Explicit queries use pre-labelled
-Skill names; generated exact-name checks choose the smallest available
-associated Skill scope (name breaks ties). Queries without a scope run once
-globally. Reports include candidate counts, search-result bytes and next-request
-Tool-array bytes. A counterfactual byte count adds descriptions from those same
-matched schemas to quantify avoided duplicate result text. These are UTF-8
-payload sizes, not model token counts.
-The scripted run also writes `tool-description-audit.json` containing only
-observed English Tool names/descriptions and Skill associations, and
-`skill-directory-measurements.json` with per-Skill appendix bytes and pure
-directory-render timings (five warmups, one hundred samples). These artifacts
-exclude parameters, credentials, prompts and business data. Base-only Skills
-must have zero appendix bytes.
-With the same opt-in, `verifyEnglishSkillInputs` checks enabled Skill discovery
-and `load_skill` documents for English model-facing instructions without
-executing their workflows. Uncached translations can consume model quota.
-Report descriptive-query hit rates separately from exact-name checks and
-negative-query false positives; this curated sample is not production accuracy.
+### Opt-in Tool and shopping diagnostics
 
-Separately, `liveReadOnlyWeatherLoop` with
-`-e mochiToolSearchLiveDiagnostic true` consumes quota on the active saved model
-connection, using its normal foreground deadline. Its transport guard permits
-`load_skill`, `tool_search` and one `amap_weather` call for Shanghai adcode `310000`;
-other calls fail before dispatch. Amap must already be configured/enabled.
-It checks search, subsequent schema visibility, real Tool success and a final
-reply without changing saved connection settings or reading user history.
-No opt-in means these diagnostics are skipped. Do not clear application data,
-grant permissions or enable a provider to make them pass.
+Update matching app/test APKs in place before running device diagnostics.
+They are excluded from CI and require explicit authorization; never enable
+providers, grant permissions or clear application data to make them pass.
+Live model calls and uncached schema/Skill translations consume quota.
 
-`core.agent.LiveToolSearchQueryDiagnosticTest#measureModelGeneratedQueries`,
-with `-e mochiLiveToolQueryDiagnostic true`, evaluates the active model's own
-search queries using the production factory and Agent prompt. Supply at most
-60 pre-labelled synthetic cases in app cache `live-tool-query-cases.json` with
-the same `group`, `query`, `expected` fields, or use the checked-in
-`tool-search-chinese-cases.json` instrumentation asset when that file is absent.
-Only the Chinese user query reaches
-the model, never the expected labels. Private persona/history/memory are omitted;
-normal enabled Skill metadata and base Tools remain visible. The guard permits
-only `load_skill` and `tool_search` and rejects an entire response containing
-any business call before dispatch. It stops at the next request boundary after
-the first search batch, without another model call or business execution.
-It preserves the model's query/limit rather than forcing search or rewriting
-queries. Reports distinguish no-search replies, blocked business calls,
-unavailable fixtures, provider errors, and the four-model-request budget.
-`live-tool-query-results.json` is checkpointed per case and marked complete at
-the end; it contains generated search queries, ordered results and separate
-factory, model, Tool and continuation timings, but no credentials, endpoint,
-full prompts, Skill contents or final reply text. This consumes model quota;
-report first-search quality separately from routing coverage and do not call
-it full business-task success or pure BM25 latency.
+| Test class / method | Instrumentation arguments and scope |
+| --- | --- |
+| `core.agent.ToolSearchDiagnosticTest#inspectAvailableCatalog` | `mochiToolRetrievalDiagnostic=true`; enabled Tool names only |
+| `#measureRetrievalCases` in the same class | Same opt-in; scripted `tool_search`, no business execution. Optional `mochiCompareSkillScopes=true` |
+| `#verifyEnglishSkillInputs` in the same class | Same opt-in; check model-facing Skill language without executing workflows |
+| `#liveReadOnlyWeatherLoop` in the same class | `mochiToolSearchLiveDiagnostic=true`; permits discovery and one configured Amap weather lookup |
+| `core.agent.LiveToolSearchQueryDiagnosticTest#measureModelGeneratedQueries` | `mochiLiveToolQueryDiagnostic=true`; model-generated search only, business calls rejected |
 
-Add `-e mochiCompareSkillDirectories true` to that live diagnostic for three
-transport-level ablations of each identical fixture: no Skill metadata/loading
-or Skill search scope; normal Skills without directory descriptions; and
-normal Skills with directories. Variant order rotates per fixture. The first
-two variants remove only the relevant model-facing metadata/schema fields and
-directory content, never change saved settings or enable Tools. All variants
-use the same production registry and live checks; host timings therefore
-include directory preparation even when the transport removes its text.
-Reports include serialized Chat-request representation bytes (not wire bytes
-for every protocol or billed tokens), unique appendix bytes, routing coverage,
-first-search targets and latency. Report conditional Top-1/Top-5 separately
-from all-case coverage, negatives and prerequisite searches. A single run does
-not measure model variance or prove universal accuracy.
-Use `-e mochiCapabilitySelectionOnly true` for the controlled capability-selection
-comparison: every variant receives the same instruction to find the final
-operation without execution, prerequisite lookups or requests for missing
-business arguments. Expected labels remain hidden. Keep this measurement
-separate from natural task routing, where assistance and prerequisite lookups
-can be correct behavior.
+Retrieval cases use app-cache `tool-retrieval-cases.json` (`group`, `query`,
+optional `skill_name`, `expected`) or bundled `tool-search-english-cases.json`.
+Live cases use `live-tool-query-cases.json` (at most 60 cases) or bundled
+`tool-search-chinese-cases.json`; expected labels never reach the model.
+`mochiCompareSkillDirectories=true` compares absent Skills, Skills without
+directories and normal directories; `mochiCapabilitySelectionOnly=true`
+isolates final-capability selection from natural task routing.
+Results are checkpointed in `tool-retrieval-results.json`,
+`tool-retrieval-timings.json` and `live-tool-query-results.json`; supporting
+schema/directory audits also stay in app cache. Distinguish search accuracy,
+coverage, preparation time and model latency. Serialized bytes are not billed
+tokens; scripted timings and individual runs do not prove production performance.
 
-`core.agent.AuthorizedShoppingDiagnosticTest#researchSwitchAndSaveDocument`
-requires `-e mochiAuthorizedSwitchShopping true` and explicit authorization
-for that real task. It compares new non-Japanese Switch 2 listings in the
-already user-selected Taobao app, may create/read a new Tencent Smart Canvas,
-and may add one verified qualifying item to the cart. It never orders or pays,
-changes permissions/settings, edits unrelated documents or bypasses filtered
-controls. The guard restricts app operations to the discovered Taobao ID.
-Document edits require the exact file ID created by this task, or explicitly
-supplied for continuation with `-e mochiShoppingDocumentId`. Creation is disabled
-when continuing an existing task document. Read-only document discovery and
-structural readers support verification. Login, unreadable screens or absent
-authorization are blockers, not successful purchases. The fixture preserves
-the production accessibility service and starts a real foreground Activity.
-`authorized-shopping-results.json` records result statuses, timing, bounded
-model-visible browser observations, clicked labels and the final task report;
-do not commit personal/account data. A finished diagnostic
-does not establish success: verify the report's price evidence, document
-readback and cart readback independently. This test consumes model quota and
-has real, explicitly authorized side effects; it is never part of CI.
-`inspectShoppingPrerequisites` with the same opt-in reads only production
-`app_read` and writes selection/accessibility booleans to
-`shopping-prerequisites.json`. It never enables an app or grants accessibility.
-For an explicitly requested web alternative, add `-e mochiShoppingBrowser true`:
-the fixture owns a real browser turn, reuses existing website sessions and
-allows native user assistance for necessary manual login. Browser clicks must
-reference observed controls; recognized checkout/payment/purchase controls are
-blocked before dispatch. App permissions are not bypassed; web access has its
-own authentication, site-access policy and Skill restrictions.
-Add `-e mochiShoppingCartOnly true` with browser mode to isolate the authorized
-product-verification/cart stage without document or app operations. It retains
-the normal Agent round limit, verifies the selected SKU, forbids checkout and
-asks the Agent not to re-add an already present matching SKU. This stage is not
-evidence that document delivery or a broader price comparison also completed.
-For bounded browser acceptance, also add `-e mochiShoppingCartAcceptance true`.
-That explicitly limits this diagnostic to two candidate details and tells the
-Agent to reserve its normal round budget for SKU verification, cart
-deduplication and readback. It does not change production Agent planning or
-establish that an unrestricted shopping task fits the same budget.
-For an authorized SKU-state investigation, add `-e mochiShoppingSelectionDiagnostic true`.
-It records bounded before/after state attributes and computed colors for clicked
-controls on Taobao item pages, alongside their model-visible snapshot entries.
-It does not change clicks, expose diagnostic JavaScript to the model, or capture
-editable values, cookies, page source or screenshots. These local diagnostic
-artifacts must not be committed.
-`-e mochiShoppingSelectionOnly true` restricts the cart-only fixture to two
-product-detail selection checks and rejects add-to-cart controls. Use it to
-validate state extraction when a prior add has not yet been read back.
-After an interrupted add attempt, `-e mochiShoppingCartReadback true` with cart-only
-browser mode runs readback without click/input Tools. It permits navigation only
-to the previously observed cart URL, never re-adds an item, and reports missing
-SKU/quantity evidence explicitly.
-`inspectCartReadiness` with the shopping opt-in performs no clicks or model
-requests. It samples only loading/login/target-presence booleans, frame visibility
-and sanitized resource timing/status metadata over sixty seconds to distinguish
-unready cart content from a completed document; no cart listing is exported.
-With `mochiShoppingAssistVerification=true`, this readiness diagnostic requests
-native manual assistance after its first sample, then observes again. It does
-not depend on a model connection or interpret a completed handoff as verification
-success. Interactive diagnostics keep only their Activity screen awake and
-record `awaiting_user` before handoff.
-`inspectMarketplaceSearchActivation` with the shopping opt-in records only
-search-form targets and geometry/obstruction flags, never input values or page
-text. Add `-e mochiShoppingAssistVerification true` only when the user is ready
-to complete website verification on the phone. This uses the production browser
-handoff and inspects the page again afterward; a completed handoff alone is not
-proof that website verification succeeded.
-`-e mochiRecoverShoppingDocument true` permits only read-only lookup/readback
-of the task's exact document title; use it after an interrupted run rather
-than replaying creation. `documentWriteGuardRejectsOtherFiles` is a deterministic
-no-business-call check for the diagnostic's write-target guard.
+`core.agent.AuthorizedShoppingDiagnosticTest` requires
+`-e mochiAuthorizedSwitchShopping true`. Its `researchSwitchAndSaveDocument`
+fixture compares new non-Japanese Switch 2 listings, may write a task-specific
+Tencent document and may add one verified item. It never orders, pays, changes
+settings or edits unrelated documents. App operations are restricted to the
+user-selected Taobao app; browser mode reuses the existing website session.
+
+| Additional argument (`-e <name> true` unless noted) | Purpose |
+| --- | --- |
+| `mochiShoppingBrowser` | Use the browser instead of app control |
+| `mochiShoppingCartOnly` | Browser-only SKU verification/cart stage, no document operations |
+| `mochiShoppingCartAcceptance` | With cart-only mode, limit comparison to two candidates |
+| `mochiShoppingSelectionOnly` | With cart-only mode, inspect two candidates and reject further adds |
+| `mochiShoppingSelectionDiagnostic` | Bounded clicked-control state/style evidence; no editable values or page source |
+| `mochiShoppingCartReadback` | With cart-only mode, navigate only to the known cart URL; no click/input or repeated add |
+| `mochiShoppingDocumentId <file_id>` | Continue only that task document; no duplicate creation |
+| `mochiRecoverShoppingDocument` | Read-only document recovery by the fixture's exact title |
+
+Other methods: `inspectShoppingPrerequisites` checks app selection/accessibility;
+`inspectMarketplaceSearchActivation` records search geometry/obstruction flags;
+`inspectCartReadiness` samples loading, target-presence flags and sanitized
+frame/resource metadata without model calls or clicks. The last two support
+`mochiShoppingAssistVerification=true` for a user-ready native handoff.
+`documentWriteGuardRejectsOtherFiles` is the deterministic write-target check.
+
+Keep `authorized-shopping-results.json` and other app-cache diagnostic artifacts
+out of Git. A finished test, click acknowledgement or completed handoff is not
+business success: verify SKU/price, document and cart readback independently.
+After an uncertain add, use readback mode rather than re-adding. Website
+verification is user-only; stop if it cannot be completed.
 
 App Control and Media Control regressions:
 
@@ -514,8 +408,8 @@ adb -s <serial> shell am start -a android.intent.action.MAIN `
 
 Use this only for a confirmed blocked launch, not while a test body is running.
 Each subsequent scenario can need the same assistance. Do not change background
-permissions or weaken assertions to get a pass. Require `OK (4 tests)` from this
-suite; an instrumentation crash can still return shell exit code zero.
+permissions or weaken assertions to get a pass. Require all selected tests to
+pass; an instrumentation crash can still return shell exit code zero.
 Expression-bodied JUnit methods must return `Unit`; use `runBlocking<Unit>`
 when the last UI assertion/action returns a semantics interaction rather than
 `Unit`, otherwise JUnit rejects the class before any fixture runs.

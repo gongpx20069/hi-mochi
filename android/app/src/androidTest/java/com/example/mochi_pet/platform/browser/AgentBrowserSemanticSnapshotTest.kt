@@ -440,6 +440,15 @@ class AgentBrowserSemanticSnapshotTest {
     }
 
     @Test
+    fun snapshotWithoutADocumentRootDoesNotFail() = fixture { runtime, page ->
+        script(page, "document.documentElement.remove()")
+        val result = runtime.snapshot()
+        assertTrue(result.getValue("interactive_elements").jsonArray.isEmpty())
+        assertEquals("_No readable text in the current viewport._", result.getValue("markdown").jsonPrimitive.content)
+        assertTrue(result.getValue("viewport").jsonObject.getValue("document_height").jsonPrimitive.content.toInt() > 0)
+    }
+
+    @Test
     fun handoffKeepsDelayedScriptsAndFramesFunctional() = fixture { runtime, page ->
         for (frame in listOf(false, true)) coroutineScope {
             val requested = CompletableDeferred<Unit>()
@@ -478,6 +487,9 @@ class AgentBrowserSemanticSnapshotTest {
                     page.loadUrl("https://93.184.215.14/handoff")
                 }
                 withTimeout(10_000) { requested.await() }
+                withTimeout(5_000) {
+                    while (script(page, "document.getElementById('handoff-probe')?.textContent") != "\"Handoff action waiting\"") delay(50)
+                }
                 val oldRef = ref(runtime.snapshot(), "Handoff action waiting")
                 val handoff = async { runtime.requestAssistance("Use the synthetic page", true, emptyList()) }
                 val request = withTimeout(5_000) { runtime.assistance.request.filterNotNull().first() }

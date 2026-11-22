@@ -1670,7 +1670,7 @@ class AgentBrowserRuntime(
                 text: visibleText(el).slice(0, 180)
               }));
               const documentHeight = Math.max(
-                document.documentElement.scrollHeight,
+                document.documentElement?.scrollHeight || 0,
                 document.body?.scrollHeight || 0,
                 viewportHeight
               );
