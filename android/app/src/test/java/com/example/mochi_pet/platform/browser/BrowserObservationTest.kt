@@ -3,6 +3,8 @@ package com.example.mochi_pet.platform.browser
 import android.app.Application
 import android.graphics.Rect
 import android.os.Looper
+import android.os.Handler
+import android.os.Message
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import androidx.test.core.app.ApplicationProvider
@@ -165,6 +167,27 @@ class BrowserObservationTest {
         }
     }
 
+    @Test fun `form resubmission is rejected and its error survives a readable snapshot`() = runBlocking {
+        withBrowser { runtime, page ->
+            val read = async(Dispatchers.Main.immediate) { BrowserReadTool(runtime).execute(empty, context) }
+            val decisions = mutableListOf<Int>()
+            val handler = Handler(Looper.getMainLooper()) { decisions += it.what; true }
+            shadowOf(page).webViewClient.onFormResubmission(
+                page, Message.obtain(handler, 1), Message.obtain(handler, 2),
+            )
+            idle(0)
+            assertEquals(listOf(1), decisions)
+            assertEquals("error", read.await().status)
+            assertTrue(runtime.state.value.error.orEmpty().contains("Form resubmission"))
+            BrowserReadTool(runtime).execute(buildJsonObject { put("wait_seconds", 0) }, context)
+            shadowOf(page).lastEvaluatedJavascriptCallback.onReceiveValue(snapshot("Current page"))
+            val observed = BrowserReadTool(runtime).execute(buildJsonObject { put("wait_seconds", 0) }, context)
+            assertTrue(observed.data!!.jsonObject["page_error"]!!.jsonPrimitive.content.contains("Form resubmission"))
+            shadowOf(page).webViewClient.onPageStarted(page, "https://example.com/safe", null)
+            assertNull(runtime.state.value.error)
+        }
+    }
+
     @Test fun `explicit navigation abandons the old observation without accepting its late snapshot`() = runBlocking {
         withBrowser { runtime, page ->
             BrowserReadTool(runtime).execute(buildJsonObject { put("wait_seconds", 0) }, context)
@@ -193,6 +216,9 @@ class BrowserObservationTest {
             old.onReceiveValue(snapshot("Do not observe user-controlled content"))
             assertEquals(state, runtime.state.value)
             assertEquals("CONFLICT", BrowserReadTool(runtime).execute(empty, context).code)
+            assertEquals("CONFLICT", BrowserClickTool(runtime).execute(buildJsonObject { put("ref", "e1") }, context).code)
+            assertEquals("CONFLICT", BrowserNavigateTool(runtime).execute(buildJsonObject { put("operation", "reload") }, context).code)
+            assertEquals(0, shadowOf(page).reloadInvocations)
             runtime.assistance.respond(request.id, UserAssistanceAnswer("completed"))
             handoff.await()
             val result = BrowserReadTool(runtime).execute(buildJsonObject { put("wait_seconds", 0) }, context)

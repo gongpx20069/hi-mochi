@@ -260,7 +260,7 @@ class AgentOrchestrator(
         suspend () -> List<AgentSkillMetadata> = { emptyList() },
     private val toolRegistryProvider:
         (suspend (AgentRunRequest) -> ToolRegistry)? = null,
-    private val maxToolRounds: Int = 20,
+    private val maxToolRounds: Int = MAX_TOOL_ROUNDS,
     private val pipelineObserver: AgentPipelineObserver =
         AgentPipelineObserver { _, _ -> },
     private val diagnosticActor: String = "main",
@@ -693,7 +693,7 @@ class AgentOrchestrator(
         const val MAX_QUERY_CHARS = 20_000
         const val MAX_REPLY_CHARS = 20_000
         const val MAX_HISTORY_MESSAGES = 100
-        const val MAX_TOOL_ROUNDS = 30
+        const val MAX_TOOL_ROUNDS = 100
         const val MAX_TOOL_RESULT_CHARS = 1_000_000
         const val FINAL_REPLY_REPAIR_PROMPT =
             "Your previous final response did not satisfy the Mochi response " +

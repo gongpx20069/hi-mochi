@@ -818,6 +818,21 @@ class MochiDatabaseTest {
     }
 
     @Test
+    fun `product cart policy refreshes without changing saved enablement`() = runBlocking {
+        val dao = database.skillDao()
+        val repository = RoomSkillRepository(dao)
+        repository.setEnabled("builtin:product-search", true)
+        val stored = checkNotNull(dao.getById("builtin:product-search"))
+        dao.upsert(stored.copy(content = "Search/read only; never add to cart"))
+        val current = checkNotNull(RoomSkillRepository(dao).loadEnabledSkill("product-search"))
+        assertTrue(current.content.contains("user's explicit request"))
+        assertTrue(current.content.contains("do not retry an unconfirmed add operation"))
+        assertTrue(current.content.contains("order, choose addresses or pay"))
+        repository.setEnabled("builtin:product-search", false)
+        assertEquals(null, RoomSkillRepository(dao).loadEnabledSkill("product-search"))
+    }
+
+    @Test
     fun `browser loads in read-only roles and declares optional tools only when available`() = runBlocking<Unit> {
         val repository = RoomSkillRepository(database.skillDao())
         val reads = setOf("browser_read", "browser_navigate", "browser_scroll")

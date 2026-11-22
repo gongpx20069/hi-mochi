@@ -748,15 +748,43 @@ class AgentOrchestratorTest {
     }
 
     @Test
-    fun `supports thirty round child budget`() = runBlocking {
-        val orchestrator = orchestrator(
-            client = QueueChatClient(
-                finalResponse("""{"reply":"Done","emotion":"neutral"}"""),
-            ),
-            maxToolRounds = 30,
+    fun `default budget executes one hundred tool rounds and accepts final response`() = runBlocking {
+        val client = QueueChatClient(*(
+            (1..100).map { toolResponse("call_$it", "echo", "{}") } +
+                finalResponse("""{"reply":"Done","emotion":"neutral"}""")
+        ).toTypedArray())
+        val registry = ToolRegistry(listOf(EchoTool()))
+        val agent = AgentOrchestrator(
+            chatClient = client,
+            toolRegistry = registry,
+            navigationPolicy = NavigationPolicy(),
+            uiDirectiveSink = {},
+            baseToolNames = registry.names,
         )
 
-        assertEquals("Done", orchestrator.run(request()).reply)
+        assertEquals("Done", agent.run(request()).reply)
+        assertEquals(101, client.requests.size)
+        assertEquals(100, client.requests.last().messages.count { it.role == "tool" })
+    }
+
+    @Test
+    fun `rejects round one hundred one before dispatching its tools`() {
+        val events = mutableListOf<AgentDiagnosticEvent>()
+        val client = QueueChatClient(*(1..101).map {
+            toolResponse("call_$it", "echo", "{}")
+        }.toTypedArray())
+        val agent = orchestrator(
+            client = client,
+            registry = ToolRegistry(listOf(EchoTool())),
+            maxToolRounds = 100,
+            diagnosticLogger = AgentDiagnosticLogger { events += it },
+        )
+
+        assertThrows(AgentToolRoundLimitException::class.java) {
+            runBlocking { agent.run(request()) }
+        }
+        assertEquals(101, client.requests.size)
+        assertEquals(100, events.count { it.type == AgentDiagnosticEventType.TOOL_STARTED })
     }
 
     @Test

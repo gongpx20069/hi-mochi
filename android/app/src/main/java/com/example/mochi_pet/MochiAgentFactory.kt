@@ -240,7 +240,6 @@ private suspend fun MochiApplication.executeSubagent(
             uiDirectiveSink = UiDirectiveSink { },
             skillCatalogProvider = { availableSkills },
             skillProvider = skillRepository::loadEnabledSkill,
-            maxToolRounds = 30,
             pipelineObserver = AgentPipelineObserver { stage, detail ->
                 parentObserver.onStage(
                     AgentPipelineStage.SUBAGENT,

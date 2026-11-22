@@ -75,6 +75,15 @@ import kotlin.coroutines.resume
 internal fun safeBrowserUrl(url: String): String =
     url.toHttpUrlOrNull()?.newBuilder()?.username("")?.password("")?.query(null)?.fragment(null)?.build()?.toString().orEmpty()
 
+internal fun safeBrowserTitle(title: String): String {
+    val text = title.trim()
+    val url = text.toHttpUrlOrNull()
+        ?: if (Regex("^[^\\s/?#]+\\.[^\\s/?#]+[/?#]").containsMatchIn(text)) {
+            "https://$text".toHttpUrlOrNull()
+        } else null
+    return url?.toString()?.let(::safeBrowserUrl) ?: title
+}
+
 internal fun desktopUserAgent(mobile: String): String =
     mobile.replaceFirst(Regex("\\([^)]*\\)"), "(X11; Linux x86_64)")
         .replace(" Version/4.0", "").replace(" Mobile", "")
@@ -470,18 +479,19 @@ class AgentBrowserRuntime(
                         current.loadUrl(validated)
                     }
                 }
-                "back" -> withContext(Dispatchers.Main.immediate) {
+                "back", "forward" -> {
                     require(requestedMode == BrowserMode.AUTO) { "Choose a mode with goto or reload, not browser history." }
-                    require(!modeLocked) { "History after page interaction requires user control; do not replay a submission." }
-                    if (current.canGoBack()) {
-                        current.goBack()
-                    }
-                }
-                "forward" -> withContext(Dispatchers.Main.immediate) {
-                    require(requestedMode == BrowserMode.AUTO) { "Choose a mode with goto or reload, not browser history." }
-                    require(!modeLocked) { "History after page interaction requires user control; do not replay a submission." }
-                    if (current.canGoForward()) {
-                        current.goForward()
+                    val offset = if (operation == "back") -1 else 1
+                    val target = withContext(Dispatchers.Main.immediate) { historyTarget(current, offset) }
+                    if (target != null) {
+                        val validated = withContext(Dispatchers.IO) { PublicWebUrlPolicy.validate(target).toString() }
+                        withContext(Dispatchers.Main.immediate) {
+                            if (historyTarget(current, offset) != target) {
+                                throw AgentBrowserException("Browser history changed. Read the page before navigating again.")
+                            }
+                            allowedRedirectUrl = validated
+                            current.goBackOrForward(offset)
+                        }
                     }
                 }
                 "reload" -> withContext(Dispatchers.Main.immediate) {
@@ -495,12 +505,20 @@ class AgentBrowserRuntime(
                 }
             }
             delay(NAVIGATION_SETTLE_MILLIS)
+            if (mutableState.value.error == FORM_RESUBMISSION_BLOCKED) {
+                throw AgentBrowserException(FORM_RESUBMISSION_BLOCKED)
+            }
             withContext(Dispatchers.Main.immediate) { current.url?.toHttpUrlOrNull()?.host }
                 ?.let { settings?.visited(it, activeMode) }
             return snapshot(current)
         } finally {
             updateAction(null)
         }
+    }
+
+    private fun historyTarget(view: WebView, offset: Int): String? = view.copyBackForwardList().let { history ->
+        val index = history.currentIndex + offset
+        if (index in 0 until history.size) history.getItemAtIndex(index)?.url else null
     }
 
     private suspend fun clickPage(ref: String): JsonObject {
@@ -516,36 +534,25 @@ class AgentBrowserRuntime(
                 (() => {
                   const el = ${refQuery(ref)};
                   if (!el) return JSON.stringify({ok:false});
-                  el.scrollIntoView({block:'center', inline:'nearest'});
-                  const rect = el.getBoundingClientRect();
-                  let hit = document.elementFromPoint(
-                    Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2)),
-                    Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2))
-                  );
-                  while (hit?.shadowRoot) {
-                    const child = hit.shadowRoot.elementFromPoint(
-                      rect.left + rect.width / 2, rect.top + rect.height / 2);
-                    if (!child || child === hit) break;
-                    hit = child;
-                  }
-                  let covered = hit;
-                  while (covered && covered !== el) {
-                    covered = covered.assignedSlot || covered.parentElement || covered.getRootNode()?.host;
-                  }
-                  let unavailable = el.matches(':disabled');
-                  for (let node = el; node; node = node.assignedSlot || node.parentElement || node.getRootNode()?.host) {
-                    const style = getComputedStyle(node);
-                    unavailable ||= node.hidden || node.inert || node.getAttribute('aria-disabled') === 'true' ||
-                      style.display === 'none' || style.visibility !== 'visible' || style.opacity === '0';
-                  }
-                  if (!rect.width || !rect.height || !covered || unavailable) {
+                  $ACTIONABLE_ELEMENT_SCRIPT
+                  if (!isActionable(el)) {
                     return JSON.stringify({ok:false, error:'not_actionable'});
                   }
-                  if (el instanceof HTMLAnchorElement && el.target === '_blank') {
-                    window.location.assign(el.href);
-                  } else {
-                    el.click();
+                  $SINGLE_WINDOW_TARGET_SCRIPT
+                  let link = null, submitter = null;
+                  for (let node = el; node; node = node.assignedSlot || node.parentElement || node.getRootNode()?.host) {
+                    if ((node instanceof HTMLButtonElement || node instanceof HTMLInputElement) &&
+                        node.form && ['submit', 'image'].includes(node.type)) {
+                      submitter = node;
+                      break;
+                    }
+                    if (node instanceof HTMLAnchorElement && node.hasAttribute('href')) {
+                      link = node;
+                      break;
+                    }
                   }
+                  inCurrentWindow(submitter || link, submitter ? 'formtarget' : 'target',
+                    submitter?.form?.getAttribute('target'), () => el.click());
                   return JSON.stringify({ok:true});
                 })()
                 """.trimIndent(),
@@ -595,6 +602,8 @@ class AgentBrowserRuntime(
                           !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)) {
                         return JSON.stringify({ok:false, error:'not_editable'});
                       }
+                      $ACTIONABLE_ELEMENT_SCRIPT
+                      if (!isActionable(el)) return JSON.stringify({ok:false, error:'not_actionable'});
                       el.focus();
                       const previous = el.isContentEditable ? el.textContent : el.value;
                       const value = (${clear.toString()} ? '' : previous) + ${inputText.jsString()};
@@ -626,6 +635,8 @@ class AgentBrowserRuntime(
                       if (!(el instanceof HTMLSelectElement) || el.matches(':disabled')) {
                         return JSON.stringify({ok:false, error:'not_editable'});
                       }
+                      $ACTIONABLE_ELEMENT_SCRIPT
+                      if (!isActionable(el)) return JSON.stringify({ok:false, error:'not_actionable'});
                       const option = Array.from(el.options).find(o => !o.disabled && !o.closest('optgroup[disabled]') &&
                         (o.value === ${selectedValue.jsString()} ||
                           o.label.replace(/\s+/g, ' ').trim() === ${selectedValue.jsString()}));
@@ -649,16 +660,21 @@ class AgentBrowserRuntime(
                     (() => {
                       const el = $selector;
                       if (!el) return JSON.stringify({ok:false});
+                      $ACTIONABLE_ELEMENT_SCRIPT
+                      if (${ref != null} && !isActionable(el)) return JSON.stringify({ok:false, error:'not_actionable'});
                       el.focus();
-                      const event = new KeyboardEvent(
-                        'keydown',
-                        {key:${pressedKey.jsString()}, bubbles:true}
-                      );
-                      el.dispatchEvent(event);
-                      if (${pressedKey.jsString()} === 'Enter' && el.form) {
-                        if (el.form.requestSubmit) el.form.requestSubmit();
-                        else el.form.submit();
-                      }
+                      $SINGLE_WINDOW_TARGET_SCRIPT
+                      inCurrentWindow(el.form, 'target', null, () => {
+                        const event = new KeyboardEvent(
+                          'keydown',
+                          {key:${pressedKey.jsString()}, bubbles:true, composed:true, cancelable:true}
+                        );
+                        const allowed = el.dispatchEvent(event);
+                        if (${pressedKey.jsString()} === 'Enter' && allowed && el.form) {
+                          if (el.form.requestSubmit) el.form.requestSubmit();
+                          else el.form.submit();
+                        }
+                      });
                       return JSON.stringify({ok:true});
                     })()
                     """.trimIndent()
@@ -671,6 +687,7 @@ class AgentBrowserRuntime(
             val result = evaluate(current, script)
             if (!result.booleanValue("ok")) {
                 when (result["error"]?.jsonPrimitive?.contentOrNull) {
+                    "not_actionable" -> throw AgentBrowserException("The page control is hidden, disabled, or covered. Read the page again before acting.")
                     "not_editable" -> throw AgentBrowserException("This control does not support that input operation or is disabled/read-only.")
                     "option_unavailable" -> throw AgentBrowserException("The requested option is unavailable or disabled. Read the page again.")
                 }
@@ -718,7 +735,7 @@ class AgentBrowserRuntime(
                     (() => {
                       const target = $target;
                       if (!target) return JSON.stringify({ok:false});
-                      target.scrollTo({top:99999999});
+                      target.scrollTo({top:target === window ? document.scrollingElement.scrollHeight : target.scrollHeight});
                       return JSON.stringify({ok:true});
                     })()
                 """.trimIndent()
@@ -731,9 +748,8 @@ class AgentBrowserRuntime(
                     (() => {
                       const target = $target;
                       if (!target) return JSON.stringify({ok:false});
-                      const distance = window.innerHeight * $multiplier * $sign;
-                      if (target === window) window.scrollBy({top:distance});
-                      else target.scrollBy({top:distance});
+                      const distance = (target === window ? window.innerHeight : target.clientHeight) * $multiplier * $sign;
+                      target.scrollBy({top:distance});
                       return JSON.stringify({ok:true});
                     })()
                     """.trimIndent()
@@ -831,6 +847,7 @@ class AgentBrowserRuntime(
                 }
             }
             put("url", page["url"]?.jsonPrimitive?.contentOrNull?.let(::safeBrowserUrl).orEmpty())
+            put("title", safeBrowserTitle(page["title"]?.jsonPrimitive?.contentOrNull.orEmpty()))
             put("mode", activeMode.name.lowercase())
             put("markdown", markdown.content)
             put(
@@ -843,6 +860,7 @@ class AgentBrowserRuntime(
                             ?.jsonPrimitive
                             ?.contentOrNull == "true",
                     )
+                    put("embedded_frames", page.booleanValue("frames_truncated"))
                 },
             )
             put(
@@ -856,10 +874,9 @@ class AgentBrowserRuntime(
             mutableState.value = mutableState.value.copy(
                 active = true,
                 url = safeBrowserUrl(current.url.orEmpty()),
-                title = current.title.orEmpty(),
+                title = safeBrowserTitle(current.title.orEmpty()),
                 canGoBack = current.canGoBack(),
                 loading = page.booleanValue("loading"),
-                error = null,
             )
             lastSnapshot = redacted
         }
@@ -962,7 +979,6 @@ class AgentBrowserRuntime(
                     throw AgentBrowserException("Observe the pending page action before handing over the browser.")
                 }
                 val current = webView ?: throw AgentBrowserException("Open a page before requesting browser assistance.")
-                current.stopLoading()
                 modeLocked = true
                 current.url?.toHttpUrlOrNull()?.let { "${it.scheme}://${it.host}" }
                     ?: throw AgentBrowserException("No website is open.")
@@ -1119,7 +1135,7 @@ class AgentBrowserRuntime(
             mutableState.value = mutableState.value.copy(
                 active = true,
                 url = safeBrowserUrl(url),
-                title = view.title.orEmpty(),
+                title = safeBrowserTitle(view.title.orEmpty()),
                 loading = false,
                 canGoBack = view.canGoBack(),
                 canGoForward = view.canGoForward(),
@@ -1130,6 +1146,13 @@ class AgentBrowserRuntime(
             if (webView === view) mutableState.value = mutableState.value.copy(
                 canGoBack = view.canGoBack(), canGoForward = view.canGoForward(),
             )
+        }
+
+        override fun onFormResubmission(view: WebView, dontResend: Message, resend: Message) {
+            dontResend.sendToTarget()
+            if (webView !== view) return
+            mutableState.value = mutableState.value.copy(loading = false, error = FORM_RESUBMISSION_BLOCKED)
+            failPendingScripts(view, FORM_RESUBMISSION_BLOCKED)
         }
 
         override fun shouldOverrideUrlLoading(
@@ -1285,6 +1308,42 @@ class AgentBrowserRuntime(
         const val BROWSER_LOG_TAG = "MochiBrowser"
         const val SNAPSHOT_FORMAT = "mochi-semantic-v3"
         const val MAX_INTERACTIVE_ELEMENTS = 100
+        const val FORM_RESUBMISSION_BLOCKED = "Form resubmission was blocked. Do not repeat the submission; open a safe page instead."
+        val ACTIONABLE_ELEMENT_SCRIPT = """
+            const isActionable = el => {
+              for (let node = el; node; node = node.assignedSlot || node.parentElement || node.getRootNode()?.host) {
+                const style = getComputedStyle(node);
+                if (node.matches(':disabled') || node.hidden || node.inert || node.getAttribute('aria-disabled') === 'true' ||
+                    style.display === 'none' || style.visibility !== 'visible' || style.opacity === '0') return false;
+              }
+              el.scrollIntoView({block:'center', inline:'nearest'});
+              const rect = el.getBoundingClientRect();
+              const x = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
+              const y = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
+              let hit = document.elementFromPoint(x, y);
+              while (hit?.shadowRoot) {
+                const child = hit.shadowRoot.elementFromPoint(x, y);
+                if (!child || child === hit) break;
+                hit = child;
+              }
+              while (hit && hit !== el) hit = hit.assignedSlot || hit.parentElement || hit.getRootNode()?.host;
+              return !!(rect.width && rect.height && hit);
+            };
+        """.trimIndent()
+        val SINGLE_WINDOW_TARGET_SCRIPT = """
+            const inCurrentWindow = (target, attribute, fallback, action) => {
+              const original = target?.getAttribute(attribute);
+              const effective = original || fallback || document.querySelector('base[target]')?.getAttribute('target') || '_self';
+              if (!target || ['_self', '_top', '_parent'].includes(effective.toLowerCase())) return action();
+              try {
+                target.setAttribute(attribute, '_self');
+                return action();
+              } finally {
+                if (original === null) target.removeAttribute(attribute);
+                else target.setAttribute(attribute, original);
+              }
+            };
+        """.trimIndent()
 
         fun newRefAttributeName(): String =
             "data-mochi-${UUID.randomUUID().toString().replace("-", "")}"
@@ -1459,6 +1518,29 @@ class AgentBrowserRuntime(
                 }
                 return {options, options_truncated: truncated};
               };
+              const selectionPatterns = ['selected', 'checked', 'pressed'].map(state => ({
+                state, pattern:new RegExp('^(?:(?:is|state)[-_])?' + state + '(?:$|--|__)|(?:--|__)' + state + '$')
+              }));
+              const selectionHints = (el, states) => {
+                const hints = [];
+                const classes = Array.from(el.classList).slice(0, 32)
+                  .map(token => token.replace(/([a-z0-9])([A-Z])/g, '${'$'}1-${'$'}2').toLowerCase());
+                for (const {state, pattern} of selectionPatterns) {
+                  if (states.some(value => value === state || value.startsWith(state + '='))) continue;
+                  const data = el.getAttribute('data-' + state);
+                  if (data === 'true' || data === 'false') {
+                    hints.push({state: data === 'true' ? state : state + '=false', source: 'data-' + state});
+                    continue;
+                  }
+                  const dataState = el.getAttribute('data-state');
+                  if (dataState === state || dataState === 'un' + state) {
+                    hints.push({state: dataState === state ? state : state + '=false', source: 'data-state'});
+                    continue;
+                  }
+                  if (classes.some(token => pattern.test(token))) hints.push({state, source:'class'});
+                }
+                return hints;
+              };
               const interactiveElements = interactiveCandidates
                 .slice(0, $MAX_INTERACTIVE_ELEMENTS)
                 .map(el => {
@@ -1473,17 +1555,22 @@ class AgentBrowserRuntime(
                   if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') {
                     states.push('disabled');
                   }
-                  if (el.checked || el.getAttribute('aria-checked') === 'true') {
-                    states.push('checked');
-                  }
-                  if (el.selected || el.getAttribute('aria-selected') === 'true') {
-                    states.push('selected');
+                  for (const [state, native] of [
+                    ['checked', el instanceof HTMLInputElement && ['checkbox','radio'].includes(el.type)
+                      ? (el.type === 'checkbox' && el.indeterminate ? 'mixed' : String(el.checked)) : null],
+                    ['selected', el instanceof HTMLOptionElement ? String(el.selected) : null],
+                    ['pressed', null]
+                  ]) {
+                    const aria = el.getAttribute('aria-' + state);
+                    const value = native ?? ((state === 'selected' ? ['true','false'] : ['true','false','mixed']).includes(aria) ? aria : null);
+                    if (value !== null) states.push(value === 'true' ? state : state + '=' + value);
                   }
                   if (el.required || el.getAttribute('aria-required') === 'true') {
                     states.push('required');
                   }
                   const expanded = el.getAttribute('aria-expanded');
                   if (expanded !== null) states.push(`expanded=${'$'}{expanded}`);
+                  const hints = selectionHints(el, states);
                   return {
                     ref,
                     tag: el.tagName.toLowerCase(),
@@ -1493,6 +1580,7 @@ class AgentBrowserRuntime(
                     ...(el instanceof HTMLSelectElement ? selectOptions(el) : {}),
                     href: el.href ? safeLink(el.href).slice(0, 1000) : '',
                     states,
+                    ...(hints.length ? {state_hints: hints} : {}),
                     visibility:
                       rect.bottom >= 0 && rect.top <= viewportHeight
                         ? 'viewport'
@@ -1582,10 +1670,19 @@ class AgentBrowserRuntime(
                 text: visibleText(el).slice(0, 180)
               }));
               const documentHeight = Math.max(
-                document.documentElement.scrollHeight,
+                document.documentElement?.scrollHeight || 0,
                 document.body?.scrollHeight || 0,
                 viewportHeight
               );
+              const frames = visibleElements.filter(el => el.matches('iframe'));
+              const embeddedFrames = frames.slice(0, 8).map(el => {
+                const rect = el.getBoundingClientRect();
+                return {
+                  url:el.hasAttribute('srcdoc') ? '' : safeLink(el.src).slice(0, 1000),
+                  visibility:rect.bottom >= 0 && rect.top <= viewportHeight ? 'viewport' : 'nearby',
+                  bounds:[Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height)]
+                };
+              });
               return JSON.stringify({
                 ok: true,
                 url: location.href,
@@ -1611,6 +1708,8 @@ class AgentBrowserRuntime(
                 blocks,
                 blocks_truncated: blockCandidates.length > 220 || textTruncated || scanTruncated,
                 interactive_elements: interactiveElements,
+                embedded_frames: embeddedFrames,
+                frames_truncated: frames.length > embeddedFrames.length || scanTruncated,
                 elements_truncated:
                   interactiveCandidates.length > interactiveElements.length || scanTruncated,
                 limitations: {

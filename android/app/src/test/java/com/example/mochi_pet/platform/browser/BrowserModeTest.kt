@@ -16,4 +16,10 @@ class BrowserModeTest {
         assertEquals("https://example.com/path", safeBrowserUrl("https://user:synthetic@example.com/path?code=fixture#token=fixture"))
         assertEquals("", safeBrowserUrl("javascript:alert(1)"))
     }
+
+    @Test fun `URL fallback titles cannot expose navigation credentials`() {
+        assertEquals("https://example.com/login", safeBrowserTitle("https://user:synthetic@example.com/login?code=fixture#token=fixture"))
+        assertEquals("https://example.com/login", safeBrowserTitle("example.com/login?code=fixture#token=fixture"))
+        assertEquals("Product details", safeBrowserTitle("Product details"))
+    }
 }
