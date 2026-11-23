@@ -2,6 +2,10 @@ package com.example.mochi_pet.feature.home
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
@@ -10,9 +14,16 @@ import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.mochi_pet.MainActivity
 import com.example.mochi_pet.MochiApplication
@@ -31,6 +42,31 @@ class ProviderProfilesSmokeTest {
 
     @After fun clearTestScreenFlag() {
         compose.runOnUiThread { compose.activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    @Test fun compactComposerAndCapabilityPagesRemainReachableWithoutSending() {
+        compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        val app = compose.activity.application as MochiApplication
+        val before = runBlocking(Dispatchers.IO) { app.providerSettingsRepository.loadProfiles() }
+        compose.onNode(hasText(localizeUiText("Talk")) and hasClickAction()).performClick()
+        val composer = compose.onNodeWithTag("conversation-composer")
+        val height = composer.getUnclippedBoundsInRoot().height
+        val input = compose.onNodeWithTag("conversation-input")
+        input.performTextInput("Synthetic local draft. ".repeat(20))
+        assertEquals(height, composer.getUnclippedBoundsInRoot().height)
+        val send = compose.onNodeWithContentDescription(localizeUiText("Send"))
+        send.assertIsDisplayed()
+        assertTrue(send.getUnclippedBoundsInRoot().width >= 48.dp)
+        compose.onNodeWithContentDescription(localizeUiText("Speak")).assertIsDisplayed()
+        input.performTextClearance()
+        send.assertIsNotEnabled()
+        Espresso.closeSoftKeyboard()
+        compose.onNode(hasText(localizeUiText("Skills")) and hasClickAction()).performClick()
+        compose.onNodeWithText(localizeUiText("Installed")).assertIsSelected()
+        compose.onNodeWithText(localizeUiText("Explore")).assertIsDisplayed()
+        compose.onNode(hasText(localizeUiText("Tools")) and hasClickAction()).performClick()
+        compose.onNodeWithText(localizeUiText("Choose what Mochi may call")).assertIsDisplayed()
+        assertEquals(before, runBlocking(Dispatchers.IO) { app.providerSettingsRepository.loadProfiles() })
     }
 
     @Test fun savedConnectionsRemainReadableAndSettingsStartsWithSharing() {

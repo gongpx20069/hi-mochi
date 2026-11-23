@@ -50,7 +50,7 @@ internal fun ToolSettingsRow(
     }
 }
 
-internal enum class ToolGlyph { APPS, PLAYER, ASSIST, RETURN, CHEVRON, CLOSE, SEARCH, WEBSITES }
+internal enum class ToolGlyph { APPS, PLAYER, ASSIST, RETURN, CHEVRON, CLOSE, SEARCH, WEBSITES, MICROPHONE, SEND, STOP }
 
 @Composable
 internal fun ToolGlyphIcon(glyph: ToolGlyph, modifier: Modifier = Modifier, color: Color = LocalContentColor.current) {
@@ -90,6 +90,17 @@ internal fun ToolGlyphIcon(glyph: ToolGlyph, modifier: Modifier = Modifier, colo
                     drawOval(color, Offset(8f, 3f), Size(8f, 18f), style = stroke)
                     path.moveTo(3f, 12f); path.lineTo(21f, 12f)
                 }
+                ToolGlyph.MICROPHONE -> {
+                    drawRoundRect(color, Offset(9f, 3f), Size(6f, 11f), CornerRadius(3f), style = stroke)
+                    drawArc(color, 0f, 180f, false, Offset(5f, 7f), Size(14f, 12f), style = stroke)
+                    path.moveTo(12f, 19f); path.lineTo(12f, 22f)
+                    path.moveTo(8f, 22f); path.lineTo(16f, 22f)
+                }
+                ToolGlyph.SEND -> {
+                    path.moveTo(12f, 20f); path.lineTo(12f, 4f)
+                    path.moveTo(5f, 11f); path.lineTo(12f, 4f); path.lineTo(19f, 11f)
+                }
+                ToolGlyph.STOP -> drawRoundRect(color, Offset(6f, 6f), Size(12f, 12f), CornerRadius(2f))
             }
             drawPath(path, color, style = stroke)
         }

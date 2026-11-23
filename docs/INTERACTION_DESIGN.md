@@ -75,8 +75,14 @@ The current Conversation surface exposes push-to-talk, partial transcript,
 stop, and Agent cancellation controls. It uses a compact Mochi identity header,
 provider-readiness status, a guided empty state, labeled asymmetric message
 bubbles, a small local send date/time beside each **Mochi / You** label,
-automatic scrolling to the newest message, and a raised rounded composer that
-keeps text and voice actions distinct. Restored history and Scheduled Agent
+automatic scrolling to the newest message, and a compact rounded composer that
+keeps text and voice actions distinct. The header uses a small Mochi wordmark
+and readiness badge, without a separate identity banner. The composer stays
+on one line, horizontally scrolling long drafts, with adjacent microphone and
+send icons. Listening replaces the microphone with Stop; Agent work replaces
+Send with Cancel. Icon actions retain localized accessibility labels and at
+least 48 dp touch targets. Keyboard Send uses the same submission path.
+Restored history and Scheduled Agent
 results retain their persisted timestamps. Errors and partial speech appear as
 separate status cards rather than conversation messages. The validated
 directive is applied before the accepted Agent reply is sent to speech synthesis.
@@ -298,6 +304,16 @@ not treated as required setup failures. Speech checks explicitly require a
 subsequent microphone test or voice preview to establish real operation.
 Checks stop on Back/Close, retain explicitly incomplete results after cancellation,
 and reject late callbacks from superseded checks.
+
+Page headings use compact title typography and secondary helper text rather
+than large banners. Skills keeps Installed/Explore as content-width tabs with
+subtle selection fills, accessible selected state and 48 dp touch targets;
+its update check remains a secondary action alongside the tabs, wrapping below
+when space or font scale requires it. Navigation, ordering
+and enablement behavior are unchanged. The shared top bar, pipeline status,
+conversation empty state and Settings header use restrained spacing and
+typography. Bottom navigation retains all five labels and selected-state
+semantics, with a muted accent fill and at least 48 dp touch targets.
 
 The Tools surface orders **Agent Browser**, **App Control**, **Media Control**,
 then **Amap Maps**, outside **Mochi Built-ins**. App Control has five Tools and

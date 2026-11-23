@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -68,6 +69,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,6 +80,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -101,6 +108,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -119,6 +127,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.layout.ContentScale
@@ -1183,8 +1192,8 @@ private fun MochiTopBar(
             Text(
                 text = "Mochi",
                 color = MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Black,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = if (wakeState.enabled) {
@@ -1233,16 +1242,14 @@ private fun ChatPipelineIndicator(state: ChatPipelineUiState) {
                         localizeUiText(state.stage.supportingText())
                 },
             color = Color(0xFF211C28),
-            shape = RoundedCornerShape(22.dp),
-            tonalElevation = 8.dp,
-            shadowElevation = 2.dp,
+            shape = RoundedCornerShape(16.dp),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PipelinePulse(accent = accent)
@@ -3136,7 +3143,7 @@ private fun TodoSurface(
 }
 
 @Composable
-private fun SkillsSurface(
+internal fun SkillsSurface(
     state: SkillsUiState,
     onSearch: (String) -> Unit,
     onLoadPopular: () -> Unit,
@@ -3172,24 +3179,30 @@ private fun SkillsSurface(
                 "Built-in and installed capabilities"
             },
         )
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            SkillSectionTab(
-                label = "Installed",
-                selected = !explore,
-                onClick = { explore = false },
-                modifier = Modifier.weight(1f),
-            )
-            SkillSectionTab(
-                label = "Explore",
-                selected = explore,
-                onClick = { explore = true },
-                modifier = Modifier.weight(1f),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SkillSectionTab(
+                    label = "Installed",
+                    selected = !explore,
+                    onClick = { explore = false },
+                )
+                SkillSectionTab(
+                    label = "Explore",
+                    selected = explore,
+                    onClick = { explore = true },
+                )
+            }
+            if (!explore) TextButton(
+                onClick = onCheckUpdates,
+                enabled = !state.isLoading,
+            ) {
+                Text("Check for updates")
+            }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         if (explore) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -3209,14 +3222,6 @@ private fun SkillsSurface(
                 ) {
                     Text("Search")
                 }
-            }
-        } else {
-            OutlinedButton(
-                onClick = onCheckUpdates,
-                enabled = !state.isLoading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Check for updates")
             }
         }
         state.feedback?.let {
@@ -4496,36 +4501,29 @@ private fun SkillSectionTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
+    Box(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            Color.Transparent
-        },
-        shape = RoundedCornerShape(16.dp),
-        border = if (selected) {
-            null
-        } else {
-            androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outline,
-            )
-        },
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
+        Surface(
             color = if (selected) {
-                MaterialTheme.colorScheme.onPrimary
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+                Color.Transparent
             },
-            textAlign = TextAlign.Center,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            modifier = Modifier.padding(vertical = 12.dp),
-        )
+            shape = RoundedCornerShape(10.dp),
+        ) {
+            Text(
+                text = label,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
     }
 }
 
@@ -5275,17 +5273,17 @@ private fun SurfaceHeader(
     Text(
         text = title,
         color = MaterialTheme.colorScheme.onSurface,
-        style = MaterialTheme.typography.headlineMedium,
+        style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
     )
     if (subtitle.isNotEmpty()) {
         Text(
             text = subtitle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodySmall,
         )
     }
-    Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(8.dp))
 }
 
 @Composable
@@ -5309,7 +5307,7 @@ private fun EmptyRow(message: String) {
 }
 
 @Composable
-private fun ConversationSurface(
+internal fun ConversationSurface(
     state: ConversationUiState,
     providerReady: Boolean,
     voiceState: VoiceRuntimeState,
@@ -5322,6 +5320,14 @@ private fun ConversationSurface(
     onRemoteTask: (com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask) -> Unit,
 ) {
     var input by remember { mutableStateOf("") }
+    val canSend = providerReady && input.isNotBlank() && !state.isSending
+    val send = {
+        if (providerReady && input.isNotBlank() && !state.isSending) {
+            val message = input
+            input = ""
+            onSend(message)
+        }
+    }
     val listState = rememberLazyListState()
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
@@ -5330,42 +5336,20 @@ private fun ConversationSurface(
     }
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth().testTag("conversation-header"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primary,
-                shape = RoundedCornerShape(18.dp),
-            ) {
-                Box(
-                    modifier = Modifier.size(52.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "M",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                    )
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Talk to Mochi",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black,
-                )
-                Text(
-                    text = "Voice or text",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
+            Text(
+                text = "Mochi",
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
             Surface(
                 color = if (providerReady) {
                     Color(0xFF72D8C0).copy(alpha = 0.16f)
@@ -5486,68 +5470,53 @@ private fun ConversationSurface(
             }
         }
         Surface(
+            modifier = Modifier.fillMaxWidth().testTag("conversation-composer"),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-            shape = RoundedCornerShape(24.dp),
-            tonalElevation = 4.dp,
+            shape = RoundedCornerShape(28.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+            Row(
+                modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedTextField(
+                BasicTextField(
                     value = input,
                     onValueChange = { input = it },
-                    placeholder = { Text("Ask Mochi anything...") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f).testTag("conversation-input"),
                     enabled = !state.isSending && !voiceState.isListening,
-                    minLines = 1,
-                    maxLines = 4,
-                    shape = RoundedCornerShape(18.dp),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { send() }),
+                    decorationBox = { field ->
+                        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                            if (input.isEmpty()) Text(
+                                "Ask Mochi anything...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            field()
+                        }
+                    },
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                val voiceLabel = localizeUiText(if (voiceState.isListening) "Stop listening" else "Speak")
+                IconButton(
+                    onClick = if (voiceState.isListening) onStopVoice else onStartVoice,
+                    enabled = voiceState.isListening || (providerReady && voiceState.recognitionAvailable && !state.isSending),
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = voiceLabel },
                 ) {
-                    if (voiceState.isListening) {
-                        Button(
-                            onClick = onStopVoice,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("Stop listening")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = onStartVoice,
-                            enabled =
-                                providerReady &&
-                                    voiceState.recognitionAvailable &&
-                                    !state.isSending,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("Speak")
-                        }
-                    }
-                    if (state.isSending) {
-                        OutlinedButton(
-                            onClick = onCancel,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("Cancel")
-                        }
-                    } else {
-                        Button(
-                            onClick = {
-                                val message = input
-                                input = ""
-                                onSend(message)
-                            },
-                            enabled = providerReady && input.isNotBlank(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("Send")
-                        }
-                    }
+                    ToolGlyphIcon(if (voiceState.isListening) ToolGlyph.STOP else ToolGlyph.MICROPHONE, Modifier.size(20.dp))
+                }
+                val sendLabel = localizeUiText(if (state.isSending) "Cancel" else "Send")
+                FilledIconButton(
+                    onClick = if (state.isSending) onCancel else send,
+                    enabled = state.isSending || canSend,
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = sendLabel },
+                ) {
+                    ToolGlyphIcon(if (state.isSending) ToolGlyph.STOP else ToolGlyph.SEND, Modifier.size(20.dp))
                 }
             }
         }
@@ -5559,7 +5528,7 @@ private fun ConversationEmptyState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 36.dp),
+            .padding(vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -5568,13 +5537,13 @@ private fun ConversationEmptyState() {
             shape = CircleShape,
         ) {
             Box(
-                modifier = Modifier.size(72.dp),
+                modifier = Modifier.size(48.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "M",
                     color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black,
                 )
             }
@@ -5843,7 +5812,7 @@ internal fun ProviderSettingsSurface(
 
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SurfaceHeader(
             title = "Mochi settings",
@@ -6566,11 +6535,11 @@ private fun NavigationBar(
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-        shape = RoundedCornerShape(24.dp),
-        tonalElevation = 8.dp,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
     ) {
         Row(
-            modifier = Modifier.padding(6.dp),
+            modifier = Modifier.padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             MochiNavigationItem(
@@ -6626,22 +6595,23 @@ private fun MochiNavigationItem(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(
                 if (selected) {
-                    MaterialTheme.colorScheme.primary
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                 } else {
                     Color.Transparent
                 },
             )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 11.dp),
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
             color = if (selected) {
-                MaterialTheme.colorScheme.onPrimary
+                MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
