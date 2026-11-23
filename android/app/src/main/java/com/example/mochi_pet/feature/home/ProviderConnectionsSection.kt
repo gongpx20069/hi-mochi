@@ -174,7 +174,16 @@ internal fun ProviderConnectionDialog(
     var key by remember(profile) { mutableStateOf("") }
     var choosePreset by remember { mutableStateOf(false) }
     var advanced by remember { mutableStateOf(false) }
+    var linkError by remember(preset) { mutableStateOf<String?>(null) }
     val uriHandler = LocalUriHandler.current
+    val openGuide: (String) -> Unit = { url ->
+        linkError = null
+        try {
+            uriHandler.openUri(url)
+        } catch (_: IllegalArgumentException) {
+            linkError = "Could not open the official page. Install or enable a browser and try again."
+        }
+    }
     AlertDialog(
         properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
         onDismissRequest = onDismiss,
@@ -204,7 +213,9 @@ internal fun ProviderConnectionDialog(
                         }
                     }
                 }
-                Text("Official presets use standard usage-billed APIs, not Coding Plans. Check your account region; you can replace any endpoint.")
+                Text("Official presets use provider APIs, not Coding Plans. Free quotas, billing, and regional availability depend on your account; endpoints remain editable.")
+                ProviderSetupGuide(preset, openGuide)
+                linkError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 OutlinedTextField(
                     endpoint, { endpoint = it }, enabled = !state.isSaving,
                     label = { Text(if (preset == ProviderPreset.AZURE) "Azure resource endpoint" else "API endpoint") },
@@ -218,9 +229,10 @@ internal fun ProviderConnectionDialog(
                 if (preset.endpoint.isNotEmpty()) TextButton(
                     onClick = { endpoint = preset.endpoint }, enabled = !state.isSaving,
                 ) { Text("Restore official endpoint") }
-                if (preset.documentation.isNotEmpty()) TextButton(onClick = { uriHandler.openUri(preset.documentation) }) {
+                if (preset.documentation.isNotEmpty()) TextButton(onClick = { openGuide(preset.documentation) }) {
                     Text("Open official API guide")
                 }
+
                 OutlinedTextField(
                     model, { model = it }, enabled = !state.isSaving,
                     label = { Text(if (preset == ProviderPreset.AZURE) "Deployment name" else "Model name") },
@@ -232,7 +244,8 @@ internal fun ProviderConnectionDialog(
                     label = { Text("Azure API version") }, modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
-                    key, { key = it }, enabled = !state.isSaving, label = { Text("API key") },
+                    key, { key = it }, enabled = !state.isSaving,
+                    label = { Text(if (preset == ProviderPreset.MODELSCOPE) "ModelScope Access Token" else "API key") },
                     supportingText = { Text(if (original.hasApiKey) "Leave blank to keep the stored key." else "Encrypted using Android Keystore.") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -290,4 +303,42 @@ internal fun ProviderConnectionDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !state.isSaving) { Text("Cancel") } },
     )
+}
+
+@Composable
+private fun ProviderSetupGuide(preset: ProviderPreset, openGuide: (String) -> Unit) {
+    when (preset) {
+        ProviderPreset.GROQ -> {
+            Text("Groq setup", fontWeight = FontWeight.Bold)
+            Text("1. Register or sign in to Groq Console. Check that the service is available in your region.")
+            TextButton(onClick = { openGuide("https://console.groq.com/") }) { Text("Register / sign in to Groq") }
+            Text("2. Open API Keys, create a key, and paste it into API key below. Do not use your login password.")
+            TextButton(onClick = { openGuide("https://console.groq.com/keys") }) { Text("Create Groq API key") }
+            Text("3. Choose a model available to your account with Tool Use support. Copy its exact Model ID below; enable multimodal input only if it supports images.")
+            TextButton(onClick = { openGuide("https://console.groq.com/docs/models") }) { Text("Browse Groq models") }
+            Text("Free-tier requests and tokens are limited. Check reset times in Groq Console; Mochi does not retry quota errors, switch providers, or upgrade billing automatically.")
+            TextButton(onClick = { openGuide("https://console.groq.com/settings/limits") }) { Text("Check Groq limits") }
+        }
+        ProviderPreset.MODELSCOPE -> {
+            Text("ModelScope setup", fontWeight = FontWeight.Bold)
+            Text("1. Register or sign in to ModelScope, verify your email, and bind a real-name-verified Alibaba Cloud account for API-Inference.")
+            TextButton(onClick = { openGuide("https://modelscope.cn/") }) { Text("Register / sign in to ModelScope") }
+            TextButton(onClick = {
+                openGuide("https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization")
+            }) { Text("Alibaba Cloud binding guide") }
+            Text("2. Open Access Tokens, create a token with a suitable expiry, and paste it below. Use the ModelScope Access Token, not an Alibaba Cloud AccessKey or a DashScope key.")
+            TextButton(onClick = { openGuide("https://modelscope.cn/my/myaccesstoken") }) { Text("Create ModelScope Access Token") }
+            Text("3. Choose a tool-capable model with the API-Inference badge. Select ModelScope as the API provider and copy the model ID from its example, including the organization prefix.")
+            TextButton(onClick = { openGuide("https://modelscope.cn/models") }) { Text("Browse ModelScope models") }
+            Text("Claim daily credits by signing in on ModelScope. Credits expire and models have different costs; Mochi does not claim credits or switch providers automatically.")
+            TextButton(onClick = { openGuide("https://modelscope.cn/magicube/usage?tab=earn") }) { Text("ModelScope daily credits") }
+        }
+        ProviderPreset.AGNES -> {
+            Text("Agnes-AI still documents this API endpoint. Use an API key from its developer dashboard and a tool-capable model from the current guide; older Quickstart model examples may be retired.")
+            TextButton(onClick = { openGuide("https://wiki.agnes-ai.com/en/docs/agnes-30-flash") }) {
+                Text("Current Agnes model guide")
+            }
+        }
+        else -> Unit
+    }
 }

@@ -491,7 +491,6 @@ class AgentOrchestrator(
                     messages += OpenAiChatMessage(
                         role = "tool",
                         toolCallId = toolCall.id,
-                        name = toolCall.function.name,
                         content = encodedResult,
                     )
                     if (

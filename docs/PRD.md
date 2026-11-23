@@ -220,8 +220,12 @@ contract are defined in [Memory design](architecture/MEMORY_DESIGN.md#17-daily-j
   response storage. Protocol failures never trigger silent fallback or tool replay.
 - Named LLM connections are saved independently, including multiple accounts
   for one provider. Official editable endpoint presets cover OpenAI, DeepSeek,
-  Kimi, GLM, MiniMax (China), and Agnes-AI; Azure and custom endpoints remain.
-  Presets are standard usage-billed APIs, not Coding Plan subscriptions.
+  Kimi, GLM, MiniMax (China), Agnes-AI, Groq, and ModelScope; Azure and custom
+  endpoints remain. Presets use provider APIs, not Coding Plan subscriptions;
+  free quotas, billing, and regional availability depend on the account.
+  Groq uses a Console API key; ModelScope uses an Access Token and requires
+  a bound, real-name-verified Alibaba Cloud account. Daily ModelScope credits
+  are claimed on its platform, never automatically by Mochi.
 - The first saved connection becomes active. Adding another preserves the
   current selection; switching is explicit. Switching, changing active runtime
   settings, or deleting the active connection cancels running local Agent

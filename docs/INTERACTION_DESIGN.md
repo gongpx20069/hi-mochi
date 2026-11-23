@@ -441,9 +441,20 @@ These controls do not complete schedules or execute Mochi tasks.
 
 AI connections shows named saved cards with current selection and Use/Edit/Delete.
 Add opens a screenshot-protected editor; OpenAI is prefilled, and presets also
-include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Azure, and custom. Each
+include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Groq, ModelScope, Azure, and custom. Each
 links to its official guide. Endpoint remains editable; model is supplied by
-the user because account access varies. Standard APIs are not Coding Plans.
+the user because account access varies. Provider APIs are not Coding Plans;
+free quotas and billing depend on the account. Groq has three localized setup
+steps and explicit Console signup, key creation, model-list and account-limit
+links. ModelScope labels the secret as Access Token and links registration,
+verified Alibaba Cloud binding, token creation, model selection and daily credits.
+Its guidance distinguishes ModelScope tokens from Alibaba Cloud AccessKeys and
+DashScope keys, and explains token expiry and the organization/model ID format.
+Links open only on explicit taps in the external browser, contain no entered
+credentials, and preserve editor state. An unavailable browser shows a safe error.
+Agnes-AI retains its preset and links the current overview/model guide rather than
+recommending model IDs from an aging Quickstart. Saved models are never rewritten.
+Both require a model with tool calling and default to Chat Completions.
 Azure calls its model field the deployment name and exposes API version only for
 Chat Completions. Advanced settings has an API protocol selector: new OpenAI/Azure
 connections default to Responses, others to Chat Completions. Existing connections

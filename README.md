@@ -84,20 +84,50 @@ Settings remains available from the top-right action.
 | --- | --- | --- |
 | OpenAI | Prefilled `https://api.openai.com/v1`; enter model | [OpenAI API key](https://platform.openai.com/api-keys) |
 | Azure OpenAI | Azure resource endpoint and **deployment name** as the model; API version for Chat Completions only | [Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| Groq | Prefilled `https://api.groq.com/openai/v1`; choose a Tool Use model | [Create API key](https://console.groq.com/keys) |
+| ModelScope | Prefilled `https://api-inference.modelscope.cn/v1`; enter a tool-capable API-Inference model ID | [Create Access Token](https://modelscope.cn/my/myaccesstoken) |
 | DeepSeek | Prefilled `https://api.deepseek.com`; enter model | [Official API guide](https://api-docs.deepseek.com/) |
 | Kimi | Prefilled `https://api.moonshot.cn/v1`; enter model | [Official API guide](https://platform.kimi.com/docs/get-api-key) |
 | GLM | Prefilled `https://open.bigmodel.cn/api/paas/v4`; enter model | [Official API guide](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
 | MiniMax (China) | Prefilled `https://api.minimax.cn/v1`; enter model and verify account region | [Official API guide](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
-| Agnes-AI | Prefilled `https://apihub.agnes-ai.com/v1`; enter model | [Official API guide](https://wiki.agnes-ai.com/en/docs/quickstart) |
+| Agnes-AI | Prefilled `https://apihub.agnes-ai.com/v1`; enter model | [Official API guide](https://wiki.agnes-ai.com/en/docs/overview) |
 | Custom OpenAI-compatible | User-defined HTTPS endpoint and model supporting tool calls through the selected API protocol | API key issued by that provider |
 
 **Settings > AI connections** saves multiple named accounts and models, with
 editable official endpoint presets for OpenAI, DeepSeek, Kimi, GLM, MiniMax
-(China), and Agnes-AI. Supply your own API key and a tool-capable model from
-the linked official guide; these are standard APIs, not Coding Plan endpoints.
+(China), Agnes-AI, Groq, and ModelScope. Supply your own API key/Access Token
+and a tool-capable model from the linked official guide. These are provider
+APIs, not Coding Plan endpoints; free quotas, billing, and regional availability
+depend on your account.
 Adding another connection preserves the current choice. **Use** switches and
 cancels running local Agent tasks; future schedules remain enabled. Existing
 single-provider settings migrate without re-entering the key.
+
+**Groq:** [Register or sign in](https://console.groq.com/), open **API Keys**,
+create a key, and paste it into Mochi. Choose an available model with **Tool Use**
+from the [model list](https://console.groq.com/docs/models) and copy its exact ID.
+Check [account limits](https://console.groq.com/settings/limits) for free-tier
+quota/reset information; Mochi does not retry quota errors or upgrade billing.
+
+**ModelScope:** [Register or sign in](https://modelscope.cn/), verify your email,
+and [bind a real-name-verified Alibaba Cloud account](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization).
+Create an [Access Token](https://modelscope.cn/my/myaccesstoken) with a suitable
+expiry. This is a ModelScope token, **not** an Alibaba Cloud AccessKey or
+DashScope key. In the [model catalog](https://modelscope.cn/models), choose a
+tool-capable API-Inference model, select **ModelScope** as the API provider,
+and copy its model ID including the organization prefix. Claim daily credits
+on [ModelScope](https://modelscope.cn/magicube/usage?tab=earn); expiry and
+consumption depend on current platform rules. Mochi does not claim credits.
+Both presets include these setup links in the editor. Keep Chat Completions
+selected unless the chosen model supports another protocol, and enable image
+input only for image-capable models.
+
+**Agnes-AI:** its [current model guide](https://wiki.agnes-ai.com/en/docs/agnes-30-flash)
+still documents the existing endpoint and tool calling. The older
+[Agnes 2.5 Flash](https://wiki.agnes-ai.com/en/docs/agnes-25-flash) is scheduled
+to retire on November 30, 2026. Choose an available current model; Mochi never
+rewrites saved model selections. Documentation availability does not verify
+your account's API access.
 
 Each connection's **Advanced connection settings > API protocol** selects Responses
 or Chat Completions. New OpenAI/Azure connections default to Responses; other
@@ -111,6 +141,8 @@ LLM and speech connections. Import adds them instead of overwriting saved accoun
 and selects each shared active connection. Shared v5 links include API protocol
 and require a v5-compatible receiver; import accepts v2/v3/v4/v5 links. Anyone holding a full link can use the
 included API credentials.
+Receivers must also support any new preset names in the shared connections;
+update both devices before sharing Groq or ModelScope profiles.
 
 ### Supported Speech Providers
 

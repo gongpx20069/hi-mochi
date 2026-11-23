@@ -267,6 +267,9 @@ class AgentOrchestratorTest {
         val toolMessage = client.requests[1].messages.last()
         assertEquals("tool", toolMessage.role)
         assertEquals("call_1", toolMessage.toolCallId)
+        assertEquals(null, toolMessage.name)
+        assertEquals("echo", client.requests[1].messages
+            .first { !it.toolCalls.isNullOrEmpty() }.toolCalls!!.single().function.name)
         assertTrue(toolMessage.content.orEmpty().contains("calendar"))
     }
 

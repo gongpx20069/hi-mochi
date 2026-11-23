@@ -28,6 +28,8 @@ class OkHttpOpenAiChatClientTest {
     @Test fun `official presets generate exact chat completion URLs without network access`() = runBlocking {
         val expected = mapOf(
             ProviderPreset.OPENAI to "https://api.openai.com/v1/chat/completions",
+            ProviderPreset.GROQ to "https://api.groq.com/openai/v1/chat/completions",
+            ProviderPreset.MODELSCOPE to "https://api-inference.modelscope.cn/v1/chat/completions",
             ProviderPreset.DEEPSEEK to "https://api.deepseek.com/chat/completions",
             ProviderPreset.KIMI to "https://api.moonshot.cn/v1/chat/completions",
             ProviderPreset.GLM to "https://open.bigmodel.cn/api/paas/v4/chat/completions",
