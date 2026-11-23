@@ -371,6 +371,25 @@ continuations, not persisted as conversation text or shown as a reply.
   its request body omits `model`.
 - Custom providers use the OpenAI-compatible bearer flow.
 
+Groq and ModelScope are branded presets over the existing Custom bearer flow,
+not new transports. Their editable bases are `https://api.groq.com/openai/v1`
+and `https://api-inference.modelscope.cn/v1`. Both default to Chat Completions;
+users supply an available tool-capable model and their own API key/Access Token.
+They use the same encrypted profile storage and sharing as other presets; older
+receivers must update to recognize the new preset names. Agent tool results use
+`tool_call_id` without the optional message `name`, which Groq does not support.
+The originating assistant tool call retains the function name. Free allowances
+are not hardcoded: quota exhaustion remains a visible Provider failure, with no
+automatic retry, provider switch, credit claim, or billing upgrade.
+
+Agnes-AI remains supported: its official
+[overview](https://wiki.agnes-ai.com/en/docs/overview) and
+[Agnes 3.0 Flash guide](https://wiki.agnes-ai.com/en/docs/agnes-30-flash)
+still specify `https://apihub.agnes-ai.com/v1`, Bearer authentication and tool
+calling. The preset links the overview instead of the Quickstart's older model
+example; stored models and credentials remain unchanged. This is a documentation
+compatibility check, not an authenticated production-inference certification.
+
 Authentication/provider type and `ApiProtocol` are separate. The saved protocol
 defaults to `CHAT_COMPLETIONS` when absent from profiles or imports.
 The new-connection editor recommends `RESPONSES` for OpenAI/Azure and Chat

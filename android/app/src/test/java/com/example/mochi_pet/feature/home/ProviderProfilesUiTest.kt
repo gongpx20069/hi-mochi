@@ -7,6 +7,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -94,6 +96,120 @@ class ProviderProfilesUiTest {
         assertEquals(ApiProtocol.RESPONSES, saved!!.settings.apiProtocol)
         assertEquals("", saved!!.settings.apiKeyReplacement)
         assertEquals(first.settings.model, saved!!.settings.model)
+    }
+
+    @Test fun `Groq preset saves official chat endpoint and displays quota guidance`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var saved: ProviderProfileInput? = null
+        val opened = mutableListOf<String>()
+        renderEditor(onSave = { saved = it }, onOpenUri = opened::add)
+        compose.onNode(hasText("OpenAI") and !hasSetTextAction()).performScrollTo().performClick()
+        compose.onNodeWithText("Groq").performScrollTo().performClick()
+        compose.onNodeWithText("API endpoint").performScrollTo().assertTextContains("https://api.groq.com/openai/v1")
+        compose.onNodeWithText(
+            "Free-tier requests and tokens are limited. Check reset times in Groq Console; Mochi does not retry quota errors, switch providers, or upgrade billing automatically.",
+        ).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Model name").performScrollTo().performTextInput("fixture-tool-model")
+        compose.onNodeWithText("API key").performScrollTo().performTextInput("synthetic-groq-key")
+        for ((label, url) in listOf(
+            "Register / sign in to Groq" to "https://console.groq.com/",
+            "Create Groq API key" to "https://console.groq.com/keys",
+            "Browse Groq models" to "https://console.groq.com/docs/models",
+            "Check Groq limits" to "https://console.groq.com/settings/limits",
+        )) {
+            compose.onNodeWithText(label).performScrollTo().performClick()
+            assertEquals(url, opened.last())
+        }
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals(ProviderPreset.GROQ, saved!!.preset)
+        assertEquals(ApiProtocol.CHAT_COMPLETIONS, saved!!.settings.apiProtocol)
+        assertEquals("https://api.groq.com/openai/v1", saved!!.settings.endpoint)
+        assertEquals("synthetic-groq-key", saved!!.settings.apiKeyReplacement)
+    }
+
+    @Test fun `Chinese ModelScope preset exposes token and account requirements and saves chat endpoint`() {
+        Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
+        var saved: ProviderProfileInput? = null
+        val opened = mutableListOf<String>()
+        renderEditor(onSave = { saved = it }, onOpenUri = opened::add)
+        compose.onNode(hasText("OpenAI") and !hasSetTextAction()).performScrollTo().performClick()
+        compose.onNodeWithText("魔搭 ModelScope").performScrollTo().performClick()
+        compose.onNodeWithText("API 端点").performScrollTo().assertTextContains("https://api-inference.modelscope.cn/v1")
+        compose.onNodeWithText(
+            "1. 注册或登录魔搭，验证邮箱，并绑定已实名认证的阿里云账号以使用 API-Inference。",
+        ).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(
+            "2. 打开访问令牌页面，创建有效期合适的令牌并粘贴到下方。应使用魔搭 Access Token，而不是阿里云 AccessKey 或百炼 DashScope Key。",
+        ).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("模型名称").performScrollTo().performTextInput("fixture/tool-model")
+        compose.onNodeWithText("魔搭 Access Token").performScrollTo().performTextInput("synthetic-modelscope-token")
+        for ((label, url) in listOf(
+            "注册 / 登录魔搭" to "https://modelscope.cn/",
+            "阿里云账号绑定指南" to "https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization",
+            "创建魔搭 Access Token" to "https://modelscope.cn/my/myaccesstoken",
+            "查看魔搭模型" to "https://modelscope.cn/models",
+            "魔搭每日额度" to "https://modelscope.cn/magicube/usage?tab=earn",
+        )) {
+            compose.onNodeWithText(label).performScrollTo().performClick()
+            assertEquals(url, opened.last())
+        }
+        compose.onNodeWithText("保存连接").performClick()
+        assertEquals(ProviderPreset.MODELSCOPE, saved!!.preset)
+        assertEquals(ApiProtocol.CHAT_COMPLETIONS, saved!!.settings.apiProtocol)
+        assertEquals("https://api-inference.modelscope.cn/v1", saved!!.settings.endpoint)
+        assertEquals("synthetic-modelscope-token", saved!!.settings.apiKeyReplacement)
+    }
+
+    @Test fun `Agnes keeps saved configuration and opens current model documentation`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var saved: ProviderProfileInput? = null
+        val opened = mutableListOf<String>()
+        val agnes = first.copy(preset = ProviderPreset.AGNES, settings = first.settings.copy(
+            providerType = ProviderPreset.AGNES.protocol, endpoint = ProviderPreset.AGNES.endpoint,
+            model = "saved-agnes-model",
+        ))
+        renderEditor(profile = agnes, onSave = { saved = it }, onOpenUri = opened::add)
+        compose.onNodeWithText("Current Agnes model guide").performScrollTo().performClick()
+        assertEquals("https://wiki.agnes-ai.com/en/docs/agnes-30-flash", opened.last())
+        compose.onNodeWithText("Open official API guide").performScrollTo().performClick()
+        assertEquals("https://wiki.agnes-ai.com/en/docs/overview", opened.last())
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals("saved-agnes-model", saved!!.settings.model)
+        assertEquals("", saved!!.settings.apiKeyReplacement)
+        assertEquals(agnes.id, saved!!.id)
+    }
+
+    @Test fun `unavailable browser shows a safe error without losing entered connection data`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var saved: ProviderProfileInput? = null
+        renderEditor(onSave = { saved = it }, onOpenUri = { throw IllegalArgumentException("fixture") })
+        compose.onNode(hasText("OpenAI") and !hasSetTextAction()).performScrollTo().performClick()
+        compose.onNodeWithText("Groq").performScrollTo().performClick()
+        compose.onNodeWithText("Model name").performScrollTo().performTextInput("fixture-model")
+        compose.onNodeWithText("API key").performScrollTo().performTextInput("synthetic-key")
+        compose.onNodeWithText("Create Groq API key").performScrollTo().performClick()
+        compose.onNodeWithText("Could not open the official page. Install or enable a browser and try again.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals("fixture-model", saved!!.settings.model)
+        assertEquals("synthetic-key", saved!!.settings.apiKeyReplacement)
+    }
+
+    private fun renderEditor(
+        profile: ProviderProfileSummary? = null,
+        onSave: (ProviderProfileInput) -> Unit,
+        onOpenUri: (String) -> Unit,
+    ) {
+        val uriHandler = object : UriHandler {
+            override fun openUri(uri: String) { onOpenUri(uri) }
+        }
+        compose.setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalUriHandler provides uriHandler) {
+                    ProviderConnectionDialog(profile, ProviderSettingsUiState(isLoading = false), {}, onSave)
+                }
+            }
+        }
     }
 
     @Test fun `share import is first and all Settings parts remain reachable at large font`() {

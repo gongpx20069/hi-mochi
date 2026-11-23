@@ -16,11 +16,13 @@ enum class ProviderPreset(
 ) {
     OPENAI("OpenAI", ProviderType.OPENAI, "https://api.openai.com/v1", "https://developers.openai.com/api/docs"),
     AZURE("Azure OpenAI", ProviderType.AZURE_OPENAI, "", "https://learn.microsoft.com/azure/ai-foundry/openai/"),
+    GROQ("Groq", ProviderType.CUSTOM, "https://api.groq.com/openai/v1", "https://console.groq.com/docs/openai"),
+    MODELSCOPE("ModelScope", ProviderType.CUSTOM, "https://api-inference.modelscope.cn/v1", "https://www.modelscope.cn/docs/model-service/API-Inference/intro"),
     DEEPSEEK("DeepSeek", ProviderType.CUSTOM, "https://api.deepseek.com", "https://api-docs.deepseek.com/"),
     KIMI("Kimi", ProviderType.CUSTOM, "https://api.moonshot.cn/v1", "https://platform.kimi.com/docs/get-api-key"),
     GLM("GLM", ProviderType.CUSTOM, "https://open.bigmodel.cn/api/paas/v4", "https://docs.bigmodel.cn/cn/guide/develop/openai/introduction"),
     MINIMAX("MiniMax", ProviderType.CUSTOM, "https://api.minimax.cn/v1", "https://platform.minimax.cn/docs/api-reference/text-openai-api"),
-    AGNES("Agnes-AI", ProviderType.CUSTOM, "https://apihub.agnes-ai.com/v1", "https://wiki.agnes-ai.com/en/docs/quickstart"),
+    AGNES("Agnes-AI", ProviderType.CUSTOM, "https://apihub.agnes-ai.com/v1", "https://wiki.agnes-ai.com/en/docs/overview"),
     CUSTOM("Custom compatible API", ProviderType.CUSTOM, "", ""),
     ;
 

@@ -24,6 +24,42 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ProviderSettingsRepositoryTest {
+    @Test fun `Groq and ModelScope profiles survive storage and sharing with isolated credentials`() = runBlocking {
+        val store = InMemoryPreferencesDataStore()
+        val repo = DataStoreProviderSettingsRepository(store, FakeApiKeyCipher())
+        for (preset in listOf(ProviderPreset.GROQ, ProviderPreset.MODELSCOPE)) {
+            repo.saveProfile(ProviderProfileInput(
+                name = preset.title, preset = preset,
+                settings = ProviderSettingsInput(
+                    providerType = preset.protocol, endpoint = preset.endpoint,
+                    model = "fixture-tool-model", apiKeyReplacement = "synthetic-${preset.name}",
+                    apiProtocol = preset.defaultApiProtocol,
+                ),
+            ))
+        }
+        val restored = DataStoreProviderSettingsRepository(store, FakeApiKeyCipher())
+        val profiles = restored.loadProfiles()
+        assertEquals(ProviderPreset.GROQ, profiles.active!!.preset)
+        val shared = profiles.profiles.map { profile ->
+            val config = restored.loadProfileRuntimeConfig(profile.id)
+            assertEquals(profile.preset.endpoint, config.endpoint)
+            assertEquals(ProviderType.CUSTOM, config.providerType)
+            assertEquals(ApiProtocol.CHAT_COMPLETIONS, config.apiProtocol)
+            assertEquals("synthetic-${profile.preset.name}", config.apiKey)
+            SharedLlmProfile(profile.name, profile.preset, SharedLlmProvider(
+                providerType = config.providerType, endpoint = config.endpoint, model = config.model,
+                apiVersion = config.apiVersion, timeoutSeconds = config.timeoutSeconds,
+                maxResponseBytes = config.maxResponseBytes, apiKey = config.apiKey,
+                apiProtocol = config.apiProtocol,
+            ))
+        }
+        val bundle = SharedProviderBundle(llmProfiles = shared)
+        assertEquals(bundle, ProviderShareCodec.decode(ProviderShareCodec.encode(bundle)))
+        assertFalse(store.data.first()[stringPreferencesKey("provider.profiles.v1")]!!.contains("synthetic-"))
+        restored.activateProfile(profiles.profiles.last().id)
+        assertEquals("synthetic-MODELSCOPE", restored.loadRuntimeConfig().apiKey)
+    }
+
     @Test fun `legacy profiles stay chat and changing only protocol preserves key and cancels active runs`() = runBlocking {
         val store = InMemoryPreferencesDataStore()
         val runs = ProviderRunCoordinator()

@@ -79,18 +79,41 @@ LLM Provider 是必需配置。未配置时，首次启动会打开设置；之�
 | --- | --- | --- |
 | OpenAI | 自动填写 `https://api.openai.com/v1`，再填写模型 | [OpenAI API Key](https://platform.openai.com/api-keys) |
 | Azure OpenAI | Azure 资源 Endpoint、以 **Deployment 名称**填写模型；仅 Chat Completions 需要 API Version | [创建 Azure OpenAI 资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
+| Groq | 自动填写 `https://api.groq.com/openai/v1`，选择支持 Tool Use 的模型 | [创建 API Key](https://console.groq.com/keys) |
+| 魔搭 ModelScope | 自动填写 `https://api-inference.modelscope.cn/v1`，填写支持工具调用的 API-Inference 模型 ID | [创建 Access Token](https://modelscope.cn/my/myaccesstoken) |
 | DeepSeek | 自动填写 `https://api.deepseek.com`，再填写模型 | [官方 API 指南](https://api-docs.deepseek.com/) |
 | Kimi | 自动填写 `https://api.moonshot.cn/v1`，再填写模型 | [官方 API 指南](https://platform.kimi.com/docs/get-api-key) |
 | GLM | 自动填写 `https://open.bigmodel.cn/api/paas/v4`，再填写模型 | [官方 API 指南](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
 | MiniMax（国内） | 自动填写 `https://api.minimax.cn/v1`，填写模型并确认账号区域 | [官方 API 指南](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
-| Agnes-AI | 自动填写 `https://apihub.agnes-ai.com/v1`，再填写模型 | [官方 API 指南](https://wiki.agnes-ai.com/en/docs/quickstart) |
+| Agnes-AI | 自动填写 `https://apihub.agnes-ai.com/v1`，再填写模型 | [官方 API 指南](https://wiki.agnes-ai.com/en/docs/overview) |
 | 自定义 OpenAI 兼容 Provider | 用户填写 HTTPS Endpoint 和模型，服务需通过所选 API 协议支持工具调用 | 对应服务商签发的 API Key |
 
 **设置 > AI 连接**支持保存多个命名账号和模型。OpenAI、DeepSeek、Kimi、GLM、
-MiniMax（国内）和 Agnes-AI 会自动填入可编辑的官方地址；根据内置官方指南填写
-自己的 API Key 和支持工具调用的模型。这些是普通按量付费 API，不是 Coding Plan
-专用地址。新增连接不会切换当前选择；点击**使用**才切换，并取消正在运行的本地
+MiniMax（国内）、Agnes-AI、Groq 和魔搭会自动填入可编辑的官方地址；根据内置官方
+指南填写自己的 API Key / Access Token 和支持工具调用的模型。这些是服务商 API，
+不是 Coding Plan 专用地址，免费额度、计费和区域可用性以账号为准。
+新增连接不会切换当前选择；点击**使用**才切换，并取消正在运行的本地
 Agent 任务，未来的定时计划仍保留。更新应用时保留已有配置及密钥。
+
+**Groq：**[注册或登录控制台](https://console.groq.com/)，进入 **API Keys** 创建密钥，
+粘贴到 Mochi。从[模型列表](https://console.groq.com/docs/models)选择账号可用且支持
+**Tool Use（工具调用）**的模型，复制完整 Model ID。免费额度与恢复时间请查看
+[账号限制](https://console.groq.com/settings/limits)；Mochi 不会自动重试额度错误或升级付费。
+
+**魔搭：**[注册或登录](https://modelscope.cn/)，验证邮箱，并
+[绑定已实名认证的阿里云账号](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization)。
+在[访问令牌页面](https://modelscope.cn/my/myaccesstoken)创建有效期合适的 Access Token；
+不要填写阿里云 AccessKey 或百炼 DashScope Key。从[模型列表](https://modelscope.cn/models)
+选择标有 API-Inference 且支持工具调用的模型，将 API 提供方选为**魔搭社区**，
+复制示例中的模型 ID（包含组织名前缀）。每日魔粒需在
+[魔搭平台](https://modelscope.cn/magicube/usage?tab=earn)登录领取，有效期和消耗以平台规则为准，
+Mochi 不代领。两种预设的编辑界面均包含这些入口；默认保留 Chat Completions，
+仅在模型支持时改用其他协议或开启图片输入。
+
+**Agnes-AI：**[当前模型文档](https://wiki.agnes-ai.com/en/docs/agnes-30-flash)仍支持现有
+API 地址和工具调用，因此保留。[旧版 Agnes 2.5 Flash](https://wiki.agnes-ai.com/en/docs/agnes-25-flash)
+计划于 2026 年 11 月 30 日退役，请选择账号可用的当前模型；Mochi 不会自动修改已保存的型号。
+文档可用不等于已验证你账号的实际调用权限。
 
 每个连接可在**高级连接设置 > API 协议**中选择 Responses 或 Chat Completions。
 新建 OpenAI/Azure 连接默认使用 Responses，其他预设及旧连接保留 Chat Completions，
@@ -101,6 +124,7 @@ Mochi 不会在报错后自动切换。
 分享时可勾选多个 LLM 和语音连接；导入会新增而非覆盖已有账号，并分别切换到分享
 中的选中连接。分享的 v5 链接包含 API 协议，接收端需支持 v5；导入支持 v2/v3/v4/v5 链接。持有完整链接的人可以使用
 其中的 API 凭据，请仅发给可信的人。
+接收端还需支持连接中的新预设名称；分享 Groq 或魔搭连接前，请先升级两端应用。
 
 ### 支持的 Speech Provider
 
