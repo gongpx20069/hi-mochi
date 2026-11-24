@@ -50,7 +50,7 @@ internal fun ToolSettingsRow(
     }
 }
 
-internal enum class ToolGlyph { APPS, PLAYER, ASSIST, RETURN, CHEVRON, CLOSE, SEARCH, WEBSITES, SEND, STOP, SPEAKER, MUTED, MOCHI, CALENDAR, SKILLS, TOOLS }
+internal enum class ToolGlyph { APPS, PLAYER, ASSIST, RETURN, CHEVRON, CLOSE, SEARCH, WEBSITES, SEND, STOP, SPEAKER, MUTED, MOCHI, CALENDAR, SKILLS, TOOLS, TASKS, SETTINGS, CHECK }
 
 @Composable
 internal fun ToolGlyphIcon(glyph: ToolGlyph, modifier: Modifier = Modifier, color: Color = LocalContentColor.current) {
@@ -93,6 +93,23 @@ internal fun ToolGlyphIcon(glyph: ToolGlyph, modifier: Modifier = Modifier, colo
                     path.moveTo(3f, 12f); path.lineTo(21f, 12f)
                     path.moveTo(9f, 11f); path.lineTo(9f, 15f)
                     path.moveTo(15f, 11f); path.lineTo(15f, 15f)
+                }
+                ToolGlyph.TASKS -> {
+                    drawRoundRect(color, Offset(3f, 3f), Size(18f, 18f), CornerRadius(3f), style = stroke)
+                    for (y in listOf(8f, 15f)) {
+                        path.moveTo(6f, y); path.lineTo(7f, y + 1f); path.lineTo(9f, y - 1f)
+                        path.moveTo(13f, y); path.lineTo(17f, y)
+                    }
+                }
+                ToolGlyph.SETTINGS -> {
+                    for ((y, x) in listOf(6f to 9f, 12f to 16f, 18f to 8f)) {
+                        path.moveTo(3f, y); path.lineTo(x - 2f, y)
+                        path.moveTo(x + 2f, y); path.lineTo(21f, y)
+                        drawCircle(color, 2f, Offset(x, y), style = stroke)
+                    }
+                }
+                ToolGlyph.CHECK -> {
+                    path.moveTo(5f, 12f); path.lineTo(10f, 17f); path.lineTo(20f, 7f)
                 }
                 ToolGlyph.APPS -> for (x in listOf(3f, 14f)) for (y in listOf(3f, 14f)) {
                     drawRoundRect(color, Offset(x, y), Size(7f, 7f), CornerRadius(1.5f), style = stroke)

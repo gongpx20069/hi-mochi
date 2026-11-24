@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
@@ -26,8 +27,10 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextLayoutResult
 import com.example.mochi_pet.core.model.MochiSurface
 import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import androidx.compose.ui.geometry.Offset
@@ -102,6 +105,7 @@ class CompactSurfacesUiTest {
         val logo = compose.onNodeWithTag("conversation-entry-logo").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue(logo.bottom < before.top)
         assertTrue(before.bottom < layout.getUnclippedBoundsInRoot().bottom - 100.dp)
+        captureFixture("conversation-layout", "central-entry-mark.png")
         val inputId = compose.onNodeWithTag("conversation-input").fetchSemanticsNode().id
         compose.mainClock.autoAdvance = false
         val showHistory = compose.onNodeWithTag("dictation-input").fetchSemanticsNode()
@@ -377,11 +381,44 @@ class CompactSurfacesUiTest {
         assertEquals(2, browsed)
         assertEquals(2, tasks)
         assertEquals(2, settings)
+        captureFixture("mochi-header", "navigation-header.png")
         listOf(MochiSurface.Today, MochiSurface.Skills, MochiSurface.Tools, MochiSurface.Settings).forEach {
             compose.runOnIdle { surface.value = it }
             compose.onNodeWithTag("mochi-browse").assertDoesNotExist()
         }
-        captureFixture("mochi-header", "navigation-header.png")
+        compose.onNodeWithText("Done").assertIsDisplayed().performClick()
+        assertEquals(3, settings)
+    }
+
+    @Test fun `header icon actions retain full labels and touch targets at large font`() {
+        val fontScale = mutableStateOf(1f)
+        compose.setContent { MochiTheme {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.value)) {
+                Column(Modifier.padding(horizontal = 16.dp)) {
+                    MochiTopBar(MochiSurface.Conversation, {}, {}, {})
+                }
+            }
+        } }
+        listOf(1f, 2f).forEach { scale ->
+            compose.runOnIdle { fontScale.value = scale }
+            val header = compose.onNodeWithTag("mochi-header").getUnclippedBoundsInRoot()
+            var previousRight = header.left
+            listOf("Browse" to "mochi-browse", "Tasks" to "mochi-tasks", "Settings" to "mochi-settings").forEach { (label, tag) ->
+                val action = compose.onNodeWithTag(tag).assertIsDisplayed().getUnclippedBoundsInRoot()
+                assertTrue(action.width >= 48.dp && action.height >= 48.dp)
+                assertTrue(action.left >= previousRight && action.right <= header.right)
+                previousRight = action.right
+                val layouts = mutableListOf<TextLayoutResult>()
+                compose.onNodeWithText(label).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                val layout = layouts.single()
+                // Cached paragraph width can exceed the text box; check the actual line bounds.
+                assertTrue("$label must remain fully visible at $scale", layout.lineCount == 1 &&
+                    !layout.multiParagraph.didExceedMaxLines && layout.getLineLeft(0) >= 0f &&
+                    layout.getLineRight(0) <= layout.size.width && layout.getLineBottom(0) <= layout.size.height)
+            }
+            compose.onNodeWithText("Mochi").assertIsDisplayed()
+        }
+        captureFixture("mochi-header", "navigation-header-large-text.png")
     }
 
     @Test fun `icon navigation retains labels selected state and all four destinations`() {
@@ -389,13 +426,14 @@ class CompactSurfacesUiTest {
         val destinations = mutableListOf<MochiNavigationIntent>()
         var opened = 0
         compose.setContent { MochiTheme {
-            NavigationBar(surface.value, { destinations += it }, { opened++ })
+            NavigationBar(surface.value, { destinations += it }, { opened++ }, Modifier.testTag("bottom-navigation"))
         } }
         compose.onNodeWithText("Mochi").assertIsSelected().performClick()
         listOf("Mochi", "Planner", "Skills", "Tools").forEach {
             val tab = compose.onNodeWithText(it).assertIsDisplayed()
             val bounds = tab.getUnclippedBoundsInRoot()
             assertTrue(bounds.width >= 48.dp && bounds.height >= 48.dp)
+            assertTrue("Default navigation must remain compact", bounds.height <= 52.dp)
             if (it != "Mochi") tab.performClick()
         }
         assertEquals(1, opened)
@@ -404,6 +442,7 @@ class CompactSurfacesUiTest {
             compose.runOnIdle { surface.value = target }
             compose.onNodeWithText(label).assertIsSelected()
         }
+        captureFixture("bottom-navigation", "compact-bottom-navigation.png")
     }
 
     @Test fun `long Skill action wraps below tabs at large font without hiding controls`() {

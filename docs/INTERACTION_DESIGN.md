@@ -19,7 +19,11 @@ its Websites and logins entry. Closing the dialog returns to its originating
 surface and still ends manual browsing. Chat instructions do not gain a new
 browser-opening action.
 Bottom destinations pair short labels with consistent outline icons: Mochi face,
-calendar, puzzle and toolbox. Selection and minimum 48 dp touch targets remain.
+calendar, puzzle and toolbox. Their 18 dp glyphs, small labels and restrained
+selection weight keep the bar compact; minimum 48 dp touch targets remain.
+Browse, Tasks and Settings share the same 18 dp outline-icon-over-label treatment.
+Settings uses a checkmark and Done while that page is open. Header actions retain
+their labels at larger font sizes, moving below the brand when necessary.
 The Mochi header
 switches **Chat / Companion** (**对话 / 陪伴**); Face and its information cards
 belong to Companion, and Conversation belongs to Chat. Both share history and
@@ -352,7 +356,9 @@ Muting stops current playback without cancelling the Agent or changing the
 draft; Companion, dictation and voice previews are unaffected.
 
 Returning from outside the app into idle Chat opens a quiet quick-entry view:
-the same one-line composer sits in the center, with a small Mochi logo above it.
+the same one-line composer sits in the center, with a thin monochrome M mark
+and a lightly spaced Mochi wordmark above it, without a filled mascot tile.
+The browser homepage uses the same mark component and theme foreground color.
 The logo fades away when history opens. Its empty placeholder combines
 **点击输入 · 长按说话 · 下滑历史**, without a separate hint below the field.
 Tap to type and hold/release to dictate still work;
@@ -721,10 +727,11 @@ expandable card rather than appearing as separate built-in cards.
 **Websites and logins** stays outside its collapsed Tool list as the same rounded
 settings row used by App Control, with a globe icon, short detail and chevron.
 Only the entry styling changes; it opens the existing secure full-screen dialog with a Bing
-search/address field centered in the page, Mochi's launcher logo above it, and
+search/address field centered in the page, the shared monochrome Mochi entry mark above it, and
 an always-visible Close action at the top right. The logo and concise
 "Search the web. Save accounts safely." caption sit on the plain theme background,
-with a small theme-tinted logo tile and a softly outlined search field.
+using the same theme foreground color as central Chat, without a mascot tile.
+The search field keeps its soft outline.
 A separate rounded, low-contrast surface below search contains website groups and the compact data
 overflow menu. There are no introductory or session-status cards.
 Each website row shows its registrable domain and badges for local data and
