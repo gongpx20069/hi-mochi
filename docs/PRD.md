@@ -81,8 +81,9 @@ Chat supports text and hold-to-dictate in the same one-line composer: tap to
 type; long-press even an existing draft to record; release to fill/append recognized
 text, or move outside to cancel without changing the draft. There is no microphone
 button. Dictation never invokes the Agent or sends a message; Send is explicit.
-The composer also has a persistent Chat-only mute control. It stops current
-reply playback and suppresses subsequent Chat replies, without muting Companion,
+Chat also has a persistent mute control beside the mode selector, away from
+the composer. It stops current reply playback and suppresses subsequent Chat
+replies, without muting Companion,
 dictation or explicit voice previews. Text responses remain available.
 Settings > Speech and wake defaults to **Follow system**: Chinese device languages
 use `老莫老莫`; English and other device languages use `Hi Mochi`. Users can

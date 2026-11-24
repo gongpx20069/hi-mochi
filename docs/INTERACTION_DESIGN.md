@@ -330,10 +330,14 @@ conversation empty state and Settings header use restrained spacing and
 typography. Bottom navigation uses the four destinations above and selected-state
 semantics, with a muted accent fill and at least 48 dp touch targets.
 Every main destination keeps the same compact Mochi wordmark in the global
-header. Chat/Companion selection sits below that header on Mochi, not in place
-of the identity. Skill/Tool card actions and switches use smaller visual
+header. Chat/Companion selection sits below that header in a compact, thinly
+outlined rounded group with a subtle selected fill, not in place of the identity.
+Labels wrap at large font sizes without shrinking touch targets.
+Skill/Tool card actions and switches use smaller visual
 controls while retaining 48 dp interaction targets and disabled/selected semantics.
-The speaker icon immediately left of Send remembers Chat-only reply muting.
+The speaker icon at the far right of the mode row remembers Chat-only reply
+muting. It appears only in Chat, separate from the composer so it cannot be
+mistaken for a recording control; its space remains reserved in Companion.
 Muting stops current playback without cancelling the Agent or changing the
 draft; Companion, dictation and voice previews are unaffected.
 

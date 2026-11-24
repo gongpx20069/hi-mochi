@@ -836,7 +836,6 @@ private fun MochiAppContent(
             onSetRecentConversationTurns =
                 viewModel::setRecentConversationTurns,
             onSetFocusStandby = viewModel::setFocusStandby,
-            onSetChatMuted = viewModel::setChatMuted,
             onSavePersona = viewModel::savePersona,
             onSearchSkills = viewModel::searchSkills,
             onLoadPopularSkills = viewModel::loadPopularSkills,
@@ -988,7 +987,13 @@ private fun MochiAppContent(
                     },
                 )
                 if (homePresentation || surface == MochiSurface.Conversation) {
-                    MochiModeSwitch(homePresentation, viewModel::navigate)
+                    MochiModeSwitch(
+                        companion = homePresentation,
+                        onNavigate = viewModel::navigate,
+                        chatMuted = agentSettingsState.settings.chatMuted,
+                        muteEnabled = !agentSettingsState.isLoading && !agentSettingsState.isSavingChatMute,
+                        onSetChatMuted = viewModel::setChatMuted,
+                    )
                 }
                 ChatPipelineIndicator(state = visiblePipelineState)
                 if (surface == MochiSurface.Settings) {
@@ -1520,7 +1525,6 @@ private fun SurfaceContent(
     onReceiveProviderShareLink: (String) -> Unit,
     onSetRecentConversationTurns: (Int) -> Unit,
     onSetFocusStandby: (Boolean, Int) -> Unit,
-    onSetChatMuted: (Boolean) -> Unit,
     onSavePersona: (String, String, String) -> Unit,
     onSearchSkills: (String) -> Unit,
     onLoadPopularSkills: () -> Unit,
@@ -1599,9 +1603,6 @@ private fun SurfaceContent(
             )
             MochiSurface.Conversation -> ConversationSurface(
                 state = conversationState,
-                chatMuted = agentSettingsState.settings.chatMuted,
-                muteEnabled = !agentSettingsState.isLoading && !agentSettingsState.isSavingChatMute,
-                onSetChatMuted = onSetChatMuted,
                 providerReady = providerSettingsState.summary.isReady,
                 voiceState = voiceState,
                 onSend = onSendMessage,
@@ -5334,9 +5335,6 @@ private fun EmptyRow(message: String) {
 @Composable
 internal fun ConversationSurface(
     state: ConversationUiState,
-    chatMuted: Boolean,
-    muteEnabled: Boolean,
-    onSetChatMuted: (Boolean) -> Unit,
     providerReady: Boolean,
     voiceState: VoiceRuntimeState,
     onSend: (String) -> Unit,
@@ -5539,15 +5537,6 @@ internal fun ConversationSurface(
                             },
                         )
                     }
-                }
-                val muteLabel = localizeUiText(if (chatMuted) "Unmute chat replies" else "Mute chat replies")
-                androidx.compose.material3.IconToggleButton(
-                    checked = chatMuted,
-                    onCheckedChange = onSetChatMuted,
-                    enabled = muteEnabled,
-                    modifier = Modifier.size(48.dp).semantics { contentDescription = muteLabel },
-                ) {
-                    ToolGlyphIcon(if (chatMuted) ToolGlyph.MUTED else ToolGlyph.SPEAKER, Modifier.size(18.dp))
                 }
                 val sendLabel = localizeUiText(when {
                     state.isSending -> "Cancel"
@@ -6578,13 +6567,42 @@ private fun AddTodoDialog(
 }
 
 @Composable
-internal fun MochiModeSwitch(companion: Boolean, onNavigate: (MochiNavigationIntent) -> Unit) {
-    FlowRow(
+internal fun MochiModeSwitch(
+    companion: Boolean,
+    onNavigate: (MochiNavigationIntent) -> Unit,
+    chatMuted: Boolean,
+    muteEnabled: Boolean,
+    onSetChatMuted: (Boolean) -> Unit,
+) {
+    Row(
         Modifier.fillMaxWidth().testTag("mochi-modes"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        SkillSectionTab("Chat", !companion, { onNavigate(MochiNavigationIntent.ShowConversation) })
-        SkillSectionTab("Companion", companion, { onNavigate(MochiNavigationIntent.ShowFace) })
+        Surface(
+            modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        ) {
+            FlowRow(Modifier.padding(horizontal = 4.dp)) {
+                SkillSectionTab("Chat", !companion, { onNavigate(MochiNavigationIntent.ShowConversation) })
+                SkillSectionTab("Companion", companion, { onNavigate(MochiNavigationIntent.ShowFace) })
+            }
+        }
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            if (!companion) {
+                val muteLabel = localizeUiText(if (chatMuted) "Unmute chat replies" else "Mute chat replies")
+                androidx.compose.material3.IconToggleButton(
+                    checked = chatMuted,
+                    onCheckedChange = onSetChatMuted,
+                    enabled = muteEnabled,
+                    modifier = Modifier.fillMaxSize().semantics { contentDescription = muteLabel },
+                ) {
+                    ToolGlyphIcon(if (chatMuted) ToolGlyph.MUTED else ToolGlyph.SPEAKER, Modifier.size(18.dp))
+                }
+            }
+        }
     }
 }
 

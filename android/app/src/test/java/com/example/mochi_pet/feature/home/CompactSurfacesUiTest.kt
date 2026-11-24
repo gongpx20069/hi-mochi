@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.example.mochi_pet.core.model.MochiSurface
+import com.example.mochi_pet.core.navigation.MochiNavigationIntent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -153,6 +154,10 @@ class CompactSurfacesUiTest {
         compose.onNodeWithTag("conversation-input").performTextInput("Keep draft")
         val toggle = compose.onNodeWithContentDescription("Mute chat replies")
         assertTrue(toggle.getUnclippedBoundsInRoot().width >= 48.dp)
+        val speaker = toggle.getUnclippedBoundsInRoot()
+        val modes = compose.onNodeWithTag("mochi-modes").getUnclippedBoundsInRoot()
+        assertTrue(speaker.top >= modes.top && speaker.bottom <= modes.bottom)
+        assertTrue(speaker.bottom < compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top)
         toggle.performClick()
         assertTrue(muted.value)
         compose.onNodeWithContentDescription("Unmute chat replies").performClick()
@@ -206,6 +211,34 @@ class CompactSurfacesUiTest {
         assertEquals(1, actions)
     }
 
+    @Test fun `mode group wraps at large text while Chat mute stays separate and Companion has no mute action`() {
+        val companion = mutableStateOf(false)
+        compose.setContent { MochiTheme {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                MochiModeSwitch(
+                    companion.value, { companion.value = it == MochiNavigationIntent.ShowFace },
+                    muted.value, true, { muted.value = it },
+                )
+            }
+        } }
+        val chat = compose.onNodeWithText("Chat").assertIsDisplayed().assertIsSelected()
+        val companionTab = compose.onNodeWithText("Companion").assertIsDisplayed()
+        val bounds = compose.onNodeWithTag("mochi-modes").getUnclippedBoundsInRoot()
+        val speaker = compose.onNodeWithContentDescription("Mute chat replies").assertIsDisplayed()
+        listOf(chat, companionTab).forEach {
+            val tab = it.getUnclippedBoundsInRoot()
+            assertTrue(tab.height >= 48.dp && tab.width >= 48.dp)
+            assertTrue(tab.right <= speaker.getUnclippedBoundsInRoot().left)
+        }
+        speaker.performClick()
+        companionTab.performClick().assertIsSelected()
+        compose.onNodeWithContentDescription("Unmute chat replies").assertDoesNotExist()
+        assertEquals(bounds, compose.onNodeWithTag("mochi-modes").getUnclippedBoundsInRoot())
+        chat.performClick().assertIsSelected()
+        compose.onNodeWithContentDescription("Unmute chat replies").assertIsDisplayed()
+        assertTrue(muted.value)
+    }
+
     @Test fun `global header keeps the same compact identity across destinations`() {
         val surface = mutableStateOf<MochiSurface>(MochiSurface.Conversation)
         compose.setContent { MochiTheme {
@@ -256,16 +289,18 @@ class CompactSurfacesUiTest {
         compose.setContent {
             MochiTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
-                    ConversationSurface(
-                        chatMuted = muted.value, muteEnabled = true, onSetChatMuted = { muted.value = it },
-                        state = state.value, providerReady = ready.value, voiceState = voice.value, onSend = sent::add,
-                        onCancel = { cancelled++ },
-                        onDraftChange = { state.value = state.value.copy(draft = it) },
-                        onStartDictation = { started++; state.value = state.value.copy(dictation = DictationPhase.RECORDING) },
-                        onFinishDictation = { stopped++; state.value = state.value.copy(dictation = DictationPhase.TRANSCRIBING) },
-                        onCancelDictation = { dictationCancelled++; state.value = state.value.copy(dictation = DictationPhase.IDLE) },
-                        onOpenSpeechSettings = {}, onCardAction = { _, _ -> }, onRemoteTask = {},
-                    )
+                    Column {
+                        MochiModeSwitch(false, {}, muted.value, true, { muted.value = it })
+                        ConversationSurface(
+                            state = state.value, providerReady = ready.value, voiceState = voice.value, onSend = sent::add,
+                            onCancel = { cancelled++ },
+                            onDraftChange = { state.value = state.value.copy(draft = it) },
+                            onStartDictation = { started++; state.value = state.value.copy(dictation = DictationPhase.RECORDING) },
+                            onFinishDictation = { stopped++; state.value = state.value.copy(dictation = DictationPhase.TRANSCRIBING) },
+                            onCancelDictation = { dictationCancelled++; state.value = state.value.copy(dictation = DictationPhase.IDLE) },
+                            onOpenSpeechSettings = {}, onCardAction = { _, _ -> }, onRemoteTask = {},
+                        )
+                    }
                 }
             }
         }

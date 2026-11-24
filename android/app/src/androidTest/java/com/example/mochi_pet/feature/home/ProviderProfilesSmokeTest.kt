@@ -63,7 +63,6 @@ class ProviderProfilesSmokeTest {
             compose.activity.setContent {
                 MochiTheme {
                     ConversationSurface(
-                        chatMuted = false, muteEnabled = true, onSetChatMuted = {},
                         state = state.value, providerReady = true, voiceState = VoiceRuntimeState(),
                         onSend = { error("Gesture must not send") }, onCancel = {},
                         onDraftChange = { state.value = state.value.copy(draft = it) },
@@ -111,6 +110,12 @@ class ProviderProfilesSmokeTest {
         assertEquals(wakeEnabled, app.wakeRuntime.shouldBeEnabled)
         val composer = compose.onNodeWithTag("conversation-composer")
         val height = composer.getUnclippedBoundsInRoot().height
+        val muted = runBlocking(Dispatchers.IO) { app.agentSettingsRepository.load().chatMuted }
+        val speaker = compose.onNodeWithContentDescription(localizeUiText(
+            if (muted) "Unmute chat replies" else "Mute chat replies",
+        )).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(speaker.bottom <= compose.onNodeWithTag("mochi-modes").getUnclippedBoundsInRoot().bottom)
+        assertTrue(speaker.bottom < composer.getUnclippedBoundsInRoot().top)
         val input = compose.onNodeWithTag("conversation-input")
         input.performTextInput("Synthetic local draft. ".repeat(20))
         assertEquals(height, composer.getUnclippedBoundsInRoot().height)
