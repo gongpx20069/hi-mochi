@@ -334,9 +334,10 @@ Tool contract table.
 
 Website management is a secure full-screen dialog with a Bing search/address
 field centered beneath the Mochi logo, a top-right Close button, and a separate
-translucent website-list panel, not dashboard cards. Its entry is a rounded
-settings row matching App Control, with globe icon, detail and chevron; the
-management dialog and login flow remain unchanged. Opening a website row shows a secure second
+low-contrast website-list panel, not dashboard cards. Tools opens it from a rounded
+settings row matching App Control, with globe icon, detail and chevron; Chat and
+Companion also provide the header Browse shortcut, outside full screen. All entries
+share the same management dialog and login flow. Opening a website row shows a secure second
 list containing one shared Cookie/site-data entry, when detected, plus its
 password/SMS accounts. Blue data and purple credential badges include text labels.
 Credential swipes reveal Edit/Delete; data swipes reveal only Delete. A shared
@@ -350,7 +351,8 @@ Selecting an account matching the current exact origin explicitly fills its
 login form without submission; other origins navigate to that account's site.
 The homepage Close action ends the manual session. Manual browsing retains
 exclusive Browser ownership even while Home or the account sheet is visible;
-wake listening pauses and no Agent snapshots/actions run. Closing restores Tools.
+wake listening pauses and no Agent snapshots/actions run. Closing restores the
+originating Mochi or Tools surface without changing the mode or clearing the draft.
 Further manual navigation keeps that WebView's selected mode, avoiding a UA
 change on an already interacted-with form.
 
