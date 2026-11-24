@@ -92,6 +92,10 @@ class ProviderProfilesSmokeTest {
         val app = compose.activity.application as MochiApplication
         val before = runBlocking(Dispatchers.IO) { app.providerSettingsRepository.loadProfiles() }
         val wakeEnabled = app.wakeRuntime.shouldBeEnabled
+        if (compose.onAllNodesWithText(localizeUiText("Settings")).fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithText(localizeUiText("Settings")).performClick()
+        }
+        compose.onNode(hasText("Mochi") and hasClickAction()).performClick()
         compose.onNode(hasText(localizeUiText("Chat")) and hasClickAction()).performClick()
         compose.waitUntil(10_000) {
             app.wakeRuntime.state.value.status in setOf(
