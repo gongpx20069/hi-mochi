@@ -357,6 +357,55 @@ class CompactSurfacesUiTest {
         compose.onNodeWithText("Companion").assertDoesNotExist()
     }
 
+    @Test fun `browser shortcut belongs to both Mochi modes without replacing other header actions`() {
+        val surface = mutableStateOf<MochiSurface>(MochiSurface.Conversation)
+        var browsed = 0
+        var tasks = 0
+        var settings = 0
+        compose.setContent { MochiTheme {
+            MochiTopBar(surface.value, { tasks++ }, { settings++ }, { browsed++ })
+        } }
+        listOf(MochiSurface.Conversation, MochiSurface.Face).forEach {
+            compose.runOnIdle { surface.value = it }
+            val browse = compose.onNodeWithTag("mochi-browse").assertIsDisplayed()
+            val bounds = browse.getUnclippedBoundsInRoot()
+            assertTrue(bounds.width >= 48.dp && bounds.height >= 48.dp)
+            browse.performClick()
+            compose.onNodeWithText("Tasks").assertIsDisplayed().performClick()
+            compose.onNodeWithText("Settings").assertIsDisplayed().performClick()
+        }
+        assertEquals(2, browsed)
+        assertEquals(2, tasks)
+        assertEquals(2, settings)
+        listOf(MochiSurface.Today, MochiSurface.Skills, MochiSurface.Tools, MochiSurface.Settings).forEach {
+            compose.runOnIdle { surface.value = it }
+            compose.onNodeWithTag("mochi-browse").assertDoesNotExist()
+        }
+        captureFixture("mochi-header", "navigation-header.png")
+    }
+
+    @Test fun `icon navigation retains labels selected state and all four destinations`() {
+        val surface = mutableStateOf<MochiSurface>(MochiSurface.Conversation)
+        val destinations = mutableListOf<MochiNavigationIntent>()
+        var opened = 0
+        compose.setContent { MochiTheme {
+            NavigationBar(surface.value, { destinations += it }, { opened++ })
+        } }
+        compose.onNodeWithText("Mochi").assertIsSelected().performClick()
+        listOf("Mochi", "Planner", "Skills", "Tools").forEach {
+            val tab = compose.onNodeWithText(it).assertIsDisplayed()
+            val bounds = tab.getUnclippedBoundsInRoot()
+            assertTrue(bounds.width >= 48.dp && bounds.height >= 48.dp)
+            if (it != "Mochi") tab.performClick()
+        }
+        assertEquals(1, opened)
+        assertEquals(listOf(MochiNavigationIntent.ShowToday, MochiNavigationIntent.ShowSkills, MochiNavigationIntent.ShowTools), destinations)
+        listOf(MochiSurface.Today to "Planner", MochiSurface.Skills to "Skills", MochiSurface.Tools to "Tools").forEach { (target, label) ->
+            compose.runOnIdle { surface.value = target }
+            compose.onNodeWithText(label).assertIsSelected()
+        }
+    }
+
     @Test fun `long Skill action wraps below tabs at large font without hiding controls`() {
         var updates = 0
         renderSkills(fontScale = 1.5f, onCheckUpdates = { updates++ })

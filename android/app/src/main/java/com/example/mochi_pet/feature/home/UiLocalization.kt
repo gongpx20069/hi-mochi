@@ -768,6 +768,7 @@ private val ZH_UI_TEXT = mapOf(
     "Could not start this schedule. Check configuration and refresh before retrying." to "无法启动此定时计划，请检查配置并刷新后再试。",
     "Could not update the schedule. Check its date and refresh before retrying." to "无法更新定时计划，请核对日期并刷新后再试。",
     "Tasks" to "任务",
+    "Browse" to "浏览",
     "Task center" to "任务中心",
     "Configuration check" to "配置自检",
     "Run configuration check" to "开始配置自检",

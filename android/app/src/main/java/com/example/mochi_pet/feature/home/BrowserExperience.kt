@@ -335,10 +335,9 @@ internal fun BrowserNavigationBar(
     Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth().testTag("browser-navigation"),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-            shadowElevation = 6.dp,
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         ) {
             Row(Modifier.padding(6.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -353,7 +352,7 @@ internal fun BrowserNavigationBar(
                 VerticalDivider(Modifier.height(24.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 TextButton(onHome, Modifier.weight(1f).heightIn(min = 52.dp).testTag("browser-home"),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(20.dp)) {
+                    shape = RoundedCornerShape(14.dp)) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         BrowserNavigationIcon(BrowserGlyph.HOME)
                         Text("Home", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false)
@@ -361,7 +360,7 @@ internal fun BrowserNavigationBar(
                 }
                 FilledTonalButton(onAccounts, Modifier.weight(1f).heightIn(min = 52.dp).testTag("browser-accounts"),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(20.dp)) {
+                    shape = RoundedCornerShape(14.dp)) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         BrowserNavigationIcon(BrowserGlyph.ACCOUNTS)
                         Text("Sites", style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false)

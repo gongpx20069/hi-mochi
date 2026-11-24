@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -526,8 +527,7 @@ private fun MochiAppContent(
         viewModel.cameraSnapshot.collectAsStateWithLifecycle()
     val browserState by viewModel.browserState.collectAsStateWithLifecycle()
     val assistanceRequest by viewModel.assistanceRequest.collectAsStateWithLifecycle()
-    var showBrowserManager by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(surface) { if (surface != MochiSurface.Tools) showBrowserManager = false }
+    var showBrowserManager by rememberSaveable(surface) { mutableStateOf(false) }
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
     val focusMode by viewModel.focusMode.collectAsStateWithLifecycle()
     var focusStandby by rememberSaveable { mutableStateOf(false) }
@@ -999,6 +999,7 @@ private fun MochiAppContent(
             ) {
                 MochiTopBar(
                     surface = surface,
+                    onBrowse = { showBrowserManager = true },
                     onTasks = { taskCenter.open() },
                     onSettings = {
                         if (surface == MochiSurface.Settings) viewModel.openMochi()
@@ -1227,6 +1228,7 @@ internal fun MochiTopBar(
     surface: MochiSurface,
     onTasks: () -> Unit,
     onSettings: () -> Unit,
+    onBrowse: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().testTag("mochi-header"),
@@ -1240,6 +1242,18 @@ internal fun MochiTopBar(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
+        if (surface.isHomePresentation() || surface == MochiSurface.Conversation) {
+            TextButton(
+                onBrowse,
+                modifier = Modifier.size(48.dp).testTag("mochi-browse"),
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    ToolGlyphIcon(ToolGlyph.WEBSITES, Modifier.size(20.dp))
+                    Text("Browse", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                }
+            }
+        }
         TextButton(onTasks) { Text("Tasks") }
         OutlinedButton(
             onClick = onSettings,
@@ -6588,7 +6602,7 @@ internal fun MochiModeSwitch(
 }
 
 @Composable
-private fun NavigationBar(
+internal fun NavigationBar(
     surface: MochiSurface,
     onNavigate: (MochiNavigationIntent) -> Unit,
     onOpenMochi: () -> Unit,
@@ -6606,6 +6620,7 @@ private fun NavigationBar(
         ) {
             MochiNavigationItem(
                 label = "Mochi",
+                glyph = ToolGlyph.MOCHI,
                 selected =
                     surface == MochiSurface.Face ||
                         surface == MochiSurface.DateTime ||
@@ -6617,6 +6632,7 @@ private fun NavigationBar(
             )
             MochiNavigationItem(
                 label = "Planner",
+                glyph = ToolGlyph.CALENDAR,
                 selected =
                     surface == MochiSurface.Today ||
                     surface is MochiSurface.CalendarMonth ||
@@ -6627,12 +6643,14 @@ private fun NavigationBar(
             )
             MochiNavigationItem(
                 label = "Skills",
+                glyph = ToolGlyph.SKILLS,
                 selected = surface == MochiSurface.Skills,
                 onClick = { onNavigate(MochiNavigationIntent.ShowSkills) },
                 modifier = Modifier.weight(1f),
             )
             MochiNavigationItem(
                 label = "Tools",
+                glyph = ToolGlyph.TOOLS,
                 selected = surface == MochiSurface.Tools,
                 onClick = { onNavigate(MochiNavigationIntent.ShowTools) },
                 modifier = Modifier.weight(1f),
@@ -6644,6 +6662,7 @@ private fun NavigationBar(
 @Composable
 private fun MochiNavigationItem(
     label: String,
+    glyph: ToolGlyph,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -6663,16 +6682,26 @@ private fun MochiNavigationItem(
             .padding(horizontal = 4.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            maxLines = 1,
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            ToolGlyphIcon(
+                glyph,
+                Modifier.size(22.dp),
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = label,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
     }
 }

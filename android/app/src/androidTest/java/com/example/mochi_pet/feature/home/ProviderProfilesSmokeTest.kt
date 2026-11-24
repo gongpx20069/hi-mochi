@@ -111,6 +111,26 @@ class ProviderProfilesSmokeTest {
         assertEquals(false, state.value.quickEntry)
     }
 
+    @Test fun homeBrowserShortcutReturnsToBothModesWithoutChangingTheDraft() {
+        compose.onNode(hasText("Mochi") and hasClickAction()).performClick()
+        compose.onNode(hasText(localizeUiText("Chat")) and hasClickAction()).performClick()
+        compose.onNodeWithTag("conversation-input").performTextInput("Browser shortcut draft")
+        hideKeyboard()
+        compose.onNodeWithTag("mochi-browse").performClick()
+        compose.onNodeWithTag("browser-search").assertIsDisplayed()
+        compose.onNodeWithTag("browser-management-close").performClick()
+        compose.onNodeWithTag("conversation-input").assertIsDisplayed()
+        assertTrue(compose.onNodeWithTag("conversation-input").fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text.contains("Browser shortcut draft"))
+        compose.onNodeWithTag("conversation-input").performTextClearance()
+        hideKeyboard()
+        compose.onNode(hasText(localizeUiText("Companion")) and hasClickAction()).performClick()
+        compose.onNodeWithTag("mochi-browse").performClick()
+        compose.onNodeWithTag("browser-management").assertIsDisplayed()
+        compose.onNodeWithTag("browser-management-close").performClick()
+        compose.onNode(hasText(localizeUiText("Companion")) and hasClickAction()).assertIsSelected()
+    }
+
     @Test fun compactComposerAndCapabilityPagesRemainReachableWithoutSending() {
         compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         val app = compose.activity.application as MochiApplication

@@ -50,7 +50,7 @@ internal fun ToolSettingsRow(
     }
 }
 
-internal enum class ToolGlyph { APPS, PLAYER, ASSIST, RETURN, CHEVRON, CLOSE, SEARCH, WEBSITES, SEND, STOP, SPEAKER, MUTED }
+internal enum class ToolGlyph { APPS, PLAYER, ASSIST, RETURN, CHEVRON, CLOSE, SEARCH, WEBSITES, SEND, STOP, SPEAKER, MUTED, MOCHI, CALENDAR, SKILLS, TOOLS }
 
 @Composable
 internal fun ToolGlyphIcon(glyph: ToolGlyph, modifier: Modifier = Modifier, color: Color = LocalContentColor.current) {
@@ -59,6 +59,41 @@ internal fun ToolGlyphIcon(glyph: ToolGlyph, modifier: Modifier = Modifier, colo
             val stroke = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
             val path = Path()
             when (glyph) {
+                ToolGlyph.MOCHI -> {
+                    path.moveTo(4f, 10f); path.lineTo(4f, 3f); path.lineTo(9f, 6f)
+                    path.quadraticTo(12f, 5f, 15f, 6f)
+                    path.lineTo(20f, 3f); path.lineTo(20f, 10f)
+                    path.cubicTo(24f, 23f, 0f, 23f, 4f, 10f)
+                    drawCircle(color, 1f, Offset(8f, 12f))
+                    drawCircle(color, 1f, Offset(16f, 12f))
+                    path.moveTo(10f, 16f); path.quadraticTo(12f, 18f, 14f, 16f)
+                }
+                ToolGlyph.CALENDAR -> {
+                    drawRoundRect(color, Offset(3f, 5f), Size(18f, 16f), CornerRadius(3f), style = stroke)
+                    path.moveTo(7f, 3f); path.lineTo(7f, 7f)
+                    path.moveTo(17f, 3f); path.lineTo(17f, 7f)
+                    path.moveTo(3f, 10f); path.lineTo(21f, 10f)
+                    path.moveTo(7f, 14f); path.lineTo(10f, 14f)
+                    path.moveTo(14f, 17f); path.lineTo(17f, 17f)
+                }
+                ToolGlyph.SKILLS -> {
+                    path.moveTo(4f, 4f); path.lineTo(9f, 4f)
+                    path.cubicTo(7f, -1f, 17f, -1f, 15f, 4f)
+                    path.lineTo(20f, 4f); path.lineTo(20f, 9f)
+                    path.cubicTo(15f, 7f, 15f, 17f, 20f, 15f)
+                    path.lineTo(20f, 20f); path.lineTo(15f, 20f)
+                    path.cubicTo(17f, 15f, 7f, 15f, 9f, 20f)
+                    path.lineTo(4f, 20f); path.lineTo(4f, 15f)
+                    path.cubicTo(9f, 17f, 9f, 7f, 4f, 9f)
+                    path.close()
+                }
+                ToolGlyph.TOOLS -> {
+                    drawRoundRect(color, Offset(3f, 7f), Size(18f, 14f), CornerRadius(3f), style = stroke)
+                    path.moveTo(8f, 7f); path.lineTo(8f, 3f); path.lineTo(16f, 3f); path.lineTo(16f, 7f)
+                    path.moveTo(3f, 12f); path.lineTo(21f, 12f)
+                    path.moveTo(9f, 11f); path.lineTo(9f, 15f)
+                    path.moveTo(15f, 11f); path.lineTo(15f, 15f)
+                }
                 ToolGlyph.APPS -> for (x in listOf(3f, 14f)) for (y in listOf(3f, 14f)) {
                     drawRoundRect(color, Offset(x, y), Size(7f, 7f), CornerRadius(1.5f), style = stroke)
                 }

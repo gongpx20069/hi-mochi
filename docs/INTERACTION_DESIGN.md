@@ -12,6 +12,15 @@
 | Tools | Provider connections and individual Tool controls |
 
 Bottom navigation is **Mochi / Planner / Skills / Tools**. The Mochi header
+uses a **Browse** shortcut in both Chat and Companion, opening the existing
+secure website/search dialog without changing modes or clearing the draft.
+It is absent in Companion full screen and on other destinations; Tools retains
+its Websites and logins entry. Closing the dialog returns to its originating
+surface and still ends manual browsing. Chat instructions do not gain a new
+browser-opening action.
+Bottom destinations pair short labels with consistent outline icons: Mochi face,
+calendar, puzzle and toolbox. Selection and minimum 48 dp touch targets remain.
+The Mochi header
 switches **Chat / Companion** (**对话 / 陪伴**); Face and its information cards
 belong to Companion, and Conversation belongs to Chat. Both share history and
 tasks. Returning from another destination restores the selected mode. Selection
@@ -714,9 +723,9 @@ settings row used by App Control, with a globe icon, short detail and chevron.
 Only the entry styling changes; it opens the existing secure full-screen dialog with a Bing
 search/address field centered in the page, Mochi's launcher logo above it, and
 an always-visible Close action at the top right. The logo and concise
-"Search the web. Save accounts safely." caption share a softly tinted brand area.
-A separate rounded translucent
-frosted-look panel below search contains website groups and the compact data
+"Search the web. Save accounts safely." caption sit on the plain theme background,
+with a small theme-tinted logo tile and a softly outlined search field.
+A separate rounded, low-contrast surface below search contains website groups and the compact data
 overflow menu. There are no introductory or session-status cards.
 Each website row shows its registrable domain and badges for local data and
 saved credentials. Clicking it opens a second secure bottom-sheet list.
@@ -728,7 +737,8 @@ changes; swiping never removes a row. Explicit actions also have accessibility
 alternatives. Color is supplementary, never the only type indicator.
 Search opens a full-screen manual browser with only four bottom controls:
 Back, Forward, Home, and Sites (Chinese: 网站), in an inset rounded navigation
-bar. History uses arrow icons with accessible labels and disabled states;
+bar, using the same subtle outline and flat tonal surface as Mochi navigation,
+without a floating shadow. History uses arrow icons with accessible labels and disabled states;
 Home and Sites use icons with short single-line labels. Sites is the
 emphasized action; its English label must not wrap on a 320 dp screen.
 Home reveals the search/account homepage without destroying or reloading
@@ -751,7 +761,7 @@ Editing supports username, website and replacement password for password account
 changing their website requires password re-entry. SMS editing offers only website
 and phone. Confirmed account deletion preserves current login.
 The overflow menu has separate cache and confirmed all-website-data deletion;
-both preserve saved passwords. Closing reveals the unchanged Tools page.
+both preserve saved passwords. Closing reveals the unchanged originating Mochi or Tools page.
 There is no mode selector; Mochi chooses mobile/desktop as needed. Legacy manual
 preferences do not override that decision.
 Website-data deletion includes shared login, unlike saved-account deletion.

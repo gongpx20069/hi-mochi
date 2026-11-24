@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
@@ -69,6 +68,12 @@ internal fun WebsiteManager(viewModel: MochiHomeViewModel, onClose: () -> Unit) 
                     value = search, onValueChange = { if (it.length <= 2_000) search = it },
                     placeholder = { Text("Search Bing or enter a website") },
                     singleLine = true, shape = MaterialTheme.shapes.extraLarge,
+                    leadingIcon = { ToolGlyphIcon(ToolGlyph.SEARCH, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { if (search.isNotBlank()) viewModel.openManagedWebsite(search) }),
                     trailingIcon = {
@@ -367,13 +372,11 @@ internal fun BrowserManagementLayout(
 ) {
     Surface(Modifier.fillMaxSize().testTag("browser-management"), color = MaterialTheme.colorScheme.background) {
         Box(
-            Modifier.fillMaxSize().background(Brush.verticalGradient(
-                listOf(Color(0xFF302640), MaterialTheme.colorScheme.background, Color(0xFF232538)),
-            )),
+            Modifier.fillMaxSize(),
             contentAlignment = Alignment.TopCenter,
         ) {
             BoxWithConstraints(Modifier.safeDrawingPadding().widthIn(max = 680.dp).fillMaxSize().padding(horizontal = 20.dp)) {
-                val logoSize = (maxHeight * 0.13f).coerceIn(48.dp, 88.dp)
+                val logoSize = (maxHeight * 0.11f).coerceIn(48.dp, 72.dp)
                 Column(Modifier.fillMaxSize().padding(bottom = 20.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         onResume?.let {
@@ -391,15 +394,14 @@ internal fun BrowserManagementLayout(
                     ) {
                         Surface(
                             modifier = Modifier.fillMaxWidth(0.85f).testTag("browser-brand"),
-                            shape = RoundedCornerShape(32.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                            shape = RoundedCornerShape(24.dp),
+                            color = Color.Transparent,
                         ) {
                             Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Box(
                                     Modifier.size(logoSize).clip(RoundedCornerShape(logoSize * 0.28f))
-                                        .background(Brush.linearGradient(listOf(Color(0xFFA794F4), Color(0xFF6758C9))))
+                                        .background(MaterialTheme.colorScheme.primaryContainer)
                                         .testTag("browser-logo"),
                                 ) {
                                     Image(painterResource(R.drawable.ic_launcher_foreground), "Mochi", Modifier.fillMaxSize())
@@ -414,14 +416,12 @@ internal fun BrowserManagementLayout(
                     }
                     Surface(
                         modifier = Modifier.fillMaxWidth().weight(1f).testTag("browser-accounts-panel"),
-                        shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
                     ) {
                         Column(
-                            Modifier.background(Brush.linearGradient(
-                                listOf(Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.015f)),
-                            )).padding(horizontal = 16.dp, vertical = 8.dp),
+                            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                             content = accounts,
                         )
                     }
