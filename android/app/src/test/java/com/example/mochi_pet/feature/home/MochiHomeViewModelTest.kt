@@ -73,6 +73,308 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test fun `cold startup restores the persisted mode without an Activity saved state`() = kotlinx.coroutines.runBlocking {
+        val settings = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        fun create() = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        create().navigate(MochiNavigationIntent.ShowConversation)
+        val restarted = create()
+        restarted.onAppVisibilityChanged(true)
+        assertEquals(MochiSurface.Conversation, restarted.surface.value)
+        assertTrue(restarted.conversationState.value.quickEntry)
+        restarted.navigate(MochiNavigationIntent.ShowTools)
+        restarted.openMochi()
+        assertFalse(restarted.conversationState.value.quickEntry)
+        restarted.navigate(MochiNavigationIntent.ShowFace)
+        val companion = create()
+        assertEquals(MochiSurface.Face, companion.surface.value)
+        assertFalse(companion.conversationState.value.quickEntry)
+    }
+
+    @Test fun `late mode loading does not override an incoming destination`() = kotlinx.coroutines.runBlocking {
+        val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        base.setCompanionMode(false)
+        val loaded = CompletableDeferred<Unit>()
+        val settings = object : com.example.mochi_pet.core.settings.AgentSettingsRepository by base {
+            override suspend fun load(): com.example.mochi_pet.core.settings.AgentSettings {
+                loaded.await()
+                return base.load()
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowTools)
+        loaded.complete(Unit)
+        assertEquals(MochiSurface.Tools, viewModel.surface.value)
+        viewModel.openMochi()
+        assertEquals(MochiSurface.Conversation, viewModel.surface.value)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+    }
+
+    @Test fun `mode writes stay ordered when a previous save is slow`() = kotlinx.coroutines.runBlocking {
+        val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        val firstWrite = CompletableDeferred<Unit>()
+        val settings = object : com.example.mochi_pet.core.settings.AgentSettingsRepository by base {
+            override suspend fun setCompanionMode(companion: Boolean): com.example.mochi_pet.core.settings.AgentSettings {
+                if (!companion) firstWrite.await()
+                return base.setCompanionMode(companion)
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        firstWrite.complete(Unit)
+        assertTrue(base.load().companionMode)
+    }
+
+    @Test fun `mode save failure keeps the current selection and reports the failure`() {
+        val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        val settings = object : com.example.mochi_pet.core.settings.AgentSettingsRepository by base {
+            override suspend fun setCompanionMode(companion: Boolean): com.example.mochi_pet.core.settings.AgentSettings {
+                throw java.io.IOException("Synthetic storage failure")
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        assertEquals(MochiSurface.Conversation, viewModel.surface.value)
+        assertTrue(viewModel.conversationState.value.errorMessage!!.contains("only to this session"))
+    }
+
+    @Test fun `only a fresh foreground entry into idle Chat centers the preserved draft`() {
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            savedStateHandle = SavedStateHandle(mapOf("mochi_companion" to false)),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.updateConversationDraft("Keep draft")
+        viewModel.onAppVisibilityChanged(true)
+        assertTrue(viewModel.conversationState.value.quickEntry)
+        viewModel.showConversationHistory()
+        viewModel.onAppVisibilityChanged(true)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        viewModel.onAppVisibilityChanged(false)
+        viewModel.onAppVisibilityChanged(true)
+        assertTrue(viewModel.conversationState.value.quickEntry)
+        assertEquals("Keep draft", viewModel.conversationState.value.draft)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        viewModel.onAppVisibilityChanged(false)
+        viewModel.onAppVisibilityChanged(true, allowQuickEntry = false)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+    }
+
+    @Test fun `returning during an Agent reply stays normal after it finishes`() {
+        val reply = CompletableDeferred<AgentReply>()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { reply.await() } },
+            savedStateHandle = SavedStateHandle(mapOf("mochi_companion" to false)),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.onAppVisibilityChanged(true)
+        assertTrue(viewModel.conversationState.value.quickEntry)
+        viewModel.sendConversation("Question")
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        viewModel.onAppVisibilityChanged(false)
+        viewModel.onAppVisibilityChanged(true)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        reply.complete(AgentReply("Answer", "neutral"))
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        assertEquals("Answer", viewModel.conversationState.value.messages.last().text)
+    }
+
+    @Test fun `mute save failure stays explicit and unrelated settings preserve the session choice`() {
+        val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        val settings = object : com.example.mochi_pet.core.settings.AgentSettingsRepository by base {
+            override suspend fun setChatMuted(muted: Boolean): com.example.mochi_pet.core.settings.AgentSettings {
+                throw java.io.IOException("Synthetic storage failure")
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.setChatMuted(true)
+        assertTrue(viewModel.conversationState.value.errorMessage!!.contains("only to this session"))
+        assertFalse(viewModel.agentSettingsState.value.isSavingChatMute)
+        viewModel.setRecentConversationTurns(4)
+        viewModel.setFocusStandby(false, 30)
+        val saved = viewModel.agentSettingsState.value.settings
+        assertTrue(saved.chatMuted)
+        assertEquals(4, saved.recentConversationTurns)
+        assertFalse(saved.focusStandbyEnabled)
+    }
+
+    @Test fun `muted Chat keeps text replies while Companion and unmuted Chat still speak`() {
+        val preferences = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        val voice = VoiceRuntimeFake("")
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), voiceRuntime = voice, agentSettingsRepository = preferences,
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { AgentReply("Reply", "neutral") } },
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.setChatMuted(true)
+        viewModel.sendConversation("Chat question")
+        assertTrue(voice.spokenTexts.isEmpty())
+        assertEquals("Reply", viewModel.conversationState.value.messages.last().text)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        viewModel.sendConversation("Companion question")
+        assertEquals(listOf("Reply"), voice.spokenTexts)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.setChatMuted(false)
+        viewModel.sendConversation("Another chat question")
+        assertEquals(listOf("Reply", "Reply"), voice.spokenTexts)
+    }
+
+    @Test fun `muting pending Chat reply survives Agent navigation and stopping playback leaves replies intact`() {
+        val reply = CompletableDeferred<AgentReply>()
+        val voice = VoiceRuntimeFake("", autoCompleteSpeech = false)
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), voiceRuntime = voice,
+            agentSettingsRepository = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+                com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+            ),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { sink, _, _ -> AgentRunner {
+                val result = reply.await()
+                sink.apply(NavigationDecision(UiDirective("date_time"), MochiNavigationIntent.ShowDateTime))
+                result
+            } },
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.sendConversation("Pending")
+        viewModel.setChatMuted(true)
+        reply.complete(AgentReply("First", "neutral"))
+        assertTrue(voice.spokenTexts.isEmpty())
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.setChatMuted(false)
+        viewModel.sendConversation("Speak")
+        assertEquals(listOf("First"), voice.spokenTexts)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        val stops = voice.stopSpeakingCount
+        viewModel.setChatMuted(true)
+        assertEquals(stops + 1, voice.stopSpeakingCount)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+        voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+        assertEquals("First", viewModel.conversationState.value.messages.last().text)
+        assertTrue(viewModel.agentSettingsState.value.settings.chatMuted)
+    }
+
+    @Test fun `dictation fills then appends to draft without invoking the Agent`() {
+        val voice = HoldingVoiceRuntimeFake()
+        val viewModel = dictationViewModel(voice)
+        viewModel.startDictation()
+        assertTrue(voice.manual)
+        viewModel.finishDictation()
+        assertEquals(DictationPhase.TRANSCRIBING, viewModel.conversationState.value.dictation)
+        assertEquals(1, voice.finishCount)
+        voice.transcript!!.invoke(" first words ")
+        assertEquals("first words", viewModel.conversationState.value.draft)
+        viewModel.startDictation()
+        voice.transcript!!.invoke("more words")
+        assertEquals("first words", viewModel.conversationState.value.draft)
+        viewModel.finishDictation()
+        assertEquals("first words more words", viewModel.conversationState.value.draft)
+        assertEquals(DictationPhase.IDLE, viewModel.conversationState.value.dictation)
+        assertTrue(viewModel.conversationState.value.messages.isEmpty())
+        assertFalse(viewModel.conversationState.value.isSending)
+    }
+
+    @Test fun `dictation cancellation and navigation discard buffered and late transcripts`() {
+        val voice = HoldingVoiceRuntimeFake()
+        val viewModel = dictationViewModel(voice)
+        viewModel.updateConversationDraft("Keep")
+        viewModel.startDictation()
+        val stale = voice.transcript!!
+        stale("buffered")
+        viewModel.cancelDictation()
+        stale("late")
+        assertEquals("Keep", viewModel.conversationState.value.draft)
+        viewModel.startDictation()
+        viewModel.finishDictation()
+        viewModel.navigate(MochiNavigationIntent.ShowTools)
+        voice.transcript!!.invoke("late navigation")
+        assertEquals(DictationPhase.IDLE, viewModel.conversationState.value.dictation)
+        assertEquals("Keep", viewModel.conversationState.value.draft)
+        assertTrue(viewModel.conversationState.value.messages.isEmpty())
+    }
+
+    @Test fun `release before wake pause completes cannot start a late microphone session`() {
+        val voice = HoldingVoiceRuntimeFake()
+        val wake = WakeRuntimeFake().apply { holdPause = true }
+        val viewModel = dictationViewModel(voice, wake)
+        viewModel.startDictation()
+        viewModel.finishDictation()
+        wake.paused!!.invoke()
+        assertEquals(null, voice.transcript)
+        assertEquals(DictationPhase.IDLE, viewModel.conversationState.value.dictation)
+    }
+
+    @Test fun `recognition failure keeps the draft and invalidates late callbacks`() {
+        val voice = HoldingVoiceRuntimeFake()
+        val viewModel = dictationViewModel(voice)
+        viewModel.updateConversationDraft("Keep")
+        viewModel.startDictation()
+        voice.noResult!!.invoke()
+        voice.transcript!!.invoke("late")
+        assertEquals("Keep", viewModel.conversationState.value.draft)
+        assertEquals("No speech was detected", viewModel.conversationState.value.errorMessage)
+        assertEquals(DictationPhase.IDLE, viewModel.conversationState.value.dictation)
+    }
+
+    @Test fun `Mochi restores its selected mode while other destinations close wake capture`() {
+        val wake = WakeRuntimeFake()
+        val viewModel = dictationViewModel(HoldingVoiceRuntimeFake(), wake)
+        viewModel.navigate(MochiNavigationIntent.ShowTools)
+        viewModel.openMochi()
+        assertEquals(MochiSurface.Conversation, viewModel.surface.value)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        viewModel.setCompanionVisible(true)
+        assertTrue(wake.allowed)
+        viewModel.navigate(MochiNavigationIntent.ShowSettings)
+        assertFalse(wake.allowed)
+        viewModel.openMochi()
+        assertEquals(MochiSurface.Face, viewModel.surface.value)
+        assertFalse(wake.allowed)
+    }
+
+    private fun dictationViewModel(voice: HoldingVoiceRuntimeFake, wake: WakeRuntimeFake = WakeRuntimeFake()) =
+        MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), voiceRuntime = voice, wakeRuntime = wake,
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> error("Dictation must not build an Agent") },
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        ).also { it.navigate(MochiNavigationIntent.ShowConversation) }
+
     @Test fun `extension install actions open the resolved APK and lookup failures show feedback`() {
         val requested = mutableListOf<ExtensionApk>()
         var fail = false
@@ -908,6 +1210,110 @@ class MochiHomeViewModelTest {
     }
 
     @Test
+    fun `leaving during wake acknowledgement rejects old callbacks but permits a fresh wake`() {
+        val voice = VoiceRuntimeFake("New request", autoCompleteSpeech = false)
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { AgentReply("Done.", "neutral") } },
+            voiceRuntime = voice, wakeRuntime = WakeRuntimeFake(),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.setCompanionVisible(true)
+        viewModel.startVoiceInput(acknowledgeWake = true)
+        val oldAcknowledgement = voice.speechCallbacks.single()
+        viewModel.setCompanionVisible(false)
+        viewModel.setCompanionVisible(true)
+        oldAcknowledgement(SpeechPlaybackResult.COMPLETED)
+        assertEquals(0, voice.listenCount)
+        assertTrue(viewModel.conversationState.value.messages.isEmpty())
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+
+        viewModel.startVoiceInput(acknowledgeWake = true)
+        oldAcknowledgement(SpeechPlaybackResult.COMPLETED)
+        assertEquals(ChatPipelineStage.SPEAKING, viewModel.pipelineState.value.stage)
+        voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(1, voice.listenCount)
+        assertEquals(listOf("New request", "Done."), viewModel.conversationState.value.messages.map { it.text })
+        voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(2, voice.listenCount)
+    }
+
+    @Test
+    fun `leaving during initial wake pause rejects delayed acknowledgement and direct listening`() {
+        for (acknowledgeWake in listOf(true, false)) {
+            val voice = VoiceRuntimeFake("Must not send")
+            val wake = WakeRuntimeFake().apply { holdPause = true }
+            val viewModel = MochiHomeViewModel(
+                plannerStore = PlannerStoreFake(), voiceRuntime = voice, wakeRuntime = wake,
+                ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+            )
+            viewModel.setCompanionVisible(true)
+            viewModel.startVoiceInput(acknowledgeWake)
+            val paused = checkNotNull(wake.paused)
+            viewModel.navigate(MochiNavigationIntent.ShowConversation)
+            viewModel.navigate(MochiNavigationIntent.ShowFace)
+            viewModel.setCompanionVisible(true)
+            paused()
+            assertEquals(0, voice.listenCount)
+            assertTrue(voice.spokenTexts.isEmpty())
+            assertTrue(viewModel.conversationState.value.messages.isEmpty())
+            assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+        }
+    }
+
+    @Test
+    fun `leaving during follow up pause rejects delayed listening without losing the reply`() {
+        val voice = VoiceRuntimeFake("Question", autoCompleteSpeech = false)
+        val wake = WakeRuntimeFake()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { AgentReply("Answer", "neutral") } },
+            voiceRuntime = voice, wakeRuntime = wake,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.setCompanionVisible(true)
+        viewModel.startVoiceInput()
+        wake.holdPause = true
+        voice.speechCallbacks.single()(SpeechPlaybackResult.COMPLETED)
+        val paused = checkNotNull(wake.paused)
+        viewModel.navigate(MochiNavigationIntent.ShowSettings)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        viewModel.setCompanionVisible(true)
+        paused()
+        assertEquals(1, voice.listenCount)
+        assertEquals(listOf("Answer"), voice.spokenTexts)
+        assertEquals("Answer", viewModel.conversationState.value.messages.last().text)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+    }
+
+    @Test
+    fun `leaving during Agent work preserves its reply and playback but ends follow up listening`() {
+        val reply = CompletableDeferred<AgentReply>()
+        val voice = VoiceRuntimeFake("Question", autoCompleteSpeech = false)
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { reply.await() } },
+            voiceRuntime = voice, wakeRuntime = WakeRuntimeFake(),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.setCompanionVisible(true)
+        viewModel.startVoiceInput()
+        viewModel.setCompanionVisible(false)
+        assertTrue(viewModel.conversationState.value.isSending)
+        reply.complete(AgentReply("Completed in background", "neutral"))
+        assertFalse(viewModel.conversationState.value.isSending)
+        assertEquals(listOf("Question", "Completed in background"), viewModel.conversationState.value.messages.map { it.text })
+        assertEquals(listOf("Completed in background"), voice.spokenTexts)
+        assertEquals(ChatPipelineStage.SPEAKING, viewModel.pipelineState.value.stage)
+        voice.speechCallbacks.single()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(1, voice.listenCount)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+    }
+
+    @Test
     fun `wake word acknowledgement is spoken but not added to history`() {
         val voiceRuntime = VoiceRuntimeFake("Turn on the light")
         val viewModel = MochiHomeViewModel(
@@ -1218,7 +1624,8 @@ private class BriefingVoiceFake : VoiceRuntime {
     var listenCount = 0
     var acknowledgements = 0
     var briefingResult: ((WakeBriefingResult) -> Unit)? = null
-    override fun startListening(onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit) { listenCount++ }
+    override fun startListening(onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit, manualEndpoint: Boolean) { listenCount++ }
+    override fun finishListening() = Unit
     override fun startListeningWithBriefing(
         text: String, onBriefingResult: (WakeBriefingResult) -> Unit,
         onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit,
@@ -1257,6 +1664,7 @@ private class VoiceRuntimeFake(
     override fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
+        manualEndpoint: Boolean,
     ) {
         listenCount += 1
         val transcript = transcripts.removeFirstOrNull()
@@ -1268,6 +1676,7 @@ private class VoiceRuntimeFake(
     }
 
     override fun stopListening() = Unit
+    override fun finishListening() = Unit
 
     override fun speak(
         text: String,
@@ -1315,13 +1724,23 @@ private class HoldingVoiceRuntimeFake : VoiceRuntime {
     )
     override val state = mutableState
     var stopCount = 0
+    var finishCount = 0
+    var manual = false
+    var transcript: ((String) -> Unit)? = null
+    var noResult: (() -> Unit)? = null
 
     override fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
+        manualEndpoint: Boolean,
     ) {
+        manual = manualEndpoint
+        transcript = onFinalTranscript
+        noResult = onNoResult
         mutableState.value = mutableState.value.copy(isListening = true)
     }
+
+    override fun finishListening() { finishCount++ }
 
     override fun stopListening() {
         stopCount += 1
@@ -1351,6 +1770,7 @@ private class InterruptibleVoiceRuntimeFake : VoiceRuntime {
     override fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
+        manualEndpoint: Boolean,
     ) {
         state.value = state.value.copy(isListening = true)
     }
@@ -1358,6 +1778,8 @@ private class InterruptibleVoiceRuntimeFake : VoiceRuntime {
     override fun stopListening() {
         state.value = state.value.copy(isListening = false)
     }
+
+    override fun finishListening() = Unit
 
     override fun speak(
         text: String,
@@ -1378,6 +1800,11 @@ private class WakeRuntimeFake : WakeRuntime {
     )
     var pauseCount = 0
     var resumeCount = 0
+    var allowed = false
+    var holdPause = false
+    var paused: (() -> Unit)? = null
+
+    override fun setCaptureAllowed(allowed: Boolean) { this.allowed = allowed }
 
     override fun enable() = Unit
 
@@ -1389,7 +1816,7 @@ private class WakeRuntimeFake : WakeRuntime {
 
     override fun pause(onPaused: () -> Unit) {
         pauseCount += 1
-        onPaused()
+        if (holdPause) paused = onPaused else onPaused()
     }
 
     override fun resume() {

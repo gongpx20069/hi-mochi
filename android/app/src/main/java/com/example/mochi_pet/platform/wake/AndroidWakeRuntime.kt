@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Resources
+import android.app.KeyguardManager
+import android.os.PowerManager
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
@@ -48,6 +50,14 @@ class AndroidWakeRuntime(
                 WakeCaptureService.EXTRA_STATUS,
             )?.let(WakeCaptureStatus::valueOf)
                 ?: WakeCaptureStatus.ERROR
+            if (!shouldBeEnabled && status != WakeCaptureStatus.DISABLED) {
+                sendAction(WakeCaptureService.ACTION_STOP)
+                return
+            }
+            if (status in setOf(WakeCaptureStatus.STARTING, WakeCaptureStatus.LISTENING) && !canCapture) {
+                sendAction(WakeCaptureService.ACTION_PAUSE)
+                return
+            }
             val event = when (status) {
                 WakeCaptureStatus.DISABLED -> WakeRuntimeEvent.Disabled
                 WakeCaptureStatus.STARTING -> WakeRuntimeEvent.Starting
@@ -79,6 +89,12 @@ class AndroidWakeRuntime(
         }
     }
     private val pauseCallbacks = mutableListOf<() -> Unit>()
+    @Volatile private var captureAllowed = false
+
+    internal val canCapture: Boolean
+        get() = captureAllowed && shouldBeEnabled &&
+            applicationContext.getSystemService(PowerManager::class.java).isInteractive &&
+            !applicationContext.getSystemService(KeyguardManager::class.java).isKeyguardLocked
 
     override val state: StateFlow<WakeRuntimeState> = mutableState.asStateFlow()
     override val shouldBeEnabled: Boolean
@@ -100,9 +116,9 @@ class AndroidWakeRuntime(
         preferences.edit { putBoolean(KEY_ENABLED, true) }
         mutableState.value = reduceWakeRuntimeState(
             mutableState.value,
-            WakeRuntimeEvent.Starting,
+            if (canCapture) WakeRuntimeEvent.Starting else WakeRuntimeEvent.Paused(),
         )
-        sendAction(WakeCaptureService.ACTION_START, foreground = true)
+        if (canCapture) sendAction(WakeCaptureService.ACTION_START, foreground = true)
     }
 
     override fun disable() {
@@ -149,9 +165,15 @@ class AndroidWakeRuntime(
         sendAction(WakeCaptureService.ACTION_PAUSE)
     }
 
+    override fun setCaptureAllowed(allowed: Boolean) {
+        if (captureAllowed == allowed) return
+        captureAllowed = allowed
+        if (allowed) resume() else pause()
+    }
+
     override fun resume() {
-        if (mutableState.value.enabled) {
-            sendAction(WakeCaptureService.ACTION_RESUME)
+        if (mutableState.value.enabled && shouldBeEnabled && canCapture) {
+            sendAction(WakeCaptureService.ACTION_START, foreground = true)
         }
     }
 

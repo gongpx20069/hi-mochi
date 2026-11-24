@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,7 +36,6 @@ internal fun TermuxProviderCard(
     onAction: (TermuxUiAction) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var management by remember { mutableStateOf(false) }
     var confirmDisconnect by remember { mutableStateOf(false) }
     ExtensionCard {
         ExtensionHeading(
@@ -51,40 +48,43 @@ internal fun TermuxProviderCard(
                 else -> "Installed · connection required"
             }),
         ) {
-            Switch(summary.enabled, { onAction(TermuxUiAction.Enable(it)) },
+            CapabilitySwitch(summary.enabled, { onAction(TermuxUiAction.Enable(it)) },
                 enabled = summary.connected && !disabled)
         }
         Text("Enabled commands run automatically for conversations, Scheduled Agents, and Subagents. Output may go to your model Provider.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         summary.detail?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        when {
-            !summary.installed || !summary.trusted ->
-                Button({ onAction(TermuxUiAction.Install) }, enabled = !disabled) { Text("Install extension") }
-            !summary.connected ->
-                Button({ onAction(TermuxUiAction.Configure) }, enabled = !disabled) { Text("Configure Termux") }
-            !summary.enabled ->
-                Button({ onAction(TermuxUiAction.EnableWithSkill) }, enabled = !disabled) { Text("Enable tools and Skill") }
-            else -> TextButton({ onAction(TermuxUiAction.Tasks) }, enabled = !disabled) { Text("Termux tasks") }
-        }
-        TextButton({ management = !management }) { Text(if (management) "Hide connection settings" else "Connection settings") }
-        if (management) {
+        ToolConnectionRow(
+            hasConnection = summary.connected && summary.trusted,
+            connectLabel = if (!summary.installed || !summary.trusted) "Install extension" else "Configure Termux",
+            detail = when {
+                !summary.installed -> "Optional extension · not installed"
+                !summary.trusted -> "Installed package could not be trusted"
+                summary.connected && !summary.enabled -> "Connected - not enabled"
+                summary.connected -> "Connected"
+                else -> "Installed · connection required"
+            },
+            enabled = !disabled, tag = "termux-connection",
+            onConnect = { onAction(if (!summary.installed || !summary.trusted) TermuxUiAction.Install else TermuxUiAction.Configure) },
+        ) { close ->
             summary.versionName?.let { Text("Extension $it", style = MaterialTheme.typography.bodySmall) }
             if (summary.trusted) {
-                TextButton({ onAction(TermuxUiAction.Configure) }, enabled = !disabled) { Text("Check connection") }
-                if (summary.connected) {
-                    if (summary.enabled) {
-                        TextButton({ onAction(TermuxUiAction.EnableWithSkill) }, enabled = !disabled) { Text("Enable tools and Skill") }
-                    }
-                    TextButton({ confirmDisconnect = true }, enabled = !disabled) { Text("Disconnect") }
+                TextButton({ close(); onAction(TermuxUiAction.Configure) }, enabled = !disabled) { Text("Check connection") }
+                CapabilityAction({ close(); onAction(TermuxUiAction.EnableWithSkill) }, enabled = !disabled, emphasized = true) {
+                    Text("Enable tools and Skill")
                 }
+                TextButton({ close(); confirmDisconnect = true }, enabled = !disabled) { Text("Disconnect") }
             }
+        }
+        if (summary.connected && summary.enabled) {
+            TextButton({ onAction(TermuxUiAction.Tasks) }, enabled = !disabled) { Text("Termux tasks") }
         }
         if (summary.tools.isNotEmpty()) {
             TextButton({ expanded = !expanded }) { Text(if (expanded) "Hide tools" else "Show tools") }
             if (expanded) summary.tools.forEach { tool ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(tool.name, Modifier.weight(1f), fontFamily = FontFamily.Monospace)
-                    Switch(tool.enabled, { onAction(TermuxUiAction.EnableTool(tool.name, it)) },
+                    CapabilitySwitch(tool.enabled, { onAction(TermuxUiAction.EnableTool(tool.name, it)) },
                         enabled = summary.enabled && !disabled)
                 }
             }

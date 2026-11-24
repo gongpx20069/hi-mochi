@@ -32,9 +32,10 @@ internal class RecordedSpeechCapture(
     private val echoCancellation: Boolean = false,
     private val onReady: (Boolean) -> Unit = {},
     private val onSpeechStarted: () -> Unit = {},
+    private val endOnSilence: Boolean = true,
 ) : AutoCloseable {
     private val recording = AtomicBoolean(false)
-    private val providerEndpointReached = AtomicBoolean(false)
+    private val endpointRequested = AtomicBoolean(false)
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
     private var outputFile: File? = null
@@ -158,8 +159,8 @@ internal class RecordedSpeechCapture(
         outputFile = null
     }
 
-    fun completeFromProvider() {
-        providerEndpointReached.set(true)
+    fun complete() {
+        endpointRequested.set(true)
         recording.set(false)
         audioRecord?.let { recorder ->
             try {
@@ -195,6 +196,7 @@ internal class RecordedSpeechCapture(
                         vadMinimumSilenceSeconds,
                     noSpeechChunkLimit =
                         secondsToChunkCount(noSpeechTimeoutSeconds),
+                    endOnSilence = endOnSilence,
                 )
             } catch (_: IOException) {
                 failure = "Speech endpoint model is unavailable"
@@ -259,11 +261,11 @@ internal class RecordedSpeechCapture(
                             }
                         }
                     }
-                    if (providerEndpointReached.get()) {
+                    if (endpointRequested.get()) {
                         captured = true
                         Log.i(
                             SPEECH_LOG_TAG,
-                            "capture_completed providerEndpoint=true totalMs=" +
+                            "capture_completed requestedEndpoint=true totalMs=" +
                                 (SystemClock.elapsedRealtime() -
                                     captureStartedAt),
                         )
@@ -301,6 +303,10 @@ internal class RecordedSpeechCapture(
             if (audioRecord === recorder) {
                 audioRecord = null
             }
+            if (captured && file.length() == 0L) {
+                captured = false
+                failure = failure ?: "No speech was detected"
+            }
             if (captured && outputFile === file) {
                 outputFile = null
                 onCaptured(file)
@@ -319,6 +325,7 @@ private class SherpaSpeechEndpointDetector(
     minimumSilenceSeconds: Float,
     private val noSpeechChunkLimit: Int = NO_SPEECH_CHUNK_LIMIT,
     private val maximumChunkLimit: Int = MAXIMUM_CHUNK_LIMIT,
+    private val endOnSilence: Boolean = true,
 ) : AutoCloseable {
     private val vad = Vad(
         null,
@@ -369,7 +376,7 @@ private class SherpaSpeechEndpointDetector(
         }
         val endpoint = resolveSpeechEndpoint(
             speechStarted = speechStarted,
-            segmentComplete = segment != null,
+            segmentComplete = endOnSilence && segment != null,
             totalChunks = totalChunks,
             noSpeechChunkLimit = noSpeechChunkLimit,
             maximumChunkLimit = maximumChunkLimit,

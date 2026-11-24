@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,7 +58,7 @@ internal fun AppControlProviderCard(
     PlannerCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("App Control", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Switch(summary.enabled, onSetEnabled, enabled = !disabled, modifier = Modifier.testTag("app-group-switch"))
+            CapabilitySwitch(summary.enabled, onSetEnabled, enabled = !disabled, modifier = Modifier.testTag("app-group-switch"))
         }
         Text(
             "Read and operate the apps you explicitly allow.",
@@ -205,7 +204,7 @@ internal fun MediaProviderCard(
     PlannerCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Media Control", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Switch(summary.enabled, onSetEnabled, enabled = !disabled, modifier = Modifier.testTag("media-group-switch"))
+            CapabilitySwitch(summary.enabled, onSetEnabled, enabled = !disabled, modifier = Modifier.testTag("media-group-switch"))
         }
         Text("Control playback, request songs and adjust media volume.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

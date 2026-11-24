@@ -160,6 +160,7 @@ class ExtensionSetupUiTest {
                 ) { if (it == WebdavUiAction.Disconnect) disconnected = true }
             }
         }
+        compose.onNodeWithText("Connection settings").performClick()
         compose.onNodeWithText("Disconnect").performClick()
         compose.onNodeWithText("Disconnect WebDAV?").assertIsDisplayed()
         assertFalse(disconnected)

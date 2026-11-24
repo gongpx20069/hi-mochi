@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -68,6 +69,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,6 +80,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -89,18 +95,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -110,15 +119,22 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.layout.ContentScale
@@ -179,7 +195,6 @@ import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import com.example.mochi_pet.core.wake.WakeKeyword
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.RadioButton
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import com.example.mochi_pet.core.web.WebContentException
@@ -239,6 +254,7 @@ fun MochiApp(
     agentLinkResults: Flow<AgentLinkAuthorizationResult>,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
     plannerDates: Flow<com.example.mochi_pet.core.model.PlannerDestination> = kotlinx.coroutines.flow.emptyFlow(),
+    appVisibility: Flow<Boolean> = kotlinx.coroutines.flow.emptyFlow(),
 ) {
     val context = LocalContext.current
     val application = context.applicationContext as MochiApplication
@@ -296,6 +312,13 @@ fun MochiApp(
             viewModel.reportMicrophonePermissionDenied()
         }
         pendingVoiceTrigger = VoiceInputTrigger.DIRECT
+    }
+    val dictationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            Toast.makeText(context, localizeUiText("Microphone ready. Hold again to dictate."), Toast.LENGTH_SHORT).show()
+        } else viewModel.reportMicrophonePermissionDenied()
     }
     val wakePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -420,23 +443,6 @@ fun MochiApp(
     LaunchedEffect(providerShareCallbacks) {
         providerShareCallbacks.collect(viewModel::stageProviderImport)
     }
-    LifecycleResumeEffect(wakeRuntime) {
-        val startJob = coroutineScope.launch {
-            delay(1_000)
-            if (
-                wakeRuntime.shouldBeEnabled &&
-                wakeRuntime.state.value.status in setOf(
-                    WakeCaptureStatus.DISABLED,
-                    WakeCaptureStatus.ERROR,
-                )
-            ) {
-                enableWake()
-            }
-        }
-        onPauseOrDispose {
-            startJob.cancel()
-        }
-    }
     LaunchedEffect(locationPermissionRequest) {
         if (locationPermissionRequest) {
             locationPermissionLauncher.launch(
@@ -450,9 +456,15 @@ fun MochiApp(
 
     MochiAppContent(
         viewModel = viewModel,
+        appVisibility = appVisibility,
         journal = journal,
         taskCenter = taskCenter,
-        onStartVoice = { startVoice(VoiceInputTrigger.DIRECT) },
+        wakeRuntime = wakeRuntime,
+        onStartDictation = {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                viewModel.startDictation()
+            } else dictationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        },
         onEnableWake = enableWake,
         launchAgentLink = launchAgentLink,
     )
@@ -460,10 +472,12 @@ fun MochiApp(
 
 @Composable
 private fun MochiAppContent(
+    appVisibility: Flow<Boolean>,
     viewModel: MochiHomeViewModel,
     journal: com.example.mochi_pet.feature.journal.JournalViewModel,
     taskCenter: TaskCenterViewModel,
-    onStartVoice: () -> Unit,
+    wakeRuntime: WakeRuntime,
+    onStartDictation: () -> Unit,
     onEnableWake: () -> Unit,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
@@ -495,6 +509,10 @@ private fun MochiAppContent(
         viewModel.providerShareState.collectAsStateWithLifecycle()
     val agentSettingsState by
         viewModel.agentSettingsState.collectAsStateWithLifecycle()
+    if (agentSettingsState.isLoading) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+        return
+    }
     val personaState by viewModel.personaState.collectAsStateWithLifecycle()
     val voiceState by viewModel.voiceState.collectAsStateWithLifecycle()
     val wakeState by viewModel.wakeState.collectAsStateWithLifecycle()
@@ -521,6 +539,36 @@ private fun MochiAppContent(
     val activity = context as? Activity
     var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
     val homePresentation = surface.isHomePresentation()
+    val taskCenterState by taskCenter.state.collectAsStateWithLifecycle()
+    val companionVisible = homePresentation && !taskCenterState.visible && assistanceRequest == null &&
+        !browserState.active && !showBrowserManager && availableUpdate == null &&
+        providerShareState.pendingImportLink == null
+    val quickEntryAllowed by rememberUpdatedState(
+        !taskCenterState.visible && assistanceRequest == null && !browserState.active &&
+            !showBrowserManager && availableUpdate == null && providerShareState.pendingImportLink == null,
+    )
+    LaunchedEffect(appVisibility) {
+        appVisibility.collect { viewModel.onAppVisibilityChanged(it, quickEntryAllowed) }
+    }
+    LaunchedEffect(quickEntryAllowed) {
+        if (!quickEntryAllowed) viewModel.showConversationHistory()
+    }
+    LifecycleResumeEffect(companionVisible) {
+        viewModel.setCompanionVisible(companionVisible)
+        val startJob = coroutineScope.launch {
+            if (companionVisible) {
+                delay(1_000)
+                if (wakeRuntime.shouldBeEnabled &&
+                    wakeRuntime.state.value.status in setOf(WakeCaptureStatus.DISABLED, WakeCaptureStatus.ERROR)
+                ) onEnableWake()
+            }
+        }
+        onPauseOrDispose {
+            startJob.cancel()
+            viewModel.setCompanionVisible(false)
+            viewModel.cancelDictation()
+        }
+    }
     val focusStandbySettings = agentSettingsState.settings
     val visiblePipelineState =
         if (pipelineState.stage == ChatPipelineStage.LISTENING) {
@@ -787,8 +835,11 @@ private fun MochiAppContent(
             onNavigate = viewModel::navigate,
             onSendMessage = viewModel::sendConversation,
             onCancelMessage = viewModel::cancelConversation,
-            onStartVoice = onStartVoice,
-            onStopVoice = viewModel::stopVoiceInput,
+            onDraftChange = viewModel::updateConversationDraft,
+            onShowHistory = viewModel::showConversationHistory,
+            onStartDictation = onStartDictation,
+            onFinishDictation = viewModel::finishDictation,
+            onCancelDictation = viewModel::cancelDictation,
             onEnableWake = onEnableWake,
             onDisableWake = viewModel::disableWakeWord,
             onSelectWakeKeyword = viewModel::selectWakeKeyword,
@@ -921,7 +972,7 @@ private fun MochiAppContent(
                                 },
                                 shape = RoundedCornerShape(18.dp),
                             ) {
-                                Text("Exit focus")
+                                Text("Exit full screen")
                             }
                         }
                         ChatPipelineIndicator(state = visiblePipelineState)
@@ -948,18 +999,21 @@ private fun MochiAppContent(
             ) {
                 MochiTopBar(
                     surface = surface,
-                    wakeState = wakeState,
                     onTasks = { taskCenter.open() },
                     onSettings = {
-                        viewModel.navigate(
-                            if (surface == MochiSurface.Settings) {
-                                MochiNavigationIntent.ShowFace
-                            } else {
-                                MochiNavigationIntent.ShowSettings
-                            },
-                        )
+                        if (surface == MochiSurface.Settings) viewModel.openMochi()
+                        else viewModel.navigate(MochiNavigationIntent.ShowSettings)
                     },
                 )
+                if (homePresentation || surface == MochiSurface.Conversation) {
+                    MochiModeSwitch(
+                        companion = homePresentation,
+                        onNavigate = viewModel::navigate,
+                        chatMuted = agentSettingsState.settings.chatMuted,
+                        muteEnabled = !agentSettingsState.isLoading && !agentSettingsState.isSavingChatMute,
+                        onSetChatMuted = viewModel::setChatMuted,
+                    )
+                }
                 ChatPipelineIndicator(state = visiblePipelineState)
                 if (surface == MochiSurface.Settings) {
                     TextButton({ taskCenter.open(diagnostics = true) }) { Text("Configuration check") }
@@ -993,6 +1047,7 @@ private fun MochiAppContent(
                 NavigationBar(
                     surface = surface,
                     onNavigate = viewModel::navigate,
+                    onOpenMochi = viewModel::openMochi,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -1168,34 +1223,23 @@ private fun BrowserSessionCard(
 }
 
 @Composable
-private fun MochiTopBar(
+internal fun MochiTopBar(
     surface: MochiSurface,
-    wakeState: WakeRuntimeState,
     onTasks: () -> Unit,
     onSettings: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("mochi-header"),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = "Mochi",
-                color = MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Black,
-            )
-            Text(
-                text = if (wakeState.enabled) {
-                    "${wakeState.keyword.phrase} is ${wakeState.status.name.lowercase()}"
-                } else {
-                    surface.displayName()
-                },
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
+        Text(
+            text = "Mochi",
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
         TextButton(onTasks) { Text("Tasks") }
         OutlinedButton(
             onClick = onSettings,
@@ -1233,16 +1277,14 @@ private fun ChatPipelineIndicator(state: ChatPipelineUiState) {
                         localizeUiText(state.stage.supportingText())
                 },
             color = Color(0xFF211C28),
-            shape = RoundedCornerShape(22.dp),
-            tonalElevation = 8.dp,
-            shadowElevation = 2.dp,
+            shape = RoundedCornerShape(16.dp),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PipelinePulse(accent = accent)
@@ -1462,6 +1504,7 @@ private fun FocusStandbyScreen(
 
 @Composable
 private fun SurfaceContent(
+    onShowHistory: () -> Unit,
     plannerToday: LocalDate,
     journalSettings: @Composable () -> Unit,
     journalDay: @Composable (LocalDate, Boolean) -> Unit,
@@ -1486,8 +1529,10 @@ private fun SurfaceContent(
     onNavigate: (MochiNavigationIntent) -> Unit,
     onSendMessage: (String) -> Unit,
     onCancelMessage: () -> Unit,
-    onStartVoice: () -> Unit,
-    onStopVoice: () -> Unit,
+    onDraftChange: (String) -> Unit,
+    onStartDictation: () -> Unit,
+    onFinishDictation: () -> Unit,
+    onCancelDictation: () -> Unit,
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
     onSelectWakeKeyword: (WakeKeyword?) -> Unit,
@@ -1578,12 +1623,15 @@ private fun SurfaceContent(
             )
             MochiSurface.Conversation -> ConversationSurface(
                 state = conversationState,
+                onShowHistory = onShowHistory,
                 providerReady = providerSettingsState.summary.isReady,
                 voiceState = voiceState,
                 onSend = onSendMessage,
                 onCancel = onCancelMessage,
-                onStartVoice = onStartVoice,
-                onStopVoice = onStopVoice,
+                onDraftChange = onDraftChange,
+                onStartDictation = onStartDictation,
+                onFinishDictation = onFinishDictation,
+                onCancelDictation = onCancelDictation,
                 onOpenSpeechSettings = {
                     onNavigate(MochiNavigationIntent.ShowSettings)
                 },
@@ -2136,7 +2184,7 @@ private fun FocusModeButton(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "Focus mode",
+                text = "Full screen",
                 fontWeight = FontWeight.Bold,
             )
             Text(
@@ -3136,7 +3184,7 @@ private fun TodoSurface(
 }
 
 @Composable
-private fun SkillsSurface(
+internal fun SkillsSurface(
     state: SkillsUiState,
     onSearch: (String) -> Unit,
     onLoadPopular: () -> Unit,
@@ -3172,24 +3220,30 @@ private fun SkillsSurface(
                 "Built-in and installed capabilities"
             },
         )
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            SkillSectionTab(
-                label = "Installed",
-                selected = !explore,
-                onClick = { explore = false },
-                modifier = Modifier.weight(1f),
-            )
-            SkillSectionTab(
-                label = "Explore",
-                selected = explore,
-                onClick = { explore = true },
-                modifier = Modifier.weight(1f),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SkillSectionTab(
+                    label = "Installed",
+                    selected = !explore,
+                    onClick = { explore = false },
+                )
+                SkillSectionTab(
+                    label = "Explore",
+                    selected = explore,
+                    onClick = { explore = true },
+                )
+            }
+            if (!explore) TextButton(
+                onClick = onCheckUpdates,
+                enabled = !state.isLoading,
+            ) {
+                Text("Check for updates")
+            }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         if (explore) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -3209,14 +3263,6 @@ private fun SkillsSurface(
                 ) {
                     Text("Search")
                 }
-            }
-        } else {
-            OutlinedButton(
-                onClick = onCheckUpdates,
-                enabled = !state.isLoading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Check for updates")
             }
         }
         state.feedback?.let {
@@ -3461,7 +3507,7 @@ internal fun BuiltInToolRow(
         }
         if (tool.name == "recall_memory") {
             com.example.mochi_pet.feature.journal.JournalManagedControl(tool.enabled, onOpenJournalSettings)
-        } else Switch(
+        } else CapabilitySwitch(
             checked = tool.enabled,
             onCheckedChange = { onSetEnabled(tool.name, it) },
             enabled = !disabled,
@@ -3607,7 +3653,7 @@ internal fun ToolsSurface(
                             )
                         }
 
-                        Switch(
+                        CapabilitySwitch(
                             checked = state.catalog.agentBrowser.enabled,
                             onCheckedChange = onSetAgentBrowserEnabled,
                             enabled = !state.isLoading,
@@ -3671,7 +3717,7 @@ internal fun ToolsSurface(
                                             fontFamily = FontFamily.Monospace,
                                         )
                                     }
-                                    Switch(
+                                    CapabilitySwitch(
                                         checked = tool.enabled,
                                         onCheckedChange = {
                                             onSetBuiltInEnabled(tool.name, it)
@@ -3727,27 +3773,22 @@ internal fun ToolsSurface(
                                 )
                             }
                             if (state.catalog.amap.connected) {
-                                Switch(
+                                CapabilitySwitch(
                                     checked = state.catalog.amap.enabled,
                                     onCheckedChange = onSetAmapEnabled,
                                     enabled = !state.isLoading,
                                 )
                             }
                         }
-                        if (state.catalog.amap.connected) {
-                            OutlinedButton(
-                                onClick = onDisconnectAmap,
-                                enabled = !state.isLoading,
-                            ) {
-                                Text("Disconnect")
-                            }
-                        } else {
-                            Button(
-                                onClick = { showAmapCredentials = true },
-                                enabled = !state.isLoading,
-                            ) {
-                                Text("Configure Amap")
-                            }
+                        ToolConnectionRow(
+                            hasConnection = state.catalog.amap.connected,
+                            connectLabel = "Configure Amap",
+                            detail = if (state.catalog.amap.connected) "Connected" else "Web Service Key required",
+                            enabled = !state.isLoading,
+                            tag = "amap-connection",
+                            onConnect = { showAmapCredentials = true },
+                        ) { close ->
+                            TextButton({ close(); onDisconnectAmap() }, enabled = !state.isLoading) { Text("Disconnect") }
                         }
                         if (state.catalog.amap.tools.isNotEmpty()) {
                             TextButton(
@@ -3809,7 +3850,7 @@ internal fun ToolsSurface(
                                                         FontFamily.Monospace,
                                                 )
                                             }
-                                            Switch(
+                                            CapabilitySwitch(
                                                 checked = tool.enabled,
                                                 onCheckedChange = {
                                                     onSetBuiltInEnabled(
@@ -3983,7 +4024,6 @@ private fun MijiaExtensionCard(
     onSetEnabled: (Boolean) -> Unit,
     onSetToolEnabled: (String, Boolean) -> Unit,
 ) {
-    var management by rememberSaveable { mutableStateOf(false) }
     var confirmDisconnect by remember { mutableStateOf(false) }
     com.example.mochi_ui.ExtensionCard {
         com.example.mochi_ui.ExtensionHeading(
@@ -4003,7 +4043,7 @@ private fun MijiaExtensionCard(
             }),
         ) {
             if (summary.connected) {
-                Switch(
+                CapabilitySwitch(
                     checked = summary.enabled,
                     onCheckedChange = onSetEnabled,
                     enabled = !disabled,
@@ -4023,66 +4063,40 @@ private fun MijiaExtensionCard(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        when {
-            !summary.installed || !summary.trusted -> {
-                Button(
-                    onClick = onInstall,
-                    enabled = !disabled,
-                ) {
-                    Text(
-                        if (summary.installed) {
-                            "Get trusted extension"
-                        } else {
-                            "Install extension"
-                        },
-                    )
-                }
-            }
-            !summary.connected -> {
-                Button(
-                    onClick = onConfigure,
-                    enabled = !disabled,
-                ) {
-                    Text(
-                        if (summary.status == "authorization_expired") {
-                            "Reconnect Mi Home"
-                        } else {
-                            "Connect Mi Home"
-                        },
-                    )
-                }
-            }
-            else -> {
-                Text(
-                    text = buildString {
-                        summary.accountLabel?.let {
-                            append(it)
-                            append(" · ")
-                        }
-                        append(summary.selectedHomeCount)
-                        append(" homes · ")
-                        append(summary.selectedDeviceCount)
-                        append(" devices")
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                TextButton({ management = !management }) { Text(if (management) "Hide connection settings" else "Connection settings") }
-                if (management) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    summary.versionName?.let { Text("Extension $it", style = MaterialTheme.typography.bodySmall) }
-                    OutlinedButton(
-                        onClick = onConfigure,
-                        enabled = !disabled,
-                    ) {
-                        Text("Manage")
-                    }
-                    TextButton(
-                        onClick = { confirmDisconnect = true },
-                        enabled = !disabled,
-                    ) {
-                        Text("Disconnect")
-                    }
-                }
+        ToolConnectionRow(
+            hasConnection = summary.connected && summary.trusted,
+            connectLabel = when {
+                !summary.installed -> "Install extension"
+                !summary.trusted -> "Get trusted extension"
+                summary.status == "authorization_expired" -> "Reconnect Mi Home"
+                else -> "Connect Mi Home"
+            },
+            detail = when {
+                !summary.installed -> "Optional extension · not installed"
+                !summary.trusted -> "Installed package could not be trusted"
+                summary.connected -> "Connected"
+                summary.status == "authorization_expired" -> "Authorization expired"
+                else -> "Installed · connection required"
+            },
+            enabled = !disabled,
+            tag = "mijia-connection",
+            onConnect = if (!summary.installed || !summary.trusted) onInstall else onConfigure,
+        ) { close ->
+            Text(
+                text = buildString {
+                    summary.accountLabel?.let { append(it); append(" · ") }
+                    append(summary.selectedHomeCount)
+                    append(" homes · ")
+                    append(summary.selectedDeviceCount)
+                    append(" devices")
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            summary.versionName?.let { Text("Extension $it", style = MaterialTheme.typography.bodySmall) }
+            CapabilityAction({ close(); onConfigure() }, enabled = !disabled) { Text("Manage") }
+            TextButton({ close(); confirmDisconnect = true }, enabled = !disabled) {
+                Text("Disconnect")
             }
         }
         if (summary.tools.isNotEmpty()) {
@@ -4133,7 +4147,7 @@ private fun MijiaExtensionCard(
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             }
-                            Switch(
+                            CapabilitySwitch(
                                 checked = tool.enabled,
                                 onCheckedChange = {
                                     onSetToolEnabled(tool.name, it)
@@ -4204,61 +4218,42 @@ private fun McpServerCard(
                 )
             }
             if (server.connected) {
-                Switch(
+                CapabilitySwitch(
                     checked = server.enabled,
                     onCheckedChange = onSetEnabled,
                     enabled = !disabled,
                 )
             }
         }
-        when (server.authMode) {
-            McpAuthMode.OAUTH -> {
-                if (server.connected) {
-                    OutlinedButton(
-                        onClick = onDisconnectNotion,
-                        enabled = !disabled,
-                    ) {
-                        Text("Disconnect")
+        val manual = server.authMode in setOf(McpAuthMode.NONE, McpAuthMode.BEARER)
+        ToolConnectionRow(
+            hasConnection = server.connected || manual,
+            connectLabel = when (server.authMode) {
+                McpAuthMode.OAUTH -> if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) "Connect Feishu" else "Connect Notion"
+                McpAuthMode.TOKEN -> "Configure token"
+                else -> "Connection settings"
+            },
+            detail = when {
+                server.connected -> "Connected"
+                manual -> "Ready"
+                server.authMode == McpAuthMode.OAUTH -> "Authorization required"
+                else -> "Personal token required"
+            },
+            enabled = !disabled && (server.connected || server.authMode != McpAuthMode.TOKEN || server.id == TENCENT_DOCS_SERVER_ID),
+            tag = "mcp-connection-${server.id}",
+            onConnect = if (server.authMode == McpAuthMode.OAUTH) onConnectNotion else onConfigureTencentDocs,
+        ) { close ->
+            TextButton(
+                onClick = {
+                    close()
+                    when (server.authMode) {
+                        McpAuthMode.OAUTH -> onDisconnectNotion()
+                        McpAuthMode.TOKEN -> onDisconnectTencentDocs()
+                        else -> onRemove()
                     }
-                } else {
-                    Button(
-                        onClick = onConnectNotion,
-                        enabled = !disabled,
-                    ) {
-                        Text(if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) {
-                            "Connect Feishu"
-                        } else "Connect Notion")
-                    }
-                }
-            }
-            McpAuthMode.TOKEN -> {
-                if (server.connected) {
-                    OutlinedButton(
-                        onClick = onDisconnectTencentDocs,
-                        enabled = !disabled,
-                    ) {
-                        Text("Disconnect")
-                    }
-                } else {
-                    Button(
-                        onClick = onConfigureTencentDocs,
-                        enabled = !disabled &&
-                            server.id == TENCENT_DOCS_SERVER_ID,
-                    ) {
-                        Text("Configure token")
-                    }
-                }
-            }
-            McpAuthMode.NONE,
-            McpAuthMode.BEARER,
-            -> {
-                TextButton(
-                    onClick = onRemove,
-                    enabled = !disabled,
-                ) {
-                    Text("Remove server")
-                }
-            }
+                },
+                enabled = !disabled,
+            ) { Text(if (manual) "Remove server" else "Disconnect") }
         }
         if (server.tools.isNotEmpty()) {
             TextButton(
@@ -4300,7 +4295,7 @@ private fun McpServerCard(
                                     maxLines = 2,
                                 )
                             }
-                            Switch(
+                            CapabilitySwitch(
                                 checked = tool.enabled,
                                 onCheckedChange = {
                                     onSetToolEnabled(tool.remoteName, it)
@@ -4496,36 +4491,29 @@ private fun SkillSectionTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
+    Box(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            Color.Transparent
-        },
-        shape = RoundedCornerShape(16.dp),
-        border = if (selected) {
-            null
-        } else {
-            androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outline,
-            )
-        },
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
+        Surface(
             color = if (selected) {
-                MaterialTheme.colorScheme.onPrimary
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+                Color.Transparent
             },
-            textAlign = TextAlign.Center,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            modifier = Modifier.padding(vertical = 12.dp),
-        )
+            shape = RoundedCornerShape(10.dp),
+        ) {
+            Text(
+                text = label,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
     }
 }
 
@@ -4593,7 +4581,7 @@ internal fun InstalledSkillCard(
                 ) {
                     if (skill.id == "builtin:memory-recall") {
                         com.example.mochi_pet.feature.journal.JournalManagedControl(skill.enabled, onOpenJournalSettings)
-                    } else Switch(
+                    } else CapabilitySwitch(
                         checked = skill.enabled,
                         onCheckedChange = {
                             onSetEnabled(skill.id, it)
@@ -4639,16 +4627,16 @@ internal fun InstalledSkillCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(onClick = onView) {
+            CapabilityAction(onClick = onView) {
                 Text("View")
             }
             if (skill.origin == SkillOrigin.MARKET) {
                 if (skill.updateAvailable) {
-                    Button(onClick = { onApplyUpdate(skill.id) }) {
+                    CapabilityAction(onClick = { onApplyUpdate(skill.id) }, emphasized = true) {
                         Text("Update")
                     }
                 }
-                TextButton(onClick = onDelete) {
+                CapabilityAction(onClick = onDelete) {
                     Text("Remove")
                 }
             }
@@ -4688,12 +4676,13 @@ private fun MarketSkillCard(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onView) {
+            CapabilityAction(onClick = onView) {
                 Text("View")
             }
-            Button(
+            CapabilityAction(
                 onClick = onInstall,
                 enabled = !installed,
+                emphasized = true,
             ) {
                 Text(if (installed) "Installed" else "Install")
             }
@@ -5275,17 +5264,17 @@ private fun SurfaceHeader(
     Text(
         text = title,
         color = MaterialTheme.colorScheme.onSurface,
-        style = MaterialTheme.typography.headlineMedium,
+        style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
     )
     if (subtitle.isNotEmpty()) {
         Text(
             text = subtitle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodySmall,
         )
     }
-    Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(8.dp))
 }
 
 @Composable
@@ -5309,19 +5298,39 @@ private fun EmptyRow(message: String) {
 }
 
 @Composable
-private fun ConversationSurface(
+internal fun ConversationSurface(
     state: ConversationUiState,
+    onShowHistory: () -> Unit = {},
     providerReady: Boolean,
     voiceState: VoiceRuntimeState,
     onSend: (String) -> Unit,
     onCancel: () -> Unit,
-    onStartVoice: () -> Unit,
-    onStopVoice: () -> Unit,
+    onDraftChange: (String) -> Unit,
+    onStartDictation: () -> Unit,
+    onFinishDictation: () -> Unit,
+    onCancelDictation: () -> Unit,
     onOpenSpeechSettings: () -> Unit,
     onCardAction: (CardPresentation, CardAction) -> Unit,
     onRemoteTask: (com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask) -> Unit,
 ) {
-    var input by remember { mutableStateOf("") }
+    val input = state.draft
+    val dictating = state.dictation != DictationPhase.IDLE
+    val keyboard = LocalSoftwareKeyboardController.current
+    val viewConfiguration = LocalViewConfiguration.current
+    val typingConfiguration = remember(viewConfiguration) {
+        object : ViewConfiguration by viewConfiguration {
+            // The parent owns long-press; ordinary text taps and cursor movement remain native.
+            override val longPressTimeoutMillis = Long.MAX_VALUE
+        }
+    }
+    val canSend = providerReady && input.isNotBlank() && !state.isSending && !dictating
+    val send = {
+        if (canSend) {
+            onShowHistory()
+            onDraftChange("")
+            onSend(input)
+        }
+    }
     val listState = rememberLazyListState()
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
@@ -5330,63 +5339,8 @@ private fun ConversationSurface(
     }
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primary,
-                shape = RoundedCornerShape(18.dp),
-            ) {
-                Box(
-                    modifier = Modifier.size(52.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "M",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                    )
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Talk to Mochi",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black,
-                )
-                Text(
-                    text = "Voice or text",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Surface(
-                color = if (providerReady) {
-                    Color(0xFF72D8C0).copy(alpha = 0.16f)
-                } else {
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
-                },
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                Text(
-                    text = if (providerReady) "Ready" else "Setup",
-                    color = if (providerReady) {
-                        Color(0xFF72D8C0)
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                )
-            }
-        }
         if (!providerReady) {
             Surface(
                 color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
@@ -5400,157 +5354,193 @@ private fun ConversationSurface(
                 )
             }
         }
-        LazyColumn(
-            state = listState,
+        ConversationEntryLayout(
+            quickEntry = state.quickEntry,
+            dictating = dictating,
+            onShowHistory = onShowHistory,
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (state.messages.isEmpty()) {
-                item {
-                    ConversationEmptyState()
-                }
-            }
-            items(state.messages, key = ConversationMessage::id) { message ->
-                ConversationBubble(
-                    message = message,
-                    onCardAction = onCardAction,
-                )
-            }
-            items(state.remoteTasks, key = { "remote:${it.key}" }) { task ->
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = .3f)),
+            history = {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("AgentLink", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
-                        Text(task.title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        if (task.unread) Text("New result", color = MaterialTheme.colorScheme.secondary)
-                        Text(when (task.receipt?.state) {
-                            "completed" -> "Remote run ended"
-                            "waitingApproval" -> "Waiting for your approval"
-                            "failed" -> "Failed"
-                            "cancelled" -> "Cancelled"
-                            "interrupted" -> "Outcome unconfirmed"
-                            "running" -> "Running"
-                            "starting", "queued" -> "Queued"
-                            else -> "Remote status not checked"
-                        })
-                        task.receipt?.resultText?.takeIf(String::isNotBlank)?.let {
-                            Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis)
+                    if (state.messages.isEmpty()) {
+                        item {
+                            ConversationEmptyState()
                         }
-                        Text("Remote run state is not verification that your request was fulfilled.",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton({ onRemoteTask(task) }) { Text("Open or continue in AgentLink") }
+                    }
+                    items(state.messages, key = ConversationMessage::id) { message ->
+                        ConversationBubble(
+                            message = message,
+                            onCardAction = onCardAction,
+                        )
+                    }
+                    items(state.remoteTasks, key = { "remote:${it.key}" }) { task ->
+                        Surface(
+                            shape = RoundedCornerShape(22.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = .3f)),
+                        ) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("AgentLink", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                                Text(task.title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                if (task.unread) Text("New result", color = MaterialTheme.colorScheme.secondary)
+                                Text(when (task.receipt?.state) {
+                                    "completed" -> "Remote run ended"
+                                    "waitingApproval" -> "Waiting for your approval"
+                                    "failed" -> "Failed"
+                                    "cancelled" -> "Cancelled"
+                                    "interrupted" -> "Outcome unconfirmed"
+                                    "running" -> "Running"
+                                    "starting", "queued" -> "Queued"
+                                    else -> "Remote status not checked"
+                                })
+                                task.receipt?.resultText?.takeIf(String::isNotBlank)?.let {
+                                    Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis)
+                                }
+                                Text("Remote run state is not verification that your request was fulfilled.",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton({ onRemoteTask(task) }) { Text("Open or continue in AgentLink") }
+                            }
+                        }
                     }
                 }
-            }
-        }
-        val errorMessage = state.errorMessage ?: voiceState.errorMessage
-        errorMessage?.let {
-            ConversationError(
-                message = it,
-                onOpenSpeechSettings = onOpenSpeechSettings
-                    .takeIf { voiceState.offerSpeechSettings },
-            )
-        }
-        if (voiceState.partialTranscript.isNotEmpty()) {
-            Surface(
-                color = Color(0xFF72D8C0).copy(alpha = 0.12f),
-                shape = RoundedCornerShape(18.dp),
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = Color(0xFF72D8C0),
-                        strokeWidth = 2.dp,
+            },
+            composer = {
+                val errorMessage = state.errorMessage ?: voiceState.errorMessage
+                errorMessage?.let {
+                    ConversationError(
+                        message = it,
+                        onOpenSpeechSettings = onOpenSpeechSettings
+                            .takeIf { voiceState.offerSpeechSettings },
                     )
-                    Column {
-                        Text(
-                            text = "Listening",
-                            color = Color(0xFF72D8C0),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        MaterialText(
-                            text = voiceState.partialTranscript,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                }
+                if (voiceState.partialTranscript.isNotEmpty() && !dictating) {
+                    Surface(
+                        color = Color(0xFF72D8C0).copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color(0xFF72D8C0),
+                                strokeWidth = 2.dp,
+                            )
+                            Column {
+                                Text(
+                                    text = "Listening",
+                                    color = Color(0xFF72D8C0),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                MaterialText(
+                                    text = voiceState.partialTranscript,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        }
                     }
                 }
-            }
-        }
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-            shape = RoundedCornerShape(24.dp),
-            tonalElevation = 4.dp,
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    placeholder = { Text("Ask Mochi anything...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.isSending && !voiceState.isListening,
-                    minLines = 1,
-                    maxLines = 4,
-                    shape = RoundedCornerShape(18.dp),
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    modifier = Modifier.fillMaxWidth().testTag("conversation-composer"),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(28.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (dictating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                    ),
                 ) {
-                    if (voiceState.isListening) {
-                        Button(
-                            onClick = onStopVoice,
-                            modifier = Modifier.weight(1f),
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier.weight(1f).testTag("dictation-input")
+                                .holdToDictate(
+                                    enabled = !state.isSending,
+                                    onStart = { keyboard?.hide(); onStartDictation() },
+                                    onFinish = onFinishDictation,
+                                    onCancel = onCancelDictation,
+                                )
+                                .semantics {
+                                    customActions = when (state.dictation) {
+                                        DictationPhase.IDLE -> if (!state.isSending) {
+                                            listOf(CustomAccessibilityAction(localizeUiText("Start dictation")) { onStartDictation(); true })
+                                        } else emptyList()
+                                        DictationPhase.RECORDING -> listOf(
+                                            CustomAccessibilityAction(localizeUiText("Finish dictation")) { onFinishDictation(); true },
+                                            CustomAccessibilityAction(localizeUiText("Cancel dictation")) { onCancelDictation(); true },
+                                        )
+                                        DictationPhase.TRANSCRIBING -> listOf(
+                                            CustomAccessibilityAction(localizeUiText("Cancel dictation")) { onCancelDictation(); true },
+                                        )
+                                    } + if (state.quickEntry && !dictating) {
+                                        listOf(CustomAccessibilityAction(localizeUiText("Show conversation history")) { onShowHistory(); true })
+                                    } else emptyList()
+                                },
                         ) {
-                            Text("Stop listening")
+                            CompositionLocalProvider(LocalViewConfiguration provides typingConfiguration) {
+                                BasicTextField(
+                                    value = input,
+                                    onValueChange = onDraftChange,
+                                    modifier = Modifier.fillMaxWidth().testTag("conversation-input"),
+                                    enabled = !state.isSending && !voiceState.isListening && !dictating,
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                    keyboardActions = KeyboardActions(onSend = { send() }),
+                                    decorationBox = { field ->
+                                        Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                                            if (input.isEmpty() || dictating) Text(
+                                                when (state.dictation) {
+                                                    DictationPhase.IDLE -> if (state.quickEntry) {
+                                                        "Type, hold to talk, swipe down for history"
+                                                    } else "Type or hold to dictate"
+                                                    DictationPhase.RECORDING -> "Release to transcribe; move out to cancel"
+                                                    DictationPhase.TRANSCRIBING -> "Transcribing..."
+                                                },
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = if (dictating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            Box(Modifier.alpha(if (dictating) 0f else 1f)) { field() }
+                                        }
+                                    },
+                                )
+                            }
                         }
-                    } else {
-                        OutlinedButton(
-                            onClick = onStartVoice,
-                            enabled =
-                                providerReady &&
-                                    voiceState.recognitionAvailable &&
-                                    !state.isSending,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("Speak")
-                        }
-                    }
-                    if (state.isSending) {
-                        OutlinedButton(
-                            onClick = onCancel,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("Cancel")
-                        }
-                    } else {
-                        Button(
-                            onClick = {
-                                val message = input
-                                input = ""
-                                onSend(message)
+                        val sendLabel = localizeUiText(when {
+                            state.isSending -> "Cancel"
+                            dictating -> "Cancel dictation"
+                            else -> "Send"
+                        })
+                        FilledIconButton(
+                            onClick = when {
+                                state.isSending -> onCancel
+                                dictating -> onCancelDictation
+                                else -> send
                             },
-                            enabled = providerReady && input.isNotBlank(),
-                            modifier = Modifier.weight(1f),
+                            enabled = state.isSending || dictating || canSend,
+                            modifier = Modifier.size(48.dp).semantics { contentDescription = sendLabel },
                         ) {
-                            Text("Send")
+                            ToolGlyphIcon(when {
+                                state.isSending -> ToolGlyph.STOP
+                                dictating -> ToolGlyph.CLOSE
+                                else -> ToolGlyph.SEND
+                            }, Modifier.size(20.dp))
                         }
                     }
                 }
-            }
-        }
+            },
+        )
     }
 }
 
@@ -5559,7 +5549,7 @@ private fun ConversationEmptyState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 36.dp),
+            .padding(vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -5568,13 +5558,13 @@ private fun ConversationEmptyState() {
             shape = CircleShape,
         ) {
             Box(
-                modifier = Modifier.size(72.dp),
+                modifier = Modifier.size(48.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "M",
                     color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black,
                 )
             }
@@ -5586,7 +5576,7 @@ private fun ConversationEmptyState() {
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "Speak naturally or type a message below.",
+            text = "Type a message or hold the input to dictate.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -5843,7 +5833,7 @@ internal fun ProviderSettingsSurface(
 
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SurfaceHeader(
             title = "Mochi settings",
@@ -6067,7 +6057,7 @@ internal fun ProviderSettingsSurface(
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
-                                text = "After Focus is idle, show a dim " +
+                                text = "When full screen is idle, show a dim " +
                                     "Mochi, date, and time on pure black.",
                                 color =
                                     MaterialTheme.colorScheme.onSurfaceVariant,
@@ -6558,37 +6548,71 @@ private fun AddTodoDialog(
 }
 
 @Composable
+internal fun MochiModeSwitch(
+    companion: Boolean,
+    onNavigate: (MochiNavigationIntent) -> Unit,
+    chatMuted: Boolean,
+    muteEnabled: Boolean,
+    onSetChatMuted: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().testTag("mochi-modes"),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+        ) {
+            FlowRow(Modifier.padding(horizontal = 4.dp)) {
+                SkillSectionTab("Chat", !companion, { onNavigate(MochiNavigationIntent.ShowConversation) })
+                SkillSectionTab("Companion", companion, { onNavigate(MochiNavigationIntent.ShowFace) })
+            }
+        }
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            if (!companion) {
+                val muteLabel = localizeUiText(if (chatMuted) "Unmute chat replies" else "Mute chat replies")
+                androidx.compose.material3.IconToggleButton(
+                    checked = chatMuted,
+                    onCheckedChange = onSetChatMuted,
+                    enabled = muteEnabled,
+                    modifier = Modifier.fillMaxSize().semantics { contentDescription = muteLabel },
+                ) {
+                    ToolGlyphIcon(if (chatMuted) ToolGlyph.MUTED else ToolGlyph.SPEAKER, Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun NavigationBar(
     surface: MochiSurface,
     onNavigate: (MochiNavigationIntent) -> Unit,
+    onOpenMochi: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-        shape = RoundedCornerShape(24.dp),
-        tonalElevation = 8.dp,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
     ) {
         Row(
-            modifier = Modifier.padding(6.dp),
+            modifier = Modifier.padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             MochiNavigationItem(
-                label = "Home",
+                label = "Mochi",
                 selected =
                     surface == MochiSurface.Face ||
                         surface == MochiSurface.DateTime ||
                         surface == MochiSurface.Weather ||
-                        surface == MochiSurface.Card,
-                onClick = { onNavigate(MochiNavigationIntent.ShowFace) },
-                modifier = Modifier.weight(1f),
-            )
-            MochiNavigationItem(
-                label = "Talk",
-                selected = surface == MochiSurface.Conversation,
-                onClick = {
-                    onNavigate(MochiNavigationIntent.ShowConversation)
-                },
+                        surface == MochiSurface.Card ||
+                        surface == MochiSurface.Conversation,
+                onClick = onOpenMochi,
                 modifier = Modifier.weight(1f),
             )
             MochiNavigationItem(
@@ -6626,22 +6650,23 @@ private fun MochiNavigationItem(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(
                 if (selected) {
-                    MaterialTheme.colorScheme.primary
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                 } else {
                     Color.Transparent
                 },
             )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 11.dp),
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
             color = if (selected) {
-                MaterialTheme.colorScheme.onPrimary
+                MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },

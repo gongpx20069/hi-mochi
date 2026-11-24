@@ -12,10 +12,16 @@ data class AgentSettings(
     val focusStandbyEnabled: Boolean = DEFAULT_FOCUS_STANDBY_ENABLED,
     val focusStandbyDelaySeconds: Int =
         DEFAULT_FOCUS_STANDBY_DELAY_SECONDS,
+    val chatMuted: Boolean = false,
+    val companionMode: Boolean = true,
 )
 
 interface AgentSettingsRepository {
     suspend fun load(): AgentSettings
+
+    suspend fun setChatMuted(muted: Boolean): AgentSettings
+
+    suspend fun setCompanionMode(companion: Boolean): AgentSettings
 
     suspend fun setRecentConversationTurns(turns: Int): AgentSettings
 
@@ -31,6 +37,8 @@ class DataStoreAgentSettingsRepository(
     override suspend fun load(): AgentSettings {
         val preferences = dataStore.data.first()
         return AgentSettings(
+            companionMode = preferences[COMPANION_MODE] ?: true,
+            chatMuted = preferences[CHAT_MUTED] ?: false,
             recentConversationTurns = preferences[RECENT_TURNS]
                 ?.coerceIn(
                     MIN_RECENT_CONVERSATION_TURNS,
@@ -58,9 +66,20 @@ class DataStoreAgentSettingsRepository(
                 "$MIN_RECENT_CONVERSATION_TURNS and " +
                 MAX_RECENT_CONVERSATION_TURNS
         }
+
         dataStore.edit { preferences ->
             preferences[RECENT_TURNS] = turns
         }
+        return load()
+    }
+
+    override suspend fun setChatMuted(muted: Boolean): AgentSettings {
+        dataStore.edit { it[CHAT_MUTED] = muted }
+        return load()
+    }
+
+    override suspend fun setCompanionMode(companion: Boolean): AgentSettings {
+        dataStore.edit { it[COMPANION_MODE] = companion }
         return load()
     }
 
@@ -80,6 +99,8 @@ class DataStoreAgentSettingsRepository(
     }
 
     private companion object {
+        val COMPANION_MODE = booleanPreferencesKey("display.companion_mode")
+        val CHAT_MUTED = booleanPreferencesKey("speech.chat_muted")
         val RECENT_TURNS = intPreferencesKey("agent.recent_conversation_turns")
         val FOCUS_STANDBY_ENABLED =
             booleanPreferencesKey("display.focus_standby_enabled")

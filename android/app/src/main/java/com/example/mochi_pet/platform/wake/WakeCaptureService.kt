@@ -23,6 +23,7 @@ import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import com.example.mochi_pet.MainActivity
+import com.example.mochi_pet.MochiApplication
 import com.example.mochi_pet.R
 import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
@@ -47,6 +48,11 @@ class WakeCaptureService : Service() {
             context: Context?,
             intent: Intent?,
         ) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                (application as MochiApplication).wakeRuntime.setCaptureAllowed(false)
+                pauseCapture()
+                return
+            }
             if (
                 intent?.action !=
                 AppLanguage.ACTION_APP_LANGUAGE_CHANGED &&
@@ -87,6 +93,7 @@ class WakeCaptureService : Service() {
             languageChangedReceiver,
             IntentFilter(AppLanguage.ACTION_APP_LANGUAGE_CHANGED).apply {
                 addAction(Intent.ACTION_LOCALE_CHANGED)
+                addAction(Intent.ACTION_SCREEN_OFF)
             },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
@@ -156,7 +163,7 @@ class WakeCaptureService : Service() {
             }
             else -> startCapture()
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -181,13 +188,19 @@ class WakeCaptureService : Service() {
         if (!ensureForegroundSafely()) {
             return
         }
+        if (!(application as MochiApplication).wakeRuntime.canCapture) {
+            pauseCapture()
+            return
+        }
         val version = commandVersion.incrementAndGet()
         publishState(WakeCaptureStatus.STARTING)
         worker.execute {
             try {
                 val currentEngine = checkNotNull(engine)
                 currentEngine.initialize()
-                if (version != commandVersion.get() || !enabled) {
+                if (version != commandVersion.get() || !enabled ||
+                    !(application as MochiApplication).wakeRuntime.canCapture
+                ) {
                     return@execute
                 }
                 currentEngine.start()
@@ -258,6 +271,7 @@ class WakeCaptureService : Service() {
     }
 
     private fun handleVoiceTrigger(source: String) {
+        if (source.startsWith("wake:") && !(application as MochiApplication).wakeRuntime.canCapture) return
         val now = SystemClock.elapsedRealtime()
         if (
             lastTriggerAtMillis > 0 &&
@@ -270,6 +284,7 @@ class WakeCaptureService : Service() {
     }
 
     private fun notifyVoiceTrigger(source: String) {
+        if (source.startsWith("wake:") && !(application as MochiApplication).wakeRuntime.canCapture) return
         getSystemService(NotificationManager::class.java).notify(
             DETECTED_NOTIFICATION_ID,
             buildDetectedNotification(source),

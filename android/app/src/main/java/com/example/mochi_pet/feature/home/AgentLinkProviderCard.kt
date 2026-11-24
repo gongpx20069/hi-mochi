@@ -3,13 +3,8 @@ package com.example.mochi_pet.feature.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,7 +41,6 @@ internal val AGENTLINK_TOOL_DESCRIPTORS = listOf(
     ),
 )
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AgentLinkProviderCard(
     state: AgentLinkState,
@@ -54,7 +48,6 @@ fun AgentLinkProviderCard(
     onAction: (AgentLinkUiAction) -> Unit,
 ) {
     var toolsExpanded by rememberSaveable { mutableStateOf(false) }
-    var management by rememberSaveable { mutableStateOf(false) }
     var chatsExpanded by rememberSaveable { mutableStateOf(false) }
     ExtensionCard {
         ExtensionHeading(
@@ -73,7 +66,7 @@ fun AgentLinkProviderCard(
             }),
         ) {
             if (state.authorized) {
-                Switch(
+                CapabilitySwitch(
                     checked = state.enabled,
                     enabled = !loading,
                     onCheckedChange = { onAction(AgentLinkUiAction.Enable(it)) },
@@ -87,55 +80,33 @@ fun AgentLinkProviderCard(
             style = MaterialTheme.typography.bodySmall,
         )
         if (!state.installed || state.status == "incompatible") {
-            Button(onClick = { onAction(AgentLinkUiAction.Install) }, enabled = !loading) {
+            CapabilityAction(onClick = { onAction(AgentLinkUiAction.Install) }, enabled = !loading, emphasized = true) {
                 Text("Install or update AgentLink")
             }
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (state.authorized) {
-                OutlinedButton(
-                    onClick = { onAction(AgentLinkUiAction.Connect) },
-                    enabled = state.installed && !loading,
-                ) {
-                    Text("Connect/Open AgentLink")
-                }
-            } else {
-                Button(
-                    onClick = { onAction(AgentLinkUiAction.Connect) },
-                    enabled = state.installed && !loading,
-                ) {
-                    Text("Connect/Open AgentLink")
-                }
-            }
-            TextButton(
-                onClick = { onAction(AgentLinkUiAction.Refresh) },
-                enabled = !loading,
-            ) {
-                Text("Refresh")
-            }
-        }
-        TextButton({ management = !management }) {
-            Text(if (management) "Hide connection settings" else "Connection settings")
-        }
-        if (management) {
+        ToolConnectionRow(
+            hasConnection = state.authorized,
+            connectLabel = "Connect/Open AgentLink",
+            detail = when {
+                state.connected -> "Connected at last check · not a live monitor"
+                state.authorized -> "Status stale · refresh required"
+                else -> "Native authorization required"
+            },
+            enabled = (state.authorized || state.installed) && !loading,
+            tag = "agentlink-connection",
+            onConnect = { onAction(AgentLinkUiAction.Connect) },
+        ) { close ->
             Text("Authorize in AgentLink, then return here. A connected desktop Bridge is needed for remote work.",
                 style = MaterialTheme.typography.bodyMedium)
-            TextButton({ onAction(AgentLinkUiAction.SetupGuide) }, enabled = !loading) { Text("Desktop Bridge setup") }
-            if (state.authorized) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { onAction(AgentLinkUiAction.Manager) },
-                        enabled = !loading,
-                    ) {
-                        Text("Manage access")
-                    }
-                    TextButton(
-                        onClick = { onAction(AgentLinkUiAction.Revoke) },
-                        enabled = !loading,
-                    ) {
-                        Text("Revoke")
-                    }
-                }
+            TextButton({ close(); onAction(AgentLinkUiAction.Connect) }, enabled = state.installed && !loading) { Text("Connect/Open AgentLink") }
+            TextButton({ close(); onAction(AgentLinkUiAction.SetupGuide) }, enabled = !loading) { Text("Desktop Bridge setup") }
+            CapabilityAction({ close(); onAction(AgentLinkUiAction.Manager) }, enabled = state.installed && !loading) { Text("Manage access") }
+            TextButton({ close(); onAction(AgentLinkUiAction.Revoke) }, enabled = !loading) { Text("Revoke") }
+        }
+        TextButton({ onAction(AgentLinkUiAction.Refresh) }, enabled = !loading) { Text("Refresh") }
+        if (!state.authorized) {
+            TextButton({ onAction(AgentLinkUiAction.SetupGuide) }, enabled = !loading) {
+                Text("Desktop Bridge setup")
             }
         }
         TextButton(

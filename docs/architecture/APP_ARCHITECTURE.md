@@ -201,11 +201,32 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   revision that revokes in-flight explicit recall.
 - Conversation storage, memory retrieval and their settings follow
   [Memory design](MEMORY_DESIGN.md#1-current-design).
+- The Home ViewModel owns the unsent Chat draft, dictation phase and callback
+  generation. Recognition only updates the draft, never the Agent/history.
+  It also owns transient Chat quick-entry state. MainActivity supplies buffered
+  start/stop events, excluding configuration stops; pause/resume alone is not
+  an external return. The ViewModel checks current surface and activity at the
+  foreground edge, and UI overlays can veto quick entry. Revealing history
+  moves one composer node without replacing its field, draft or recognition
+  session. Internal navigation and sending clear quick entry.
+  Agent settings DataStore persists Chat/Companion selection; a serialized,
+  conflated writer preserves the latest selection during rapid switches.
+  `SavedStateHandle` retains the current activity's selection and takes priority
+  over disk at restoration. Startup resolves the mode before rendering or
+  allowing Companion wake capture, without replacing an incoming navigation
+  intent. A fresh process restoring Chat starts in quick entry; drafts remain
+  transient and conversation history uses its existing persistent store.
+  The resumed UI supplies Companion visibility to `WakeRuntime`; the runtime
+  and capture service independently enforce visibility and unlocked screen
+  state without rewriting the saved wake preference.
 - App-private `files/persona/SOUL.md`, `USER.md`, and `AGENTS.md` are seeded
   from bundled assets and updated atomically. Persona is intentionally not a
   Room model, and there is no HEARTBEAT file.
 - DataStore owns Focus standby enablement and its validated idle-delay choice.
   The default is enabled after 30 seconds; no Room migration is involved.
+  The same Agent settings store owns Chat-only mute (default off). Its UI
+  applies immediately; a persistence failure is explicit and retains the
+  session choice. Preference updates preserve unrelated fields.
 - The Home ViewModel owns the active Focus flag in `SavedStateHandle`; UI
   buttons and typed navigation intents use the same idempotent setter. The
   Agent navigation sink switches to the main dispatcher before updating it.

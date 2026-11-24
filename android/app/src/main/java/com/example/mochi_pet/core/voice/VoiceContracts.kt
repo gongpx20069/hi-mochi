@@ -105,7 +105,10 @@ interface VoiceRuntime {
     fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit = {},
+        manualEndpoint: Boolean = false,
     )
+
+    fun finishListening()
 
     fun stopListening()
 

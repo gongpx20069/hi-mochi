@@ -9,6 +9,14 @@
 | Planner | One date agenda with an expandable week/month date selector |
 | Settings | BYOK, voice, permissions, backup, and tools |
 | Skills | Bottom-navigation destination for built-ins and skills.sh |
+| Tools | Provider connections and individual Tool controls |
+
+Bottom navigation is **Mochi / Planner / Skills / Tools**. The Mochi header
+switches **Chat / Companion** (**对话 / 陪伴**); Face and its information cards
+belong to Companion, and Conversation belongs to Chat. Both share history and
+tasks. Returning from another destination restores the selected mode. Selection
+also persists across process death; cold-start Chat opens central entry, while
+Companion opens its usual home view. First installation defaults to Companion.
 
 Mochi remains visible as a compact companion where space permits, but planner
 content takes priority when the selected surface requires reading or editing.
@@ -71,12 +79,24 @@ Examples:
 If a directive is invalid, keep the current surface and still deliver the
 spoken response. Navigation failure must not fail the whole conversation.
 
-The current Conversation surface exposes push-to-talk, partial transcript,
-stop, and Agent cancellation controls. It uses a compact Mochi identity header,
-provider-readiness status, a guided empty state, labeled asymmetric message
+The Conversation surface uses the shared compact mode header, a guided empty
+state, labeled asymmetric message
 bubbles, a small local send date/time beside each **Mochi / You** label,
-automatic scrolling to the newest message, and a raised rounded composer that
-keeps text and voice actions distinct. Restored history and Scheduled Agent
+automatic scrolling to the newest message, and a compact rounded composer that
+stays on one line, horizontally scrolling long drafts. There is no separate
+identity banner or microphone button. Tapping the input edits text; long-press
+records even when a draft exists, overriding long-press text selection. Release
+fills or appends the recognized text, never sends it; moving outside cancels.
+An early provider result is held until release and can still be cancelled.
+Recording, recognition and permission handoffs never start late after
+cancellation, navigation or backgrounding. A new permission grant requires
+another hold. Accessibility actions expose start, finish and cancel.
+The muted empty hint is **点击输入，长按说话**; active hints are
+**松开转文字，移出取消** and **正在识别…**. Recording has a subtle accent outline.
+The single adjacent icon sends, cancels recognition, or cancels active Agent work.
+Icon actions retain localized accessibility labels and at least 48 dp touch
+targets. Keyboard Send uses the same explicit submission path.
+Restored history and Scheduled Agent
 results retain their persisted timestamps. Errors and partial speech appear as
 separate status cards rather than conversation messages. The validated
 directive is applied before the accepted Agent reply is sent to speech synthesis.
@@ -86,9 +106,11 @@ configuration, and response errors. Raw provider error text is not displayed.
 These messages do not claim that device actions were skipped or rolled back:
 an earlier Tool may already have executed before a later model request failed.
 
-The native foreground wake service is enabled by default once the
-required Android permissions are granted. Settings can disable it, and that
-explicit choice is retained across later launches.
+The wake preference defaults to enabled after permission is granted; capture
+requires visible, unlocked, foreground Companion. Chat, other destinations,
+covering full-screen surfaces, background and lock pause it without changing
+the preference. Returning to Companion resumes enabled capture.
+Settings can disable it, and that explicit choice survives later launches.
 Settings > Speech > Wake word offers **Follow system** (default), English
 `Hi Mochi`, and Chinese `老莫老莫`. Follow system resolves Chinese device
 languages to `老莫老莫` and other device languages to `Hi Mochi`, updating when
@@ -98,21 +120,21 @@ retained. Selection is independent of Mochi's UI language and persists while
 disabled. A keyword update alone does not enable or resume capture; manually
 changing the selection ends an active voice interaction through the existing safe
 microphone release and wake-restoration path.
-When Mochi is visible, wake and media triggers start listening without changing
-the current surface.
-When it is backgrounded or locked, wake detection posts a lock-screen-visible
-notification; tapping it starts the same permission-checked voice path.
+In visible Companion, wake triggers start listening without changing its
+presentation. No wake capture or wake notification is produced in background or
+on the lock screen. Explicit notification/media actions retain the
+permission-checked voice path.
 After a confirmed selected wake phrase, Mochi speaks a one-syllable acknowledgement
 ("嗯？" in both Chinese and English) before listening, using the same
 bundled audio cue without waiting for a speech engine. The acknowledgement
 is transient feedback, not a conversation message, and is excluded from
-history and model context. Microphone-button and media-button starts do not add
+history and model context. Dictation and media-button starts do not add
 this acknowledgement.
 
 An explicit request to finish talking uses Mochi Navigation's
 `end_voice_session`. The current response finishes without automatic follow-up
 STT; the screen and Focus state remain unchanged. The user can start another
-session with the wake phrase, microphone or media button. Lifecycle details
+session with the wake phrase or media button; Chat dictation remains draft-only. Lifecycle details
 are owned by [Voice runtime](architecture/VOICE_RUNTIME.md#ending-continuous-voice-input).
 
 New AgentLink outcomes replace the acknowledgement with a short conversational
@@ -147,13 +169,13 @@ clock and date presentation. Current weather requests use the same full-area
 layout for temperature, apparent temperature, humidity, and weather state.
 Face and information modes transition with coordinated scale/fade motion, and
 a compact Mochi remains available as the restore control. Home stays selected
-in bottom navigation throughout.
+as Mochi in bottom navigation throughout.
 
-Home also offers Focus mode for the Face, date-time, and weather presentations.
-Focus hides app navigation and Android system bars, keeps the display awake,
-and fills the screen with the active Home presentation. The **Focus mode**
-control in that presentation remains available and toggles Focus off when
-tapped again. A separate top-right **Exit focus** action exits immediately.
+Companion offers **Full screen** (**全屏显示**) for Face, date-time and weather.
+This display option hides navigation and Android system bars, keeps the display
+awake, and fills the screen with the active presentation. Its control toggles it
+off; a top-right **Exit full screen** action exits immediately. Internal Focus
+state and the existing typed `enter_focus` / `exit_focus` commands remain compatible.
 Back and navigation away from Home also exit. Focus survives device rotation,
 and date-time and weather switch to two-column landscape layouts so their
 primary facts and supporting metrics remain balanced and unclipped.
@@ -299,6 +321,51 @@ subsequent microphone test or voice preview to establish real operation.
 Checks stop on Back/Close, retain explicitly incomplete results after cancellation,
 and reject late callbacks from superseded checks.
 
+Page headings use compact title typography and secondary helper text rather
+than large banners. Skills keeps Installed/Explore as content-width tabs with
+subtle selection fills, accessible selected state and 48 dp touch targets;
+its update check remains a secondary action alongside the tabs, wrapping below
+when space or font scale requires it. Navigation, ordering
+and enablement behavior are unchanged. The shared top bar, pipeline status,
+conversation empty state and Settings header use restrained spacing and
+typography. Bottom navigation uses the four destinations above and selected-state
+semantics, with a muted accent fill and at least 48 dp touch targets.
+Every main destination keeps the same compact Mochi wordmark in the global
+header. Chat/Companion selection sits below that header in a compact, thinly
+outlined rounded group with a subtle selected fill, not in place of the identity.
+Labels wrap at large font sizes without shrinking touch targets.
+Skill/Tool card actions and switches use smaller visual
+controls while retaining 48 dp interaction targets and disabled/selected semantics.
+The speaker icon at the far right of the mode row remembers Chat-only reply
+muting. It appears only in Chat, separate from the composer so it cannot be
+mistaken for a recording control; its space remains reserved in Companion.
+Muting stops current playback without cancelling the Agent or changing the
+draft; Companion, dictation and voice previews are unaffected.
+
+Returning from outside the app into idle Chat opens a quiet quick-entry view:
+the same one-line composer sits in the center, with a small Mochi logo above it.
+The logo fades away when history opens. Its empty placeholder combines
+**点击输入 · 长按说话 · 下滑历史**, without a separate hint below the field.
+Tap to type and hold/release to dictate still work;
+the draft is never cleared by changing presentation. A downward swipe reveals
+history and smoothly moves that same input to the bottom, restoring its normal
+placeholder. A custom accessibility action also exposes history, including when
+a draft hides the placeholder.
+Sending also restores normal Chat. Switching from Companion or another in-app
+page opens normal Chat, not quick entry. A keyboard, a pause-only permission
+dialog, or configuration recreation does not count as an external return.
+Returning during Agent work, listening, dictation, reply playback or a covering
+workflow keeps the normal view; finishing that work does not later recenter it.
+
+Provider and extension connections use the same rounded settings blocks as
+Player access, with status text and a chevron. An unconnected block opens its
+existing install/configuration/authorization flow. A configured block opens a
+scrollable connection-management sheet with a pinned Close action. Configure,
+scope management, disconnect/revoke and manual-server removal live there,
+preserving existing trust gates and disconnection confirmations. The provider
+and individual Tool switches remain on the card; opening management does not
+change authorization, enablement or credentials.
+
 The Tools surface orders **Agent Browser**, **App Control**, **Media Control**,
 then **Amap Maps**, outside **Mochi Built-ins**. App Control has five Tools and
 Media Control has four, each with its own master switch and collapsed child
@@ -374,9 +441,19 @@ Planner's bottom label is **日程** in Chinese. Today, month and date voice
 destinations render the same agenda; month navigation expands its date selector.
 Date selection updates immediately, while the last loaded agenda keeps its own
 date heading and cards until the new snapshot is ready. A fixed-size progress
-indicator in that heading signals loading without removing or shifting the list.
+indicator in that heading signals loads lasting over 150 ms without removing
+or shifting the list; fast local reads do not flash a spinner. Day headings
+and dated cards use short fades when replaced, without fading the calendar or
+global header. Journal height changes settle without an abrupt layout jump.
 Only the latest selection may replace the snapshot; failures retain the dated
 content with an explicit error, never presenting old entries under a new date.
+Swipe left/right across the agenda to select the next/previous day, including
+across month boundaries. Each deliberate horizontal swipe changes one day;
+short drags, vertical scrolling and the filter strip's own scrolling do not.
+While dragging, only the dated heading/cards follow the finger with a small,
+bounded displacement; releasing or cancelling smoothly settles them back.
+The calendar and filters stay fixed, including for a swipe below the day-change
+threshold. Loading still retains the correctly dated snapshot.
 A return-to-today shortcut appears only away from today. All/My schedule/Mochi
 tasks/Journal chips filter the selected date, and a single New button opens a
 two-choice sheet. A secondary-text hint below its choices explains that users
@@ -547,7 +624,7 @@ shares without these fields import with system speech output. New shares use
 v5, include AI API protocol, and require an updated receiver; existing authenticated v2/v3/v4 links remain
 importable as additional saved connections.
 
-Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
+Skills sits beside Mochi, Planner, and Tools in bottom navigation.
 Installed/Explore uses a dark selected segment. Explore opens with the public
 skills.sh Trending (24h) leaderboard, then switches to search results after a
 query. Cards show rank, source, install count, and a derived popularity label.

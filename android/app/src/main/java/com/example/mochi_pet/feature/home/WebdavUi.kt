@@ -2,9 +2,7 @@ package com.example.mochi_pet.feature.home
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,36 +35,40 @@ internal fun WebdavProviderCard(summary: ExtensionProviderSummary, disabled: Boo
             !summary.enabled -> "Connected - not enabled"
             else -> "Connected"
         })) {
-            Switch(summary.enabled, { onAction(WebdavUiAction.Enable(it)) }, enabled = summary.connected && !disabled)
+            CapabilitySwitch(summary.enabled, { onAction(WebdavUiAction.Enable(it)) }, enabled = summary.connected && !disabled)
         }
         Text("Browse a scoped WebDAV folder. File content may go to your model Provider. Foreground conversations only.")
         Text("Read-only by default. Writing, deletion and file transfer require separate Tool switches.")
         summary.detail?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        when {
-            !summary.installed || !summary.trusted ->
-                Button({ onAction(WebdavUiAction.Install) }, enabled = !disabled) { Text("Install extension") }
-            !summary.connected ->
-                Button({ onAction(WebdavUiAction.Configure) }, enabled = !disabled) { Text("Connect WebDAV") }
-            !summary.enabled ->
-                Button({ onAction(WebdavUiAction.EnableWithSkill) }, enabled = !disabled) { Text("Enable tools and Skill") }
-        }
-        if (summary.trusted) {
-            if (summary.connected) TextButton({ onAction(WebdavUiAction.Configure) }, enabled = !disabled) {
+        ToolConnectionRow(
+            hasConnection = summary.trusted && (summary.connected || summary.status == "error" || summary.detail != null),
+            connectLabel = if (!summary.installed || !summary.trusted) "Install extension" else "Connect WebDAV",
+            detail = when {
+                !summary.installed -> "Optional extension · not installed"
+                !summary.trusted -> "Installed package could not be trusted"
+                summary.connected && !summary.enabled -> "Connected - not enabled"
+                summary.connected -> "Connected"
+                else -> "Installed · connection required"
+            },
+            enabled = !disabled, tag = "webdav-connection",
+            onConnect = { onAction(if (!summary.installed || !summary.trusted) WebdavUiAction.Install else WebdavUiAction.Configure) },
+        ) { close ->
+            TextButton({ close(); onAction(WebdavUiAction.Configure) }, enabled = !disabled) {
                 Text("Connection and files")
             }
-            if (summary.connected || summary.status == "error" || summary.detail != null) {
-                TextButton({ disconnect = true }, enabled = !disabled) { Text("Disconnect") }
-                if (summary.enabled) TextButton({ onAction(WebdavUiAction.EnableWithSkill) }, enabled = !disabled) {
+            if (summary.connected) {
+                CapabilityAction({ close(); onAction(WebdavUiAction.EnableWithSkill) }, enabled = !disabled, emphasized = true) {
                     Text("Enable tools and Skill")
                 }
             }
+            TextButton({ close(); disconnect = true }, enabled = !disabled) { Text("Disconnect") }
         }
         if (summary.tools.isNotEmpty()) {
             TextButton({ expanded = !expanded }) { Text(if (expanded) "Hide tools" else "Show tools") }
             if (expanded) summary.tools.forEach { tool ->
                 Row {
                     Text(tool.name, Modifier.weight(1f))
-                    Switch(tool.enabled, { onAction(WebdavUiAction.EnableTool(tool.name, it)) },
+                    CapabilitySwitch(tool.enabled, { onAction(WebdavUiAction.EnableTool(tool.name, it)) },
                         enabled = summary.enabled && !disabled)
                 }
             }

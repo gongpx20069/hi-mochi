@@ -1,6 +1,8 @@
 package com.example.mochi_pet.platform.wake
 
 import android.app.Application
+import android.app.KeyguardManager
+import android.os.PowerManager
 import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
@@ -8,6 +10,8 @@ import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import com.example.mochi_pet.core.wake.WakeKeyword
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.robolectric.Shadows.shadowOf
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -102,6 +106,7 @@ class AndroidWakeRuntimeTest {
     @Test
     fun `old phrase broadcasts cannot resume capture or release a pending pause`() {
         AndroidWakeRuntime(context).use { runtime ->
+            runtime.setCaptureAllowed(true)
             runtime.enable()
             broadcast(WakeKeyword.ENGLISH, WakeCaptureStatus.LISTENING)
             var paused = false
@@ -118,6 +123,57 @@ class AndroidWakeRuntimeTest {
             assertEquals(WakeCaptureStatus.PAUSED, runtime.state.value.status)
         }
     }
+
+    @Test fun `hidden Companion blocks starts and stale listening without changing enabled preference`() {
+        AndroidWakeRuntime(context).use { runtime ->
+            runtime.enable()
+            runtime.resume()
+            assertEquals(WakeCaptureStatus.PAUSED, runtime.state.value.status)
+            assertTrue(runtime.shouldBeEnabled)
+            assertFalse(startedActions().contains(WakeCaptureService.ACTION_START))
+            runtime.setCaptureAllowed(true)
+            assertTrue(startedActions().contains(WakeCaptureService.ACTION_START))
+            broadcast(runtime.state.value.keyword, WakeCaptureStatus.LISTENING)
+            runtime.setCaptureAllowed(false)
+            broadcast(runtime.state.value.keyword, WakeCaptureStatus.PAUSED)
+            runtime.resume()
+            broadcast(runtime.state.value.keyword, WakeCaptureStatus.LISTENING)
+            assertEquals(WakeCaptureStatus.PAUSED, runtime.state.value.status)
+            assertFalse(startedActions().contains(WakeCaptureService.ACTION_START))
+            assertTrue(runtime.shouldBeEnabled)
+        }
+    }
+
+    @Test fun `screen off lock and explicit disable cannot be bypassed by resume`() {
+        AndroidWakeRuntime(context).use { runtime ->
+            runtime.setCaptureAllowed(true)
+            runtime.enable()
+            startedActions()
+            val power = shadowOf(context.getSystemService(PowerManager::class.java))
+            val keyguard = shadowOf(context.getSystemService(KeyguardManager::class.java))
+            power.setIsInteractive(false)
+            runtime.resume()
+            assertFalse(runtime.canCapture)
+            assertFalse(startedActions().contains(WakeCaptureService.ACTION_START))
+            power.setIsInteractive(true)
+            keyguard.setKeyguardLocked(true)
+            runtime.resume()
+            assertFalse(runtime.canCapture)
+            assertFalse(startedActions().contains(WakeCaptureService.ACTION_START))
+            keyguard.setKeyguardLocked(false)
+            runtime.disable()
+            runtime.setCaptureAllowed(false)
+            runtime.setCaptureAllowed(true)
+            runtime.resume()
+            assertFalse(runtime.shouldBeEnabled)
+            assertFalse(runtime.canCapture)
+            broadcast(runtime.state.value.keyword, WakeCaptureStatus.PAUSED)
+            assertEquals(WakeCaptureStatus.DISABLED, runtime.state.value.status)
+            assertFalse(startedActions().contains(WakeCaptureService.ACTION_START))
+        }
+    }
+
+    private fun startedActions() = generateSequence { shadowOf(context).nextStartedService }.map { it.action }.toList()
 
     private fun broadcast(keyword: WakeKeyword, status: WakeCaptureStatus) {
         context.sendBroadcast(
