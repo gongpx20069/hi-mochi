@@ -35,7 +35,6 @@ import com.example.mochi_ui.MochiTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
-import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.mochi_pet.MainActivity
 import com.example.mochi_pet.MochiApplication
@@ -51,6 +50,21 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ProviderProfilesSmokeTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+
+    private fun hideKeyboard() {
+        compose.waitForIdle()
+        compose.runOnUiThread {
+            androidx.core.view.WindowCompat.getInsetsController(compose.activity.window, compose.activity.window.decorView)
+                .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+        }
+        compose.waitUntil(10_000) {
+            compose.runOnUiThread {
+                androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                    ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == false
+            }
+        }
+        compose.waitForIdle()
+    }
 
     @After fun clearTestScreenFlag() {
         compose.runOnUiThread { compose.activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
@@ -92,7 +106,7 @@ class ProviderProfilesSmokeTest {
         assertEquals("Existing draft", state.value.draft)
         compose.onNodeWithTag("conversation-input").assertIsEnabled().performTextInput(" typed")
         assertTrue(state.value.draft.contains("typed"))
-        Espresso.closeSoftKeyboard()
+        hideKeyboard()
         compose.onNodeWithTag("conversation-layout").performTouchInput { swipeDown() }
         assertEquals(false, state.value.quickEntry)
     }
@@ -132,7 +146,7 @@ class ProviderProfilesSmokeTest {
         compose.onNodeWithContentDescription(localizeUiText("Speak")).assertDoesNotExist()
         input.performTextClearance()
         send.assertIsNotEnabled()
-        Espresso.closeSoftKeyboard()
+        hideKeyboard()
         compose.onNode(hasText(localizeUiText("Skills")) and hasClickAction()).performClick()
         compose.onNodeWithText(localizeUiText("Installed")).assertIsSelected()
         compose.onNodeWithText(localizeUiText("Explore")).assertIsDisplayed()
@@ -255,7 +269,7 @@ class ProviderProfilesSmokeTest {
         assertEquals(false, historyAvailable())
         val bottom = compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top
         compose.onNodeWithTag("conversation-input").performTextInput("Synthetic return draft")
-        Espresso.closeSoftKeyboard()
+        hideKeyboard()
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.STARTED)
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
         assertEquals(false, historyAvailable())
@@ -278,7 +292,7 @@ class ProviderProfilesSmokeTest {
         compose.onNodeWithText(localizeUiText("Close")).performClick()
         assertEquals(false, historyAvailable())
         compose.onNodeWithTag("conversation-input").performTextClearance()
-        Espresso.closeSoftKeyboard()
+        hideKeyboard()
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
         compose.onNodeWithText(localizeUiText("Type, hold to talk, swipe down for history")).assertIsDisplayed()
