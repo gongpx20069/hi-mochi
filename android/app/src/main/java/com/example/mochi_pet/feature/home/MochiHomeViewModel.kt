@@ -1389,7 +1389,7 @@ class MochiHomeViewModel(
         var briefingDismissed = false
         runtime.stopSpeaking()
         val startListening = startListening@ {
-            if (version != interactionVersion) {
+            if (!canContinueVoiceInteraction(version)) {
                 return@startListening
             }
             mutablePipelineState.value = ChatPipelineUiState(
@@ -1427,8 +1427,11 @@ class MochiHomeViewModel(
                 }, onTranscript, onNoResult)
             }
         }
-        val beginVoiceInput = {
-            if (acknowledgeWake && candidate == null && interruptedBriefing == null && version == interactionVersion) {
+        val beginVoiceInput = beginVoiceInput@ {
+            if (!canContinueVoiceInteraction(version)) {
+                return@beginVoiceInput
+            }
+            if (acknowledgeWake && candidate == null && interruptedBriefing == null) {
                 mutablePipelineState.value = ChatPipelineUiState(
                     stage = ChatPipelineStage.SPEAKING,
                 )
@@ -1466,14 +1469,15 @@ class MochiHomeViewModel(
     }
 
     private fun startFollowUpListening(version: Long) {
+        if (!canContinueVoiceInteraction(version)) return
         val runtime = voiceRuntime
-        if (runtime == null || version != interactionVersion) {
+        if (runtime == null) {
             mutablePipelineState.value = ChatPipelineUiState()
             wakeRuntime?.resume()
             return
         }
         val startListening = startListening@ {
-            if (version != interactionVersion) {
+            if (!canContinueVoiceInteraction(version)) {
                 return@startListening
             }
             mutablePipelineState.value = ChatPipelineUiState(
@@ -1503,6 +1507,16 @@ class MochiHomeViewModel(
         } else {
             wake.pause(startListening)
         }
+    }
+
+    private fun canContinueVoiceInteraction(version: Long): Boolean {
+        if (version != interactionVersion) return false
+        if (endedVoiceInteractionVersion == version) {
+            mutablePipelineState.value = ChatPipelineUiState()
+            wakeRuntime?.resume()
+            return false
+        }
+        return true
     }
 
     private fun cancelAgentInteraction() {

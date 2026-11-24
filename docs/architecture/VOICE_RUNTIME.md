@@ -86,6 +86,13 @@ worker initialization, delayed resumes and wake delivery recheck it. The service
 is non-sticky; no background/lock-screen wake detection or silent keep-alive
 playback runs. Temporary pauses preserve the saved enable preference.
 
+Leaving Companion ends automatic listening for the current interaction without
+cancelling Agent work or suppressing its final history entry or reply playback
+(existing Chat mute rules still apply). Initial wake-pause callbacks, acknowledgement
+completion and follow-up wake-pause callbacks recheck the interaction version and
+its ended marker before starting audio. Returning to Companion does not revive
+those callbacks; only a new voice interaction can start listening again.
+
 The wake service emits a typed wake event only. UI and agent work remain
 outside the audio thread.
 

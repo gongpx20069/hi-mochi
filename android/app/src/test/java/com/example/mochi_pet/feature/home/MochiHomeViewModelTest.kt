@@ -1210,6 +1210,110 @@ class MochiHomeViewModelTest {
     }
 
     @Test
+    fun `leaving during wake acknowledgement rejects old callbacks but permits a fresh wake`() {
+        val voice = VoiceRuntimeFake("New request", autoCompleteSpeech = false)
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { AgentReply("Done.", "neutral") } },
+            voiceRuntime = voice, wakeRuntime = WakeRuntimeFake(),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.setCompanionVisible(true)
+        viewModel.startVoiceInput(acknowledgeWake = true)
+        val oldAcknowledgement = voice.speechCallbacks.single()
+        viewModel.setCompanionVisible(false)
+        viewModel.setCompanionVisible(true)
+        oldAcknowledgement(SpeechPlaybackResult.COMPLETED)
+        assertEquals(0, voice.listenCount)
+        assertTrue(viewModel.conversationState.value.messages.isEmpty())
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+
+        viewModel.startVoiceInput(acknowledgeWake = true)
+        oldAcknowledgement(SpeechPlaybackResult.COMPLETED)
+        assertEquals(ChatPipelineStage.SPEAKING, viewModel.pipelineState.value.stage)
+        voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(1, voice.listenCount)
+        assertEquals(listOf("New request", "Done."), viewModel.conversationState.value.messages.map { it.text })
+        voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(2, voice.listenCount)
+    }
+
+    @Test
+    fun `leaving during initial wake pause rejects delayed acknowledgement and direct listening`() {
+        for (acknowledgeWake in listOf(true, false)) {
+            val voice = VoiceRuntimeFake("Must not send")
+            val wake = WakeRuntimeFake().apply { holdPause = true }
+            val viewModel = MochiHomeViewModel(
+                plannerStore = PlannerStoreFake(), voiceRuntime = voice, wakeRuntime = wake,
+                ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+            )
+            viewModel.setCompanionVisible(true)
+            viewModel.startVoiceInput(acknowledgeWake)
+            val paused = checkNotNull(wake.paused)
+            viewModel.navigate(MochiNavigationIntent.ShowConversation)
+            viewModel.navigate(MochiNavigationIntent.ShowFace)
+            viewModel.setCompanionVisible(true)
+            paused()
+            assertEquals(0, voice.listenCount)
+            assertTrue(voice.spokenTexts.isEmpty())
+            assertTrue(viewModel.conversationState.value.messages.isEmpty())
+            assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+        }
+    }
+
+    @Test
+    fun `leaving during follow up pause rejects delayed listening without losing the reply`() {
+        val voice = VoiceRuntimeFake("Question", autoCompleteSpeech = false)
+        val wake = WakeRuntimeFake()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { AgentReply("Answer", "neutral") } },
+            voiceRuntime = voice, wakeRuntime = wake,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.setCompanionVisible(true)
+        viewModel.startVoiceInput()
+        wake.holdPause = true
+        voice.speechCallbacks.single()(SpeechPlaybackResult.COMPLETED)
+        val paused = checkNotNull(wake.paused)
+        viewModel.navigate(MochiNavigationIntent.ShowSettings)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        viewModel.setCompanionVisible(true)
+        paused()
+        assertEquals(1, voice.listenCount)
+        assertEquals(listOf("Answer"), voice.spokenTexts)
+        assertEquals("Answer", viewModel.conversationState.value.messages.last().text)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+    }
+
+    @Test
+    fun `leaving during Agent work preserves its reply and playback but ends follow up listening`() {
+        val reply = CompletableDeferred<AgentReply>()
+        val voice = VoiceRuntimeFake("Question", autoCompleteSpeech = false)
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { reply.await() } },
+            voiceRuntime = voice, wakeRuntime = WakeRuntimeFake(),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.setCompanionVisible(true)
+        viewModel.startVoiceInput()
+        viewModel.setCompanionVisible(false)
+        assertTrue(viewModel.conversationState.value.isSending)
+        reply.complete(AgentReply("Completed in background", "neutral"))
+        assertFalse(viewModel.conversationState.value.isSending)
+        assertEquals(listOf("Question", "Completed in background"), viewModel.conversationState.value.messages.map { it.text })
+        assertEquals(listOf("Completed in background"), voice.spokenTexts)
+        assertEquals(ChatPipelineStage.SPEAKING, viewModel.pipelineState.value.stage)
+        voice.speechCallbacks.single()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(1, voice.listenCount)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+    }
+
+    @Test
     fun `wake word acknowledgement is spoken but not added to history`() {
         val voiceRuntime = VoiceRuntimeFake("Turn on the light")
         val viewModel = MochiHomeViewModel(
