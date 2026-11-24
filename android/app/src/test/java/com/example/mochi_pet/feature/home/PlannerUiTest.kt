@@ -7,6 +7,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -177,6 +183,47 @@ class PlannerUiTest {
         compose.onNodeWithText("No arrangements for this day").assertDoesNotExist()
         compose.runOnIdle { state = PlannerSurfaceState(date = date) }
         compose.onNodeWithText("No arrangements for this day").assertIsDisplayed()
+    }
+
+    @Test fun `day swipes cross month boundaries once without treating vertical or small drags as navigation`() {
+        val today = LocalDate.of(2026, 11, 30)
+        var selected by mutableStateOf(today)
+        val selections = mutableListOf<LocalDate>()
+        compose.setContent { MochiTheme {
+            PlannerAgenda(selected, today, false, PlannerSurfaceState(date = selected),
+                { selections += it; selected = it }, {}, {}, actions(), {}, {}, {}, { _, _ -> })
+        } }
+        val agenda = compose.onNodeWithTag("planner-agenda")
+        agenda.performTouchInput { swipeLeft() }
+        assertEquals(listOf(LocalDate.of(2026, 12, 1)), selections)
+        agenda.performTouchInput { swipeRight() }
+        assertEquals(today, selected)
+        agenda.performTouchInput { swipeUp() }
+        agenda.performTouchInput {
+            down(center)
+            moveTo(center + Offset(15f, 0f))
+            up()
+        }
+        assertEquals(2, selections.size)
+    }
+
+    @Test fun `filter swipes and vertical agenda scrolling do not change the date`() {
+        val today = LocalDate.of(2026, 11, 9)
+        val base = Instant.parse("2026-11-09T08:00:00Z")
+        val event = com.example.mochi_pet.core.model.CalendarEvent("first", "Morning walk", null, base,
+            null, false, java.time.ZoneOffset.UTC, null, null, null, base, base)
+        var changes = 0
+        compose.setContent { MochiTheme {
+            PlannerAgenda(today, today, false, PlannerSurfaceState(date = today,
+                events = (1..20).map { event.copy(id = "$it", title = "Event $it") }),
+                { changes++ }, {}, {}, actions(), {}, {}, {}, { _, _ -> })
+        } }
+        compose.onNodeWithTag("agenda-filters").performTouchInput { swipeLeft() }
+        val agenda = compose.onNodeWithTag("planner-agenda")
+        agenda.performTouchInput { swipeUp() }
+        assertTrue(agenda.fetchSemanticsNode().config[
+            androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange].value() > 0f)
+        assertEquals(0, changes)
     }
 
     @Test fun `history uses one task card and opens exact persisted result`() {

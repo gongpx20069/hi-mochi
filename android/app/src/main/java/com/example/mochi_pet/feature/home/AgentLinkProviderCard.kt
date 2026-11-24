@@ -6,10 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -73,7 +70,7 @@ fun AgentLinkProviderCard(
             }),
         ) {
             if (state.authorized) {
-                Switch(
+                CapabilitySwitch(
                     checked = state.enabled,
                     enabled = !loading,
                     onCheckedChange = { onAction(AgentLinkUiAction.Enable(it)) },
@@ -87,21 +84,22 @@ fun AgentLinkProviderCard(
             style = MaterialTheme.typography.bodySmall,
         )
         if (!state.installed || state.status == "incompatible") {
-            Button(onClick = { onAction(AgentLinkUiAction.Install) }, enabled = !loading) {
+            CapabilityAction(onClick = { onAction(AgentLinkUiAction.Install) }, enabled = !loading, emphasized = true) {
                 Text("Install or update AgentLink")
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (state.authorized) {
-                OutlinedButton(
+                CapabilityAction(
                     onClick = { onAction(AgentLinkUiAction.Connect) },
                     enabled = state.installed && !loading,
                 ) {
                     Text("Connect/Open AgentLink")
                 }
             } else {
-                Button(
+                CapabilityAction(
                     onClick = { onAction(AgentLinkUiAction.Connect) },
+                    emphasized = true,
                     enabled = state.installed && !loading,
                 ) {
                     Text("Connect/Open AgentLink")
@@ -123,7 +121,7 @@ fun AgentLinkProviderCard(
             TextButton({ onAction(AgentLinkUiAction.SetupGuide) }, enabled = !loading) { Text("Desktop Bridge setup") }
             if (state.authorized) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
+                    CapabilityAction(
                         onClick = { onAction(AgentLinkUiAction.Manager) },
                         enabled = !loading,
                     ) {

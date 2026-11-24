@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
@@ -22,6 +23,8 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.mutableStateOf
 import androidx.activity.compose.setContent
@@ -60,6 +63,7 @@ class ProviderProfilesSmokeTest {
             compose.activity.setContent {
                 MochiTheme {
                     ConversationSurface(
+                        chatMuted = false, muteEnabled = true, onSetChatMuted = {},
                         state = state.value, providerReady = true, voiceState = VoiceRuntimeState(),
                         onSend = { error("Gesture must not send") }, onCancel = {},
                         onDraftChange = { state.value = state.value.copy(draft = it) },
@@ -176,5 +180,68 @@ class ProviderProfilesSmokeTest {
         compose.onNodeWithText(localizeUiText("Cancel")).performClick()
         assertEquals(before, runBlocking(Dispatchers.IO) { repo.loadProfiles() })
         assertEquals(speechBefore, runBlocking(Dispatchers.IO) { speech.loadProfiles() })
+    }
+
+    @Test fun agendaSwipesReplaceDifferentContentsWithoutMovingTheCalendar() {
+        val today = java.time.LocalDate.of(2026, 11, 30)
+        val selected = mutableStateOf(today)
+        val base = java.time.Instant.parse("2026-11-30T08:00:00Z")
+        val event = com.example.mochi_pet.core.model.CalendarEvent("fixture", "Synthetic agenda event", null, base,
+            null, false, java.time.ZoneOffset.UTC, null, null, null, base, base)
+        val actions = PlannerUiActions(
+            saveUser = { _, _, _, _ -> null }, completeUser = {}, deleteUser = { _, _, _ -> },
+            saveTask = { _, _ -> }, results = { _, _ -> emptyList() },
+            result = { error("Unexpected result request") }, showResults = {}, changes = kotlinx.coroutines.flow.emptyFlow(),
+        )
+        compose.runOnUiThread { compose.activity.setContent { MochiTheme {
+            PlannerAgenda(selected.value, today, false, PlannerSurfaceState(date = selected.value,
+                events = if (selected.value == today) listOf(event) else emptyList()),
+                { selected.value = it }, {}, {}, actions, {}, {}, {}, { _, _ -> })
+        } } }
+        val filters = compose.onNodeWithTag("agenda-filters")
+        val before = filters.getUnclippedBoundsInRoot()
+        compose.onNodeWithText("Synthetic agenda event").assertIsDisplayed()
+        compose.onNodeWithTag("planner-agenda").performTouchInput { swipeLeft() }
+        assertEquals(today.plusDays(1), selected.value)
+        compose.onNodeWithText(localizeUiText("No arrangements for this day")).assertIsDisplayed()
+        assertEquals(before, filters.getUnclippedBoundsInRoot())
+        compose.onNodeWithTag("planner-agenda").performTouchInput { swipeRight() }
+        assertEquals(today, selected.value)
+        compose.onNodeWithText("Synthetic agenda event").assertIsDisplayed()
+        assertEquals(before, filters.getUnclippedBoundsInRoot())
+    }
+
+    @Test fun chatMuteSurvivesActivityRecreationWithoutChangingOtherPreferences() {
+        val app = compose.activity.application as MochiApplication
+        val repository = app.agentSettingsRepository
+        val before = runBlocking(Dispatchers.IO) { repository.load() }
+        fun openChat() {
+            if (compose.onAllNodesWithText(localizeUiText("Settings")).fetchSemanticsNodes().isNotEmpty()) {
+                compose.onNodeWithText(localizeUiText("Settings")).performClick()
+            }
+            compose.onNode(hasText("Mochi") and hasClickAction()).performClick()
+            compose.onNode(hasText(localizeUiText("Chat")) and hasClickAction()).performClick()
+        }
+        try {
+            openChat()
+            val label = localizeUiText(if (before.chatMuted) "Unmute chat replies" else "Mute chat replies")
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasContentDescription(label) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithContentDescription(label).performClick()
+            compose.waitUntil(10_000) {
+                runBlocking(Dispatchers.IO) { repository.load().chatMuted != before.chatMuted }
+            }
+            compose.activityRule.scenario.recreate()
+            openChat()
+            val restoredLabel = localizeUiText(if (before.chatMuted) "Mute chat replies" else "Unmute chat replies")
+            compose.waitUntil(10_000) {
+                compose.onNodeWithContentDescription(restoredLabel).isDisplayed()
+            }
+            assertEquals(before.copy(chatMuted = !before.chatMuted), runBlocking(Dispatchers.IO) { repository.load() })
+        } finally {
+            runBlocking(Dispatchers.IO) { repository.setChatMuted(before.chatMuted) }
+            compose.activityRule.scenario.recreate()
+        }
     }
 }

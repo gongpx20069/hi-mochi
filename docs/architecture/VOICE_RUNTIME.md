@@ -137,6 +137,12 @@ outside the audio thread.
 
 ### Chat dictation
 
+The Home ViewModel gates automatic Chat reply/assistance speech with the
+persisted Chat mute preference, including replies whose Agent navigated away
+from Chat. Muting stops playback and invalidates its completion callback, not
+the Agent turn, microphone or text reply. Companion and explicit voice previews
+remain independent. Unmuting does not replay an already delivered response.
+
 Chat's long-press gesture uses `startListening(manualEndpoint = true)`.
 Release calls `finishListening()`, which preserves recognition callbacks and
 finalizes captured audio; `stopListening()` remains cancellation. Local silence

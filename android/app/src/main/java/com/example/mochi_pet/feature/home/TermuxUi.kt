@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,7 +49,7 @@ internal fun TermuxProviderCard(
                 else -> "Installed · connection required"
             }),
         ) {
-            Switch(summary.enabled, { onAction(TermuxUiAction.Enable(it)) },
+            CapabilitySwitch(summary.enabled, { onAction(TermuxUiAction.Enable(it)) },
                 enabled = summary.connected && !disabled)
         }
         Text("Enabled commands run automatically for conversations, Scheduled Agents, and Subagents. Output may go to your model Provider.",
@@ -59,11 +57,11 @@ internal fun TermuxProviderCard(
         summary.detail?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         when {
             !summary.installed || !summary.trusted ->
-                Button({ onAction(TermuxUiAction.Install) }, enabled = !disabled) { Text("Install extension") }
+                CapabilityAction({ onAction(TermuxUiAction.Install) }, enabled = !disabled, emphasized = true) { Text("Install extension") }
             !summary.connected ->
-                Button({ onAction(TermuxUiAction.Configure) }, enabled = !disabled) { Text("Configure Termux") }
+                CapabilityAction({ onAction(TermuxUiAction.Configure) }, enabled = !disabled, emphasized = true) { Text("Configure Termux") }
             !summary.enabled ->
-                Button({ onAction(TermuxUiAction.EnableWithSkill) }, enabled = !disabled) { Text("Enable tools and Skill") }
+                CapabilityAction({ onAction(TermuxUiAction.EnableWithSkill) }, enabled = !disabled, emphasized = true) { Text("Enable tools and Skill") }
             else -> TextButton({ onAction(TermuxUiAction.Tasks) }, enabled = !disabled) { Text("Termux tasks") }
         }
         TextButton({ management = !management }) { Text(if (management) "Hide connection settings" else "Connection settings") }
@@ -84,7 +82,7 @@ internal fun TermuxProviderCard(
             if (expanded) summary.tools.forEach { tool ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(tool.name, Modifier.weight(1f), fontFamily = FontFamily.Monospace)
-                    Switch(tool.enabled, { onAction(TermuxUiAction.EnableTool(tool.name, it)) },
+                    CapabilitySwitch(tool.enabled, { onAction(TermuxUiAction.EnableTool(tool.name, it)) },
                         enabled = summary.enabled && !disabled)
                 }
             }

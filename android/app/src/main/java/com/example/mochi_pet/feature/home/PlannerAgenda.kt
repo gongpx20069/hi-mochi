@@ -1,6 +1,13 @@
 package com.example.mochi_pet.feature.home
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.semantics.contentDescription
@@ -35,6 +44,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
+import kotlinx.coroutines.delay
 
 private enum class AgendaFilter(val label: String, val kind: AgendaKind?) {
     ALL("All", null), USER("My schedule", AgendaKind.USER), MOCHI("Mochi tasks", AgendaKind.MOCHI), JOURNAL("Journal", AgendaKind.JOURNAL),
@@ -72,7 +82,26 @@ internal fun PlannerAgenda(
         onRemove = { editTask?.let { onRemove(it.id) } }, onDismiss = { taskEditor = false })
     val rows = remember(state, filter) { agendaRows(state, filter) }
     val contentDate = state.date ?: date
-    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp),
+    val selectDate by rememberUpdatedState(onDate)
+    val showLoading by produceState(false, state.isLoading) {
+        value = false
+        if (state.isLoading) {
+            delay(150)
+            value = true
+        }
+    }
+    LazyColumn(Modifier.fillMaxSize().testTag("planner-agenda").pointerInput(date) {
+        var distance = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { distance = 0f },
+            onHorizontalDrag = { change, amount -> change.consume(); distance += amount },
+            onDragCancel = { distance = 0f },
+            onDragEnd = {
+                if (distance > size.width * 0.2f) selectDate(date.minusDays(1))
+                else if (distance < -size.width * 0.2f) selectDate(date.plusDays(1))
+            },
+        )
+    }, verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 24.dp)) {
         item("heading") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -99,7 +128,7 @@ internal fun PlannerAgenda(
             }
         }
         item("filters") {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.testTag("agenda-filters").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AgendaFilter.entries.forEach { option ->
                     val accent = option.kind?.let { agendaColor(it) } ?: MaterialTheme.colorScheme.primary
                     FilterChip(selected = filter == option, onClick = { filter = option },
@@ -111,10 +140,16 @@ internal fun PlannerAgenda(
         }
         item("day") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                MaterialText(contentDate.format(uiDateFormatter("MMM d · EEEE", "M月d日 · EEEE")),
-                    style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                AnimatedContent(
+                    contentDate, modifier = Modifier.weight(1f),
+                    transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
+                    label = "agenda-date",
+                ) { day ->
+                    MaterialText(day.format(uiDateFormatter("MMM d · EEEE", "M月d日 · EEEE")),
+                        style = MaterialTheme.typography.titleMedium)
+                }
                 Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                    if (state.isLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    if (showLoading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 }
                 if (filter == AgendaFilter.MOCHI) TextButton(onClick = { managing = true }) { Text("Manage all tasks") }
             }
@@ -122,34 +157,43 @@ internal fun PlannerAgenda(
         state.errorMessage?.let { error -> item("error") { MaterialText(error, color = MaterialTheme.colorScheme.error) } }
         if (!state.isLoading || state.date != null) {
             if (filter == AgendaFilter.JOURNAL || (filter == AgendaFilter.ALL && contentDate < today)) {
-                item("journal") { journalDay(contentDate, filter == AgendaFilter.JOURNAL) }
+                item("journal:$contentDate") {
+                    Box(Modifier.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)
+                        .animateContentSize(tween(160))) { journalDay(contentDate, filter == AgendaFilter.JOURNAL) }
+                }
             }
-            if (rows.isEmpty() && state.errorMessage == null && filter != AgendaFilter.JOURNAL) item("empty") { AgendaEmpty("No arrangements for this day") }
-            items(rows, key = { it.key }) { row ->
-                when (row) {
-                    is AgendaRow.Event -> {
-                        val event = row.value
-                        UserScheduleCard(event.title,
-                            if (event.allDay) localizeUiText("All day") else agendaTime(event.startAt),
-                            event.completedAt != null, event.recurrenceRule != null,
-                            onEdit = { editEvent = event; editTodo = null; userEditor = true },
-                            onComplete = { actions.completeUser(event) },
-                            highlighted = event.id in state.highlightIds || event.occurrenceId in state.highlightIds)
+            if (rows.isEmpty() && state.errorMessage == null && filter != AgendaFilter.JOURNAL) item("empty:$contentDate") {
+                Box(Modifier.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)) {
+                    AgendaEmpty("No arrangements for this day")
+                }
+            }
+            items(rows, key = { "$contentDate:${it.key}" }) { row ->
+                Box(Modifier.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)) {
+                    when (row) {
+                        is AgendaRow.Event -> {
+                            val event = row.value
+                            UserScheduleCard(event.title,
+                                if (event.allDay) localizeUiText("All day") else agendaTime(event.startAt),
+                                event.completedAt != null, event.recurrenceRule != null,
+                                onEdit = { editEvent = event; editTodo = null; userEditor = true },
+                                onComplete = { actions.completeUser(event) },
+                                highlighted = event.id in state.highlightIds || event.occurrenceId in state.highlightIds)
+                        }
+                        is AgendaRow.Todo -> {
+                            val todo = row.value
+                            UserScheduleCard(todo.content, todo.dueAt?.let { agendaTime(it) }
+                                ?: localizeUiText("All day"), todo.status == TodoStatus.COMPLETED, false,
+                                onEdit = { editTodo = todo; editEvent = null; userEditor = true },
+                                onComplete = { onCompleteTodo(todo.id) }, highlighted = todo.id in state.highlightIds)
+                        }
+                        is AgendaRow.Task -> ScheduleAgendaCard(row.value, contentDate < today,
+                            onDetails = { details = row.value },
+                            onAction = {
+                                val run = row.value.runs.lastOrNull()
+                                if (run != null) actions.showRun(run)
+                                else row.value.plan?.let { if (contentDate < today) details = row.value else onRun(it.id) }
+                            })
                     }
-                    is AgendaRow.Todo -> {
-                        val todo = row.value
-                        UserScheduleCard(todo.content, todo.dueAt?.let { agendaTime(it) }
-                            ?: localizeUiText("All day"), todo.status == TodoStatus.COMPLETED, false,
-                            onEdit = { editTodo = todo; editEvent = null; userEditor = true },
-                            onComplete = { onCompleteTodo(todo.id) }, highlighted = todo.id in state.highlightIds)
-                    }
-                    is AgendaRow.Task -> ScheduleAgendaCard(row.value, contentDate < today,
-                        onDetails = { details = row.value },
-                        onAction = {
-                            val run = row.value.runs.lastOrNull()
-                            if (run != null) actions.showRun(run)
-                            else row.value.plan?.let { if (contentDate < today) details = row.value else onRun(it.id) }
-                        })
                 }
             }
         }

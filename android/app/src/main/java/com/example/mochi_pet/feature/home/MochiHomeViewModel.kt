@@ -188,6 +188,7 @@ data class PersonaUiState(
 data class AgentSettingsUiState(
     val settings: AgentSettings = AgentSettings(),
     val isLoading: Boolean = true,
+    val isSavingChatMute: Boolean = false,
     val feedback: String? = null,
 )
 
@@ -399,6 +400,7 @@ class MochiHomeViewModel(
     private var interactionVersion = 0L
     private var endedVoiceInteractionVersion: Long? = null
     private var voiceInteraction = false
+    private var replyPlaybackVersion = 0L
     private var dictationVersion = 0L
     private var dictationStarted = false
     private var pendingDictation: String? = null
@@ -533,13 +535,17 @@ class MochiHomeViewModel(
     }
 
     fun speakAssistance(id: String) {
+        if (mutableSurface.value == MochiSurface.Conversation &&
+            mutableAgentSettingsState.value.let { it.isLoading || it.settings.chatMuted }) return
         val request = assistanceRequest.value?.takeIf { it.id == id } ?: return
         if (spokenAssistanceId == id) return
         spokenAssistanceId = id
         mutableAssistanceFeedback.value = null
         val voice = voiceRuntime ?: return
+        val playbackVersion = ++replyPlaybackVersion
         voice.speak(request.message) { result ->
-            if (assistanceRequest.value?.id == id && result != SpeechPlaybackResult.COMPLETED) {
+            if (playbackVersion == replyPlaybackVersion &&
+                assistanceRequest.value?.id == id && result != SpeechPlaybackResult.COMPLETED) {
                 mutableAssistanceFeedback.value = "Could not speak the request. Please read it below."
             }
         }
@@ -1074,6 +1080,7 @@ class MochiHomeViewModel(
         voiceRuntime?.stopSpeaking()
         agentJob?.cancel()
         voiceInteraction = continueListeningAfterReply
+        val chatReply = mutableSurface.value == MochiSurface.Conversation
         val version = ++interactionVersion
         mutableConversationState.update {
             it.copy(
@@ -1174,6 +1181,7 @@ class MochiHomeViewModel(
                 )
                 deliverAssistantReply(
                     version = version,
+                    chatReply = chatReply,
                     text = deliveredText,
                     emotion = reply.emotion,
                     card = reply.card,
@@ -1223,6 +1231,7 @@ class MochiHomeViewModel(
                         )
                         deliverAssistantReply(
                             version = version,
+                            chatReply = chatReply,
                             text = fallbackReply,
                             emotion = "neutral",
                             card = null,
@@ -1251,6 +1260,7 @@ class MochiHomeViewModel(
 
     private fun deliverAssistantReply(
         version: Long,
+        chatReply: Boolean,
         text: String,
         emotion: String,
         card: CardPresentation?,
@@ -1282,7 +1292,10 @@ class MochiHomeViewModel(
             )
         }
         val runtime = voiceRuntime
-        if (runtime == null) {
+        val speechSettings = mutableAgentSettingsState.value
+        if (runtime == null || ((chatReply || mutableSurface.value == MochiSurface.Conversation) &&
+                (speechSettings.isLoading || speechSettings.settings.chatMuted))
+        ) {
             mutablePipelineState.value = ChatPipelineUiState()
             wakeRuntime?.resume()
             return
@@ -1290,8 +1303,9 @@ class MochiHomeViewModel(
         mutablePipelineState.value = ChatPipelineUiState(
             stage = ChatPipelineStage.SPEAKING,
         )
+        val playbackVersion = ++replyPlaybackVersion
         runtime.speak(text) { result ->
-            if (version != interactionVersion) {
+            if (version != interactionVersion || playbackVersion != replyPlaybackVersion) {
                 return@speak
             }
             if (
@@ -1871,16 +1885,47 @@ class MochiHomeViewModel(
         }
     }
 
+    fun setChatMuted(muted: Boolean) {
+        if (mutableAgentSettingsState.value.let { it.isLoading || it.isSavingChatMute }) return
+        val repository = agentSettingsRepository ?: run {
+            mutableConversationState.update { it.copy(errorMessage = "Chat speech settings are unavailable") }
+            return
+        }
+        mutableAgentSettingsState.update {
+            it.copy(settings = it.settings.copy(chatMuted = muted), isSavingChatMute = true)
+        }
+        if (muted && mutableSurface.value == MochiSurface.Conversation) {
+            replyPlaybackVersion++
+            voiceRuntime?.stopSpeaking()
+            if (mutablePipelineState.value.stage == ChatPipelineStage.SPEAKING) {
+                mutablePipelineState.value = ChatPipelineUiState()
+            }
+        }
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                repository.setChatMuted(muted)
+            } catch (_: IOException) {
+                mutableConversationState.update {
+                    it.copy(errorMessage = "Could not save chat speech settings. This choice applies only to this session.")
+                }
+            } finally {
+                mutableAgentSettingsState.update { it.copy(isSavingChatMute = false) }
+            }
+        }
+    }
+
     fun setRecentConversationTurns(turns: Int) {
         val repository = agentSettingsRepository ?: return
         viewModelScope.launch(ioDispatcher) {
             try {
                 val settings = repository.setRecentConversationTurns(turns)
-                mutableAgentSettingsState.value = AgentSettingsUiState(
-                    settings = settings,
-                    isLoading = false,
-                    feedback = "Agent context settings saved",
-                )
+                mutableAgentSettingsState.update {
+                    it.copy(
+                        settings = it.settings.copy(recentConversationTurns = settings.recentConversationTurns),
+                        isLoading = false,
+                        feedback = "Agent context settings saved",
+                    )
+                }
                 loadPersistedConversation(settings.recentConversationTurns)
             } catch (error: IllegalArgumentException) {
                 mutableAgentSettingsState.update {
@@ -1911,11 +1956,16 @@ class MochiHomeViewModel(
                     enabled = enabled,
                     delaySeconds = delaySeconds,
                 )
-                mutableAgentSettingsState.value = AgentSettingsUiState(
-                    settings = settings,
-                    isLoading = false,
-                    feedback = "Fullscreen standby settings saved",
-                )
+                mutableAgentSettingsState.update {
+                    it.copy(
+                        settings = it.settings.copy(
+                            focusStandbyEnabled = settings.focusStandbyEnabled,
+                            focusStandbyDelaySeconds = settings.focusStandbyDelaySeconds,
+                        ),
+                        isLoading = false,
+                        feedback = "Fullscreen standby settings saved",
+                    )
+                }
             } catch (error: IllegalArgumentException) {
                 mutableAgentSettingsState.update {
                     it.copy(

@@ -329,6 +329,13 @@ and enablement behavior are unchanged. The shared top bar, pipeline status,
 conversation empty state and Settings header use restrained spacing and
 typography. Bottom navigation uses the four destinations above and selected-state
 semantics, with a muted accent fill and at least 48 dp touch targets.
+Every main destination keeps the same compact Mochi wordmark in the global
+header. Chat/Companion selection sits below that header on Mochi, not in place
+of the identity. Skill/Tool card actions and switches use smaller visual
+controls while retaining 48 dp interaction targets and disabled/selected semantics.
+The speaker icon immediately left of Send remembers Chat-only reply muting.
+Muting stops current playback without cancelling the Agent or changing the
+draft; Companion, dictation and voice previews are unaffected.
 
 The Tools surface orders **Agent Browser**, **App Control**, **Media Control**,
 then **Amap Maps**, outside **Mochi Built-ins**. App Control has five Tools and
@@ -405,9 +412,15 @@ Planner's bottom label is **日程** in Chinese. Today, month and date voice
 destinations render the same agenda; month navigation expands its date selector.
 Date selection updates immediately, while the last loaded agenda keeps its own
 date heading and cards until the new snapshot is ready. A fixed-size progress
-indicator in that heading signals loading without removing or shifting the list.
+indicator in that heading signals loads lasting over 150 ms without removing
+or shifting the list; fast local reads do not flash a spinner. Day headings
+and dated cards use short fades when replaced, without fading the calendar or
+global header. Journal height changes settle without an abrupt layout jump.
 Only the latest selection may replace the snapshot; failures retain the dated
 content with an explicit error, never presenting old entries under a new date.
+Swipe left/right across the agenda to select the next/previous day, including
+across month boundaries. Each deliberate horizontal swipe changes one day;
+short drags, vertical scrolling and the filter strip's own scrolling do not.
 A return-to-today shortcut appears only away from today. All/My schedule/Mochi
 tasks/Journal chips filter the selected date, and a single New button opens a
 two-choice sheet. A secondary-text hint below its choices explains that users

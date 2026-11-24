@@ -18,7 +18,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -104,7 +103,7 @@ internal fun RestApiConnectionCard(summary: RestConnectionSummary, actions: Rest
                     Text("REST API", style = MaterialTheme.typography.labelMedium)
                     Text(connection.baseUrl, style = MaterialTheme.typography.bodySmall)
                 }
-                Switch(
+                CapabilitySwitch(
                     checked = connection.enabled,
                     onCheckedChange = { change(RestApiChange.SetEnabled(connection.id, null, it)) },
                     enabled = !busy,
@@ -125,7 +124,7 @@ internal fun RestApiConnectionCard(summary: RestConnectionSummary, actions: Rest
                                 Text(tool.name)
                                 Text("${tool.method} ${tool.path}", style = MaterialTheme.typography.bodySmall)
                             }
-                            Switch(
+                            CapabilitySwitch(
                                 checked = tool.enabled,
                                 onCheckedChange = { change(RestApiChange.SetEnabled(connection.id, tool.id, it)) },
                                 enabled = !busy,
@@ -137,10 +136,10 @@ internal fun RestApiConnectionCard(summary: RestConnectionSummary, actions: Rest
                         }
                     }
                 }
-                OutlinedButton(onClick = { toolEditor = RestToolDefinition() }, enabled = !busy) { Text("Add API tool") }
+                CapabilityAction(onClick = { toolEditor = RestToolDefinition() }, enabled = !busy, emphasized = true) { Text("Add API tool") }
             }
             if (connection.tools.isEmpty() && !expanded) {
-                OutlinedButton(onClick = { toolEditor = RestToolDefinition() }, enabled = !busy) { Text("Add API tool") }
+                CapabilityAction(onClick = { toolEditor = RestToolDefinition() }, enabled = !busy, emphasized = true) { Text("Add API tool") }
             }
         }
     }

@@ -73,6 +73,91 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test fun `mute save failure stays explicit and unrelated settings preserve the session choice`() {
+        val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        val settings = object : com.example.mochi_pet.core.settings.AgentSettingsRepository by base {
+            override suspend fun setChatMuted(muted: Boolean): com.example.mochi_pet.core.settings.AgentSettings {
+                throw java.io.IOException("Synthetic storage failure")
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.setChatMuted(true)
+        assertTrue(viewModel.conversationState.value.errorMessage!!.contains("only to this session"))
+        assertFalse(viewModel.agentSettingsState.value.isSavingChatMute)
+        viewModel.setRecentConversationTurns(4)
+        viewModel.setFocusStandby(false, 30)
+        val saved = viewModel.agentSettingsState.value.settings
+        assertTrue(saved.chatMuted)
+        assertEquals(4, saved.recentConversationTurns)
+        assertFalse(saved.focusStandbyEnabled)
+    }
+
+    @Test fun `muted Chat keeps text replies while Companion and unmuted Chat still speak`() {
+        val preferences = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        val voice = VoiceRuntimeFake("")
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), voiceRuntime = voice, agentSettingsRepository = preferences,
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { AgentReply("Reply", "neutral") } },
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.setChatMuted(true)
+        viewModel.sendConversation("Chat question")
+        assertTrue(voice.spokenTexts.isEmpty())
+        assertEquals("Reply", viewModel.conversationState.value.messages.last().text)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        viewModel.sendConversation("Companion question")
+        assertEquals(listOf("Reply"), voice.spokenTexts)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.setChatMuted(false)
+        viewModel.sendConversation("Another chat question")
+        assertEquals(listOf("Reply", "Reply"), voice.spokenTexts)
+    }
+
+    @Test fun `muting pending Chat reply survives Agent navigation and stopping playback leaves replies intact`() {
+        val reply = CompletableDeferred<AgentReply>()
+        val voice = VoiceRuntimeFake("", autoCompleteSpeech = false)
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), voiceRuntime = voice,
+            agentSettingsRepository = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+                com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+            ),
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { sink, _, _ -> AgentRunner {
+                val result = reply.await()
+                sink.apply(NavigationDecision(UiDirective("date_time"), MochiNavigationIntent.ShowDateTime))
+                result
+            } },
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.sendConversation("Pending")
+        viewModel.setChatMuted(true)
+        reply.complete(AgentReply("First", "neutral"))
+        assertTrue(voice.spokenTexts.isEmpty())
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.setChatMuted(false)
+        viewModel.sendConversation("Speak")
+        assertEquals(listOf("First"), voice.spokenTexts)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        val stops = voice.stopSpeakingCount
+        viewModel.setChatMuted(true)
+        assertEquals(stops + 1, voice.stopSpeakingCount)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+        voice.speechCallbacks.last()(SpeechPlaybackResult.COMPLETED)
+        assertEquals(ChatPipelineStage.IDLE, viewModel.pipelineState.value.stage)
+        assertEquals("First", viewModel.conversationState.value.messages.last().text)
+        assertTrue(viewModel.agentSettingsState.value.settings.chatMuted)
+    }
+
     @Test fun `dictation fills then appends to draft without invoking the Agent`() {
         val voice = HoldingVoiceRuntimeFake()
         val viewModel = dictationViewModel(voice)

@@ -21,6 +21,12 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.example.mochi_pet.core.model.MochiSurface
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -50,6 +56,7 @@ class CompactSurfacesUiTest {
     private val state = mutableStateOf(ConversationUiState())
     private val voice = mutableStateOf(VoiceRuntimeState(recognitionAvailable = true))
     private val ready = mutableStateOf(true)
+    private val muted = mutableStateOf(false)
     private val sent = mutableListOf<String>()
     private var started = 0
     private var stopped = 0
@@ -141,6 +148,19 @@ class CompactSurfacesUiTest {
         captureFixture("conversation-composer", "compact-conversation-zh-large.png")
     }
 
+    @Test fun `chat mute is a separate accessible action and never sends the draft`() {
+        renderConversation()
+        compose.onNodeWithTag("conversation-input").performTextInput("Keep draft")
+        val toggle = compose.onNodeWithContentDescription("Mute chat replies")
+        assertTrue(toggle.getUnclippedBoundsInRoot().width >= 48.dp)
+        toggle.performClick()
+        assertTrue(muted.value)
+        compose.onNodeWithContentDescription("Unmute chat replies").performClick()
+        assertEquals(false, muted.value)
+        assertEquals("Keep draft", state.value.draft)
+        assertTrue(sent.isEmpty())
+    }
+
     @Test fun `compact Skill tabs retain selection and explore update actions`() {
         Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
         var popular = 0
@@ -160,6 +180,46 @@ class CompactSurfacesUiTest {
         assertEquals(1, popular)
         installed.performClick().assertIsSelected()
         compose.onNodeWithText(localizeUiText("Check for updates")).assertIsDisplayed()
+    }
+
+    @Test fun `compact controls preserve full touch targets and disabled behavior`() {
+        val checked = mutableStateOf(false)
+        val enabled = mutableStateOf(true)
+        var actions = 0
+        compose.setContent { MochiTheme { Column {
+            CapabilitySwitch(checked.value, { checked.value = it }, Modifier.testTag("switch"), enabled.value)
+            CapabilityAction({ actions++ }, Modifier.testTag("action"), enabled.value) { Text("View") }
+        } } }
+        val toggle = compose.onNodeWithTag("switch")
+        val action = compose.onNodeWithTag("action")
+        listOf(toggle, action).forEach {
+            val bounds = it.getUnclippedBoundsInRoot()
+            assertTrue(bounds.width >= 48.dp && bounds.height >= 48.dp)
+            it.performTouchInput { click(Offset(2f, center.y)) }
+        }
+        toggle.assertIsOn()
+        assertEquals(1, actions)
+        compose.runOnIdle { enabled.value = false }
+        toggle.assertIsNotEnabled().performTouchInput { click() }
+        action.assertIsNotEnabled().performTouchInput { click() }
+        toggle.assertIsOn()
+        assertEquals(1, actions)
+    }
+
+    @Test fun `global header keeps the same compact identity across destinations`() {
+        val surface = mutableStateOf<MochiSurface>(MochiSurface.Conversation)
+        compose.setContent { MochiTheme {
+            MochiTopBar(surface.value, {}, {})
+        } }
+        val header = compose.onNodeWithTag("mochi-header")
+        val bounds = header.getUnclippedBoundsInRoot()
+        listOf(MochiSurface.Face, MochiSurface.Today, MochiSurface.Skills, MochiSurface.Tools).forEach {
+            compose.runOnIdle { surface.value = it }
+            compose.onNodeWithText("Mochi").assertIsDisplayed()
+            assertEquals(bounds, header.getUnclippedBoundsInRoot())
+        }
+        compose.onNodeWithText("Chat").assertDoesNotExist()
+        compose.onNodeWithText("Companion").assertDoesNotExist()
     }
 
     @Test fun `long Skill action wraps below tabs at large font without hiding controls`() {
@@ -197,6 +257,7 @@ class CompactSurfacesUiTest {
             MochiTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
                     ConversationSurface(
+                        chatMuted = muted.value, muteEnabled = true, onSetChatMuted = { muted.value = it },
                         state = state.value, providerReady = ready.value, voiceState = voice.value, onSend = sent::add,
                         onCancel = { cancelled++ },
                         onDraftChange = { state.value = state.value.copy(draft = it) },

@@ -836,6 +836,7 @@ private fun MochiAppContent(
             onSetRecentConversationTurns =
                 viewModel::setRecentConversationTurns,
             onSetFocusStandby = viewModel::setFocusStandby,
+            onSetChatMuted = viewModel::setChatMuted,
             onSavePersona = viewModel::savePersona,
             onSearchSkills = viewModel::searchSkills,
             onLoadPopularSkills = viewModel::loadPopularSkills,
@@ -980,14 +981,15 @@ private fun MochiAppContent(
             ) {
                 MochiTopBar(
                     surface = surface,
-                    wakeState = wakeState,
-                    onNavigate = viewModel::navigate,
                     onTasks = { taskCenter.open() },
                     onSettings = {
                         if (surface == MochiSurface.Settings) viewModel.openMochi()
                         else viewModel.navigate(MochiNavigationIntent.ShowSettings)
                     },
                 )
+                if (homePresentation || surface == MochiSurface.Conversation) {
+                    MochiModeSwitch(homePresentation, viewModel::navigate)
+                }
                 ChatPipelineIndicator(state = visiblePipelineState)
                 if (surface == MochiSurface.Settings) {
                     TextButton({ taskCenter.open(diagnostics = true) }) { Text("Configuration check") }
@@ -1197,36 +1199,23 @@ private fun BrowserSessionCard(
 }
 
 @Composable
-private fun MochiTopBar(
+internal fun MochiTopBar(
     surface: MochiSurface,
-    wakeState: WakeRuntimeState,
-    onNavigate: (MochiNavigationIntent) -> Unit,
     onTasks: () -> Unit,
     onSettings: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("mochi-header"),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            val isMochi = surface.isHomePresentation() || surface == MochiSurface.Conversation
-            if (isMochi) MochiModeSwitch(surface.isHomePresentation(), onNavigate) else Text(
-                text = "Mochi",
-                color = MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            if (!isMochi || (surface.isHomePresentation() && wakeState.enabled)) Text(
-                text = if (surface.isHomePresentation() && wakeState.enabled) {
-                    "${wakeState.keyword.phrase} is ${wakeState.status.name.lowercase()}"
-                } else {
-                    surface.displayName()
-                },
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
+        Text(
+            text = "Mochi",
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
         TextButton(onTasks) { Text("Tasks") }
         OutlinedButton(
             onClick = onSettings,
@@ -1531,6 +1520,7 @@ private fun SurfaceContent(
     onReceiveProviderShareLink: (String) -> Unit,
     onSetRecentConversationTurns: (Int) -> Unit,
     onSetFocusStandby: (Boolean, Int) -> Unit,
+    onSetChatMuted: (Boolean) -> Unit,
     onSavePersona: (String, String, String) -> Unit,
     onSearchSkills: (String) -> Unit,
     onLoadPopularSkills: () -> Unit,
@@ -1609,6 +1599,9 @@ private fun SurfaceContent(
             )
             MochiSurface.Conversation -> ConversationSurface(
                 state = conversationState,
+                chatMuted = agentSettingsState.settings.chatMuted,
+                muteEnabled = !agentSettingsState.isLoading && !agentSettingsState.isSavingChatMute,
+                onSetChatMuted = onSetChatMuted,
                 providerReady = providerSettingsState.summary.isReady,
                 voiceState = voiceState,
                 onSend = onSendMessage,
@@ -3492,7 +3485,7 @@ internal fun BuiltInToolRow(
         }
         if (tool.name == "recall_memory") {
             com.example.mochi_pet.feature.journal.JournalManagedControl(tool.enabled, onOpenJournalSettings)
-        } else Switch(
+        } else CapabilitySwitch(
             checked = tool.enabled,
             onCheckedChange = { onSetEnabled(tool.name, it) },
             enabled = !disabled,
@@ -3638,7 +3631,7 @@ internal fun ToolsSurface(
                             )
                         }
 
-                        Switch(
+                        CapabilitySwitch(
                             checked = state.catalog.agentBrowser.enabled,
                             onCheckedChange = onSetAgentBrowserEnabled,
                             enabled = !state.isLoading,
@@ -3702,7 +3695,7 @@ internal fun ToolsSurface(
                                             fontFamily = FontFamily.Monospace,
                                         )
                                     }
-                                    Switch(
+                                    CapabilitySwitch(
                                         checked = tool.enabled,
                                         onCheckedChange = {
                                             onSetBuiltInEnabled(tool.name, it)
@@ -3758,7 +3751,7 @@ internal fun ToolsSurface(
                                 )
                             }
                             if (state.catalog.amap.connected) {
-                                Switch(
+                                CapabilitySwitch(
                                     checked = state.catalog.amap.enabled,
                                     onCheckedChange = onSetAmapEnabled,
                                     enabled = !state.isLoading,
@@ -3766,15 +3759,16 @@ internal fun ToolsSurface(
                             }
                         }
                         if (state.catalog.amap.connected) {
-                            OutlinedButton(
+                            CapabilityAction(
                                 onClick = onDisconnectAmap,
                                 enabled = !state.isLoading,
                             ) {
                                 Text("Disconnect")
                             }
                         } else {
-                            Button(
+                            CapabilityAction(
                                 onClick = { showAmapCredentials = true },
+                                emphasized = true,
                                 enabled = !state.isLoading,
                             ) {
                                 Text("Configure Amap")
@@ -3840,7 +3834,7 @@ internal fun ToolsSurface(
                                                         FontFamily.Monospace,
                                                 )
                                             }
-                                            Switch(
+                                            CapabilitySwitch(
                                                 checked = tool.enabled,
                                                 onCheckedChange = {
                                                     onSetBuiltInEnabled(
@@ -4034,7 +4028,7 @@ private fun MijiaExtensionCard(
             }),
         ) {
             if (summary.connected) {
-                Switch(
+                CapabilitySwitch(
                     checked = summary.enabled,
                     onCheckedChange = onSetEnabled,
                     enabled = !disabled,
@@ -4056,8 +4050,9 @@ private fun MijiaExtensionCard(
         }
         when {
             !summary.installed || !summary.trusted -> {
-                Button(
+                CapabilityAction(
                     onClick = onInstall,
+                    emphasized = true,
                     enabled = !disabled,
                 ) {
                     Text(
@@ -4070,8 +4065,9 @@ private fun MijiaExtensionCard(
                 }
             }
             !summary.connected -> {
-                Button(
+                CapabilityAction(
                     onClick = onConfigure,
+                    emphasized = true,
                     enabled = !disabled,
                 ) {
                     Text(
@@ -4101,7 +4097,7 @@ private fun MijiaExtensionCard(
                 TextButton({ management = !management }) { Text(if (management) "Hide connection settings" else "Connection settings") }
                 if (management) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     summary.versionName?.let { Text("Extension $it", style = MaterialTheme.typography.bodySmall) }
-                    OutlinedButton(
+                    CapabilityAction(
                         onClick = onConfigure,
                         enabled = !disabled,
                     ) {
@@ -4164,7 +4160,7 @@ private fun MijiaExtensionCard(
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             }
-                            Switch(
+                            CapabilitySwitch(
                                 checked = tool.enabled,
                                 onCheckedChange = {
                                     onSetToolEnabled(tool.name, it)
@@ -4235,7 +4231,7 @@ private fun McpServerCard(
                 )
             }
             if (server.connected) {
-                Switch(
+                CapabilitySwitch(
                     checked = server.enabled,
                     onCheckedChange = onSetEnabled,
                     enabled = !disabled,
@@ -4245,15 +4241,16 @@ private fun McpServerCard(
         when (server.authMode) {
             McpAuthMode.OAUTH -> {
                 if (server.connected) {
-                    OutlinedButton(
+                    CapabilityAction(
                         onClick = onDisconnectNotion,
                         enabled = !disabled,
                     ) {
                         Text("Disconnect")
                     }
                 } else {
-                    Button(
+                    CapabilityAction(
                         onClick = onConnectNotion,
+                        emphasized = true,
                         enabled = !disabled,
                     ) {
                         Text(if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) {
@@ -4264,15 +4261,16 @@ private fun McpServerCard(
             }
             McpAuthMode.TOKEN -> {
                 if (server.connected) {
-                    OutlinedButton(
+                    CapabilityAction(
                         onClick = onDisconnectTencentDocs,
                         enabled = !disabled,
                     ) {
                         Text("Disconnect")
                     }
                 } else {
-                    Button(
+                    CapabilityAction(
                         onClick = onConfigureTencentDocs,
+                        emphasized = true,
                         enabled = !disabled &&
                             server.id == TENCENT_DOCS_SERVER_ID,
                     ) {
@@ -4331,7 +4329,7 @@ private fun McpServerCard(
                                     maxLines = 2,
                                 )
                             }
-                            Switch(
+                            CapabilitySwitch(
                                 checked = tool.enabled,
                                 onCheckedChange = {
                                     onSetToolEnabled(tool.remoteName, it)
@@ -4617,7 +4615,7 @@ internal fun InstalledSkillCard(
                 ) {
                     if (skill.id == "builtin:memory-recall") {
                         com.example.mochi_pet.feature.journal.JournalManagedControl(skill.enabled, onOpenJournalSettings)
-                    } else Switch(
+                    } else CapabilitySwitch(
                         checked = skill.enabled,
                         onCheckedChange = {
                             onSetEnabled(skill.id, it)
@@ -4663,16 +4661,16 @@ internal fun InstalledSkillCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(onClick = onView) {
+            CapabilityAction(onClick = onView) {
                 Text("View")
             }
             if (skill.origin == SkillOrigin.MARKET) {
                 if (skill.updateAvailable) {
-                    Button(onClick = { onApplyUpdate(skill.id) }) {
+                    CapabilityAction(onClick = { onApplyUpdate(skill.id) }, emphasized = true) {
                         Text("Update")
                     }
                 }
-                TextButton(onClick = onDelete) {
+                CapabilityAction(onClick = onDelete) {
                     Text("Remove")
                 }
             }
@@ -4712,12 +4710,13 @@ private fun MarketSkillCard(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onView) {
+            CapabilityAction(onClick = onView) {
                 Text("View")
             }
-            Button(
+            CapabilityAction(
                 onClick = onInstall,
                 enabled = !installed,
+                emphasized = true,
             ) {
                 Text(if (installed) "Installed" else "Install")
             }
@@ -5335,6 +5334,9 @@ private fun EmptyRow(message: String) {
 @Composable
 internal fun ConversationSurface(
     state: ConversationUiState,
+    chatMuted: Boolean,
+    muteEnabled: Boolean,
+    onSetChatMuted: (Boolean) -> Unit,
     providerReady: Boolean,
     voiceState: VoiceRuntimeState,
     onSend: (String) -> Unit,
@@ -5537,6 +5539,15 @@ internal fun ConversationSurface(
                             },
                         )
                     }
+                }
+                val muteLabel = localizeUiText(if (chatMuted) "Unmute chat replies" else "Mute chat replies")
+                androidx.compose.material3.IconToggleButton(
+                    checked = chatMuted,
+                    onCheckedChange = onSetChatMuted,
+                    enabled = muteEnabled,
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = muteLabel },
+                ) {
+                    ToolGlyphIcon(if (chatMuted) ToolGlyph.MUTED else ToolGlyph.SPEAKER, Modifier.size(18.dp))
                 }
                 val sendLabel = localizeUiText(when {
                     state.isSending -> "Cancel"

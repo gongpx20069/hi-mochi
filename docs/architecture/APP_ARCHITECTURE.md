@@ -212,6 +212,9 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   Room model, and there is no HEARTBEAT file.
 - DataStore owns Focus standby enablement and its validated idle-delay choice.
   The default is enabled after 30 seconds; no Room migration is involved.
+  The same Agent settings store owns Chat-only mute (default off). Its UI
+  applies immediately; a persistence failure is explicit and retains the
+  session choice. Preference updates preserve unrelated fields.
 - The Home ViewModel owns the active Focus flag in `SavedStateHandle`; UI
   buttons and typed navigation intents use the same idempotent setter. The
   Agent navigation sink switches to the main dispatcher before updating it.
