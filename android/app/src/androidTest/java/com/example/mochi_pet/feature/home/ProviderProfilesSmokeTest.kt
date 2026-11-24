@@ -233,6 +233,25 @@ class ProviderProfilesSmokeTest {
         fun historyAvailable() = compose.onAllNodes(hasTestTag("dictation-input")).fetchSemanticsNodes()
             .singleOrNull()?.config?.get(SemanticsActions.CustomActions)
             ?.any { it.label == localizeUiText("Show conversation history") } == true
+        val model = compose.runOnUiThread {
+            androidx.lifecycle.ViewModelProvider(compose.activity)[MochiHomeViewModel::class.java]
+        }
+        fun awaitCentralEntry() {
+            try {
+                compose.waitUntil(10_000) { historyAvailable() }
+            } catch (error: androidx.compose.ui.test.ComposeTimeoutException) {
+                val conversation = model.conversationState.value
+                val updateDialog = compose.onAllNodesWithText(localizeUiText("Download APK")).fetchSemanticsNodes().isNotEmpty() ||
+                    compose.onAllNodesWithText(localizeUiText("Open release")).fetchSemanticsNodes().isNotEmpty()
+                throw AssertionError(
+                    "Central entry unavailable: surface=${model.surface.value.javaClass.simpleName}, " +
+                        "quick=${conversation.quickEntry}, sending=${conversation.isSending}, dictation=${conversation.dictation}, " +
+                        "pipeline=${model.pipelineState.value.stage}, listening=${model.voiceState.value.isListening}, " +
+                        "updateDialog=$updateDialog",
+                    error,
+                )
+            }
+        }
         assertEquals(false, historyAvailable())
         val bottom = compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top
         compose.onNodeWithTag("conversation-input").performTextInput("Synthetic return draft")
@@ -242,7 +261,7 @@ class ProviderProfilesSmokeTest {
         assertEquals(false, historyAvailable())
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
-        compose.waitUntil(10_000) { historyAvailable() }
+        awaitCentralEntry()
         assertTrue(compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top < bottom)
         compose.activityRule.scenario.recreate()
         assertTrue(historyAvailable())
@@ -254,7 +273,7 @@ class ProviderProfilesSmokeTest {
         assertEquals(false, historyAvailable())
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
-        compose.waitUntil(10_000) { historyAvailable() }
+        awaitCentralEntry()
         compose.onNodeWithText(localizeUiText("Tasks")).performClick()
         compose.onNodeWithText(localizeUiText("Close")).performClick()
         assertEquals(false, historyAvailable())
