@@ -19,6 +19,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -51,6 +54,7 @@ class CompactSurfacesUiTest {
     private var started = 0
     private var stopped = 0
     private var cancelled = 0
+    private var dictationCancelled = 0
 
     @Before fun english() { Locale.setDefault(Locale.ENGLISH) }
     @After fun restore() { Locale.setDefault(locale) }
@@ -61,7 +65,8 @@ class CompactSurfacesUiTest {
         val input = compose.onNodeWithTag("conversation-input")
         val originalHeight = composer.getUnclippedBoundsInRoot().height
         assertTrue(originalHeight <= 60.dp)
-        assertTrue(compose.onNodeWithTag("conversation-header").getUnclippedBoundsInRoot().height <= 36.dp)
+        compose.onNodeWithTag("conversation-header").assertDoesNotExist()
+        compose.onNodeWithText("Type or hold to dictate").assertIsDisplayed()
         val longDraft = "A long message that stays on one line. ".repeat(20)
         input.performTextInput(longDraft)
         assertEquals(originalHeight, composer.getUnclippedBoundsInRoot().height)
@@ -75,51 +80,63 @@ class CompactSurfacesUiTest {
         captureFixture("conversation-composer", "compact-conversation.png")
     }
 
-    @Test fun `voice stop and agent cancellation keep their separate accessible actions`() {
+    @Test fun `holding an existing draft records and release finalizes without sending`() {
         renderConversation()
-        compose.onNodeWithContentDescription("Speak").performClick()
+        compose.onNodeWithTag("conversation-input").performTextInput("Keep draft")
+        compose.onNodeWithTag("dictation-input").performTouchInput { longClick() }
         assertEquals(1, started)
-        compose.runOnIdle { voice.value = voice.value.copy(isListening = true, partialTranscript = "Fixture speech") }
-        compose.onNodeWithTag("conversation-input").assertIsNotEnabled()
-        compose.onNodeWithText("Fixture speech").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Stop listening").performClick()
         assertEquals(1, stopped)
+        assertEquals("Keep draft", state.value.draft)
+        compose.onNodeWithTag("conversation-input").assertIsNotEnabled()
+        compose.onNodeWithText("Transcribing...").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Speak").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Cancel dictation").performClick()
+        assertEquals(1, dictationCancelled)
         compose.runOnIdle {
-            voice.value = voice.value.copy(isListening = false, partialTranscript = "")
             state.value = state.value.copy(isSending = true)
         }
-        compose.onNodeWithContentDescription("Speak").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Cancel").assertIsEnabled().performClick()
         assertEquals(1, cancelled)
         assertTrue(sent.isEmpty())
     }
 
-    @Test fun `unconfigured provider and unavailable microphone cannot dispatch actions`() {
+    @Test fun `moving outside the held field cancels and preserves the draft`() {
+        state.value = state.value.copy(draft = "Existing text")
+        renderConversation()
+        compose.onNodeWithTag("dictation-input").performTouchInput {
+            down(center)
+            advanceEventTime(700)
+            moveTo(Offset(-30f, center.y))
+            up()
+        }
+        assertEquals(1, started)
+        assertEquals(1, dictationCancelled)
+        assertEquals(0, stopped)
+        assertEquals("Existing text", state.value.draft)
+        assertTrue(sent.isEmpty())
+    }
+
+    @Test fun `unconfigured provider blocks sending without losing the editable draft`() {
         ready.value = false
         renderConversation()
         compose.onNodeWithTag("conversation-input").performTextInput("Keep this draft")
         compose.onNodeWithTag("conversation-input").performImeAction()
         compose.onNodeWithContentDescription("Send").assertIsNotEnabled()
-        compose.onNodeWithContentDescription("Speak").assertIsNotEnabled()
         assertTrue(sent.isEmpty())
         compose.runOnIdle {
             ready.value = true
-            voice.value = voice.value.copy(recognitionAvailable = false)
         }
-        compose.onNodeWithContentDescription("Speak").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Send").performClick()
         assertEquals(listOf("Keep this draft"), sent)
     }
 
-    @Test fun `Chinese large text keeps both icon targets reachable on narrow screens`() {
+    @Test fun `Chinese large text keeps hint and send target reachable on narrow screens`() {
         Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
         renderConversation(fontScale = 1.5f)
+        compose.onNodeWithText("点击输入，长按说话").assertIsDisplayed()
         compose.onNodeWithTag("conversation-input").performTextInput("这是一条界面测试消息")
-        val mic = compose.onNodeWithContentDescription("说话").assertIsDisplayed().getUnclippedBoundsInRoot()
         val send = compose.onNodeWithContentDescription("发送").assertIsDisplayed().getUnclippedBoundsInRoot()
-        assertTrue(mic.width >= 48.dp && mic.height >= 48.dp)
         assertTrue(send.width >= 48.dp && send.height >= 48.dp)
-        assertTrue(mic.right <= send.left)
         assertTrue(compose.onNodeWithTag("conversation-input").getUnclippedBoundsInRoot().width >= 100.dp)
         captureFixture("conversation-composer", "compact-conversation-zh-large.png")
     }
@@ -180,8 +197,13 @@ class CompactSurfacesUiTest {
             MochiTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
                     ConversationSurface(
-                        state.value, ready.value, voice.value, sent::add,
-                        { cancelled++ }, { started++ }, { stopped++ }, {}, { _, _ -> }, {},
+                        state = state.value, providerReady = ready.value, voiceState = voice.value, onSend = sent::add,
+                        onCancel = { cancelled++ },
+                        onDraftChange = { state.value = state.value.copy(draft = it) },
+                        onStartDictation = { started++; state.value = state.value.copy(dictation = DictationPhase.RECORDING) },
+                        onFinishDictation = { stopped++; state.value = state.value.copy(dictation = DictationPhase.TRANSCRIBING) },
+                        onCancelDictation = { dictationCancelled++; state.value = state.value.copy(dictation = DictationPhase.IDLE) },
+                        onOpenSpeechSettings = {}, onCardAction = { _, _ -> }, onRemoteTask = {},
                     )
                 }
             }

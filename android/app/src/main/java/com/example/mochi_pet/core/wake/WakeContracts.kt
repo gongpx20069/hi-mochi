@@ -82,6 +82,8 @@ interface WakeRuntime {
 
     fun selectKeyword(keyword: WakeKeyword?)
 
+    fun setCaptureAllowed(allowed: Boolean)
+
     fun pause(onPaused: () -> Unit = {})
 
     fun resume()

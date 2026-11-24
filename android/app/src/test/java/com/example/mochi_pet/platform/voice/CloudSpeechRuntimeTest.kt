@@ -4,6 +4,9 @@ import android.os.Looper
 import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
+import android.speech.SpeechRecognizer
+import android.os.Bundle
+import org.robolectric.shadows.ShadowSpeechRecognizer
 import com.example.mochi_pet.R
 import com.example.mochi_pet.core.settings.AppLanguage
 import com.example.mochi_pet.core.settings.SpeechRuntimeConfig
@@ -38,6 +41,68 @@ class CloudSpeechRuntimeTest {
 
     private var runtime: AndroidVoiceRuntime? = null
     private var settingsReads = 0
+
+    @Test fun `finishing before speech settings load completes never starts capture`() {
+        val config = CompletableDeferred<SpeechRuntimeConfig>()
+        val voice = runtime(recognitionConfig = { config.await() })
+        var empty = 0
+        voice.startListening({ error("No audio was captured") }, { empty++ }, manualEndpoint = true)
+        idle()
+        voice.finishListening()
+        idle()
+        config.complete(SpeechRuntimeConfig.System())
+        idle()
+        assertEquals(1, empty)
+        assertEquals(false, voice.state.value.isListening)
+    }
+
+    @Test fun `manual system finish delivers final transcript but cancellation discards it`() {
+        ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+        val voice = runtime(recognitionConfig = { SpeechRuntimeConfig.System() })
+        val words = mutableListOf<String>()
+        voice.startListening(words::add, {}, manualEndpoint = true)
+        idle()
+        val recognizer = shadowOf(ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        voice.finishListening()
+        idle()
+        recognizer.triggerOnResults(Bundle().apply {
+            putStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION, arrayListOf("Dictated text"))
+        })
+        idle()
+        assertEquals(listOf("Dictated text"), words)
+        voice.startListening(words::add, {}, manualEndpoint = true)
+        idle()
+        val cancelledRecognizer = shadowOf(ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        voice.stopListening()
+        idle()
+        voice.startListening(words::add, {}, manualEndpoint = true)
+        idle()
+        cancelledRecognizer.triggerOnResults(Bundle().apply {
+            putStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION, arrayListOf("Cancelled text"))
+        })
+        idle()
+        assertEquals(listOf("Dictated text"), words)
+        assertTrue(voice.state.value.isListening)
+        shadowOf(ShadowSpeechRecognizer.getLatestSpeechRecognizer()).triggerOnResults(Bundle().apply {
+            putStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION, arrayListOf("New text"))
+        })
+        idle()
+        assertEquals(listOf("Dictated text", "New text"), words)
+    }
+
+    @Test fun `unresponsive system finalization ends with an explicit timeout`() {
+        ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+        val voice = runtime(recognitionConfig = { SpeechRuntimeConfig.System() })
+        var empty = 0
+        voice.startListening({ error("No result was delivered") }, { empty++ }, manualEndpoint = true)
+        idle()
+        voice.finishListening()
+        idle()
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(21))
+        assertEquals(1, empty)
+        assertEquals(false, voice.state.value.isListening)
+        assertEquals("Speech recognition timed out. Please try again.", voice.state.value.errorMessage)
+    }
 
     @Test
     fun `reply speaks link labels before splitting cloud synthesis requests`() {
@@ -265,6 +330,7 @@ class CloudSpeechRuntimeTest {
         synthesizer: SpeechSynthesizer = SpeechSynthesizer { _, _, _ -> byteArrayOf(0, 0) },
         player: PcmSpeechPlayer = PcmSpeechPlayer {},
         synthesisEnabled: Boolean = true,
+        recognitionConfig: suspend () -> SpeechRuntimeConfig = { SpeechRuntimeConfig.IFlytek("test-app", "test-key", "test-secret") },
     ): AndroidVoiceRuntime = AndroidVoiceRuntime(
         context = RuntimeEnvironment.getApplication(),
         speechSettingsRepository = object : SpeechSettingsRepository by com.example.mochi_pet.core.settings.DataStoreSpeechSettingsRepository(
@@ -275,7 +341,7 @@ class CloudSpeechRuntimeTest {
             override suspend fun save(input: SpeechSettingsInput) = error("Not used")
             override suspend fun loadRuntimeConfig(): SpeechRuntimeConfig {
                 settingsReads += 1
-                return SpeechRuntimeConfig.IFlytek("test-app", "test-key", "test-secret")
+                return recognitionConfig()
             }
             override suspend fun loadSynthesisConfig(): SpeechRuntimeConfig =
                 if (synthesisEnabled) loadRuntimeConfig() else SpeechRuntimeConfig.System()

@@ -201,6 +201,12 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   revision that revokes in-flight explicit recall.
 - Conversation storage, memory retrieval and their settings follow
   [Memory design](MEMORY_DESIGN.md#1-current-design).
+- The Home ViewModel owns the unsent Chat draft, dictation phase and callback
+  generation. Recognition only updates the draft, never the Agent/history.
+  `SavedStateHandle` remembers Chat/Companion selection within the activity.
+  The resumed UI supplies Companion visibility to `WakeRuntime`; the runtime
+  and capture service independently enforce visibility and unlocked screen
+  state without rewriting the saved wake preference.
 - App-private `files/persona/SOUL.md`, `USER.md`, and `AGENTS.md` are seeded
   from bundled assets and updated atomically. Persona is intentionally not a
   Room model, and there is no HEARTBEAT file.

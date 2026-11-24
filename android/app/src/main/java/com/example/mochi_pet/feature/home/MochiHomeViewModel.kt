@@ -215,7 +215,11 @@ data class ConversationUiState(
     val errorMessage: String? = null,
     val emotion: String = "neutral",
     val remoteTasks: List<FollowedAgentLinkTask> = emptyList(),
+    val draft: String = "",
+    val dictation: DictationPhase = DictationPhase.IDLE,
 )
+
+enum class DictationPhase { IDLE, RECORDING, TRANSCRIBING }
 
 enum class ChatPipelineStage {
     IDLE,
@@ -361,7 +365,9 @@ class MochiHomeViewModel(
         throw IOException("Extension downloads are unavailable.")
     },
 ) : ViewModel() {
-    private val mutableSurface = MutableStateFlow<MochiSurface>(MochiSurface.Face)
+    private val mutableSurface = MutableStateFlow<MochiSurface>(
+        if (savedStateHandle["mochi_companion"] ?: true) MochiSurface.Face else MochiSurface.Conversation,
+    )
     private var plannerHighlights: List<String> = emptyList()
     private val mutablePlannerState = MutableStateFlow(PlannerSurfaceState())
     private val mutableConversationState =
@@ -393,6 +399,9 @@ class MochiHomeViewModel(
     private var interactionVersion = 0L
     private var endedVoiceInteractionVersion: Long? = null
     private var voiceInteraction = false
+    private var dictationVersion = 0L
+    private var dictationStarted = false
+    private var pendingDictation: String? = null
     private var agentJob: Job? = null
     private val mutableSpeechVoiceState = MutableStateFlow(SpeechVoiceUiState())
     val speechVoiceState = mutableSpeechVoiceState.asStateFlow()
@@ -714,6 +723,10 @@ class MochiHomeViewModel(
             return
         }
         val target = MochiNavigationReducer.reduce(intent, mutableSurface.value)
+        if (target != mutableSurface.value) cancelDictation()
+        if (!target.isHomePresentation()) setCompanionVisible(false)
+        if (target.isHomePresentation()) savedStateHandle["mochi_companion"] = true
+        if (target == MochiSurface.Conversation) savedStateHandle["mochi_companion"] = false
         if (target != mutableSurface.value) cancelExtensionDownload()
         if (!target.isHomePresentation()) savedStateHandle["focus_mode"] = false
         if (target != MochiSurface.Settings) stopVoicePreview()
@@ -729,6 +742,106 @@ class MochiHomeViewModel(
         }
         mutableSurface.value = target
         load(target)
+    }
+
+    fun openMochi() = navigate(
+        if (savedStateHandle["mochi_companion"] ?: true) MochiNavigationIntent.ShowFace
+        else MochiNavigationIntent.ShowConversation,
+    )
+
+    fun setCompanionVisible(visible: Boolean) {
+        wakeRuntime?.setCaptureAllowed(visible)
+        if (!visible) {
+            endedVoiceInteractionVersion = interactionVersion
+            if (voiceInteraction && mutablePipelineState.value.stage == ChatPipelineStage.LISTENING) stopVoiceInput()
+        }
+    }
+
+    fun updateConversationDraft(text: String) {
+        mutableConversationState.update { it.copy(draft = text) }
+    }
+
+    fun startDictation() {
+        if (mutableSurface.value != MochiSurface.Conversation ||
+            mutableConversationState.value.isSending ||
+            mutableConversationState.value.dictation != DictationPhase.IDLE
+        ) return
+        val runtime = voiceRuntime ?: run {
+            mutableConversationState.update { it.copy(errorMessage = "Speech recognition is unavailable on this device") }
+            return
+        }
+        stopVoicePreview()
+        cancelAgentInteraction()
+        runtime.stopSpeaking()
+        val version = ++dictationVersion
+        dictationStarted = false
+        pendingDictation = null
+        mutableConversationState.update { it.copy(dictation = DictationPhase.RECORDING, errorMessage = null) }
+        val begin = {
+            if (version == dictationVersion && mutableConversationState.value.dictation == DictationPhase.RECORDING) {
+                dictationStarted = true
+                runtime.startListening(
+                    onFinalTranscript = { transcript ->
+                        if (version == dictationVersion) {
+                            if (mutableConversationState.value.dictation == DictationPhase.RECORDING) {
+                                pendingDictation = transcript
+                            } else acceptDictation(transcript)
+                        }
+                    },
+                    onNoResult = {
+                        if (version == dictationVersion) {
+                            dictationVersion++
+                            pendingDictation = null
+                            dictationStarted = false
+                            mutableConversationState.update {
+                                it.copy(
+                                    dictation = DictationPhase.IDLE,
+                                    errorMessage = runtime.state.value.errorMessage ?: "No speech was detected",
+                                )
+                            }
+                        }
+                    },
+                    manualEndpoint = true,
+                )
+            }
+        }
+        wakeRuntime?.pause(begin) ?: begin()
+    }
+
+    fun finishDictation() {
+        if (mutableConversationState.value.dictation != DictationPhase.RECORDING) return
+        val transcript = pendingDictation
+        if (transcript != null) {
+            acceptDictation(transcript)
+        } else if (dictationStarted) {
+            mutableConversationState.update { it.copy(dictation = DictationPhase.TRANSCRIBING) }
+            voiceRuntime?.finishListening()
+        } else {
+            cancelDictation()
+        }
+    }
+
+    private fun acceptDictation(transcript: String) {
+        val text = transcript.trim()
+        pendingDictation = null
+        mutableConversationState.update {
+            it.copy(
+                draft = if (text.isEmpty()) it.draft else it.draft +
+                    (if (it.draft.isNotEmpty() && !it.draft.last().isWhitespace()) " " else "") + text,
+                dictation = DictationPhase.IDLE,
+                errorMessage = if (text.isEmpty()) "No speech was detected" else null,
+            )
+        }
+        dictationVersion++
+    }
+
+    fun cancelDictation() {
+        if (mutableConversationState.value.dictation == DictationPhase.IDLE) return
+        dictationVersion++
+        pendingDictation = null
+        dictationStarted = false
+        voiceRuntime?.stopListening()
+        mutableConversationState.update { it.copy(dictation = DictationPhase.IDLE) }
     }
 
     fun setFocusMode(enabled: Boolean) {
@@ -1195,6 +1308,7 @@ class MochiHomeViewModel(
     }
 
     fun cancelConversation() {
+        cancelDictation()
         stopVoicePreview()
         cancelAgentInteraction()
         voiceRuntime?.stopListening()
@@ -1203,6 +1317,7 @@ class MochiHomeViewModel(
     }
 
     fun startVoiceInput(acknowledgeWake: Boolean = false) {
+        cancelDictation()
         stopVoicePreview()
         val runtime = voiceRuntime ?: return
         val interruptedBriefing = activeBriefing.takeIf { acknowledgeWake }
@@ -1477,6 +1592,7 @@ class MochiHomeViewModel(
     }
 
     private fun stopChangedSpeechConnection() {
+        cancelDictation()
         stopVoicePreview()
         if (voiceInteraction) cancelConversation()
         else {
@@ -3170,6 +3286,8 @@ class MochiHomeViewModel(
         }
 
     override fun onCleared() {
+        cancelDictation()
+        wakeRuntime?.setCaptureAllowed(false)
         cancelExtensionDownload()
         closeManualBrowser()
         stopVoicePreview()

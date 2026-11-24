@@ -9,6 +9,13 @@
 | Planner | One date agenda with an expandable week/month date selector |
 | Settings | BYOK, voice, permissions, backup, and tools |
 | Skills | Bottom-navigation destination for built-ins and skills.sh |
+| Tools | Provider connections and individual Tool controls |
+
+Bottom navigation is **Mochi / Planner / Skills / Tools**. The Mochi header
+switches **Chat / Companion** (**对话 / 陪伴**); Face and its information cards
+belong to Companion, and Conversation belongs to Chat. Both share history and
+tasks. Returning from another destination restores the selected mode. This is
+activity saved state, not a separate durable mode preference.
 
 Mochi remains visible as a compact companion where space permits, but planner
 content takes priority when the selected surface requires reading or editing.
@@ -71,17 +78,23 @@ Examples:
 If a directive is invalid, keep the current surface and still deliver the
 spoken response. Navigation failure must not fail the whole conversation.
 
-The current Conversation surface exposes push-to-talk, partial transcript,
-stop, and Agent cancellation controls. It uses a compact Mochi identity header,
-provider-readiness status, a guided empty state, labeled asymmetric message
+The Conversation surface uses the shared compact mode header, a guided empty
+state, labeled asymmetric message
 bubbles, a small local send date/time beside each **Mochi / You** label,
 automatic scrolling to the newest message, and a compact rounded composer that
-keeps text and voice actions distinct. The header uses a small Mochi wordmark
-and readiness badge, without a separate identity banner. The composer stays
-on one line, horizontally scrolling long drafts, with adjacent microphone and
-send icons. Listening replaces the microphone with Stop; Agent work replaces
-Send with Cancel. Icon actions retain localized accessibility labels and at
-least 48 dp touch targets. Keyboard Send uses the same submission path.
+stays on one line, horizontally scrolling long drafts. There is no separate
+identity banner or microphone button. Tapping the input edits text; long-press
+records even when a draft exists, overriding long-press text selection. Release
+fills or appends the recognized text, never sends it; moving outside cancels.
+An early provider result is held until release and can still be cancelled.
+Recording, recognition and permission handoffs never start late after
+cancellation, navigation or backgrounding. A new permission grant requires
+another hold. Accessibility actions expose start, finish and cancel.
+The muted empty hint is **点击输入，长按说话**; active hints are
+**松开转文字，移出取消** and **正在识别…**. Recording has a subtle accent outline.
+The single adjacent icon sends, cancels recognition, or cancels active Agent work.
+Icon actions retain localized accessibility labels and at least 48 dp touch
+targets. Keyboard Send uses the same explicit submission path.
 Restored history and Scheduled Agent
 results retain their persisted timestamps. Errors and partial speech appear as
 separate status cards rather than conversation messages. The validated
@@ -92,9 +105,11 @@ configuration, and response errors. Raw provider error text is not displayed.
 These messages do not claim that device actions were skipped or rolled back:
 an earlier Tool may already have executed before a later model request failed.
 
-The native foreground wake service is enabled by default once the
-required Android permissions are granted. Settings can disable it, and that
-explicit choice is retained across later launches.
+The wake preference defaults to enabled after permission is granted; capture
+requires visible, unlocked, foreground Companion. Chat, other destinations,
+covering full-screen surfaces, background and lock pause it without changing
+the preference. Returning to Companion resumes enabled capture.
+Settings can disable it, and that explicit choice survives later launches.
 Settings > Speech > Wake word offers **Follow system** (default), English
 `Hi Mochi`, and Chinese `老莫老莫`. Follow system resolves Chinese device
 languages to `老莫老莫` and other device languages to `Hi Mochi`, updating when
@@ -104,21 +119,21 @@ retained. Selection is independent of Mochi's UI language and persists while
 disabled. A keyword update alone does not enable or resume capture; manually
 changing the selection ends an active voice interaction through the existing safe
 microphone release and wake-restoration path.
-When Mochi is visible, wake and media triggers start listening without changing
-the current surface.
-When it is backgrounded or locked, wake detection posts a lock-screen-visible
-notification; tapping it starts the same permission-checked voice path.
+In visible Companion, wake triggers start listening without changing its
+presentation. No wake capture or wake notification is produced in background or
+on the lock screen. Explicit notification/media actions retain the
+permission-checked voice path.
 After a confirmed selected wake phrase, Mochi speaks a one-syllable acknowledgement
 ("嗯？" in both Chinese and English) before listening, using the same
 bundled audio cue without waiting for a speech engine. The acknowledgement
 is transient feedback, not a conversation message, and is excluded from
-history and model context. Microphone-button and media-button starts do not add
+history and model context. Dictation and media-button starts do not add
 this acknowledgement.
 
 An explicit request to finish talking uses Mochi Navigation's
 `end_voice_session`. The current response finishes without automatic follow-up
 STT; the screen and Focus state remain unchanged. The user can start another
-session with the wake phrase, microphone or media button. Lifecycle details
+session with the wake phrase or media button; Chat dictation remains draft-only. Lifecycle details
 are owned by [Voice runtime](architecture/VOICE_RUNTIME.md#ending-continuous-voice-input).
 
 New AgentLink outcomes replace the acknowledgement with a short conversational
@@ -153,13 +168,13 @@ clock and date presentation. Current weather requests use the same full-area
 layout for temperature, apparent temperature, humidity, and weather state.
 Face and information modes transition with coordinated scale/fade motion, and
 a compact Mochi remains available as the restore control. Home stays selected
-in bottom navigation throughout.
+as Mochi in bottom navigation throughout.
 
-Home also offers Focus mode for the Face, date-time, and weather presentations.
-Focus hides app navigation and Android system bars, keeps the display awake,
-and fills the screen with the active Home presentation. The **Focus mode**
-control in that presentation remains available and toggles Focus off when
-tapped again. A separate top-right **Exit focus** action exits immediately.
+Companion offers **Full screen** (**全屏显示**) for Face, date-time and weather.
+This display option hides navigation and Android system bars, keeps the display
+awake, and fills the screen with the active presentation. Its control toggles it
+off; a top-right **Exit full screen** action exits immediately. Internal Focus
+state and the existing typed `enter_focus` / `exit_focus` commands remain compatible.
 Back and navigation away from Home also exit. Focus survives device rotation,
 and date-time and weather switch to two-column landscape layouts so their
 primary facts and supporting metrics remain balanced and unclipped.
@@ -312,7 +327,7 @@ its update check remains a secondary action alongside the tabs, wrapping below
 when space or font scale requires it. Navigation, ordering
 and enablement behavior are unchanged. The shared top bar, pipeline status,
 conversation empty state and Settings header use restrained spacing and
-typography. Bottom navigation retains all five labels and selected-state
+typography. Bottom navigation uses the four destinations above and selected-state
 semantics, with a muted accent fill and at least 48 dp touch targets.
 
 The Tools surface orders **Agent Browser**, **App Control**, **Media Control**,
@@ -563,7 +578,7 @@ shares without these fields import with system speech output. New shares use
 v5, include AI API protocol, and require an updated receiver; existing authenticated v2/v3/v4 links remain
 importable as additional saved connections.
 
-Skills sits beside Home, Talk, Planner, and Tools in bottom navigation.
+Skills sits beside Mochi, Planner, and Tools in bottom navigation.
 Installed/Explore uses a dark selected segment. Explore opens with the public
 skills.sh Trending (24h) leaderboard, then switches to search results after a
 query. Cards show rank, source, install count, and a derived popularity label.

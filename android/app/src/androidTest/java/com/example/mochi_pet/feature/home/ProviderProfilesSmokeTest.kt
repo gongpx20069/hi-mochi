@@ -20,6 +20,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.mutableStateOf
+import androidx.activity.compose.setContent
+import com.example.mochi_pet.core.voice.VoiceRuntimeState
+import com.example.mochi_ui.MochiTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
@@ -44,11 +51,56 @@ class ProviderProfilesSmokeTest {
         compose.runOnUiThread { compose.activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
+    @Test fun holdGestureFinalizesAndCancelsWithoutRecordingOrSending() {
+        val state = mutableStateOf(ConversationUiState(draft = "Existing draft"))
+        var started = 0
+        var finished = 0
+        var cancelled = 0
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                MochiTheme {
+                    ConversationSurface(
+                        state = state.value, providerReady = true, voiceState = VoiceRuntimeState(),
+                        onSend = { error("Gesture must not send") }, onCancel = {},
+                        onDraftChange = { state.value = state.value.copy(draft = it) },
+                        onStartDictation = { started++; state.value = state.value.copy(dictation = DictationPhase.RECORDING) },
+                        onFinishDictation = { finished++; state.value = state.value.copy(dictation = DictationPhase.IDLE) },
+                        onCancelDictation = { cancelled++; state.value = state.value.copy(dictation = DictationPhase.IDLE) },
+                        onOpenSpeechSettings = {}, onCardAction = { _, _ -> }, onRemoteTask = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("dictation-input").performTouchInput { longClick() }
+        assertEquals(1, started)
+        assertEquals(1, finished)
+        compose.onNodeWithTag("dictation-input").performTouchInput {
+            down(center)
+            advanceEventTime(700)
+            moveTo(Offset(-30f, center.y))
+            up()
+        }
+        assertEquals(2, started)
+        assertEquals(1, cancelled)
+        assertEquals("Existing draft", state.value.draft)
+        compose.onNodeWithTag("conversation-input").assertIsEnabled().performTextInput(" typed")
+        assertTrue(state.value.draft.contains("typed"))
+    }
+
     @Test fun compactComposerAndCapabilityPagesRemainReachableWithoutSending() {
         compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         val app = compose.activity.application as MochiApplication
         val before = runBlocking(Dispatchers.IO) { app.providerSettingsRepository.loadProfiles() }
-        compose.onNode(hasText(localizeUiText("Talk")) and hasClickAction()).performClick()
+        val wakeEnabled = app.wakeRuntime.shouldBeEnabled
+        compose.onNode(hasText(localizeUiText("Chat")) and hasClickAction()).performClick()
+        compose.waitUntil(10_000) {
+            app.wakeRuntime.state.value.status in setOf(
+                com.example.mochi_pet.core.wake.WakeCaptureStatus.PAUSED,
+                com.example.mochi_pet.core.wake.WakeCaptureStatus.DISABLED,
+                com.example.mochi_pet.core.wake.WakeCaptureStatus.ERROR,
+            )
+        }
+        assertEquals(wakeEnabled, app.wakeRuntime.shouldBeEnabled)
         val composer = compose.onNodeWithTag("conversation-composer")
         val height = composer.getUnclippedBoundsInRoot().height
         val input = compose.onNodeWithTag("conversation-input")
@@ -57,7 +109,7 @@ class ProviderProfilesSmokeTest {
         val send = compose.onNodeWithContentDescription(localizeUiText("Send"))
         send.assertIsDisplayed()
         assertTrue(send.getUnclippedBoundsInRoot().width >= 48.dp)
-        compose.onNodeWithContentDescription(localizeUiText("Speak")).assertIsDisplayed()
+        compose.onNodeWithContentDescription(localizeUiText("Speak")).assertDoesNotExist()
         input.performTextClearance()
         send.assertIsNotEnabled()
         Espresso.closeSoftKeyboard()
@@ -66,6 +118,9 @@ class ProviderProfilesSmokeTest {
         compose.onNodeWithText(localizeUiText("Explore")).assertIsDisplayed()
         compose.onNode(hasText(localizeUiText("Tools")) and hasClickAction()).performClick()
         compose.onNodeWithText(localizeUiText("Choose what Mochi may call")).assertIsDisplayed()
+        compose.onNode(hasText("Mochi") and hasClickAction()).performClick()
+        compose.onNodeWithText(localizeUiText("Chat")).assertIsSelected()
+        compose.onNodeWithTag("conversation-input").assertIsDisplayed()
         assertEquals(before, runBlocking(Dispatchers.IO) { app.providerSettingsRepository.loadProfiles() })
     }
 

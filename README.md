@@ -266,9 +266,14 @@ Needs attention, Not tested and Not enabled. It never changes settings, records
 audio or executes Shell commands. Real speech operation still requires a
 microphone test and voice preview.
 
-### Always ready for your voice
+### Chat or hands-free Companion
 
-- Wake Mochi with your selected on-device phrase: **“Hi Mochi”** or **“老莫老莫”**.
+- The **Mochi** tab switches between **Chat** and **Companion**.
+- Chat: tap the one-line input to type, or hold to dictate. Release fills/appends
+  the draft; move outside to cancel. Only explicit Send submits the message.
+- In visible, unlocked Companion, wake Mochi with **“Hi Mochi”** or **“老莫老莫”**.
+  Chat, other pages, background and lock pause wake listening without changing
+  your saved enable setting. **Full screen** is a separate Companion display option.
 - Continue speaking naturally through automatic follow-up listening.
 - Use Android speech recognition by default, or optionally connect built-in
   iFlytek/Azure Speech-to-Text settings for greater reliability.

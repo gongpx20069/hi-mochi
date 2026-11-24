@@ -73,6 +73,92 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test fun `dictation fills then appends to draft without invoking the Agent`() {
+        val voice = HoldingVoiceRuntimeFake()
+        val viewModel = dictationViewModel(voice)
+        viewModel.startDictation()
+        assertTrue(voice.manual)
+        viewModel.finishDictation()
+        assertEquals(DictationPhase.TRANSCRIBING, viewModel.conversationState.value.dictation)
+        assertEquals(1, voice.finishCount)
+        voice.transcript!!.invoke(" first words ")
+        assertEquals("first words", viewModel.conversationState.value.draft)
+        viewModel.startDictation()
+        voice.transcript!!.invoke("more words")
+        assertEquals("first words", viewModel.conversationState.value.draft)
+        viewModel.finishDictation()
+        assertEquals("first words more words", viewModel.conversationState.value.draft)
+        assertEquals(DictationPhase.IDLE, viewModel.conversationState.value.dictation)
+        assertTrue(viewModel.conversationState.value.messages.isEmpty())
+        assertFalse(viewModel.conversationState.value.isSending)
+    }
+
+    @Test fun `dictation cancellation and navigation discard buffered and late transcripts`() {
+        val voice = HoldingVoiceRuntimeFake()
+        val viewModel = dictationViewModel(voice)
+        viewModel.updateConversationDraft("Keep")
+        viewModel.startDictation()
+        val stale = voice.transcript!!
+        stale("buffered")
+        viewModel.cancelDictation()
+        stale("late")
+        assertEquals("Keep", viewModel.conversationState.value.draft)
+        viewModel.startDictation()
+        viewModel.finishDictation()
+        viewModel.navigate(MochiNavigationIntent.ShowTools)
+        voice.transcript!!.invoke("late navigation")
+        assertEquals(DictationPhase.IDLE, viewModel.conversationState.value.dictation)
+        assertEquals("Keep", viewModel.conversationState.value.draft)
+        assertTrue(viewModel.conversationState.value.messages.isEmpty())
+    }
+
+    @Test fun `release before wake pause completes cannot start a late microphone session`() {
+        val voice = HoldingVoiceRuntimeFake()
+        val wake = WakeRuntimeFake().apply { holdPause = true }
+        val viewModel = dictationViewModel(voice, wake)
+        viewModel.startDictation()
+        viewModel.finishDictation()
+        wake.paused!!.invoke()
+        assertEquals(null, voice.transcript)
+        assertEquals(DictationPhase.IDLE, viewModel.conversationState.value.dictation)
+    }
+
+    @Test fun `recognition failure keeps the draft and invalidates late callbacks`() {
+        val voice = HoldingVoiceRuntimeFake()
+        val viewModel = dictationViewModel(voice)
+        viewModel.updateConversationDraft("Keep")
+        viewModel.startDictation()
+        voice.noResult!!.invoke()
+        voice.transcript!!.invoke("late")
+        assertEquals("Keep", viewModel.conversationState.value.draft)
+        assertEquals("No speech was detected", viewModel.conversationState.value.errorMessage)
+        assertEquals(DictationPhase.IDLE, viewModel.conversationState.value.dictation)
+    }
+
+    @Test fun `Mochi restores its selected mode while other destinations close wake capture`() {
+        val wake = WakeRuntimeFake()
+        val viewModel = dictationViewModel(HoldingVoiceRuntimeFake(), wake)
+        viewModel.navigate(MochiNavigationIntent.ShowTools)
+        viewModel.openMochi()
+        assertEquals(MochiSurface.Conversation, viewModel.surface.value)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        viewModel.setCompanionVisible(true)
+        assertTrue(wake.allowed)
+        viewModel.navigate(MochiNavigationIntent.ShowSettings)
+        assertFalse(wake.allowed)
+        viewModel.openMochi()
+        assertEquals(MochiSurface.Face, viewModel.surface.value)
+        assertFalse(wake.allowed)
+    }
+
+    private fun dictationViewModel(voice: HoldingVoiceRuntimeFake, wake: WakeRuntimeFake = WakeRuntimeFake()) =
+        MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), voiceRuntime = voice, wakeRuntime = wake,
+            providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> error("Dictation must not build an Agent") },
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        ).also { it.navigate(MochiNavigationIntent.ShowConversation) }
+
     @Test fun `extension install actions open the resolved APK and lookup failures show feedback`() {
         val requested = mutableListOf<ExtensionApk>()
         var fail = false
@@ -1218,7 +1304,8 @@ private class BriefingVoiceFake : VoiceRuntime {
     var listenCount = 0
     var acknowledgements = 0
     var briefingResult: ((WakeBriefingResult) -> Unit)? = null
-    override fun startListening(onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit) { listenCount++ }
+    override fun startListening(onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit, manualEndpoint: Boolean) { listenCount++ }
+    override fun finishListening() = Unit
     override fun startListeningWithBriefing(
         text: String, onBriefingResult: (WakeBriefingResult) -> Unit,
         onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit,
@@ -1257,6 +1344,7 @@ private class VoiceRuntimeFake(
     override fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
+        manualEndpoint: Boolean,
     ) {
         listenCount += 1
         val transcript = transcripts.removeFirstOrNull()
@@ -1268,6 +1356,7 @@ private class VoiceRuntimeFake(
     }
 
     override fun stopListening() = Unit
+    override fun finishListening() = Unit
 
     override fun speak(
         text: String,
@@ -1315,13 +1404,23 @@ private class HoldingVoiceRuntimeFake : VoiceRuntime {
     )
     override val state = mutableState
     var stopCount = 0
+    var finishCount = 0
+    var manual = false
+    var transcript: ((String) -> Unit)? = null
+    var noResult: (() -> Unit)? = null
 
     override fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
+        manualEndpoint: Boolean,
     ) {
+        manual = manualEndpoint
+        transcript = onFinalTranscript
+        noResult = onNoResult
         mutableState.value = mutableState.value.copy(isListening = true)
     }
+
+    override fun finishListening() { finishCount++ }
 
     override fun stopListening() {
         stopCount += 1
@@ -1351,6 +1450,7 @@ private class InterruptibleVoiceRuntimeFake : VoiceRuntime {
     override fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
+        manualEndpoint: Boolean,
     ) {
         state.value = state.value.copy(isListening = true)
     }
@@ -1358,6 +1458,8 @@ private class InterruptibleVoiceRuntimeFake : VoiceRuntime {
     override fun stopListening() {
         state.value = state.value.copy(isListening = false)
     }
+
+    override fun finishListening() = Unit
 
     override fun speak(
         text: String,
@@ -1378,6 +1480,11 @@ private class WakeRuntimeFake : WakeRuntime {
     )
     var pauseCount = 0
     var resumeCount = 0
+    var allowed = false
+    var holdPause = false
+    var paused: (() -> Unit)? = null
+
+    override fun setCaptureAllowed(allowed: Boolean) { this.allowed = allowed }
 
     override fun enable() = Unit
 
@@ -1389,7 +1496,7 @@ private class WakeRuntimeFake : WakeRuntime {
 
     override fun pause(onPaused: () -> Unit) {
         pauseCount += 1
-        onPaused()
+        if (holdPause) paused = onPaused else onPaused()
     }
 
     override fun resume() {

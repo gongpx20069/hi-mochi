@@ -79,9 +79,12 @@ conversion would invalidate its verified byte length.
 
 `WakeCaptureService` also owns the active MediaSession and persistent
 notification. Notification actions and headset media keys enter the same voice
-path. A background keyword detection posts a high-importance lock-screen
-notification that the user taps to begin STT; no silent keep-alive playback or
-restricted background Activity launch is used.
+path. Wake capture requires visible foreground Companion and an interactive,
+unlocked screen. Chat, other destinations, covering full-screen surfaces,
+Activity pause and screen-off close the runtime capture gate. Service startup,
+worker initialization, delayed resumes and wake delivery recheck it. The service
+is non-sticky; no background/lock-screen wake detection or silent keep-alive
+playback runs. Temporary pauses preserve the saved enable preference.
 
 The wake service emits a typed wake event only. UI and agent work remain
 outside the audio thread.
@@ -123,14 +126,31 @@ outside the audio thread.
   seconds; provider `vad_eos` applies only after speech has started.
 - Delete temporary speech audio after success, cancellation, or final failure;
   never add it to memory or backup.
-- Pause wake only while full-sentence STT owns the microphone, then resume it
-  during Agent work, tool execution, summarization, and TTS.
+- Pause wake while full-sentence STT owns the microphone, then resume during
+  Agent work, tool execution, summarization and TTS only if Companion is visible.
 - A wake detection during those phases cancels the active interaction, stops
   TTS, and enters a fresh STT session; completed tool side effects remain.
 - Enable platform acoustic echo cancellation on wake AudioRecord when
   available to reduce self-triggering from Mochi's speaker output.
 - Release AudioRecord, streams, and native objects on every stop path.
 - Native initialization errors are visible; no silent slow fallback.
+
+### Chat dictation
+
+Chat's long-press gesture uses `startListening(manualEndpoint = true)`.
+Release calls `finishListening()`, which preserves recognition callbacks and
+finalizes captured audio; `stopListening()` remains cancellation. Local silence
+does not end manual cloud capture, but no-speech and maximum-duration bounds
+remain. Provider-final results can arrive early and are buffered until release.
+Cancellation invalidates callbacks and preserves the previous draft.
+System recognition finalization has a twenty-second response deadline.
+Release during settings initialization must not start a later microphone session.
+Empty captures fail explicitly without uploading an empty file.
+
+The ViewModel fills/appends the result to its draft only: no Agent request,
+message persistence, TTS or follow-up listening. Navigation, Activity pause,
+speech-profile changes and ViewModel disposal cancel dictation. Permissions
+granted after a hold require another gesture; there is no deferred auto-start.
 
 ### Next-wake task briefing
 

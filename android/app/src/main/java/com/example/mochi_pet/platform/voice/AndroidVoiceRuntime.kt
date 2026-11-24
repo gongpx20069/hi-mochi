@@ -84,6 +84,14 @@ class AndroidVoiceRuntime internal constructor(
     private var briefingText = ""
     private var activeSpeechPurpose = SpeechPurpose.REPLY
     private var closed = false
+    private var manualEndpoint = false
+    private var finishRequested = false
+    private var systemRecognitionActive = false
+    private val finishRecognitionTimeout = Runnable {
+        if (finishRequested && systemRecognitionActive) {
+            finishRecognition(errorMessage = "Speech recognition timed out. Please try again.")
+        }
+    }
 
     override val state: StateFlow<VoiceRuntimeState> = mutableState.asStateFlow()
 
@@ -103,10 +111,6 @@ class AndroidVoiceRuntime internal constructor(
             }
         }
         mainHandler.post {
-            if (mutableState.value.recognitionAvailable) {
-                speechRecognizer = createSpeechRecognizer(applicationContext)
-                    .apply { setRecognitionListener(RecognitionCallbacks()) }
-            }
             textToSpeech = TextToSpeech(applicationContext) { status ->
                 val languageStatus = if (status == TextToSpeech.SUCCESS) {
                     textToSpeech?.setLanguage(
@@ -136,7 +140,8 @@ class AndroidVoiceRuntime internal constructor(
     override fun startListening(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
-    ) = listen(onFinalTranscript, onNoResult, null)
+        manualEndpoint: Boolean,
+    ) = listen(onFinalTranscript, onNoResult, null, manualEndpoint)
 
     override fun startListeningWithBriefing(
         text: String,
@@ -149,6 +154,7 @@ class AndroidVoiceRuntime internal constructor(
         onFinalTranscript: (String) -> Unit,
         onNoResult: () -> Unit,
         candidate: ListeningBriefing?,
+        manualEndpoint: Boolean = false,
     ) {
         mainHandler.post {
             textToSpeech?.stop()
@@ -174,6 +180,9 @@ class AndroidVoiceRuntime internal constructor(
             }
             cancelRecognition()
             textToSpeech?.stop()
+            this.manualEndpoint = manualEndpoint
+            finishRequested = false
+            systemRecognitionActive = false
             finalTranscriptCallback = onFinalTranscript
             noResultCallback = onNoResult
             latestPartialTranscript = ""
@@ -202,6 +211,10 @@ class AndroidVoiceRuntime internal constructor(
                     if (version != interactionVersion) {
                         return@post
                     }
+                    if (finishRequested) {
+                        finishRecognition()
+                        return@post
+                    }
                     when (config) {
                         is SpeechRuntimeConfig.System -> {
                             finishBriefing(WakeBriefingResult.SKIPPED)
@@ -213,6 +226,18 @@ class AndroidVoiceRuntime internal constructor(
                             startCloudCapture(config, version)
                     }
                 }
+            }
+        }
+    }
+
+    override fun finishListening() {
+        mainHandler.post {
+            if (finalTranscriptCallback == null || finishRequested) return@post
+            finishRequested = true
+            speechCapture?.complete()
+            if (systemRecognitionActive) {
+                speechRecognizer?.stopListening()
+                mainHandler.postDelayed(finishRecognitionTimeout, 20_000)
             }
         }
     }
@@ -460,7 +485,12 @@ class AndroidVoiceRuntime internal constructor(
     }
 
     private fun startSystemRecognition() {
-        val recognizer = speechRecognizer
+        val recognizer = if (recognitionAvailable(applicationContext)) {
+            createSpeechRecognizer(applicationContext).apply {
+                setRecognitionListener(RecognitionCallbacks(interactionVersion))
+            }
+        } else null
+        speechRecognizer = recognizer
         if (recognizer == null) {
             finishRecognition(
                 errorMessage =
@@ -471,6 +501,7 @@ class AndroidVoiceRuntime internal constructor(
             return
         }
         try {
+            systemRecognitionActive = true
             recognizer.startListening(
                 Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(
@@ -522,6 +553,7 @@ class AndroidVoiceRuntime internal constructor(
         prepareBriefingCapture()
         val capture = RecordedSpeechCapture(
             context = applicationContext,
+            endOnSilence = !manualEndpoint,
             echoCancellation = briefing != null,
             noSpeechTimeoutSeconds = if (briefing != null) 10f else 8f,
             onReady = { ready -> mainHandler.post { briefingCaptureReady(ready, version) } },
@@ -572,7 +604,7 @@ class AndroidVoiceRuntime internal constructor(
             onProviderEndpoint = {
                 mainHandler.post {
                     if (version == interactionVersion) {
-                        capture.completeFromProvider()
+                        capture.complete()
                     }
                 }
             },
@@ -580,6 +612,7 @@ class AndroidVoiceRuntime internal constructor(
         iflytekLiveSession = session
         capture = RecordedSpeechCapture(
             context = applicationContext,
+            endOnSilence = !manualEndpoint,
             onAudioSamples = { samples, count ->
                 session.acceptPcm(samples, count)
                 inspectBriefingWake(samples, count, version)
@@ -849,6 +882,8 @@ class AndroidVoiceRuntime internal constructor(
     }
 
     private fun cancelRecognition() {
+        mainHandler.removeCallbacks(finishRecognitionTimeout)
+        systemRecognitionActive = false
         detectBriefingWake = false
         finishBriefing(WakeBriefingResult.INTERRUPTED)
         transcriptionJob?.cancel()
@@ -858,6 +893,8 @@ class AndroidVoiceRuntime internal constructor(
         iflytekLiveSession?.close()
         iflytekLiveSession = null
         speechRecognizer?.cancel()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
     }
 
     private fun failSpeech(message: String, diagnosticCode: String? = null) {
@@ -969,7 +1006,7 @@ class AndroidVoiceRuntime internal constructor(
         var playing = false
     }
 
-    private inner class RecognitionCallbacks : RecognitionListener {
+    private inner class RecognitionCallbacks(private val version: Long) : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) = Unit
 
         override fun onBeginningOfSpeech() = Unit
@@ -981,6 +1018,7 @@ class AndroidVoiceRuntime internal constructor(
         override fun onEndOfSpeech() = Unit
 
         override fun onError(error: Int) {
+            if (version != interactionVersion || !systemRecognitionActive) return
             if (
                 finalTranscriptCallback == null &&
                 !mutableState.value.isListening
@@ -1002,6 +1040,7 @@ class AndroidVoiceRuntime internal constructor(
         }
 
         override fun onResults(results: Bundle?) {
+            if (version != interactionVersion || !systemRecognitionActive) return
             val transcript = preferredRecognitionTranscript(
                 finalCandidates = results?.getStringArrayList(
                     SpeechRecognizer.RESULTS_RECOGNITION,
@@ -1012,6 +1051,7 @@ class AndroidVoiceRuntime internal constructor(
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
+            if (version != interactionVersion || !systemRecognitionActive) return
             val transcript = partialResults
                 ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 ?.firstOrNull()

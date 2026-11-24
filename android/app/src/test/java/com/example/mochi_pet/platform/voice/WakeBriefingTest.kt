@@ -14,7 +14,8 @@ class WakeBriefingTest {
         var listening = false
         val voice = object : VoiceRuntime {
             override val state = MutableStateFlow(VoiceRuntimeState())
-            override fun startListening(onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit) { listening = true }
+            override fun startListening(onFinalTranscript: (String) -> Unit, onNoResult: () -> Unit, manualEndpoint: Boolean) { listening = true }
+            override fun finishListening() = Unit
             override fun stopListening() = Unit
             override fun stopSpeaking() = Unit
             override fun speak(text: String, purpose: SpeechPurpose, previewVoiceId: String?, previewProfileId: String?, onCompleted: (SpeechPlaybackResult) -> Unit) {

@@ -42,10 +42,14 @@ ordinary commands run in the background without switching away from Mochi.
 - Full-screen animated Mochi face.
 - Listening, thinking, speaking, and emotional states.
 - Touch and gesture navigation remain available alongside voice navigation.
-- Focus mode hides navigation and system chrome, keeps the screen awake, and
-  dedicates the full display to the active Home presentation. The same Focus
-  mode control toggles the presentation into and out of full screen.
-- Focus mode enters an optional low-power standby presentation after 30 seconds
+- Bottom navigation has **Mochi / Planner / Skills / Tools**. Mochi contains
+  **Chat / Companion** (Chinese: **对话 / 陪伴**), selected in the compact header.
+  Both modes share conversation history and tasks. Returning to Mochi restores
+  the last selected mode within the activity's saved state.
+- Companion's **Full screen** display option hides navigation and system chrome,
+  keeps the screen awake, and dedicates the display to the Home presentation.
+  It is a display option, not a third interaction mode.
+- Full screen enters an optional low-power standby presentation after 30 seconds
   of idle time by default. Standby uses pure black with a static gray-white,
   earless cartoon-cat Mochi, a smaller solid lishu date/weekday at 40% of the time's
   font size, and hollow, thick-outlined bubble-style 24-hour local time. It restores the prior Home presentation on
@@ -54,7 +58,8 @@ ordinary commands run in the background without switching away from Mochi.
 
 ### 3.2 Voice interaction
 
-1. Wake with the selected phrase (`Hi Mochi` or `老莫老莫`), microphone, media button, or text.
+1. In Companion, wake with the selected phrase (`Hi Mochi` or `老莫老莫`),
+   or use an explicit media-button trigger.
    A confirmed wake phrase normally receives a one-syllable acknowledgement.
    New AgentLink outcomes may replace it with one short local task briefing.
    User input takes priority; unsupported simultaneous input skips the briefing
@@ -67,7 +72,15 @@ ordinary commands run in the background without switching away from Mochi.
 6. Speak the final response with Android `TextToSpeech` by default, or the
    explicitly enabled synthesis service of the selected speech Provider.
 
-The wake word is enabled by default after Android permissions are granted.
+The wake-word preference is enabled by default after Android permissions are
+granted, but capture runs only while Companion is visible in the unlocked
+foreground. Chat, other pages, covering full-screen surfaces, backgrounding and
+locking pause capture without changing that preference. Returning to visible
+Companion resumes it if enabled. No background or lock-screen wake detection runs.
+Chat supports text and hold-to-dictate in the same one-line composer: tap to
+type; long-press even an existing draft to record; release to fill/append recognized
+text, or move outside to cancel without changing the draft. There is no microphone
+button. Dictation never invokes the Agent or sends a message; Send is explicit.
 Settings > Speech and wake defaults to **Follow system**: Chinese device languages
 use `老莫老莫`; English and other device languages use `Hi Mochi`. Users can
 disable capture, pin either phrase, or return to Follow system. Existing saved

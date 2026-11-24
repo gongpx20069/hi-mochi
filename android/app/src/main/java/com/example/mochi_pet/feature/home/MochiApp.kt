@@ -81,7 +81,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -102,6 +101,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -118,10 +118,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.SpanStyle
@@ -188,7 +194,6 @@ import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import com.example.mochi_pet.core.wake.WakeKeyword
 import com.example.mochi_pet.core.wake.WakeRuntime
 import com.example.mochi_pet.core.wake.WakeRuntimeState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.RadioButton
 import com.example.mochi_pet.core.web.PublicWebUrlPolicy
 import com.example.mochi_pet.core.web.WebContentException
@@ -305,6 +310,13 @@ fun MochiApp(
             viewModel.reportMicrophonePermissionDenied()
         }
         pendingVoiceTrigger = VoiceInputTrigger.DIRECT
+    }
+    val dictationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            Toast.makeText(context, localizeUiText("Microphone ready. Hold again to dictate."), Toast.LENGTH_SHORT).show()
+        } else viewModel.reportMicrophonePermissionDenied()
     }
     val wakePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -429,23 +441,6 @@ fun MochiApp(
     LaunchedEffect(providerShareCallbacks) {
         providerShareCallbacks.collect(viewModel::stageProviderImport)
     }
-    LifecycleResumeEffect(wakeRuntime) {
-        val startJob = coroutineScope.launch {
-            delay(1_000)
-            if (
-                wakeRuntime.shouldBeEnabled &&
-                wakeRuntime.state.value.status in setOf(
-                    WakeCaptureStatus.DISABLED,
-                    WakeCaptureStatus.ERROR,
-                )
-            ) {
-                enableWake()
-            }
-        }
-        onPauseOrDispose {
-            startJob.cancel()
-        }
-    }
     LaunchedEffect(locationPermissionRequest) {
         if (locationPermissionRequest) {
             locationPermissionLauncher.launch(
@@ -461,7 +456,12 @@ fun MochiApp(
         viewModel = viewModel,
         journal = journal,
         taskCenter = taskCenter,
-        onStartVoice = { startVoice(VoiceInputTrigger.DIRECT) },
+        wakeRuntime = wakeRuntime,
+        onStartDictation = {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                viewModel.startDictation()
+            } else dictationPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        },
         onEnableWake = enableWake,
         launchAgentLink = launchAgentLink,
     )
@@ -472,7 +472,8 @@ private fun MochiAppContent(
     viewModel: MochiHomeViewModel,
     journal: com.example.mochi_pet.feature.journal.JournalViewModel,
     taskCenter: TaskCenterViewModel,
-    onStartVoice: () -> Unit,
+    wakeRuntime: WakeRuntime,
+    onStartDictation: () -> Unit,
     onEnableWake: () -> Unit,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
 ) {
@@ -530,6 +531,26 @@ private fun MochiAppContent(
     val activity = context as? Activity
     var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
     val homePresentation = surface.isHomePresentation()
+    val taskCenterState by taskCenter.state.collectAsStateWithLifecycle()
+    val companionVisible = homePresentation && !taskCenterState.visible && assistanceRequest == null &&
+        !browserState.active && !showBrowserManager && availableUpdate == null &&
+        providerShareState.pendingImportLink == null
+    LifecycleResumeEffect(companionVisible) {
+        viewModel.setCompanionVisible(companionVisible)
+        val startJob = coroutineScope.launch {
+            if (companionVisible) {
+                delay(1_000)
+                if (wakeRuntime.shouldBeEnabled &&
+                    wakeRuntime.state.value.status in setOf(WakeCaptureStatus.DISABLED, WakeCaptureStatus.ERROR)
+                ) onEnableWake()
+            }
+        }
+        onPauseOrDispose {
+            startJob.cancel()
+            viewModel.setCompanionVisible(false)
+            viewModel.cancelDictation()
+        }
+    }
     val focusStandbySettings = agentSettingsState.settings
     val visiblePipelineState =
         if (pipelineState.stage == ChatPipelineStage.LISTENING) {
@@ -796,8 +817,10 @@ private fun MochiAppContent(
             onNavigate = viewModel::navigate,
             onSendMessage = viewModel::sendConversation,
             onCancelMessage = viewModel::cancelConversation,
-            onStartVoice = onStartVoice,
-            onStopVoice = viewModel::stopVoiceInput,
+            onDraftChange = viewModel::updateConversationDraft,
+            onStartDictation = onStartDictation,
+            onFinishDictation = viewModel::finishDictation,
+            onCancelDictation = viewModel::cancelDictation,
             onEnableWake = onEnableWake,
             onDisableWake = viewModel::disableWakeWord,
             onSelectWakeKeyword = viewModel::selectWakeKeyword,
@@ -930,7 +953,7 @@ private fun MochiAppContent(
                                 },
                                 shape = RoundedCornerShape(18.dp),
                             ) {
-                                Text("Exit focus")
+                                Text("Exit full screen")
                             }
                         }
                         ChatPipelineIndicator(state = visiblePipelineState)
@@ -958,15 +981,11 @@ private fun MochiAppContent(
                 MochiTopBar(
                     surface = surface,
                     wakeState = wakeState,
+                    onNavigate = viewModel::navigate,
                     onTasks = { taskCenter.open() },
                     onSettings = {
-                        viewModel.navigate(
-                            if (surface == MochiSurface.Settings) {
-                                MochiNavigationIntent.ShowFace
-                            } else {
-                                MochiNavigationIntent.ShowSettings
-                            },
-                        )
+                        if (surface == MochiSurface.Settings) viewModel.openMochi()
+                        else viewModel.navigate(MochiNavigationIntent.ShowSettings)
                     },
                 )
                 ChatPipelineIndicator(state = visiblePipelineState)
@@ -1002,6 +1021,7 @@ private fun MochiAppContent(
                 NavigationBar(
                     surface = surface,
                     onNavigate = viewModel::navigate,
+                    onOpenMochi = viewModel::openMochi,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -1180,6 +1200,7 @@ private fun BrowserSessionCard(
 private fun MochiTopBar(
     surface: MochiSurface,
     wakeState: WakeRuntimeState,
+    onNavigate: (MochiNavigationIntent) -> Unit,
     onTasks: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -1189,14 +1210,15 @@ private fun MochiTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(
+            val isMochi = surface.isHomePresentation() || surface == MochiSurface.Conversation
+            if (isMochi) MochiModeSwitch(surface.isHomePresentation(), onNavigate) else Text(
                 text = "Mochi",
                 color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
-            Text(
-                text = if (wakeState.enabled) {
+            if (!isMochi || (surface.isHomePresentation() && wakeState.enabled)) Text(
+                text = if (surface.isHomePresentation() && wakeState.enabled) {
                     "${wakeState.keyword.phrase} is ${wakeState.status.name.lowercase()}"
                 } else {
                     surface.displayName()
@@ -1493,8 +1515,10 @@ private fun SurfaceContent(
     onNavigate: (MochiNavigationIntent) -> Unit,
     onSendMessage: (String) -> Unit,
     onCancelMessage: () -> Unit,
-    onStartVoice: () -> Unit,
-    onStopVoice: () -> Unit,
+    onDraftChange: (String) -> Unit,
+    onStartDictation: () -> Unit,
+    onFinishDictation: () -> Unit,
+    onCancelDictation: () -> Unit,
     onEnableWake: () -> Unit,
     onDisableWake: () -> Unit,
     onSelectWakeKeyword: (WakeKeyword?) -> Unit,
@@ -1589,8 +1613,10 @@ private fun SurfaceContent(
                 voiceState = voiceState,
                 onSend = onSendMessage,
                 onCancel = onCancelMessage,
-                onStartVoice = onStartVoice,
-                onStopVoice = onStopVoice,
+                onDraftChange = onDraftChange,
+                onStartDictation = onStartDictation,
+                onFinishDictation = onFinishDictation,
+                onCancelDictation = onCancelDictation,
                 onOpenSpeechSettings = {
                     onNavigate(MochiNavigationIntent.ShowSettings)
                 },
@@ -2143,7 +2169,7 @@ private fun FocusModeButton(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "Focus mode",
+                text = "Full screen",
                 fontWeight = FontWeight.Bold,
             )
             Text(
@@ -5313,19 +5339,29 @@ internal fun ConversationSurface(
     voiceState: VoiceRuntimeState,
     onSend: (String) -> Unit,
     onCancel: () -> Unit,
-    onStartVoice: () -> Unit,
-    onStopVoice: () -> Unit,
+    onDraftChange: (String) -> Unit,
+    onStartDictation: () -> Unit,
+    onFinishDictation: () -> Unit,
+    onCancelDictation: () -> Unit,
     onOpenSpeechSettings: () -> Unit,
     onCardAction: (CardPresentation, CardAction) -> Unit,
     onRemoteTask: (com.example.mochi_pet.core.agentlink.FollowedAgentLinkTask) -> Unit,
 ) {
-    var input by remember { mutableStateOf("") }
-    val canSend = providerReady && input.isNotBlank() && !state.isSending
+    val input = state.draft
+    val dictating = state.dictation != DictationPhase.IDLE
+    val keyboard = LocalSoftwareKeyboardController.current
+    val viewConfiguration = LocalViewConfiguration.current
+    val typingConfiguration = remember(viewConfiguration) {
+        object : ViewConfiguration by viewConfiguration {
+            // The parent owns long-press; ordinary text taps and cursor movement remain native.
+            override val longPressTimeoutMillis = Long.MAX_VALUE
+        }
+    }
+    val canSend = providerReady && input.isNotBlank() && !state.isSending && !dictating
     val send = {
-        if (providerReady && input.isNotBlank() && !state.isSending) {
-            val message = input
-            input = ""
-            onSend(message)
+        if (canSend) {
+            onDraftChange("")
+            onSend(input)
         }
     }
     val listState = rememberLazyListState()
@@ -5338,39 +5374,6 @@ internal fun ConversationSurface(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().testTag("conversation-header"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Mochi",
-                modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Surface(
-                color = if (providerReady) {
-                    Color(0xFF72D8C0).copy(alpha = 0.16f)
-                } else {
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
-                },
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                Text(
-                    text = if (providerReady) "Ready" else "Setup",
-                    color = if (providerReady) {
-                        Color(0xFF72D8C0)
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                )
-            }
-        }
         if (!providerReady) {
             Surface(
                 color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
@@ -5438,7 +5441,7 @@ internal fun ConversationSurface(
                     .takeIf { voiceState.offerSpeechSettings },
             )
         }
-        if (voiceState.partialTranscript.isNotEmpty()) {
+        if (voiceState.partialTranscript.isNotEmpty() && !dictating) {
             Surface(
                 color = Color(0xFF72D8C0).copy(alpha = 0.12f),
                 shape = RoundedCornerShape(18.dp),
@@ -5473,50 +5476,87 @@ internal fun ConversationSurface(
             modifier = Modifier.fillMaxWidth().testTag("conversation-composer"),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
             shape = RoundedCornerShape(28.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+            border = BorderStroke(
+                1.dp,
+                if (dictating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+            ),
         ) {
             Row(
                 modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BasicTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    modifier = Modifier.weight(1f).testTag("conversation-input"),
-                    enabled = !state.isSending && !voiceState.isListening,
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { send() }),
-                    decorationBox = { field ->
-                        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
-                            if (input.isEmpty()) Text(
-                                "Ask Mochi anything...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            field()
-                        }
-                    },
-                )
-                val voiceLabel = localizeUiText(if (voiceState.isListening) "Stop listening" else "Speak")
-                IconButton(
-                    onClick = if (voiceState.isListening) onStopVoice else onStartVoice,
-                    enabled = voiceState.isListening || (providerReady && voiceState.recognitionAvailable && !state.isSending),
-                    modifier = Modifier.size(48.dp).semantics { contentDescription = voiceLabel },
+                Box(
+                    Modifier.weight(1f).testTag("dictation-input")
+                        .holdToDictate(
+                            enabled = !state.isSending,
+                            onStart = { keyboard?.hide(); onStartDictation() },
+                            onFinish = onFinishDictation,
+                            onCancel = onCancelDictation,
+                        )
+                        .semantics {
+                            customActions = when (state.dictation) {
+                                DictationPhase.IDLE -> if (!state.isSending) {
+                                    listOf(CustomAccessibilityAction(localizeUiText("Start dictation")) { onStartDictation(); true })
+                                } else emptyList()
+                                DictationPhase.RECORDING -> listOf(
+                                    CustomAccessibilityAction(localizeUiText("Finish dictation")) { onFinishDictation(); true },
+                                    CustomAccessibilityAction(localizeUiText("Cancel dictation")) { onCancelDictation(); true },
+                                )
+                                DictationPhase.TRANSCRIBING -> listOf(
+                                    CustomAccessibilityAction(localizeUiText("Cancel dictation")) { onCancelDictation(); true },
+                                )
+                            }
+                        },
                 ) {
-                    ToolGlyphIcon(if (voiceState.isListening) ToolGlyph.STOP else ToolGlyph.MICROPHONE, Modifier.size(20.dp))
+                    CompositionLocalProvider(LocalViewConfiguration provides typingConfiguration) {
+                        BasicTextField(
+                            value = input,
+                            onValueChange = onDraftChange,
+                            modifier = Modifier.fillMaxWidth().testTag("conversation-input"),
+                            enabled = !state.isSending && !voiceState.isListening && !dictating,
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { send() }),
+                            decorationBox = { field ->
+                                Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                                    if (input.isEmpty() || dictating) Text(
+                                        when (state.dictation) {
+                                            DictationPhase.IDLE -> "Type or hold to dictate"
+                                            DictationPhase.RECORDING -> "Release to transcribe; move out to cancel"
+                                            DictationPhase.TRANSCRIBING -> "Transcribing..."
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (dictating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Box(Modifier.alpha(if (dictating) 0f else 1f)) { field() }
+                                }
+                            },
+                        )
+                    }
                 }
-                val sendLabel = localizeUiText(if (state.isSending) "Cancel" else "Send")
+                val sendLabel = localizeUiText(when {
+                    state.isSending -> "Cancel"
+                    dictating -> "Cancel dictation"
+                    else -> "Send"
+                })
                 FilledIconButton(
-                    onClick = if (state.isSending) onCancel else send,
-                    enabled = state.isSending || canSend,
+                    onClick = when {
+                        state.isSending -> onCancel
+                        dictating -> onCancelDictation
+                        else -> send
+                    },
+                    enabled = state.isSending || dictating || canSend,
                     modifier = Modifier.size(48.dp).semantics { contentDescription = sendLabel },
                 ) {
-                    ToolGlyphIcon(if (state.isSending) ToolGlyph.STOP else ToolGlyph.SEND, Modifier.size(20.dp))
+                    ToolGlyphIcon(when {
+                        state.isSending -> ToolGlyph.STOP
+                        dictating -> ToolGlyph.CLOSE
+                        else -> ToolGlyph.SEND
+                    }, Modifier.size(20.dp))
                 }
             }
         }
@@ -5555,7 +5595,7 @@ private fun ConversationEmptyState() {
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "Speak naturally or type a message below.",
+            text = "Type a message or hold the input to dictate.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -6036,7 +6076,7 @@ internal fun ProviderSettingsSurface(
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
-                                text = "After Focus is idle, show a dim " +
+                                text = "When full screen is idle, show a dim " +
                                     "Mochi, date, and time on pure black.",
                                 color =
                                     MaterialTheme.colorScheme.onSurfaceVariant,
@@ -6527,9 +6567,21 @@ private fun AddTodoDialog(
 }
 
 @Composable
+internal fun MochiModeSwitch(companion: Boolean, onNavigate: (MochiNavigationIntent) -> Unit) {
+    FlowRow(
+        Modifier.fillMaxWidth().testTag("mochi-modes"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SkillSectionTab("Chat", !companion, { onNavigate(MochiNavigationIntent.ShowConversation) })
+        SkillSectionTab("Companion", companion, { onNavigate(MochiNavigationIntent.ShowFace) })
+    }
+}
+
+@Composable
 private fun NavigationBar(
     surface: MochiSurface,
     onNavigate: (MochiNavigationIntent) -> Unit,
+    onOpenMochi: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -6543,21 +6595,14 @@ private fun NavigationBar(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             MochiNavigationItem(
-                label = "Home",
+                label = "Mochi",
                 selected =
                     surface == MochiSurface.Face ||
                         surface == MochiSurface.DateTime ||
                         surface == MochiSurface.Weather ||
-                        surface == MochiSurface.Card,
-                onClick = { onNavigate(MochiNavigationIntent.ShowFace) },
-                modifier = Modifier.weight(1f),
-            )
-            MochiNavigationItem(
-                label = "Talk",
-                selected = surface == MochiSurface.Conversation,
-                onClick = {
-                    onNavigate(MochiNavigationIntent.ShowConversation)
-                },
+                        surface == MochiSurface.Card ||
+                        surface == MochiSurface.Conversation,
+                onClick = onOpenMochi,
                 modifier = Modifier.weight(1f),
             )
             MochiNavigationItem(

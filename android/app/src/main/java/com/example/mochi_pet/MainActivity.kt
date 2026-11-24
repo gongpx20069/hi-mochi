@@ -141,6 +141,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        (application as MochiApplication).wakeRuntime.setCaptureAllowed(false)
         (application as MochiApplication).mediaPlatform.onActivityPaused(this)
         super.onPause()
     }
@@ -188,6 +189,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun acceptVoiceTrigger(source: String?) {
+        if (source?.startsWith("wake:") == true && !(application as MochiApplication).wakeRuntime.canCapture) return
         getSystemService(NotificationManager::class.java)
             .cancel(WakeCaptureService.DETECTED_NOTIFICATION_ID)
         voiceTriggers.trySend(
