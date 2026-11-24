@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -22,6 +23,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Modifier
@@ -86,6 +88,106 @@ class CompactSurfacesUiTest {
         assertEquals(listOf(longDraft, "Keyboard message"), sent)
         compose.onNodeWithContentDescription("Send").assertIsNotEnabled()
         captureFixture("conversation-composer", "compact-conversation.png")
+    }
+
+    @Test fun `central entry reveals history with a moving composer without recreating the text field`() {
+        state.value = state.value.copy(quickEntry = true, draft = "Keep draft", messages = listOf(
+            ConversationMessage("previous", ConversationRole.ASSISTANT, "Previous conversation", java.time.Instant.EPOCH),
+        ))
+        renderConversation()
+        compose.onNodeWithText("Previous conversation").assertDoesNotExist()
+        val composer = compose.onNodeWithTag("conversation-composer")
+        val layout = compose.onNodeWithTag("conversation-layout")
+        val before = composer.getUnclippedBoundsInRoot()
+        val logo = compose.onNodeWithTag("conversation-entry-logo").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(logo.bottom < before.top)
+        assertTrue(before.bottom < layout.getUnclippedBoundsInRoot().bottom - 100.dp)
+        val inputId = compose.onNodeWithTag("conversation-input").fetchSemanticsNode().id
+        compose.mainClock.autoAdvance = false
+        val showHistory = compose.onNodeWithTag("dictation-input").fetchSemanticsNode()
+            .config[SemanticsActions.CustomActions].single { it.label == "Show conversation history" }
+        compose.runOnUiThread { assertTrue(showHistory.action()) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(140)
+        compose.waitForIdle()
+        val middle = composer.getUnclippedBoundsInRoot().top
+        compose.mainClock.advanceTimeBy(600)
+        compose.waitForIdle()
+        val after = composer.getUnclippedBoundsInRoot().top
+        assertTrue("Composer positions: ${before.top}, $middle, $after; quick=${state.value.quickEntry}",
+            middle > before.top && middle < after)
+        compose.onNodeWithText("Previous conversation").assertIsDisplayed()
+        compose.onNodeWithTag("conversation-history-hint").assertDoesNotExist()
+        compose.onNodeWithTag("conversation-entry-logo").assertDoesNotExist()
+        assertEquals(inputId, compose.onNodeWithTag("conversation-input").fetchSemanticsNode().id)
+        assertEquals("Keep draft", state.value.draft)
+        assertTrue(sent.isEmpty())
+    }
+
+    @Test fun `central entry sends explicitly and long press still only transcribes`() {
+        state.value = state.value.copy(quickEntry = true, draft = "Draft")
+        renderConversation()
+        compose.onNodeWithTag("dictation-input").performTouchInput { longClick() }
+        assertEquals(1, started)
+        assertEquals(1, stopped)
+        assertTrue(state.value.quickEntry)
+        assertTrue(sent.isEmpty())
+        compose.onNodeWithContentDescription("Cancel dictation").performClick()
+        compose.onNodeWithContentDescription("Send").performClick()
+        assertEquals(listOf("Draft"), sent)
+        assertEquals(false, state.value.quickEntry)
+        compose.runOnIdle { state.value = state.value.copy(quickEntry = true) }
+        compose.onNodeWithText("Type, hold to talk, swipe down for history").assertIsDisplayed()
+        compose.onNodeWithTag("conversation-history-hint").assertDoesNotExist()
+        compose.onNodeWithTag("conversation-layout").performTouchInput { swipeDown() }
+        assertEquals(false, state.value.quickEntry)
+        compose.onNodeWithText("Type or hold to dictate").assertIsDisplayed()
+        compose.onNodeWithText("Type, hold to talk, swipe down for history").assertDoesNotExist()
+        assertEquals(listOf("Draft"), sent)
+    }
+
+    @Test fun `moving before a long press does not start recording`() {
+        state.value = state.value.copy(quickEntry = true)
+        renderConversation()
+        compose.onNodeWithTag("dictation-input").performTouchInput {
+            down(center)
+            advanceEventTime(100)
+            moveTo(center + Offset(0f, 20f))
+            advanceEventTime(700)
+            up()
+        }
+        assertEquals(0, started)
+        assertTrue(sent.isEmpty())
+    }
+
+    @Test fun `connection block separates connecting from management at large font scale`() {
+        val connected = mutableStateOf(false)
+        var connects = 0
+        var disconnects = 0
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) { MochiTheme {
+                ToolConnectionRow(
+                    hasConnection = connected.value, connectLabel = "Connect Feishu",
+                    detail = if (connected.value) "Connected" else "Authorization required",
+                    enabled = true, tag = "test-connection",
+                    onConnect = { connects++; connected.value = true },
+                ) { close ->
+                    CapabilityAction({ close(); disconnects++; connected.value = false }) { Text("Disconnect") }
+                }
+            } }
+        }
+        compose.onNodeWithText("Disconnect").assertDoesNotExist()
+        compose.onNodeWithText("Connect Feishu").performClick()
+        assertEquals(1, connects)
+        compose.onNodeWithTag("test-connection").performClick()
+        compose.onNodeWithText("Disconnect").assertIsDisplayed()
+        compose.onNodeWithText("Close").performClick()
+        assertEquals(0, disconnects)
+        compose.onNodeWithTag("test-connection").performClick()
+        compose.onNodeWithText("Disconnect").performClick()
+        assertEquals(1, disconnects)
+        compose.onNodeWithText("Connect Feishu").assertIsDisplayed()
     }
 
     @Test fun `holding an existing draft records and release finalizes without sending`() {
@@ -293,6 +395,7 @@ class CompactSurfacesUiTest {
                         MochiModeSwitch(false, {}, muted.value, true, { muted.value = it })
                         ConversationSurface(
                             state = state.value, providerReady = ready.value, voiceState = voice.value, onSend = sent::add,
+                            onShowHistory = { state.value = state.value.copy(quickEntry = false) },
                             onCancel = { cancelled++ },
                             onDraftChange = { state.value = state.value.copy(draft = it) },
                             onStartDictation = { started++; state.value = state.value.copy(dictation = DictationPhase.RECORDING) },

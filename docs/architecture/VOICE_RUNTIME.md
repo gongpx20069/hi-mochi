@@ -157,6 +157,9 @@ The ViewModel fills/appends the result to its draft only: no Agent request,
 message persistence, TTS or follow-up listening. Navigation, Activity pause,
 speech-profile changes and ViewModel disposal cancel dictation. Permissions
 granted after a hold require another gesture; there is no deferred auto-start.
+Movement beyond touch slop before the hold threshold abandons recording so a
+quick-entry history swipe cannot become a long press. During dictation, history
+reveal is disabled; central and bottom composers use the same field and callbacks.
 
 ### Next-wake task briefing
 

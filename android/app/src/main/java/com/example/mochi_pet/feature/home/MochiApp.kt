@@ -95,6 +95,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -253,6 +254,7 @@ fun MochiApp(
     agentLinkResults: Flow<AgentLinkAuthorizationResult>,
     launchAgentLink: (AgentLinkActivityRequest) -> Unit,
     plannerDates: Flow<com.example.mochi_pet.core.model.PlannerDestination> = kotlinx.coroutines.flow.emptyFlow(),
+    appVisibility: Flow<Boolean> = kotlinx.coroutines.flow.emptyFlow(),
 ) {
     val context = LocalContext.current
     val application = context.applicationContext as MochiApplication
@@ -454,6 +456,7 @@ fun MochiApp(
 
     MochiAppContent(
         viewModel = viewModel,
+        appVisibility = appVisibility,
         journal = journal,
         taskCenter = taskCenter,
         wakeRuntime = wakeRuntime,
@@ -469,6 +472,7 @@ fun MochiApp(
 
 @Composable
 private fun MochiAppContent(
+    appVisibility: Flow<Boolean>,
     viewModel: MochiHomeViewModel,
     journal: com.example.mochi_pet.feature.journal.JournalViewModel,
     taskCenter: TaskCenterViewModel,
@@ -505,6 +509,10 @@ private fun MochiAppContent(
         viewModel.providerShareState.collectAsStateWithLifecycle()
     val agentSettingsState by
         viewModel.agentSettingsState.collectAsStateWithLifecycle()
+    if (agentSettingsState.isLoading) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+        return
+    }
     val personaState by viewModel.personaState.collectAsStateWithLifecycle()
     val voiceState by viewModel.voiceState.collectAsStateWithLifecycle()
     val wakeState by viewModel.wakeState.collectAsStateWithLifecycle()
@@ -535,6 +543,16 @@ private fun MochiAppContent(
     val companionVisible = homePresentation && !taskCenterState.visible && assistanceRequest == null &&
         !browserState.active && !showBrowserManager && availableUpdate == null &&
         providerShareState.pendingImportLink == null
+    val quickEntryAllowed by rememberUpdatedState(
+        !taskCenterState.visible && assistanceRequest == null && !browserState.active &&
+            !showBrowserManager && availableUpdate == null && providerShareState.pendingImportLink == null,
+    )
+    LaunchedEffect(appVisibility) {
+        appVisibility.collect { viewModel.onAppVisibilityChanged(it, quickEntryAllowed) }
+    }
+    LaunchedEffect(quickEntryAllowed) {
+        if (!quickEntryAllowed) viewModel.showConversationHistory()
+    }
     LifecycleResumeEffect(companionVisible) {
         viewModel.setCompanionVisible(companionVisible)
         val startJob = coroutineScope.launch {
@@ -818,6 +836,7 @@ private fun MochiAppContent(
             onSendMessage = viewModel::sendConversation,
             onCancelMessage = viewModel::cancelConversation,
             onDraftChange = viewModel::updateConversationDraft,
+            onShowHistory = viewModel::showConversationHistory,
             onStartDictation = onStartDictation,
             onFinishDictation = viewModel::finishDictation,
             onCancelDictation = viewModel::cancelDictation,
@@ -1485,6 +1504,7 @@ private fun FocusStandbyScreen(
 
 @Composable
 private fun SurfaceContent(
+    onShowHistory: () -> Unit,
     plannerToday: LocalDate,
     journalSettings: @Composable () -> Unit,
     journalDay: @Composable (LocalDate, Boolean) -> Unit,
@@ -1603,6 +1623,7 @@ private fun SurfaceContent(
             )
             MochiSurface.Conversation -> ConversationSurface(
                 state = conversationState,
+                onShowHistory = onShowHistory,
                 providerReady = providerSettingsState.summary.isReady,
                 voiceState = voiceState,
                 onSend = onSendMessage,
@@ -3759,21 +3780,15 @@ internal fun ToolsSurface(
                                 )
                             }
                         }
-                        if (state.catalog.amap.connected) {
-                            CapabilityAction(
-                                onClick = onDisconnectAmap,
-                                enabled = !state.isLoading,
-                            ) {
-                                Text("Disconnect")
-                            }
-                        } else {
-                            CapabilityAction(
-                                onClick = { showAmapCredentials = true },
-                                emphasized = true,
-                                enabled = !state.isLoading,
-                            ) {
-                                Text("Configure Amap")
-                            }
+                        ToolConnectionRow(
+                            hasConnection = state.catalog.amap.connected,
+                            connectLabel = "Configure Amap",
+                            detail = if (state.catalog.amap.connected) "Connected" else "Web Service Key required",
+                            enabled = !state.isLoading,
+                            tag = "amap-connection",
+                            onConnect = { showAmapCredentials = true },
+                        ) { close ->
+                            TextButton({ close(); onDisconnectAmap() }, enabled = !state.isLoading) { Text("Disconnect") }
                         }
                         if (state.catalog.amap.tools.isNotEmpty()) {
                             TextButton(
@@ -4009,7 +4024,6 @@ private fun MijiaExtensionCard(
     onSetEnabled: (Boolean) -> Unit,
     onSetToolEnabled: (String, Boolean) -> Unit,
 ) {
-    var management by rememberSaveable { mutableStateOf(false) }
     var confirmDisconnect by remember { mutableStateOf(false) }
     com.example.mochi_ui.ExtensionCard {
         com.example.mochi_ui.ExtensionHeading(
@@ -4049,68 +4063,40 @@ private fun MijiaExtensionCard(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        when {
-            !summary.installed || !summary.trusted -> {
-                CapabilityAction(
-                    onClick = onInstall,
-                    emphasized = true,
-                    enabled = !disabled,
-                ) {
-                    Text(
-                        if (summary.installed) {
-                            "Get trusted extension"
-                        } else {
-                            "Install extension"
-                        },
-                    )
-                }
-            }
-            !summary.connected -> {
-                CapabilityAction(
-                    onClick = onConfigure,
-                    emphasized = true,
-                    enabled = !disabled,
-                ) {
-                    Text(
-                        if (summary.status == "authorization_expired") {
-                            "Reconnect Mi Home"
-                        } else {
-                            "Connect Mi Home"
-                        },
-                    )
-                }
-            }
-            else -> {
-                Text(
-                    text = buildString {
-                        summary.accountLabel?.let {
-                            append(it)
-                            append(" · ")
-                        }
-                        append(summary.selectedHomeCount)
-                        append(" homes · ")
-                        append(summary.selectedDeviceCount)
-                        append(" devices")
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                TextButton({ management = !management }) { Text(if (management) "Hide connection settings" else "Connection settings") }
-                if (management) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    summary.versionName?.let { Text("Extension $it", style = MaterialTheme.typography.bodySmall) }
-                    CapabilityAction(
-                        onClick = onConfigure,
-                        enabled = !disabled,
-                    ) {
-                        Text("Manage")
-                    }
-                    TextButton(
-                        onClick = { confirmDisconnect = true },
-                        enabled = !disabled,
-                    ) {
-                        Text("Disconnect")
-                    }
-                }
+        ToolConnectionRow(
+            hasConnection = summary.connected && summary.trusted,
+            connectLabel = when {
+                !summary.installed -> "Install extension"
+                !summary.trusted -> "Get trusted extension"
+                summary.status == "authorization_expired" -> "Reconnect Mi Home"
+                else -> "Connect Mi Home"
+            },
+            detail = when {
+                !summary.installed -> "Optional extension · not installed"
+                !summary.trusted -> "Installed package could not be trusted"
+                summary.connected -> "Connected"
+                summary.status == "authorization_expired" -> "Authorization expired"
+                else -> "Installed · connection required"
+            },
+            enabled = !disabled,
+            tag = "mijia-connection",
+            onConnect = if (!summary.installed || !summary.trusted) onInstall else onConfigure,
+        ) { close ->
+            Text(
+                text = buildString {
+                    summary.accountLabel?.let { append(it); append(" · ") }
+                    append(summary.selectedHomeCount)
+                    append(" homes · ")
+                    append(summary.selectedDeviceCount)
+                    append(" devices")
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            summary.versionName?.let { Text("Extension $it", style = MaterialTheme.typography.bodySmall) }
+            CapabilityAction({ close(); onConfigure() }, enabled = !disabled) { Text("Manage") }
+            TextButton({ close(); confirmDisconnect = true }, enabled = !disabled) {
+                Text("Disconnect")
             }
         }
         if (summary.tools.isNotEmpty()) {
@@ -4239,56 +4225,35 @@ private fun McpServerCard(
                 )
             }
         }
-        when (server.authMode) {
-            McpAuthMode.OAUTH -> {
-                if (server.connected) {
-                    CapabilityAction(
-                        onClick = onDisconnectNotion,
-                        enabled = !disabled,
-                    ) {
-                        Text("Disconnect")
+        val manual = server.authMode in setOf(McpAuthMode.NONE, McpAuthMode.BEARER)
+        ToolConnectionRow(
+            hasConnection = server.connected || manual,
+            connectLabel = when (server.authMode) {
+                McpAuthMode.OAUTH -> if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) "Connect Feishu" else "Connect Notion"
+                McpAuthMode.TOKEN -> "Configure token"
+                else -> "Connection settings"
+            },
+            detail = when {
+                server.connected -> "Connected"
+                manual -> "Ready"
+                server.authMode == McpAuthMode.OAUTH -> "Authorization required"
+                else -> "Personal token required"
+            },
+            enabled = !disabled && (server.connected || server.authMode != McpAuthMode.TOKEN || server.id == TENCENT_DOCS_SERVER_ID),
+            tag = "mcp-connection-${server.id}",
+            onConnect = if (server.authMode == McpAuthMode.OAUTH) onConnectNotion else onConfigureTencentDocs,
+        ) { close ->
+            TextButton(
+                onClick = {
+                    close()
+                    when (server.authMode) {
+                        McpAuthMode.OAUTH -> onDisconnectNotion()
+                        McpAuthMode.TOKEN -> onDisconnectTencentDocs()
+                        else -> onRemove()
                     }
-                } else {
-                    CapabilityAction(
-                        onClick = onConnectNotion,
-                        emphasized = true,
-                        enabled = !disabled,
-                    ) {
-                        Text(if (server.id == com.example.mochi_pet.core.mcp.FEISHU_SERVER_ID) {
-                            "Connect Feishu"
-                        } else "Connect Notion")
-                    }
-                }
-            }
-            McpAuthMode.TOKEN -> {
-                if (server.connected) {
-                    CapabilityAction(
-                        onClick = onDisconnectTencentDocs,
-                        enabled = !disabled,
-                    ) {
-                        Text("Disconnect")
-                    }
-                } else {
-                    CapabilityAction(
-                        onClick = onConfigureTencentDocs,
-                        emphasized = true,
-                        enabled = !disabled &&
-                            server.id == TENCENT_DOCS_SERVER_ID,
-                    ) {
-                        Text("Configure token")
-                    }
-                }
-            }
-            McpAuthMode.NONE,
-            McpAuthMode.BEARER,
-            -> {
-                TextButton(
-                    onClick = onRemove,
-                    enabled = !disabled,
-                ) {
-                    Text("Remove server")
-                }
-            }
+                },
+                enabled = !disabled,
+            ) { Text(if (manual) "Remove server" else "Disconnect") }
         }
         if (server.tools.isNotEmpty()) {
             TextButton(
@@ -5335,6 +5300,7 @@ private fun EmptyRow(message: String) {
 @Composable
 internal fun ConversationSurface(
     state: ConversationUiState,
+    onShowHistory: () -> Unit = {},
     providerReady: Boolean,
     voiceState: VoiceRuntimeState,
     onSend: (String) -> Unit,
@@ -5360,6 +5326,7 @@ internal fun ConversationSurface(
     val canSend = providerReady && input.isNotBlank() && !state.isSending && !dictating
     val send = {
         if (canSend) {
+            onShowHistory()
             onDraftChange("")
             onSend(input)
         }
@@ -5387,179 +5354,193 @@ internal fun ConversationSurface(
                 )
             }
         }
-        LazyColumn(
-            state = listState,
+        ConversationEntryLayout(
+            quickEntry = state.quickEntry,
+            dictating = dictating,
+            onShowHistory = onShowHistory,
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (state.messages.isEmpty()) {
-                item {
-                    ConversationEmptyState()
-                }
-            }
-            items(state.messages, key = ConversationMessage::id) { message ->
-                ConversationBubble(
-                    message = message,
-                    onCardAction = onCardAction,
-                )
-            }
-            items(state.remoteTasks, key = { "remote:${it.key}" }) { task ->
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = .3f)),
+            history = {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("AgentLink", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
-                        Text(task.title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        if (task.unread) Text("New result", color = MaterialTheme.colorScheme.secondary)
-                        Text(when (task.receipt?.state) {
-                            "completed" -> "Remote run ended"
-                            "waitingApproval" -> "Waiting for your approval"
-                            "failed" -> "Failed"
-                            "cancelled" -> "Cancelled"
-                            "interrupted" -> "Outcome unconfirmed"
-                            "running" -> "Running"
-                            "starting", "queued" -> "Queued"
-                            else -> "Remote status not checked"
-                        })
-                        task.receipt?.resultText?.takeIf(String::isNotBlank)?.let {
-                            Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis)
+                    if (state.messages.isEmpty()) {
+                        item {
+                            ConversationEmptyState()
                         }
-                        Text("Remote run state is not verification that your request was fulfilled.",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton({ onRemoteTask(task) }) { Text("Open or continue in AgentLink") }
+                    }
+                    items(state.messages, key = ConversationMessage::id) { message ->
+                        ConversationBubble(
+                            message = message,
+                            onCardAction = onCardAction,
+                        )
+                    }
+                    items(state.remoteTasks, key = { "remote:${it.key}" }) { task ->
+                        Surface(
+                            shape = RoundedCornerShape(22.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = .3f)),
+                        ) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("AgentLink", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                                Text(task.title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                if (task.unread) Text("New result", color = MaterialTheme.colorScheme.secondary)
+                                Text(when (task.receipt?.state) {
+                                    "completed" -> "Remote run ended"
+                                    "waitingApproval" -> "Waiting for your approval"
+                                    "failed" -> "Failed"
+                                    "cancelled" -> "Cancelled"
+                                    "interrupted" -> "Outcome unconfirmed"
+                                    "running" -> "Running"
+                                    "starting", "queued" -> "Queued"
+                                    else -> "Remote status not checked"
+                                })
+                                task.receipt?.resultText?.takeIf(String::isNotBlank)?.let {
+                                    Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis)
+                                }
+                                Text("Remote run state is not verification that your request was fulfilled.",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton({ onRemoteTask(task) }) { Text("Open or continue in AgentLink") }
+                            }
+                        }
                     }
                 }
-            }
-        }
-        val errorMessage = state.errorMessage ?: voiceState.errorMessage
-        errorMessage?.let {
-            ConversationError(
-                message = it,
-                onOpenSpeechSettings = onOpenSpeechSettings
-                    .takeIf { voiceState.offerSpeechSettings },
-            )
-        }
-        if (voiceState.partialTranscript.isNotEmpty() && !dictating) {
-            Surface(
-                color = Color(0xFF72D8C0).copy(alpha = 0.12f),
-                shape = RoundedCornerShape(18.dp),
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = Color(0xFF72D8C0),
-                        strokeWidth = 2.dp,
+            },
+            composer = {
+                val errorMessage = state.errorMessage ?: voiceState.errorMessage
+                errorMessage?.let {
+                    ConversationError(
+                        message = it,
+                        onOpenSpeechSettings = onOpenSpeechSettings
+                            .takeIf { voiceState.offerSpeechSettings },
                     )
-                    Column {
-                        Text(
-                            text = "Listening",
-                            color = Color(0xFF72D8C0),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        MaterialText(
-                            text = voiceState.partialTranscript,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
                 }
-            }
-        }
-        Surface(
-            modifier = Modifier.fillMaxWidth().testTag("conversation-composer"),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-            shape = RoundedCornerShape(28.dp),
-            border = BorderStroke(
-                1.dp,
-                if (dictating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-            ),
-        ) {
-            Row(
-                modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier.weight(1f).testTag("dictation-input")
-                        .holdToDictate(
-                            enabled = !state.isSending,
-                            onStart = { keyboard?.hide(); onStartDictation() },
-                            onFinish = onFinishDictation,
-                            onCancel = onCancelDictation,
-                        )
-                        .semantics {
-                            customActions = when (state.dictation) {
-                                DictationPhase.IDLE -> if (!state.isSending) {
-                                    listOf(CustomAccessibilityAction(localizeUiText("Start dictation")) { onStartDictation(); true })
-                                } else emptyList()
-                                DictationPhase.RECORDING -> listOf(
-                                    CustomAccessibilityAction(localizeUiText("Finish dictation")) { onFinishDictation(); true },
-                                    CustomAccessibilityAction(localizeUiText("Cancel dictation")) { onCancelDictation(); true },
+                if (voiceState.partialTranscript.isNotEmpty() && !dictating) {
+                    Surface(
+                        color = Color(0xFF72D8C0).copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color(0xFF72D8C0),
+                                strokeWidth = 2.dp,
+                            )
+                            Column {
+                                Text(
+                                    text = "Listening",
+                                    color = Color(0xFF72D8C0),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
                                 )
-                                DictationPhase.TRANSCRIBING -> listOf(
-                                    CustomAccessibilityAction(localizeUiText("Cancel dictation")) { onCancelDictation(); true },
+                                MaterialText(
+                                    text = voiceState.partialTranscript,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.bodyMedium,
                                 )
                             }
-                        },
-                ) {
-                    CompositionLocalProvider(LocalViewConfiguration provides typingConfiguration) {
-                        BasicTextField(
-                            value = input,
-                            onValueChange = onDraftChange,
-                            modifier = Modifier.fillMaxWidth().testTag("conversation-input"),
-                            enabled = !state.isSending && !voiceState.isListening && !dictating,
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = { send() }),
-                            decorationBox = { field ->
-                                Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
-                                    if (input.isEmpty() || dictating) Text(
-                                        when (state.dictation) {
-                                            DictationPhase.IDLE -> "Type or hold to dictate"
-                                            DictationPhase.RECORDING -> "Release to transcribe; move out to cancel"
-                                            DictationPhase.TRANSCRIBING -> "Transcribing..."
-                                        },
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (dictating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Box(Modifier.alpha(if (dictating) 0f else 1f)) { field() }
-                                }
-                            },
-                        )
+                        }
                     }
                 }
-                val sendLabel = localizeUiText(when {
-                    state.isSending -> "Cancel"
-                    dictating -> "Cancel dictation"
-                    else -> "Send"
-                })
-                FilledIconButton(
-                    onClick = when {
-                        state.isSending -> onCancel
-                        dictating -> onCancelDictation
-                        else -> send
-                    },
-                    enabled = state.isSending || dictating || canSend,
-                    modifier = Modifier.size(48.dp).semantics { contentDescription = sendLabel },
+                Surface(
+                    modifier = Modifier.fillMaxWidth().testTag("conversation-composer"),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(28.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (dictating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                    ),
                 ) {
-                    ToolGlyphIcon(when {
-                        state.isSending -> ToolGlyph.STOP
-                        dictating -> ToolGlyph.CLOSE
-                        else -> ToolGlyph.SEND
-                    }, Modifier.size(20.dp))
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier.weight(1f).testTag("dictation-input")
+                                .holdToDictate(
+                                    enabled = !state.isSending,
+                                    onStart = { keyboard?.hide(); onStartDictation() },
+                                    onFinish = onFinishDictation,
+                                    onCancel = onCancelDictation,
+                                )
+                                .semantics {
+                                    customActions = when (state.dictation) {
+                                        DictationPhase.IDLE -> if (!state.isSending) {
+                                            listOf(CustomAccessibilityAction(localizeUiText("Start dictation")) { onStartDictation(); true })
+                                        } else emptyList()
+                                        DictationPhase.RECORDING -> listOf(
+                                            CustomAccessibilityAction(localizeUiText("Finish dictation")) { onFinishDictation(); true },
+                                            CustomAccessibilityAction(localizeUiText("Cancel dictation")) { onCancelDictation(); true },
+                                        )
+                                        DictationPhase.TRANSCRIBING -> listOf(
+                                            CustomAccessibilityAction(localizeUiText("Cancel dictation")) { onCancelDictation(); true },
+                                        )
+                                    } + if (state.quickEntry && !dictating) {
+                                        listOf(CustomAccessibilityAction(localizeUiText("Show conversation history")) { onShowHistory(); true })
+                                    } else emptyList()
+                                },
+                        ) {
+                            CompositionLocalProvider(LocalViewConfiguration provides typingConfiguration) {
+                                BasicTextField(
+                                    value = input,
+                                    onValueChange = onDraftChange,
+                                    modifier = Modifier.fillMaxWidth().testTag("conversation-input"),
+                                    enabled = !state.isSending && !voiceState.isListening && !dictating,
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                    keyboardActions = KeyboardActions(onSend = { send() }),
+                                    decorationBox = { field ->
+                                        Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                                            if (input.isEmpty() || dictating) Text(
+                                                when (state.dictation) {
+                                                    DictationPhase.IDLE -> if (state.quickEntry) {
+                                                        "Type, hold to talk, swipe down for history"
+                                                    } else "Type or hold to dictate"
+                                                    DictationPhase.RECORDING -> "Release to transcribe; move out to cancel"
+                                                    DictationPhase.TRANSCRIBING -> "Transcribing..."
+                                                },
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = if (dictating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            Box(Modifier.alpha(if (dictating) 0f else 1f)) { field() }
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                        val sendLabel = localizeUiText(when {
+                            state.isSending -> "Cancel"
+                            dictating -> "Cancel dictation"
+                            else -> "Send"
+                        })
+                        FilledIconButton(
+                            onClick = when {
+                                state.isSending -> onCancel
+                                dictating -> onCancelDictation
+                                else -> send
+                            },
+                            enabled = state.isSending || dictating || canSend,
+                            modifier = Modifier.size(48.dp).semantics { contentDescription = sendLabel },
+                        ) {
+                            ToolGlyphIcon(when {
+                                state.isSending -> ToolGlyph.STOP
+                                dictating -> ToolGlyph.CLOSE
+                                else -> ToolGlyph.SEND
+                            }, Modifier.size(20.dp))
+                        }
+                    }
                 }
-            }
-        }
+            },
+        )
     }
 }
 

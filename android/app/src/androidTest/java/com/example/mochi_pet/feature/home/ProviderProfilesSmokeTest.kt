@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -25,6 +26,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.mutableStateOf
 import androidx.activity.compose.setContent
@@ -55,7 +57,7 @@ class ProviderProfilesSmokeTest {
     }
 
     @Test fun holdGestureFinalizesAndCancelsWithoutRecordingOrSending() {
-        val state = mutableStateOf(ConversationUiState(draft = "Existing draft"))
+        val state = mutableStateOf(ConversationUiState(draft = "Existing draft", quickEntry = true))
         var started = 0
         var finished = 0
         var cancelled = 0
@@ -64,6 +66,7 @@ class ProviderProfilesSmokeTest {
                 MochiTheme {
                     ConversationSurface(
                         state = state.value, providerReady = true, voiceState = VoiceRuntimeState(),
+                        onShowHistory = { state.value = state.value.copy(quickEntry = false) },
                         onSend = { error("Gesture must not send") }, onCancel = {},
                         onDraftChange = { state.value = state.value.copy(draft = it) },
                         onStartDictation = { started++; state.value = state.value.copy(dictation = DictationPhase.RECORDING) },
@@ -77,6 +80,7 @@ class ProviderProfilesSmokeTest {
         compose.onNodeWithTag("dictation-input").performTouchInput { longClick() }
         assertEquals(1, started)
         assertEquals(1, finished)
+        assertTrue(state.value.quickEntry)
         compose.onNodeWithTag("dictation-input").performTouchInput {
             down(center)
             advanceEventTime(700)
@@ -88,6 +92,9 @@ class ProviderProfilesSmokeTest {
         assertEquals("Existing draft", state.value.draft)
         compose.onNodeWithTag("conversation-input").assertIsEnabled().performTextInput(" typed")
         assertTrue(state.value.draft.contains("typed"))
+        Espresso.closeSoftKeyboard()
+        compose.onNodeWithTag("conversation-layout").performTouchInput { swipeDown() }
+        assertEquals(false, state.value.quickEntry)
     }
 
     @Test fun compactComposerAndCapabilityPagesRemainReachableWithoutSending() {
@@ -216,6 +223,52 @@ class ProviderProfilesSmokeTest {
         assertEquals(before, filters.getUnclippedBoundsInRoot())
     }
 
+    @Test fun externalReturnCentersIdleChatButPauseAndInternalNavigationDoNot() {
+        compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        if (compose.onAllNodesWithText(localizeUiText("Settings")).fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithText(localizeUiText("Settings")).performClick()
+        }
+        compose.onNode(hasText("Mochi") and hasClickAction()).performClick()
+        compose.onNode(hasText(localizeUiText("Chat")) and hasClickAction()).performClick()
+        fun historyAvailable() = compose.onAllNodes(hasTestTag("dictation-input")).fetchSemanticsNodes()
+            .singleOrNull()?.config?.get(SemanticsActions.CustomActions)
+            ?.any { it.label == localizeUiText("Show conversation history") } == true
+        assertEquals(false, historyAvailable())
+        val bottom = compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top
+        compose.onNodeWithTag("conversation-input").performTextInput("Synthetic return draft")
+        Espresso.closeSoftKeyboard()
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.STARTED)
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        assertEquals(false, historyAvailable())
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        compose.waitUntil(10_000) { historyAvailable() }
+        assertTrue(compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top < bottom)
+        compose.activityRule.scenario.recreate()
+        assertTrue(historyAvailable())
+        compose.onNodeWithTag("conversation-layout").performTouchInput { swipeDown() }
+        assertEquals(false, historyAvailable())
+        assertEquals("Synthetic return draft", compose.onNodeWithTag("conversation-input").fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text)
+        compose.activityRule.scenario.recreate()
+        assertEquals(false, historyAvailable())
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        compose.waitUntil(10_000) { historyAvailable() }
+        compose.onNodeWithText(localizeUiText("Tasks")).performClick()
+        compose.onNodeWithText(localizeUiText("Close")).performClick()
+        assertEquals(false, historyAvailable())
+        compose.onNodeWithTag("conversation-input").performTextClearance()
+        Espresso.closeSoftKeyboard()
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        compose.onNodeWithText(localizeUiText("Type, hold to talk, swipe down for history")).assertIsDisplayed()
+        compose.onNodeWithTag("conversation-entry-logo").assertIsDisplayed()
+        compose.onNodeWithTag("conversation-history-hint").assertDoesNotExist()
+        compose.onNodeWithTag("conversation-layout").performTouchInput { swipeDown() }
+        compose.onNodeWithText(localizeUiText("Type or hold to dictate")).assertIsDisplayed()
+    }
+
     @Test fun chatMuteSurvivesActivityRecreationWithoutChangingOtherPreferences() {
         val app = compose.activity.application as MochiApplication
         val repository = app.agentSettingsRepository
@@ -243,9 +296,12 @@ class ProviderProfilesSmokeTest {
             compose.waitUntil(10_000) {
                 compose.onNodeWithContentDescription(restoredLabel).isDisplayed()
             }
-            assertEquals(before.copy(chatMuted = !before.chatMuted), runBlocking(Dispatchers.IO) { repository.load() })
+            assertEquals(before.copy(chatMuted = !before.chatMuted, companionMode = false), runBlocking(Dispatchers.IO) { repository.load() })
         } finally {
-            runBlocking(Dispatchers.IO) { repository.setChatMuted(before.chatMuted) }
+            runBlocking(Dispatchers.IO) {
+                repository.setChatMuted(before.chatMuted)
+                repository.setCompanionMode(before.companionMode)
+            }
             compose.activityRule.scenario.recreate()
         }
     }

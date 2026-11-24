@@ -45,7 +45,7 @@ ordinary commands run in the background without switching away from Mochi.
 - Bottom navigation has **Mochi / Planner / Skills / Tools**. Mochi contains
   **Chat / Companion** (Chinese: **对话 / 陪伴**), selected in the compact header.
   Both modes share conversation history and tasks. Returning to Mochi restores
-  the last selected mode within the activity's saved state.
+  the last selected mode, including after the app process is killed.
 - Companion's **Full screen** display option hides navigation and system chrome,
   keeps the screen awake, and dedicates the display to the Home presentation.
   It is a display option, not a third interaction mode.
@@ -81,6 +81,13 @@ Chat supports text and hold-to-dictate in the same one-line composer: tap to
 type; long-press even an existing draft to record; release to fill/append recognized
 text, or move outside to cancel without changing the draft. There is no microphone
 button. Dictation never invokes the Agent or sends a message; Send is explicit.
+An external foreground entry into idle Chat centers the composer and temporarily
+hides history. The empty input includes the swipe-down hint, without a separate
+prompt underneath. Swipe down, use the accessibility history action, or send to return to normal
+Chat with a short transition. Drafts and history are preserved. In-app navigation
+and returns during an active reply use normal Chat. A cold start restores the
+persisted mode: Chat opens central entry, Companion opens its usual home view.
+First installation still defaults to Companion.
 Chat also has a persistent mute control beside the mode selector, away from
 the composer. It stops current reply playback and suppresses subsequent Chat
 replies, without muting Companion,

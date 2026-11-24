@@ -13,12 +13,15 @@ data class AgentSettings(
     val focusStandbyDelaySeconds: Int =
         DEFAULT_FOCUS_STANDBY_DELAY_SECONDS,
     val chatMuted: Boolean = false,
+    val companionMode: Boolean = true,
 )
 
 interface AgentSettingsRepository {
     suspend fun load(): AgentSettings
 
     suspend fun setChatMuted(muted: Boolean): AgentSettings
+
+    suspend fun setCompanionMode(companion: Boolean): AgentSettings
 
     suspend fun setRecentConversationTurns(turns: Int): AgentSettings
 
@@ -34,6 +37,7 @@ class DataStoreAgentSettingsRepository(
     override suspend fun load(): AgentSettings {
         val preferences = dataStore.data.first()
         return AgentSettings(
+            companionMode = preferences[COMPANION_MODE] ?: true,
             chatMuted = preferences[CHAT_MUTED] ?: false,
             recentConversationTurns = preferences[RECENT_TURNS]
                 ?.coerceIn(
@@ -74,6 +78,11 @@ class DataStoreAgentSettingsRepository(
         return load()
     }
 
+    override suspend fun setCompanionMode(companion: Boolean): AgentSettings {
+        dataStore.edit { it[COMPANION_MODE] = companion }
+        return load()
+    }
+
     override suspend fun setFocusStandby(
         enabled: Boolean,
         delaySeconds: Int,
@@ -90,6 +99,7 @@ class DataStoreAgentSettingsRepository(
     }
 
     private companion object {
+        val COMPANION_MODE = booleanPreferencesKey("display.companion_mode")
         val CHAT_MUTED = booleanPreferencesKey("speech.chat_muted")
         val RECENT_TURNS = intPreferencesKey("agent.recent_conversation_turns")
         val FOCUS_STANDBY_ENABLED =

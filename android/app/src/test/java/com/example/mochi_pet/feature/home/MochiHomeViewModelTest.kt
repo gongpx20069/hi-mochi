@@ -73,6 +73,137 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MochiHomeViewModelTest {
+    @Test fun `cold startup restores the persisted mode without an Activity saved state`() = kotlinx.coroutines.runBlocking {
+        val settings = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        fun create() = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        create().navigate(MochiNavigationIntent.ShowConversation)
+        val restarted = create()
+        restarted.onAppVisibilityChanged(true)
+        assertEquals(MochiSurface.Conversation, restarted.surface.value)
+        assertTrue(restarted.conversationState.value.quickEntry)
+        restarted.navigate(MochiNavigationIntent.ShowTools)
+        restarted.openMochi()
+        assertFalse(restarted.conversationState.value.quickEntry)
+        restarted.navigate(MochiNavigationIntent.ShowFace)
+        val companion = create()
+        assertEquals(MochiSurface.Face, companion.surface.value)
+        assertFalse(companion.conversationState.value.quickEntry)
+    }
+
+    @Test fun `late mode loading does not override an incoming destination`() = kotlinx.coroutines.runBlocking {
+        val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        base.setCompanionMode(false)
+        val loaded = CompletableDeferred<Unit>()
+        val settings = object : com.example.mochi_pet.core.settings.AgentSettingsRepository by base {
+            override suspend fun load(): com.example.mochi_pet.core.settings.AgentSettings {
+                loaded.await()
+                return base.load()
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowTools)
+        loaded.complete(Unit)
+        assertEquals(MochiSurface.Tools, viewModel.surface.value)
+        viewModel.openMochi()
+        assertEquals(MochiSurface.Conversation, viewModel.surface.value)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+    }
+
+    @Test fun `mode writes stay ordered when a previous save is slow`() = kotlinx.coroutines.runBlocking {
+        val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        val firstWrite = CompletableDeferred<Unit>()
+        val settings = object : com.example.mochi_pet.core.settings.AgentSettingsRepository by base {
+            override suspend fun setCompanionMode(companion: Boolean): com.example.mochi_pet.core.settings.AgentSettings {
+                if (!companion) firstWrite.await()
+                return base.setCompanionMode(companion)
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        firstWrite.complete(Unit)
+        assertTrue(base.load().companionMode)
+    }
+
+    @Test fun `mode save failure keeps the current selection and reports the failure`() {
+        val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
+            com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),
+        )
+        val settings = object : com.example.mochi_pet.core.settings.AgentSettingsRepository by base {
+            override suspend fun setCompanionMode(companion: Boolean): com.example.mochi_pet.core.settings.AgentSettings {
+                throw java.io.IOException("Synthetic storage failure")
+            }
+        }
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), agentSettingsRepository = settings,
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        assertEquals(MochiSurface.Conversation, viewModel.surface.value)
+        assertTrue(viewModel.conversationState.value.errorMessage!!.contains("only to this session"))
+    }
+
+    @Test fun `only a fresh foreground entry into idle Chat centers the preserved draft`() {
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(),
+            savedStateHandle = SavedStateHandle(mapOf("mochi_companion" to false)),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.updateConversationDraft("Keep draft")
+        viewModel.onAppVisibilityChanged(true)
+        assertTrue(viewModel.conversationState.value.quickEntry)
+        viewModel.showConversationHistory()
+        viewModel.onAppVisibilityChanged(true)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        viewModel.navigate(MochiNavigationIntent.ShowFace)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        viewModel.onAppVisibilityChanged(false)
+        viewModel.onAppVisibilityChanged(true)
+        assertTrue(viewModel.conversationState.value.quickEntry)
+        assertEquals("Keep draft", viewModel.conversationState.value.draft)
+        viewModel.navigate(MochiNavigationIntent.ShowConversation)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        viewModel.onAppVisibilityChanged(false)
+        viewModel.onAppVisibilityChanged(true, allowQuickEntry = false)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+    }
+
+    @Test fun `returning during an Agent reply stays normal after it finishes`() {
+        val reply = CompletableDeferred<AgentReply>()
+        val viewModel = MochiHomeViewModel(
+            plannerStore = PlannerStoreFake(), providerSettingsRepository = ProviderSettingsRepositoryFake(),
+            agentRunnerBuilder = { _, _, _ -> AgentRunner { reply.await() } },
+            savedStateHandle = SavedStateHandle(mapOf("mochi_companion" to false)),
+            ioDispatcher = Dispatchers.Unconfined, mainDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.onAppVisibilityChanged(true)
+        assertTrue(viewModel.conversationState.value.quickEntry)
+        viewModel.sendConversation("Question")
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        viewModel.onAppVisibilityChanged(false)
+        viewModel.onAppVisibilityChanged(true)
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        reply.complete(AgentReply("Answer", "neutral"))
+        assertFalse(viewModel.conversationState.value.quickEntry)
+        assertEquals("Answer", viewModel.conversationState.value.messages.last().text)
+    }
+
     @Test fun `mute save failure stays explicit and unrelated settings preserve the session choice`() {
         val base = com.example.mochi_pet.core.settings.DataStoreAgentSettingsRepository(
             com.example.mochi_pet.core.settings.SpeechPreferencesDataStore(),

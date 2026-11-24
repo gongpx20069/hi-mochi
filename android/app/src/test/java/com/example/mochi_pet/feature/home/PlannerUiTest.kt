@@ -174,6 +174,31 @@ class PlannerUiTest {
         compose.onNodeWithText("Evening walk").assertIsDisplayed()
     }
 
+    @Test fun `a short horizontal drag moves dated content then settles without moving the calendar`() {
+        val today = LocalDate.of(2026, 11, 9)
+        var changes = 0
+        compose.setContent { MochiTheme {
+            PlannerAgenda(today, today, false, PlannerSurfaceState(date = today),
+                { changes++ }, {}, {}, actions(), {}, {}, {}, { _, _ -> })
+        } }
+        val calendar = compose.onNodeWithTag("agenda-filters")
+        val heading = compose.onNodeWithText("Nov 9 · Monday")
+        val initial = heading.fetchSemanticsNode().boundsInRoot
+        val calendarBounds = calendar.fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("planner-agenda").performTouchInput {
+            down(center)
+            moveTo(center + Offset(45f, 0f))
+        }
+        compose.mainClock.advanceTimeBy(32)
+        assertTrue("Dated heading should follow the drag: $initial -> ${heading.fetchSemanticsNode().boundsInRoot}",
+            heading.fetchSemanticsNode().boundsInRoot.left > initial.left)
+        assertEquals(calendarBounds, calendar.fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithTag("planner-agenda").performTouchInput { up() }
+        compose.mainClock.advanceTimeBy(1000)
+        assertEquals(initial, heading.fetchSemanticsNode().boundsInRoot)
+        assertEquals(0, changes)
+    }
+
     @Test fun `initial date load does not briefly report an empty day`() {
         val date = LocalDate.of(2026, 11, 9)
         var state by mutableStateOf(PlannerSurfaceState(isLoading = true))

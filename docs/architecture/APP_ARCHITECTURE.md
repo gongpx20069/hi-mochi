@@ -203,7 +203,19 @@ Android `Context`, JSON maps, or navigation controllers through domain APIs.
   [Memory design](MEMORY_DESIGN.md#1-current-design).
 - The Home ViewModel owns the unsent Chat draft, dictation phase and callback
   generation. Recognition only updates the draft, never the Agent/history.
-  `SavedStateHandle` remembers Chat/Companion selection within the activity.
+  It also owns transient Chat quick-entry state. MainActivity supplies buffered
+  start/stop events, excluding configuration stops; pause/resume alone is not
+  an external return. The ViewModel checks current surface and activity at the
+  foreground edge, and UI overlays can veto quick entry. Revealing history
+  moves one composer node without replacing its field, draft or recognition
+  session. Internal navigation and sending clear quick entry.
+  Agent settings DataStore persists Chat/Companion selection; a serialized,
+  conflated writer preserves the latest selection during rapid switches.
+  `SavedStateHandle` retains the current activity's selection and takes priority
+  over disk at restoration. Startup resolves the mode before rendering or
+  allowing Companion wake capture, without replacing an incoming navigation
+  intent. A fresh process restoring Chat starts in quick entry; drafts remain
+  transient and conversation history uses its existing persistent store.
   The resumed UI supplies Companion visibility to `WakeRuntime`; the runtime
   and capture service independently enforce visibility and unlocked screen
   state without rewriting the saved wake preference.

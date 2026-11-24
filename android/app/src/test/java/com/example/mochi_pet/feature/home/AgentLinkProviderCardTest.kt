@@ -117,19 +117,14 @@ class AgentLinkProviderCardTest {
             }
         }
 
+        compose.onNodeWithText("Connection settings").performScrollTo().performClick()
         val connect = compose.onNodeWithText("Connect/Open AgentLink")
         val refresh = compose.onNodeWithText("Refresh")
         connect.assertIsDisplayed().performClick()
         refresh.assertIsDisplayed().performClick()
-        assertTrue(
-            "Refresh should wrap below Connect on a 240dp card: " +
-                "${connect.fetchSemanticsNode().boundsInRoot}, " +
-                "${refresh.fetchSemanticsNode().boundsInRoot}",
-            refresh.fetchSemanticsNode().boundsInRoot.top >=
-                connect.fetchSemanticsNode().boundsInRoot.bottom,
-        )
         compose.onNodeWithText("Connection settings").performScrollTo().performClick()
         compose.onNodeWithText("Manage access").performScrollTo().performClick()
+        compose.onNodeWithText("Connection settings").performScrollTo().performClick()
         compose.onNodeWithText("Revoke").performScrollTo().performClick()
         compose.onNodeWithText("Linked remote chats · refresh via tools").performScrollTo().performClick()
         compose.onNodeWithText("Test chat").performScrollTo().performClick()

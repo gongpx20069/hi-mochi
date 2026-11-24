@@ -40,24 +40,28 @@ internal fun WebdavProviderCard(summary: ExtensionProviderSummary, disabled: Boo
         Text("Browse a scoped WebDAV folder. File content may go to your model Provider. Foreground conversations only.")
         Text("Read-only by default. Writing, deletion and file transfer require separate Tool switches.")
         summary.detail?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        when {
-            !summary.installed || !summary.trusted ->
-                CapabilityAction({ onAction(WebdavUiAction.Install) }, enabled = !disabled, emphasized = true) { Text("Install extension") }
-            !summary.connected ->
-                CapabilityAction({ onAction(WebdavUiAction.Configure) }, enabled = !disabled, emphasized = true) { Text("Connect WebDAV") }
-            !summary.enabled ->
-                CapabilityAction({ onAction(WebdavUiAction.EnableWithSkill) }, enabled = !disabled, emphasized = true) { Text("Enable tools and Skill") }
-        }
-        if (summary.trusted) {
-            if (summary.connected) TextButton({ onAction(WebdavUiAction.Configure) }, enabled = !disabled) {
+        ToolConnectionRow(
+            hasConnection = summary.trusted && (summary.connected || summary.status == "error" || summary.detail != null),
+            connectLabel = if (!summary.installed || !summary.trusted) "Install extension" else "Connect WebDAV",
+            detail = when {
+                !summary.installed -> "Optional extension · not installed"
+                !summary.trusted -> "Installed package could not be trusted"
+                summary.connected && !summary.enabled -> "Connected - not enabled"
+                summary.connected -> "Connected"
+                else -> "Installed · connection required"
+            },
+            enabled = !disabled, tag = "webdav-connection",
+            onConnect = { onAction(if (!summary.installed || !summary.trusted) WebdavUiAction.Install else WebdavUiAction.Configure) },
+        ) { close ->
+            TextButton({ close(); onAction(WebdavUiAction.Configure) }, enabled = !disabled) {
                 Text("Connection and files")
             }
-            if (summary.connected || summary.status == "error" || summary.detail != null) {
-                TextButton({ disconnect = true }, enabled = !disabled) { Text("Disconnect") }
-                if (summary.enabled) TextButton({ onAction(WebdavUiAction.EnableWithSkill) }, enabled = !disabled) {
+            if (summary.connected) {
+                CapabilityAction({ close(); onAction(WebdavUiAction.EnableWithSkill) }, enabled = !disabled, emphasized = true) {
                     Text("Enable tools and Skill")
                 }
             }
+            TextButton({ close(); disconnect = true }, enabled = !disabled) { Text("Disconnect") }
         }
         if (summary.tools.isNotEmpty()) {
             TextButton({ expanded = !expanded }) { Text(if (expanded) "Hide tools" else "Show tools") }

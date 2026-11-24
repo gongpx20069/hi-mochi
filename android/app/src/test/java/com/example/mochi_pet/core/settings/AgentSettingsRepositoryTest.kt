@@ -10,6 +10,19 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class AgentSettingsRepositoryTest {
+    @Test fun `selected mode survives recreation and unrelated preference updates`() = runBlocking {
+        val store = TestPreferencesDataStore()
+        val first = DataStoreAgentSettingsRepository(store)
+        first.setCompanionMode(false)
+        first.setChatMuted(true)
+        first.setRecentConversationTurns(35)
+        first.setFocusStandby(false, 300)
+        val recreated = DataStoreAgentSettingsRepository(store)
+        assertEquals(AgentSettings(35, false, 300, true, false), recreated.load())
+        recreated.setCompanionMode(true)
+        assertEquals(AgentSettings(35, false, 300, true, true), first.load())
+    }
+
     @Test fun `chat mute survives repository recreation without changing other preferences`() = runBlocking {
         val store = TestPreferencesDataStore()
         val first = DataStoreAgentSettingsRepository(store)

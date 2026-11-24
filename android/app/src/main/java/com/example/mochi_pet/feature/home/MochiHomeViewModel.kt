@@ -218,6 +218,7 @@ data class ConversationUiState(
     val remoteTasks: List<FollowedAgentLinkTask> = emptyList(),
     val draft: String = "",
     val dictation: DictationPhase = DictationPhase.IDLE,
+    val quickEntry: Boolean = false,
 )
 
 enum class DictationPhase { IDLE, RECORDING, TRANSCRIBING }
@@ -401,6 +402,9 @@ class MochiHomeViewModel(
     private var endedVoiceInteractionVersion: Long? = null
     private var voiceInteraction = false
     private var replyPlaybackVersion = 0L
+    private var appWasAway = true
+    private var navigationVersion = 0L
+    private val companionModeChanges = kotlinx.coroutines.channels.Channel<Boolean>(kotlinx.coroutines.channels.Channel.CONFLATED)
     private var dictationVersion = 0L
     private var dictationStarted = false
     private var pendingDictation: String? = null
@@ -496,6 +500,19 @@ class MochiHomeViewModel(
             ?: unavailableLocationPermissionRequest.asStateFlow()
 
     init {
+        agentSettingsRepository?.let { repository ->
+            viewModelScope.launch(ioDispatcher) {
+                for (companion in companionModeChanges) {
+                    try {
+                        repository.setCompanionMode(companion)
+                    } catch (_: IOException) {
+                        val message = "Could not save Mochi mode. This choice applies only to this session."
+                        mutableAgentSettingsState.update { it.copy(feedback = message) }
+                        mutableConversationState.update { it.copy(errorMessage = message) }
+                    }
+                }
+            }
+        }
         viewModelScope.launch(ioDispatcher) {
             kotlinx.coroutines.flow.merge(plannerStore.changes, agentScheduleStore?.changes ?: kotlinx.coroutines.flow.emptyFlow())
                 .collect {
@@ -729,10 +746,16 @@ class MochiHomeViewModel(
             return
         }
         val target = MochiNavigationReducer.reduce(intent, mutableSurface.value)
+        navigationVersion++
+        showConversationHistory()
         if (target != mutableSurface.value) cancelDictation()
         if (!target.isHomePresentation()) setCompanionVisible(false)
-        if (target.isHomePresentation()) savedStateHandle["mochi_companion"] = true
-        if (target == MochiSurface.Conversation) savedStateHandle["mochi_companion"] = false
+        if (target.isHomePresentation() || target == MochiSurface.Conversation) {
+            val companion = target.isHomePresentation()
+            savedStateHandle["mochi_companion"] = companion
+            mutableAgentSettingsState.update { it.copy(settings = it.settings.copy(companionMode = companion)) }
+            if (agentSettingsRepository != null) companionModeChanges.trySend(companion)
+        }
         if (target != mutableSurface.value) cancelExtensionDownload()
         if (!target.isHomePresentation()) savedStateHandle["focus_mode"] = false
         if (target != MochiSurface.Settings) stopVoicePreview()
@@ -765,6 +788,25 @@ class MochiHomeViewModel(
 
     fun updateConversationDraft(text: String) {
         mutableConversationState.update { it.copy(draft = text) }
+    }
+
+    fun onAppVisibilityChanged(visible: Boolean, allowQuickEntry: Boolean = true) {
+        if (!visible) {
+            appWasAway = true
+            return
+        }
+        if (appWasAway) {
+            val idle = !mutablePipelineState.value.isActive && !voiceState.value.isListening
+            mutableConversationState.update {
+                it.copy(quickEntry = allowQuickEntry && mutableSurface.value == MochiSurface.Conversation &&
+                    idle && !it.isSending && it.dictation == DictationPhase.IDLE)
+            }
+        }
+        appWasAway = false
+    }
+
+    fun showConversationHistory() {
+        mutableConversationState.update { it.copy(quickEntry = false) }
     }
 
     fun startDictation() {
@@ -1067,6 +1109,7 @@ class MochiHomeViewModel(
         if (trimmed.isEmpty()) {
             return
         }
+        showConversationHistory()
         val settingsRepository = providerSettingsRepository
         val runnerBuilder = agentRunnerBuilder
         if (settingsRepository == null || runnerBuilder == null) {
@@ -2787,11 +2830,22 @@ class MochiHomeViewModel(
                 AgentSettings() to
                     "Could not load Agent settings; using defaults"
             }
-            mutableAgentSettingsState.value = AgentSettingsUiState(
-                settings = settings,
-                isLoading = false,
-                feedback = settingsFeedback,
-            )
+            withContext(mainDispatcher) {
+                val companion = savedStateHandle.get<Boolean>("mochi_companion") ?: settings.companionMode
+                savedStateHandle["mochi_companion"] = companion
+                if (navigationVersion == 0L) {
+                    mutableSurface.value = if (companion) MochiSurface.Face else MochiSurface.Conversation
+                    mutableConversationState.update {
+                        it.copy(quickEntry = !companion && !it.isSending &&
+                            !mutablePipelineState.value.isActive && it.dictation == DictationPhase.IDLE)
+                    }
+                }
+                mutableAgentSettingsState.value = AgentSettingsUiState(
+                    settings = settings.copy(companionMode = companion),
+                    isLoading = false,
+                    feedback = settingsFeedback,
+                )
+            }
             loadPersistedConversation(settings.recentConversationTurns)
             personaRepository?.let { repository ->
                 loadPersona(repository)

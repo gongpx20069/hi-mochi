@@ -29,6 +29,7 @@ internal fun Modifier.holdToDictate(
                     val event = awaitPointerEvent(PointerEventPass.Initial)
                     val change = event.changes.firstOrNull { it.id == down.id }
                     pressed = event.changes.size == 1 && change != null && change.pressed &&
+                        (change.position - down.position).getDistance() <= viewConfiguration.touchSlop &&
                         change.position.x in 0f..size.width.toFloat() &&
                         change.position.y in 0f..size.height.toFloat()
                 }

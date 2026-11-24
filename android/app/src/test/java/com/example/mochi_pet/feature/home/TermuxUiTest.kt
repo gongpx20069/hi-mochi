@@ -40,7 +40,8 @@ class TermuxUiTest {
                 )
             }
         }
-        compose.onNodeWithText("Connection settings").performClick()
+        compose.onNodeWithText("Connection settings").assertExists()
+        compose.onNodeWithText("Disconnect").assertDoesNotExist()
         compose.onNodeWithText("Background Shell authorization").assertDoesNotExist()
         compose.onNodeWithText("Allow Termux command?").assertDoesNotExist()
         compose.onNodeWithText("Enabled commands run automatically for conversations, Scheduled Agents, and Subagents. Output may go to your model Provider.").assertExists()

@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val voiceTriggers = Channel<VoiceInputTrigger>(Channel.BUFFERED)
+    private val appVisibility = Channel<Boolean>(Channel.BUFFERED)
     private val oauthCallbacks = Channel<String>(Channel.BUFFERED)
     private val providerShareCallbacks = Channel<String>(Channel.BUFFERED)
     private val agentLinkResults = Channel<AgentLinkAuthorizationResult>(Channel.BUFFERED)
@@ -68,6 +69,7 @@ class MainActivity : AppCompatActivity() {
                     voiceRuntime = application.voiceRuntime,
                     wakeRuntime = application.wakeRuntime,
                     voiceTriggers = voiceTriggers.receiveAsFlow(),
+                    appVisibility = appVisibility.receiveAsFlow(),
                     oauthCallbacks = oauthCallbacks.receiveAsFlow(),
                     providerShareCallbacks =
                         providerShareCallbacks.receiveAsFlow(),
@@ -122,6 +124,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        appVisibility.trySend(true)
         ContextCompat.registerReceiver(
             this,
             wakeTriggerReceiver,
@@ -131,6 +134,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        if (!isChangingConfigurations) appVisibility.trySend(false)
         unregisterReceiver(wakeTriggerReceiver)
         super.onStop()
     }
@@ -161,6 +165,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        appVisibility.close()
         voiceTriggers.close()
         oauthCallbacks.close()
         providerShareCallbacks.close()

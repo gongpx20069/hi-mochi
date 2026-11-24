@@ -14,8 +14,9 @@
 Bottom navigation is **Mochi / Planner / Skills / Tools**. The Mochi header
 switches **Chat / Companion** (**对话 / 陪伴**); Face and its information cards
 belong to Companion, and Conversation belongs to Chat. Both share history and
-tasks. Returning from another destination restores the selected mode. This is
-activity saved state, not a separate durable mode preference.
+tasks. Returning from another destination restores the selected mode. Selection
+also persists across process death; cold-start Chat opens central entry, while
+Companion opens its usual home view. First installation defaults to Companion.
 
 Mochi remains visible as a compact companion where space permits, but planner
 content takes priority when the selected surface requires reading or editing.
@@ -341,6 +342,30 @@ mistaken for a recording control; its space remains reserved in Companion.
 Muting stops current playback without cancelling the Agent or changing the
 draft; Companion, dictation and voice previews are unaffected.
 
+Returning from outside the app into idle Chat opens a quiet quick-entry view:
+the same one-line composer sits in the center, with a small Mochi logo above it.
+The logo fades away when history opens. Its empty placeholder combines
+**点击输入 · 长按说话 · 下滑历史**, without a separate hint below the field.
+Tap to type and hold/release to dictate still work;
+the draft is never cleared by changing presentation. A downward swipe reveals
+history and smoothly moves that same input to the bottom, restoring its normal
+placeholder. A custom accessibility action also exposes history, including when
+a draft hides the placeholder.
+Sending also restores normal Chat. Switching from Companion or another in-app
+page opens normal Chat, not quick entry. A keyboard, a pause-only permission
+dialog, or configuration recreation does not count as an external return.
+Returning during Agent work, listening, dictation, reply playback or a covering
+workflow keeps the normal view; finishing that work does not later recenter it.
+
+Provider and extension connections use the same rounded settings blocks as
+Player access, with status text and a chevron. An unconnected block opens its
+existing install/configuration/authorization flow. A configured block opens a
+scrollable connection-management sheet with a pinned Close action. Configure,
+scope management, disconnect/revoke and manual-server removal live there,
+preserving existing trust gates and disconnection confirmations. The provider
+and individual Tool switches remain on the card; opening management does not
+change authorization, enablement or credentials.
+
 The Tools surface orders **Agent Browser**, **App Control**, **Media Control**,
 then **Amap Maps**, outside **Mochi Built-ins**. App Control has five Tools and
 Media Control has four, each with its own master switch and collapsed child
@@ -425,6 +450,10 @@ content with an explicit error, never presenting old entries under a new date.
 Swipe left/right across the agenda to select the next/previous day, including
 across month boundaries. Each deliberate horizontal swipe changes one day;
 short drags, vertical scrolling and the filter strip's own scrolling do not.
+While dragging, only the dated heading/cards follow the finger with a small,
+bounded displacement; releasing or cancelling smoothly settles them back.
+The calendar and filters stay fixed, including for a swipe below the day-change
+threshold. Loading still retains the correctly dated snapshot.
 A return-to-today shortcut appears only away from today. All/My schedule/Mochi
 tasks/Journal chips filter the selected date, and a single New button opens a
 two-choice sheet. A secondary-text hint below its choices explains that users

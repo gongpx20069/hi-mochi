@@ -4,6 +4,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -22,6 +25,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
@@ -82,6 +87,15 @@ internal fun PlannerAgenda(
         onRemove = { editTask?.let { onRemove(it.id) } }, onDismiss = { taskEditor = false })
     val rows = remember(state, filter) { agendaRows(state, filter) }
     val contentDate = state.date ?: date
+    var dragging by remember { mutableStateOf(false) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val maxDragOffset = with(LocalDensity.current) { 48.dp.toPx() }
+    val motionOffset by animateFloatAsState(
+        if (dragging) dragOffset else 0f,
+        animationSpec = if (dragging) snap() else spring(dampingRatio = 1f, stiffness = 450f),
+        label = "agenda-swipe",
+    )
+    val dayMotion = Modifier.graphicsLayer { translationX = motionOffset }
     val selectDate by rememberUpdatedState(onDate)
     val showLoading by produceState(false, state.isLoading) {
         value = false
@@ -93,10 +107,15 @@ internal fun PlannerAgenda(
     LazyColumn(Modifier.fillMaxSize().testTag("planner-agenda").pointerInput(date) {
         var distance = 0f
         detectHorizontalDragGestures(
-            onDragStart = { distance = 0f },
-            onHorizontalDrag = { change, amount -> change.consume(); distance += amount },
-            onDragCancel = { distance = 0f },
+            onDragStart = { distance = 0f; dragOffset = motionOffset; dragging = true },
+            onHorizontalDrag = { change, amount ->
+                change.consume()
+                distance += amount
+                dragOffset = (dragOffset + amount * 0.22f).coerceIn(-maxDragOffset, maxDragOffset)
+            },
+            onDragCancel = { dragging = false },
             onDragEnd = {
+                dragging = false
                 if (distance > size.width * 0.2f) selectDate(date.minusDays(1))
                 else if (distance < -size.width * 0.2f) selectDate(date.plusDays(1))
             },
@@ -139,7 +158,7 @@ internal fun PlannerAgenda(
             }
         }
         item("day") {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(dayMotion.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 AnimatedContent(
                     contentDate, modifier = Modifier.weight(1f),
                     transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
@@ -158,17 +177,17 @@ internal fun PlannerAgenda(
         if (!state.isLoading || state.date != null) {
             if (filter == AgendaFilter.JOURNAL || (filter == AgendaFilter.ALL && contentDate < today)) {
                 item("journal:$contentDate") {
-                    Box(Modifier.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)
+                    Box(dayMotion.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)
                         .animateContentSize(tween(160))) { journalDay(contentDate, filter == AgendaFilter.JOURNAL) }
                 }
             }
             if (rows.isEmpty() && state.errorMessage == null && filter != AgendaFilter.JOURNAL) item("empty:$contentDate") {
-                Box(Modifier.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)) {
+                Box(dayMotion.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)) {
                     AgendaEmpty("No arrangements for this day")
                 }
             }
             items(rows, key = { "$contentDate:${it.key}" }) { row ->
-                Box(Modifier.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)) {
+                Box(dayMotion.animateItem(fadeInSpec = tween(160), fadeOutSpec = tween(120), placementSpec = null)) {
                     when (row) {
                         is AgendaRow.Event -> {
                             val event = row.value
