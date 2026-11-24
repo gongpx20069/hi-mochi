@@ -100,9 +100,15 @@ emulators for API 29 (Android 10) and API 35 (Android 15). The explicit
 allowlist covers connection/settings screens, REST/MCP editors, task-center
 navigation, local WebView semantic snapshots, and bundled synthetic wake-word
 audio. The emulator grants the app's requested runtime permissions at install,
-disables animations, and disconnects Wi-Fi/mobile data before execution to
-avoid live services and release-update dialogs. This setup is for disposable
-CI emulators, not a connected personal phone.
+disables animations, and disconnects Wi-Fi/mobile data before execution.
+Because radio toggles do not cover every emulator network transport, CI also
+uses root-capable Google APIs images to reject non-loopback IPv4/IPv6 traffic
+from the installed Mochi UID. The isolation script checks the emulator, UID,
+and both firewall rules before tests run; a failed setup fails the job.
+This keeps live release-update dialogs out of navigation tests without changing
+production update checks or dismissing unexpected dialogs in assertions.
+Loopback fixtures and adb remain available. This setup is for disposable
+CI emulators only, not a connected personal phone.
 
 The API 29 job installs a pinned official Chromium x86_64 WebView snapshot
 because the image's factory WebView does not support the browser's JavaScript.
