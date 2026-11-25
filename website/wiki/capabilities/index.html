@@ -1,271 +1,108 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Connect what you need. Grant only the access you trust.">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Choose Mochi skills and extensions, connect services, and understand their permissions.">
   <title>Skills, tools &amp; extensions · Mochi Wiki</title>
   <link rel="canonical" href="https://gongpx20069.github.io/hi-mochi/wiki/capabilities/">
   <link rel="alternate" hreflang="en" href="https://gongpx20069.github.io/hi-mochi/wiki/capabilities/">
   <link rel="alternate" hreflang="zh-CN" href="https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/capabilities/">
   <link rel="alternate" hreflang="x-default" href="https://gongpx20069.github.io/hi-mochi/wiki/capabilities/">
   <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../../styles.css">
-  <script src="../../scripts.js" defer></script>
+  <link rel="stylesheet" href="../../styles.css"><script src="../../scripts.js" defer></script>
 </head>
-<body class="wiki-page reference-page">
+<body class="wiki-page">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header" data-header><div class="nav-shell">
     <a class="brand" href="../../"><span class="brand-mark" aria-hidden="true"><span></span></span>Mochi</a>
     <nav class="mochi-nav" aria-label="Primary navigation" data-nav><a href="../../">Home</a><a href="../" aria-current="true">Wiki</a><a href="../../zh-CN/wiki/capabilities/" lang="zh-CN">中文</a></nav>
   </div></header>
-  <main id="main">
-    <div class="shell wiki-heading"><a class="text-link" href="../">Mochi Wiki</a><h1>Skills, tools &amp; extensions</h1><p>Connect what you need. Grant only the access you trust.</p>
+  <main class="shell wiki-frame" id="main">
+    <aside class="wiki-sidebar"><nav aria-label="Wiki"><a href="../">Overview</a><a href="../quick-start/">Quick start</a><a href="../models/">AI providers</a><a href="../speech/">Speech providers</a><a href="./" aria-current="page">Skills &amp; extensions</a></nav></aside>
+    <article class="wiki-article">
+      <header><a class="text-link" href="../">Mochi Wiki</a><h1>Skills, tools &amp; extensions</h1><p class="wiki-lede">Choose what you need, then expand its setup and permissions. Basic Mochi use does not require an extension.</p></header>
       <nav class="wiki-tabs" aria-label="On this page"><a href="#features">Built-in tools</a><a href="#extensions">Extensions</a><a href="#privacy">Privacy</a></nav>
-    </div>
-      <section class="section features-section" id="features">
-        <div class="shell">
-          <div class="section-heading split-heading reveal">
-            <div>
-              <span class="kicker">One conversation, many capabilities</span>
-              <h2>Made to understand.<br>Built to get things done.</h2>
-            </div>
-            <p>Mochi combines a natural voice experience with local context and typed, inspectable Tools. The result is an assistant that can move from conversation to action without becoming a black box.</p>
-          </div>
-
-          <div class="feature-grid">
-            <article class="feature-card feature-large voice-feature reveal" data-speech-feature>
-              <div class="feature-icon mic-icon" aria-hidden="true"><span></span></div>
-              <div>
-                <span class="feature-label">Voice first</span>
-                <h3>Say “Hi Mochi.”<br>Then just keep talking.</h3>
-                <p>Local wake-word detection follows your system language: “老莫老莫” for Chinese, “Hi Mochi” for English and other languages. Choose either in Settings → Speech and wake; only one is active at a time. Follow-up listening keeps conversation flowing.</p>
-                <p class="feature-note">Wake listening requires visible, unlocked Companion mode. Use Android speech or save multiple iFlytek and Azure Speech accounts. Choose an account, preview its voices, and opt into cloud replies separately.</p>
-              </div>
-              <div class="waveform" aria-hidden="true">
-                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              </div>
-            </article>
-
-            <article class="feature-card memory-feature reveal" id="memory" data-memory-feature>
-              <div class="feature-icon memory-icon" aria-hidden="true"><span></span><i></i></div>
-              <span class="feature-label">Local-first memory architecture</span>
-              <h3>Remember the day.<br>Find the original words.</h3>
-              <dl class="memory-paths">
-                <div><dt>Keep the conversation flowing</dt><dd>Recent turns and relevant older messages provide context automatically.</dd></div>
-                <div><dt>Keep the day's highlights</dt><dd>Optional daily journals distill meaningful events from conversations, schedules, and Mochi task results.</dd></div>
-                <div><dt>Return to the source</dt><dd>The Memory Recall Skill uses journals to find candidate dates, then searches and reads original conversation turns for detail.</dd></div>
-              </dl>
-              <p class="feature-note">History and search indexes stay on your phone, without a separate vector service. Relevant excerpts may be sent to your selected AI provider.</p>
-              <details class="extension-setup">
-                <summary>How recall works &amp; what you control</summary>
-                <p>Enable Daily journal in Settings to use journals and explicit recall together; both are off by default. The Skill and Tool follow that setting. Turning it off leaves ordinary conversation context unchanged.</p>
-                <p class="feature-note">Journals are clues, not verbatim evidence. A missed journal search falls back to conversations; an exact date or quote can go straight to them. Search can miss information—it does not prove nothing happened.</p>
-              </details>
-              <a class="text-link" href="https://github.com/gongpx20069/hi-mochi/blob/main/docs/architecture/MEMORY_DESIGN.md">Explore the memory architecture →</a>
-            </article>
-
-            <article class="feature-card planner-feature reveal" id="planner">
-              <div class="feature-icon planner-icon" aria-hidden="true"><span>12</span></div>
-              <span class="feature-label">Planner</span>
-              <h3>Dates become a view, not just an answer.</h3>
-              <p>Discuss a day or todo and Mochi can open its native calendar and planner at the right moment.</p>
-              <div class="date-strip" aria-hidden="true"><span><small>MON</small>10</span><span><small>TUE</small>11</span><span class="selected"><small>WED</small>12</span><span><small>THU</small>13</span></div>
-            </article>
-
-            <article class="feature-card knowledge-feature reveal" id="documents" data-documents-feature>
-              <div class="feature-icon knowledge-icon" aria-hidden="true"><span></span><i></i></div>
-              <span class="feature-label">Notion · Tencent Docs · Feishu</span>
-              <h3>Cowork inside your private knowledge base.</h3>
-              <p>Find sources, research, create documents, and edit your work through authorized Tools. Feishu includes guided self-built-app setup and account authorization, with search, wiki browsing, and document read/write access; no callback server to deploy.</p>
-              <div class="knowledge-workspaces" aria-hidden="true"><span>Notion</span><span>Tencent Docs</span><span>Feishu</span><i>Read ↔ Write</i></div>
-            </article>
-
-            <article class="feature-card connections-feature reveal" data-connections-feature>
-              <div class="feature-icon memory-icon" aria-hidden="true"><span></span><i></i></div>
-              <span class="feature-label">Your AI connections</span>
-              <h3>Keep your accounts.<br>Choose your model.</h3>
-              <p>Save named connections, including multiple accounts with the same provider. Official endpoint presets simplify setup; Azure and custom endpoints remain available. Supply your own API key and a tool-capable model.</p>
-              <div class="connection-presets"><span>OpenAI</span><span>DeepSeek</span><span>Kimi</span><span>GLM</span><span>MiniMax</span><span>Agnes-AI</span></div>
-              <details class="extension-setup">
-                <summary>Responses or Chat Completions?</summary>
-                <p>Choose a supported protocol under Advanced connection settings → API protocol. New OpenAI/Azure connections default to Responses; other presets and existing connections retain Chat Completions. Errors do not trigger automatic protocol switching.</p>
-              </details>
-            </article>
-
-            <article class="feature-card tasks-feature reveal" data-tasks-feature>
-              <div class="feature-icon planner-icon" aria-hidden="true"><span>✓</span></div>
-              <span class="feature-label">Tasks, not every chat</span>
-              <h3>Keep ongoing work in view.<br>Keep conversation simple.</h3>
-              <p>Track scheduled runs, Termux jobs, and authorized AgentLink remote work in Tasks. Open results and stop supported work without mixing ordinary chats or foreground Subagents into the list.</p>
-              <p class="feature-note">The optional signed Termux extension connects a separately installed Termux. Stopping an Agent does not stop work already submitted to Shell or a remote service.</p>
-            </article>
-
-            <article class="feature-card feature-wide tools-feature reveal" id="browser" data-browser-feature>
-              <div class="tools-copy">
-                <div class="feature-icon tools-icon" aria-hidden="true"><span></span><i></i></div>
-                <span class="feature-label">Native Android Agent Browser</span>
-                <h3>The web, navigated<br>by your Android agent.</h3>
-                <p>Read, navigate, click, input, and scroll on supported public HTTPS pages. Page reading keeps visible text and labeled statistics, such as likes and favorites, while identifying interactive controls separately—not just converting the article body.</p>
-                <p class="feature-note">Reuse valid logins inside Mochi. Take over the page for login or verification, then select Continue. Manage website data and saved accounts locally; passwords are not sent to the model. Compatibility varies: verification is not bypassed, and not every page detail can be read.</p>
-                <a class="text-link" href="#skills" rel="noopener">Explore Tools & Skills <span aria-hidden="true">→</span></a>
-              </div>
-              <div class="tool-stack" aria-hidden="true">
-                <span class="tool-pill tool-search"><i>⌕</i> Open Website</span>
-                <span class="tool-pill tool-weather"><i>◎</i> Read Page</span>
-                <span class="tool-pill tool-map"><i>↗</i> Navigate & Click</span>
-                <span class="tool-pill tool-doc"><i>□</i> Input</span>
-                <span class="tool-pill tool-clock"><i>↕</i> Scroll</span>
-              </div>
-            </article>
-            <article class="feature-card feature-wide reveal" id="app-control" data-app-control-feature>
-              <div>
-                <span class="feature-label">Built-in App Control · Early access</span>
-                <h3>Your apps.<br>A little help with the taps.</h3>
-                <p>Let Mochi open an app you selected, read supported native controls, search, click, and scroll. Clear ordinary popups or skip ads through explicit close controls, then continue your request—not just in music apps.</p>
-                <blockquote class="example-prompt">“Search for this song in my music app, then return to Mochi.”</blockquote>
-                <p class="feature-note">Music is one example, not a compatibility guarantee. Exact-song playback is still being validated. A successful tap does not prove a task is complete; returning preserves Mochi's previous page and mode.</p>
-              </div>
-              <div>
-                <details class="extension-setup">
-                  <summary>Choose apps and enable assistance</summary>
-                  <ol><li>Open Tools → App Control, enable the Tools you need, and choose Allowed apps. Music apps are selected initially; add other apps or remove any selection.</li><li>Open App assistance and manually enable the Android accessibility service. Some phones also need Background pop-up permission to open Mochi over another foreground app.</li><li>Start from an unlocked, foreground conversation. The built-in App Assistant Skill is on by default and explains missing Tools; it never grants permissions. Media Control and Player access are separate and needed for media-session playback verification, not ordinary app operation.</li></ol>
-                </details>
-                <p class="feature-note">Only selected apps and supported controls are available. No arbitrary screen coordinates, unattended background control, or bypassing login, payments, permission prompts, or unreadable screens. Filtered interface text used by the Agent reaches your configured model provider.</p>
-              </div>
-            </article>
-            <article class="feature-card reveal" id="skills" data-skills-feature>
-              <span class="feature-label">Skill Market</span>
-              <h3>Add a workflow.<br>Not every permission.</h3>
-              <p>Browse, search, and install community Skills from the built-in skills.sh market. Skills guide Mochi through tasks; enabling one does not automatically enable its Tools. Check dependencies and grant only the access you need.</p>
-              <a class="text-link" href="#skills">Explore Skills and dependencies →</a>
-            </article>
-            <article class="feature-card reveal" id="api" data-api-feature>
-              <span class="feature-label">REST API · MCP</span>
-              <h3>Connect your services.<br>Without writing a plugin.</h3>
-              <p>Use Tools → Add tool to connect a REST API or MCP service. For REST APIs, configure requests, authentication, and returned fields. Preview stays offline; a real API test asks first.</p>
-              <p class="feature-note">The initial REST connector supports public HTTPS JSON services on port 443, not OAuth or LAN access. Writes require confirmation and selected results go to your model. Enable both the connection and its Tools explicitly.</p>
-              <a class="text-link" href="#api">Read the connection guide →</a>
-            </article>
-          </div>
-        </div>
+      <section class="wiki-section" id="features"><h2>Built-in capabilities</h2><p>Enable the Skills and Tools you need. Installing a Skill does not automatically grant its required access.</p>
+        <details class="wiki-disclosure" id="speech" data-speech-feature><summary>Voice and Companion</summary>
+          <p>Local wake-word detection follows your system language: “老莫老莫” for Chinese, “Hi Mochi” for English and other languages. Choose either in Settings → Speech and wake; only one is active at a time. Follow-up listening keeps conversation flowing.</p>
+          <p>Wake listening requires visible, unlocked Companion mode. Use Android speech or save multiple iFlytek and Azure Speech accounts. Choose an account, preview its voices, and opt into cloud replies separately. See the <a href="../speech/">speech guide</a>.</p>
+        </details>
+        <details class="wiki-disclosure" id="planner"><summary>Calendar, todos and reminders</summary>
+          <p>Discuss a day or todo and Mochi can open its native calendar and planner at the right moment. Manage events, dated todos and reminders from the app.</p>
+          <p>Allow notifications for reminders. Android background restrictions can delay scheduled work; do not rely on Mochi for critical alerts.</p>
+        </details>
+        <details class="wiki-disclosure" id="tasks" data-tasks-feature><summary>Tasks and scheduled work</summary>
+          <p>Track scheduled runs, Termux jobs, and authorized AgentLink remote work in Tasks. Open results and stop supported work without mixing ordinary chats or foreground Subagents into the list.</p>
+          <p>The optional signed Termux extension connects a separately installed Termux. Stopping an Agent does not stop work already submitted to Shell or a remote service.</p>
+        </details>
+        <details class="wiki-disclosure" id="browser" data-browser-feature><summary>Browser and web research</summary>
+          <p>Read, navigate, click, input, and scroll on supported public HTTPS pages. Page reading keeps visible text and labeled statistics, such as likes and favorites, while identifying interactive controls separately.</p>
+          <p>Reuse valid logins inside Mochi. Take over the page for login or verification, then select Continue. Manage website data and saved accounts locally; passwords are not sent to the model. Compatibility varies: verification is not bypassed, and not every page detail can be read.</p>
+          <p>Enabled browser actions can run without per-action approval. Page content used by the Agent reaches your selected model provider.</p>
+        </details>
+        <details class="wiki-disclosure" id="memory" data-memory-feature><summary>Daily journal and memory recall</summary>
+          <ul><li>Recent turns and relevant older messages provide conversation context automatically.</li><li>Optional daily journals distill meaningful events from conversations, schedules, and Mochi task results.</li><li>Memory Recall uses journals to find candidate dates, then searches and reads original conversation turns for detail.</li></ul>
+          <p>Enable Daily journal in Settings to use journals and explicit recall together; both are off by default. The Skill and Tool follow that setting. Turning it off leaves ordinary conversation context unchanged.</p>
+          <p>Journals are clues, not verbatim evidence. A missed journal search falls back to conversations; an exact date or quote can go straight to them. Search can miss information—it does not prove nothing happened.</p>
+          <p>History and search indexes stay on your phone, without a separate vector service. Relevant excerpts may reach your selected model. See the <a href="https://github.com/gongpx20069/hi-mochi/blob/main/docs/architecture/MEMORY_DESIGN.md">memory architecture</a>.</p>
+        </details>
+        <details class="wiki-disclosure" id="documents" data-documents-feature><summary>Notion, Tencent Docs and Feishu</summary>
+          <p>Find sources, research, create documents, and edit your work through authorized Tools. Connect <a href="https://www.notion.com/help/notion-mcp">Notion</a>, <a href="https://docs.qq.com/open/auth/mcp.html">Tencent Docs</a> or <a href="https://open.feishu.cn/app">Feishu</a> from Tools.</p>
+          <p>Feishu includes guided self-built-app setup and account authorization, with search, wiki browsing, and document read/write access; no callback server to deploy. It does not support whole-document deletion, native spreadsheets, Bitable or PPT editing.</p>
+        </details>
+        <details class="wiki-disclosure" id="connections" data-connections-feature><summary>Model accounts and protocols</summary>
+          <p>Save named connections, including multiple accounts with the same provider. Official endpoint presets simplify setup; Azure and custom endpoints remain available. Supply your own API key and a tool-capable model.</p>
+          <p>Choose a supported protocol under Advanced connection settings → API protocol. New OpenAI/Azure connections default to Responses; other presets and existing connections retain Chat Completions. Errors do not trigger automatic protocol switching. Follow the <a href="../models/">AI provider guide</a>.</p>
+        </details>
+        <details class="wiki-disclosure" id="app-control" data-app-control-feature><summary>App control · Early access</summary>
+          <p>Let Mochi open an app you selected, read supported native controls, search, click, and scroll. Ordinary popups and ads require explicit close or skip controls; this is not limited to music apps.</p>
+          <ol><li>Open Tools → App Control, enable the Tools you need, and choose Allowed apps. Music apps are selected initially; add other apps or remove any selection.</li><li>Open App assistance and manually enable the Android accessibility service. Some phones also need Background pop-up permission to open Mochi over another foreground app.</li><li>Start from an unlocked, foreground conversation. App Assistant is on by default and explains missing Tools; it never grants permissions. Media Control and Player access are separate and needed for media-session playback verification, not ordinary app operation.</li></ol>
+          <p>Music is one example, not a compatibility guarantee. Exact-song playback is still being validated. A successful tap does not prove completion; returning preserves Mochi's previous page and mode.</p>
+          <p>No arbitrary screen coordinates, unattended background control, or bypassing login, payments, permission prompts, or unreadable screens. Filtered interface text used by the Agent reaches your model provider.</p>
+        </details>
+        <details class="wiki-disclosure" id="skills" data-skills-feature><summary>Community Skills</summary>
+          <p>Browse, search, and install community Skills from the built-in skills.sh market. Skills guide Mochi through tasks; enabling one does not automatically enable its Tools. Check dependencies and grant only the access you need.</p>
+        </details>
+        <details class="wiki-disclosure" id="api" data-api-feature><summary>Connect REST APIs and MCP services</summary>
+          <p>Use Tools → Add tool to connect a REST API or MCP service. For REST APIs, configure requests, authentication, and returned fields. Preview stays offline; a real API test asks first.</p>
+          <p>The REST connector supports public HTTPS JSON services on port 443, not OAuth or LAN access. Writes require confirmation and selected results go to your model. Enable both the connection and its Tools explicitly.</p>
+        </details>
       </section>
-
-      <section class="section extensions-section" id="extensions">
-        <div class="shell">
-          <div class="section-heading centered reveal">
-            <span class="kicker">Optional connections. Real capabilities.</span>
-            <h2>Your home. Your files. Your work.<br>One place to ask.</h2>
-            <p>Conversation, memory, and planning need only Mochi. Mi Home, Termux, and WebDAV Files are signed extensions; WebDAV is available as a preview. AgentLink is an independent companion app. Connect only what you need.</p>
-          </div>
-          <nav class="capability-map reveal" aria-label="Explore optional capabilities">
-            <a href="#mijia-extension"><span>01 / HOME</span><strong>Mi Home</strong><small>Devices & scenes ↗</small></a>
-            <a href="#termux-extension"><span>02 / PHONE</span><strong>Termux</strong><small>Commands & scripts ↗</small></a>
-            <a href="#agentlink-extension"><span>03 / COMPUTER</span><strong>AgentLink</strong><small>Shared coding chats ↗</small></a>
-            <a href="#webdav-extension"><span>04 / FILES · PREVIEW</span><strong>WebDAV</strong><small>Notes & remote files ↗</small></a>
-          </nav>
-          <div class="feature-grid">
-            <article class="feature-card feature-wide smart-home-feature reveal" id="mijia-extension" data-smart-home-feature data-extension-card="mijia">
-              <div class="smart-home-copy">
-                <span class="extension-badge">Signed extension APK</span>
-                <h3>A voice for your<br>connected home.</h3>
-                <span class="feature-label">Smart home · Mi Home</span>
-                <p>Control supported appliances and TVs, inspect device state, trigger scenes, and view the latest available camera event image in a foreground conversation.</p>
-                <blockquote class="example-prompt">“Turn off the living room TV.”</blockquote>
-                <div class="extension-actions">
-                  <a class="button button-secondary" href="../../#mijia-extension">Get Mi Home extension ↓</a>
-                </div>
-                <details class="extension-setup">
-                  <summary>Connect in three steps</summary>
-                  <ol><li>Install the extension from the same release/signing channel as Mochi.</li><li>In Tools → Extensions → Mi Home, scan the login QR with another phone signed into Mi Home; select your devices.</li><li>Return to Mochi and choose Enable tools and Skill when ready. Installation alone does not enable access.</li></ol>
-                </details>
-                <p class="feature-note">Unofficial connector; capabilities vary by device. Event images are not live video. Control is foreground-only; acceptance is not proof of a physical result when a device cannot report its state.</p>
-              </div>
-              <div class="smart-home-visual" aria-hidden="true">
-                <span class="smart-home-hub"><i></i><b>Mochi</b><small>Home, connected</small></span>
-                <span class="smart-device smart-device-tv"><i>TV</i><b>Living room</b><small>Power & state</small></span>
-                <span class="smart-device smart-device-camera"><i>CAM</i><b>Front door</b><small>Latest event</small></span>
-                <span class="smart-device smart-device-scale"><i>KG</i><b>Scale</b><small>Device state</small></span>
-                <span class="smart-device smart-device-scene"><i>◇</i><b>Good night</b><small>Manual scene</small></span>
-              </div>
-            </article>
-            <article class="feature-card extension-card termux-card reveal" id="termux-extension" data-extension-card="termux">
-              <span class="extension-badge">Signed extension APK + Termux</span>
-              <h3>Put your phone<br>to work.</h3>
-              <p>Run commands and scripts in Termux, process files it can access, and inspect output or stop jobs in Tasks. Once enabled, Tools can run from foreground chats, scheduled Agents, and Subagents.</p>
-              <div class="execution-preview" aria-label="Illustrative workflow, not a live task"><small>ON YOUR PHONE / EXAMPLE FLOW</small><code>request → script → output</code><span>Submit · Follow progress · Inspect results</span></div>
-              <div class="extension-actions">
-                <a class="button button-secondary" href="../../#termux-extension">Get Termux extension ↓</a>
-                <a class="text-link" href="https://github.com/termux/termux-app#installation">Install official Termux ↗</a>
-              </div>
-              <details class="extension-setup">
-                <summary>Connect in three steps</summary>
-                <ol><li>Install Termux separately, plus the matching Mochi extension.</li><li>Open Termux setup from Mochi Tools. Follow the external-command and Android permission guidance, then test the connection.</li><li>Enable the Provider, Tools, and Skill you need. Manage submitted jobs in Tasks; disabling access blocks new calls, not existing jobs.</li></ol>
-              </details>
-              <p class="feature-note">Full shell access under Termux permissions, not root or a sandbox. Enabled commands run without per-command confirmation. Output used by the Agent goes to your model provider.</p>
-            </article>
-            <article class="feature-card extension-card agentlink-card reveal" id="agentlink-extension" data-extension-card="agentlink">
-              <span class="extension-badge">Independent app + computer Bridge</span>
-              <h3>Your coding agents.<br>Now within reach.</h3>
-              <p>Connect Android to GitHub Copilot CLI, Claude Code, Kimi Code, Qwen Code, or DeepSeek Harness on your computer. Share a chat with your terminal; optionally grant Mochi scoped access to send work and read results.</p>
-              <div class="execution-preview link-preview" aria-label="Connection diagram"><small>ON YOUR COMPUTER / AGENTLINK</small><code>phone ↔ Bridge ↔ coding agent</code><span>One chat · Shared context · Your computer</span></div>
-              <div class="extension-actions">
-                <a class="button button-primary" href="../../agentlink/">AgentLink official website →</a>
-                <a class="text-link" href="https://github.com/gongpx20069/android-agent-link/releases">Android downloads · Preview ↗</a>
-              </div>
-              <p class="feature-note">A separate product, not a Mochi extension APK. Requires a running computer Bridge and a signed-in coding agent. Mochi access is explicitly granted and foreground-only; remote work can continue after Mochi closes.</p>
-            </article>
-          </div>
-          <article class="feature-card feature-wide reveal" id="webdav-extension" data-extension-card="webdav" data-release-status="released-preview">
-            <div>
-              <span class="extension-badge">WebDAV Files extension · Preview</span>
-              <h3>Your cloud notes.<br>Ready to discuss.</h3>
-              <p>Designed for Nutstore, Nextcloud, ownCloud, and compatible NAS services. Find files and read or edit Markdown in an authorized folder; optionally enable file management and transfers. No separate MCP Server required.</p>
-              <blockquote class="example-prompt">“Find notes with project plan in the filename, read them, and summarize.”</blockquote>
-              <p class="feature-note">Available as an optional preview APK. Install it alongside the matching Mochi app. Real Nutstore/NAS compatibility still needs validation; start with a test folder and read-only access.</p>
-              <div class="extension-actions">
-                <a class="button button-secondary" href="../../#webdav-extension">Get WebDAV preview ↓</a>
-                <a class="text-link" href="#webdav-extension">Read the preview guide →</a>
-              </div>
-            </div>
-            <div>
-              <details class="extension-setup">
-                <summary>Preview setup and permissions</summary>
-                <ol><li>Install the app and extension with matching versions and signing certificates. Open Tools → Extensions → WebDAV Files to connect.</li><li>Enter the HTTPS WebDAV address, an existing authorized folder, account, and application password. Nutstore has an address preset. Never send passwords in chat.</li><li>Save and check, then select Enable tools and Skill. Access starts read-only; enable writing, management, and transfer Tools separately. The Skill becomes unavailable when the extension or required read Tools are unavailable.</li></ol>
-              </details>
-              <p class="feature-note">Not an Obsidian bidirectional sync engine or encrypted-vault decoder. Search matches filenames; text is limited to 32 KiB and binary files to 32 MiB each. Safe changes to existing files require server-provided strong ETags.</p>
-              <p class="feature-note">Foreground conversations only. LAN access needs separate authorization and HTTPS needs a valid certificate. File text analyzed by the Agent goes to your configured model service.</p>
-            </div>
-          </article>
-          <p class="extensions-footnote">Mi Home, Termux, and WebDAV extensions have no separate launcher icon: open them from Mochi Tools. AgentLink has its own app. None is required for basic Mochi use; connect and enable only what you trust.</p>
-        </div>
+      <section class="wiki-section" id="extensions"><h2>Optional extensions</h2><p>Mi Home, Termux and WebDAV use matching, same-signed extension APKs. Open them from Mochi Tools; they have no separate launcher icon. AgentLink is an independent app.</p>
+        <details class="wiki-disclosure" id="mijia-extension" data-smart-home-feature data-extension-card="mijia"><summary>Smart home · Mi Home</summary>
+          <p>Control supported appliances and TVs, inspect device state, trigger scenes, and view the latest available camera event image in a foreground conversation.</p>
+          <p><a href="../../#mijia-extension">Get Mi Home extension</a></p>
+          <ol><li>Install the extension from the same release/signing channel as Mochi.</li><li>In Tools → Extensions → Mi Home, scan the login QR with another phone signed into Mi Home; select your devices.</li><li>Return to Mochi and choose Enable tools and Skill when ready. Installation alone does not enable access.</li></ol>
+          <p>Unofficial connector; capabilities vary by device. Event images are not live video. Control is foreground-only; acceptance is not proof of a physical result when a device cannot report its state.</p>
+        </details>
+        <details class="wiki-disclosure" id="termux-extension" data-extension-card="termux"><summary>Termux · Local commands</summary>
+          <p>Run commands and scripts in Termux, process files it can access, and inspect output or stop jobs in Tasks. Once enabled, Tools can run from foreground chats, scheduled Agents, and Subagents.</p>
+          <p><a href="../../#termux-extension">Get Mochi Termux extension</a> · <a href="https://github.com/termux/termux-app#installation">Install official Termux</a></p>
+          <ol><li>Install Termux separately, plus the matching Mochi extension.</li><li>Open Termux setup from Mochi Tools. Follow the external-command and Android permission guidance, then test the connection.</li><li>Enable the Provider, Tools, and Skill you need. Manage submitted jobs in Tasks; disabling access blocks new calls, not existing jobs.</li></ol>
+          <p>Full shell access under Termux permissions, not root or a sandbox. Enabled commands run without per-command confirmation. Output used by the Agent goes to your model provider.</p>
+        </details>
+        <details class="wiki-disclosure" id="agentlink-extension" data-extension-card="agentlink"><summary>AgentLink · Computer coding agents</summary>
+          <p>Connect Android to GitHub Copilot CLI, Claude Code, Kimi Code, Qwen Code, or DeepSeek Harness on your computer. Share a chat with your terminal; optionally grant Mochi scoped access to send work and read results.</p>
+          <p><a href="../../agentlink/">AgentLink website and setup</a> · <a href="https://github.com/gongpx20069/android-agent-link/releases">Android downloads, including previews</a></p>
+          <p>A separate product, not a Mochi extension APK. Requires a running computer Bridge and a signed-in coding agent. Mochi access is explicitly granted and foreground-only; remote work can continue after Mochi closes.</p>
+        </details>
+        <details class="wiki-disclosure" id="webdav-extension" data-extension-card="webdav" data-release-status="released-preview"><summary>WebDAV files · Preview</summary>
+          <p>Designed for Nutstore, Nextcloud, ownCloud, and compatible NAS services. Find files and read or edit Markdown in an authorized folder; optionally enable file management and transfers. No separate MCP Server required.</p>
+          <p><a href="../../#webdav-extension">Get WebDAV preview extension</a>. Real Nutstore/NAS compatibility still needs validation; start with a test folder and read-only access.</p>
+          <ol><li>Install the app and extension with matching versions and signing certificates. Open Tools → Extensions → WebDAV Files to connect.</li><li>Enter the HTTPS WebDAV address, an existing authorized folder, account, and application password. Nutstore has an address preset. Never send passwords in chat.</li><li>Save and check, then select Enable tools and Skill. Access starts read-only; enable writing, management, and transfer Tools separately. The Skill becomes unavailable when the extension or required read Tools are unavailable.</li></ol>
+          <p>Not an Obsidian bidirectional sync engine or encrypted-vault decoder. Search matches filenames; text is limited to 32 KiB and binary files to 32 MiB each. Safe changes to existing files require server-provided strong ETags.</p>
+          <p>Foreground conversations only. LAN access needs separate authorization and HTTPS needs a valid certificate. File text analyzed by the Agent goes to your configured model service.</p>
+        </details>
       </section>
-
-      <section class="section privacy-section" id="privacy">
-        <div class="shell privacy-grid">
-          <div class="privacy-visual reveal" aria-hidden="true">
-            <div class="privacy-halo"></div>
-            <div class="shield"><span class="shield-face"><i></i><i></i><b></b></span></div>
-            <span class="privacy-orbit orbit-local">Local data</span>
-            <span class="privacy-orbit orbit-control">Your control</span>
-            <span class="privacy-orbit orbit-open">Open source</span>
-          </div>
-          <div class="privacy-copy reveal">
-            <span class="kicker">Privacy starts locally</span>
-            <h2>Your companion.<br>Your provider. Your choices.</h2>
-            <p>Persona files, settings, conversations, memory, calendar, and todos stay on the device by default. Provider credentials use Android Keystore-backed storage.</p>
-            <ul class="check-list">
-              <li><span>✓</span> Save and explicitly switch independent AI and speech accounts</li>
-              <li><span>✓</span> Enable only the Tools and Skills you trust</li>
-              <li><span>✓</span> Location is requested only when a location Tool runs</li>
-              <li><span>✓</span> Review the implementation—the entire app is open source</li>
-            </ul>
-            <p class="privacy-note">Local-first does not mean fully offline: model requests, optional cloud speech, and enabled external Tools send necessary content to their configured services. In Settings, Share/import lets you select multiple saved connections; importing adds accounts rather than overwriting them. Anyone holding the full share link can use its included credentials and consume quota. Share it only with people you trust.</p>
-          </div>
-        </div>
+      <section class="wiki-section" id="privacy"><h2>Privacy and control</h2>
+        <p>Persona files, settings, conversations, memory, calendar, and todos stay on the device by default. Provider credentials use Android Keystore-backed storage.</p>
+        <ul><li>Save and explicitly switch independent AI and speech accounts.</li><li>Enable only the Tools and Skills you trust.</li><li>Location is requested only when a location Tool runs.</li><li>The entire app is open source for review.</li></ul>
+        <p>Local-first does not mean fully offline: model requests, optional cloud speech, and enabled external Tools send necessary content to their configured services.</p>
+        <p class="wiki-note">Settings → Share/import lets you select multiple saved connections; importing adds accounts rather than overwriting them. Anyone holding the full share link can use its included credentials and consume quota. Share it only with people you trust.</p>
       </section>
-
+      <nav class="wiki-next" aria-label="Next guide"><a href="../speech/">← Speech providers</a><a href="../quick-start/">Quick start →</a></nav>
+    </article>
   </main>
-  <footer class="site-footer"><div class="shell"><a class="text-link" href="../">← Mochi Wiki</a> · <a href="https://github.com/gongpx20069/hi-mochi/issues">Report an issue</a></div></footer>
+  <footer class="site-footer"><div class="shell footer-bottom"><a href="../">← Wiki</a><a href="https://github.com/gongpx20069/hi-mochi/issues">Report an issue</a></div></footer>
 </body>
 </html>

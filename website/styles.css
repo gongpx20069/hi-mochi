@@ -248,18 +248,6 @@
   overflow-wrap: anywhere;
 }
 
-.reference-page .wiki-heading {
-  padding-top: 132px;
-}
-
-.reference-page .section {
-  padding-block: 36px;
-}
-
-.reference-page .section-heading h2 {
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
-}
-
 .home-page [id],
 .wiki-page [id] {
   scroll-margin-top: 100px;
@@ -290,8 +278,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .wiki-main,
-  .wiki-frame,
-  .reference-page .wiki-heading {
+  .wiki-frame {
     padding-top: 110px;
   }
   .wiki-disclosure {

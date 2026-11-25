@@ -379,6 +379,15 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                 route = f"{locale}wiki/{guide}"
                 page.goto(base + route)
                 assert page.locator("h1").count() == 1
+                if guide:
+                    assert page.locator("main.wiki-frame > .wiki-sidebar").count() == 1
+                    assert page.locator("main.wiki-frame > .wiki-article").count() == 1
+                    assert page.locator(".wiki-sidebar [aria-current='page']").get_attribute("href") == "./"
+                if screenshots and javascript and guide == "capabilities/":
+                    for width in (390, 1280):
+                        page.set_viewport_size({"width": width, "height": 900})
+                        label = (locale + "wiki-capabilities").replace("/", "-")
+                        page.screenshot(path=str(screenshots / f"{label}-overview-{width}.png"), full_page=True)
                 if guide == "models/":
                     preferred = "modelscope" if locale else "groq"
                     assert page.locator(f"#{preferred}").evaluate("item => item.open")
@@ -407,6 +416,12 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                     assert fits_viewport, (route, javascript, width)
                     assert fits_text, (route, javascript, width, "clipped text")
                     check_mochi_navigation(page, bool(locale))
+                    if guide:
+                        assert page.locator(".wiki-sidebar").evaluate("""(sidebar) => {
+                            const side = sidebar.getBoundingClientRect();
+                            const article = document.querySelector('.wiki-article').getBoundingClientRect();
+                            return innerWidth > 1024 ? side.right < article.left : side.bottom <= article.top;
+                        }"""), (route, width, "Wiki sidebar layout")
                     if screenshots and javascript and guide in ("", "models/") and width in (390, 1280):
                         page.evaluate("scrollTo(0, 0)")
                         label = (locale + "wiki-" + (guide or "overview")).strip("/").replace("/", "-")
@@ -414,6 +429,14 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                 if javascript and guide == "models/":
                     page.goto(base + route + "#azure")
                     assert page.locator("#azure").evaluate("item => item.open")
+                if javascript and guide == "capabilities/":
+                    for anchor in ("planner", "browser", "memory", "documents", "app-control",
+                                   "mijia-extension", "termux-extension", "agentlink-extension", "webdav-extension"):
+                        page.locator("details").evaluate_all("items => items.forEach(item => item.open = false)")
+                        page.goto(base + route + "#" + anchor)
+                        target = page.locator(f"#{anchor}")
+                        assert target.evaluate("item => item.open"), (route, anchor)
+                        assert target.locator("p").first.is_visible()
                 other = f"{'' if locale else 'zh-CN/'}wiki/{guide}"
                 language_link = page.locator("[data-nav] a").filter(has_text="EN" if locale else "中文")
                 language_link.click()

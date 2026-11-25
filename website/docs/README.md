@@ -67,8 +67,12 @@ Token and model-library links, without binding/credit tutorials.
 Speech covers Android, iFlytek and Azure, including saving credentials before
 voice previews and explicitly selecting a saved speech account.
 The quick start contains permission, update and configuration-check recovery.
-The capabilities reference retains the detailed disclosures moved off the
-homepage. Quick start provides a direct recommended APK download and a disclosure
+All four guides share the same `wiki-frame`, `wiki-sidebar`, `wiki-article`,
+`wiki-section` and `wiki-disclosure` layout. Skills and extensions use a
+single-column reference with collapsed capability/setup entries, not homepage
+feature cards, illustrations or reveal animations. Preserve existing topic
+anchors so homepage links open the relevant disclosure directly.
+Quick start provides a direct recommended APK download and a disclosure
 for all five architectures, not a link back to a homepage card. Its checked-in
 release bundle must match the homepage in both languages.
 
@@ -118,8 +122,8 @@ setup disclosure that remains usable without JavaScript.
 The homepage groups optional capabilities under `#extensions`: Mi Home and
 Termux are released same-signer extension APKs; WebDAV Files is a downloadable
 extension preview; AgentLink is an independent Android app with a computer-side
-Bridge. Keep all four discoverable through compact homepage cards and the Wiki
-capability map, using installation links only for released packages. Show benefits first,
+Bridge. Keep all four discoverable through compact homepage cards and Wiki
+disclosures, using installation links only for released packages. Show benefits first,
 then setup and permissions; basic Mochi use does not require any of them.
 Mi Home setup and Termux setup use native HTML disclosures, not JavaScript.
 Termux copy must disclose automatic command execution after enablement, the
@@ -130,9 +134,9 @@ links to its matching release APK and Wiki setup guide. In that guide, disclose 
 read-only defaults, Skill readiness gating, foreground-only access, valid HTTPS
 and explicit LAN authorization. It is not Obsidian synchronization or vault
 decryption. File text analyzed by the Agent goes to the configured model.
-The four-item map and homepage extension cards use four desktop columns, two
-tablet columns and one mobile column; retain readable expanded disclosures in
-both Wiki languages.
+Homepage extension cards use four desktop columns, two tablet columns and one
+mobile column. Wiki extensions use the same single-column disclosures as other
+guides; retain readable expanded instructions in both languages.
 
 AgentLink's official website lives at `agentlink/` and `zh-CN/agentlink/`.
 Treat these as a standalone product destination, not a Mochi extension detail:

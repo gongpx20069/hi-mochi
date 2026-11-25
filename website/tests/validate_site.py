@@ -265,6 +265,19 @@ def main() -> None:
             source = path.read_text(encoding="utf-8")
             if source.count("<h1>") != 1:
                 errors.append(f"{path.relative_to(SITE_ROOT)}: expected one guide heading")
+            if guide:
+                for layout in ('<main class="shell wiki-frame"', '<aside class="wiki-sidebar"', '<article class="wiki-article"'):
+                    if layout not in source:
+                        errors.append(f"{path.relative_to(SITE_ROOT)}: missing shared Wiki layout {layout}")
+                if re.search(r'class="[^"]*\b(?:feature-card|feature-grid|reference-page|reveal)\b', source):
+                    errors.append(f"{path.relative_to(SITE_ROOT)}: guides must not use homepage presentation")
+            if guide == "capabilities/":
+                for extension in ("mijia", "termux", "agentlink", "webdav"):
+                    if not re.search(
+                        rf'<details class="wiki-disclosure" id="{extension}-extension"[^>]*data-extension-card="{extension}"',
+                        source,
+                    ):
+                        errors.append(f"{path.relative_to(SITE_ROOT)}: missing {extension} setup disclosure")
             if guide != "quick-start/" and ("data-release-download" in source or "data-extension-download" in source):
                 errors.append(f"{path.relative_to(SITE_ROOT)}: unexpected release download outside quick start")
             if guide == "models/":
@@ -370,17 +383,6 @@ def main() -> None:
     ):
         if marker not in scripts:
             errors.append(f"scripts.js: missing release updater marker {marker}")
-
-    styles = (SITE_ROOT / "styles.css").read_text(encoding="utf-8")
-    for marker in (
-        ".smart-home-feature",
-        ".smart-home-visual",
-        ".smart-device-camera",
-    ):
-        if marker not in styles:
-            errors.append(f"styles.css: missing smart-home style {marker}")
-    if styles.count(".smart-home-feature") < 3:
-        errors.append("styles.css: missing responsive smart-home sizing")
 
     if errors:
         raise SystemExit("\n".join(errors))
