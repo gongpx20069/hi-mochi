@@ -209,7 +209,7 @@ preserve the matching bundled release as a whole. If the API is unavailable or
 rate-limited, the fallback remains usable. AgentLink pages do not request the
 Mochi release API.
 
-The bundled release is **v1.0.22**. After publishing a new release and completing
+The bundled release is **v1.0.24**. After publishing a new release and completing
 full anonymous download and SHA-256 verification of all nine CNB mirror files,
 update both homepages' architecture/extension URLs, release-page URLs, and version
 labels together. Retain the last verified Chinese version if mirroring fails;

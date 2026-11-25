@@ -6,7 +6,7 @@
 
 **把 Android 手机变成你的 AI 伙伴：陪你聊天、安排日常、查资料、办事情。**
 
-[**下载 APK**](https://github.com/gongpx20069/hi-mochi/releases/latest)
+[**国内下载 APK**](https://cnb.cool/hi-mochi/hi-mochi/-/releases/tag/v1.0.24)
 · [官网](https://gongpx20069.github.io/hi-mochi/zh-CN/) · [使用指南](https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/)
 · [观看介绍视频](https://www.bilibili.com/video/BV1u6aB6GEDD/)
 · [English](README.md) · [简体中文](README.zh-CN.md)
@@ -20,7 +20,7 @@
 
 ## 快速开始
 
-1. **安装老莫。** 下载[最新 APK](https://github.com/gongpx20069/hi-mochi/releases/latest)，
+1. **安装老莫。** 下载[APK](https://cnb.cool/hi-mochi/hi-mochi/-/releases/tag/v1.0.24)，
    大多数手机选 `arm64-v8a`，不确定选 `universal`。升级时覆盖安装，不要先卸载。
 2. **连接模型。** 打开**设置 > AI 连接**。
    **推荐魔搭 ModelScope，可用免费 API 额度入门：**
@@ -79,10 +79,10 @@
 
 | 集成 | 附加能力 | 获取 |
 | --- | --- | --- |
-| 米家智能家居 | 控制选定设备、执行场景、查看摄像头事件图片（非直播） | [米家扩展](https://github.com/gongpx20069/hi-mochi/releases) |
+| 米家智能家居 | 控制选定设备、执行场景、查看摄像头事件图片（非直播） | [米家扩展](https://cnb.cool/hi-mochi/hi-mochi/-/releases/download/v1.0.24/Mochi-Mijia-Extension-v1.0.24.apk) |
 | AgentLink | 向已授权的电脑工作区发送编程任务，继续共享聊天 | [Android 应用与电脑端 Bridge](https://github.com/gongpx20069/android-agent-link) |
-| Termux | 执行本机 Shell 命令，查看输出 | [Termux 扩展](https://github.com/gongpx20069/hi-mochi/releases) + [Termux](https://github.com/termux/termux-app#installation) |
-| WebDAV 文件（预览） | 在授权目录中查找、读写和传输文件 | [WebDAV 扩展](https://github.com/gongpx20069/hi-mochi/releases) |
+| Termux | 执行本机 Shell 命令，查看输出 | [Termux 扩展](https://cnb.cool/hi-mochi/hi-mochi/-/releases/download/v1.0.24/Mochi-Termux-Extension-v1.0.24.apk) + [Termux](https://github.com/termux/termux-app#installation) |
+| WebDAV 文件（预览） | 在授权目录中查找、读写和传输文件 | [WebDAV 扩展](https://cnb.cool/hi-mochi/hi-mochi/-/releases/download/v1.0.24/Mochi-WebDAV-Extension-v1.0.24.apk) |
 
 Mochi 扩展使用匹配版本、相同签名的 APK，按**工具**页引导连接。
 米家为非官方集成；Termux 是完整 Shell，**不是沙箱**。
