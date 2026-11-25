@@ -65,12 +65,19 @@ The bilingual Wiki has five destinations: its index, `quick-start/`, `models/`,
 canonical/hreflang metadata and sitemap entries for every page. Use static
 HTML, shared styles, native disclosures, side navigation and short steps; no
 new runtime, build dependency, account or API key is needed to read a guide.
-The model guide covers all ten presets with three steps each; only the
-language's recommended provider starts expanded. ModelScope has only signup,
+The Wiki index's common questions include a linked native disclosure explaining
+LLMs versus Agents, with a concrete example and the authorized-tool boundary.
+The model guide covers all ten presets with three steps each. Put the language's
+recommended provider (Chinese: ModelScope; English: Groq) in the first content
+section, with always-visible steps rather than a disclosure. The Wiki index
+also names that recommendation. Other providers start collapsed. ModelScope has only signup,
 Token and model-library links, without binding/credit tutorials.
 Speech covers Android, iFlytek and Azure, including saving credentials before
 voice previews and explicitly selecting a saved speech account.
-The quick start contains permission, update and configuration-check recovery.
+The quick start separates LLM setup from an explicit optional speech-model step,
+with an on-page navigation link. Recommend iFlytek, retain Android speech without
+extra credentials, and link directly to provider setup and cloud voice selection.
+It also contains permission, update and configuration-check recovery.
 All four guides share the same `wiki-frame`, `wiki-sidebar`, `wiki-article`,
 `wiki-section` and `wiki-disclosure` layout. Skills and extensions use a
 single-column reference with collapsed capability/setup entries, not homepage

@@ -21,13 +21,14 @@
   <main class="shell wiki-main" id="main">
     <header class="wiki-heading"><span class="kicker">Mochi Wiki</span><h1>从第一次对话开始。</h1><p>先让老莫聊起来，再按需连接更多能力。不必一次读完。</p></header>
     <div class="guide-grid">
-      <a href="quick-start/"><span>01 / 入门</span><h2>快速开始 →</h2><p>安装、连接魔搭、发送第一条消息，无需扩展。</p></a>
-      <a href="models/"><span>02 / 模型</span><h2>连接 LLM 服务 →</h2><p>去哪获取密钥、怎么填配置，以及什么时候需要改协议。</p></a>
+      <a href="quick-start/"><span>01 / 入门</span><h2>快速开始 →</h2><p>安装、连接魔搭、按需配置语音，再开始第一次对话。</p></a>
+      <a href="models/"><span>02 / 模型</span><h2>连接 LLM 服务 →</h2><p>首选魔搭 ModelScope：注册、获取 Token、选择模型。其他服务也有分步指南。</p></a>
       <a href="speech/"><span>03 / 语音</span><h2>配置语音服务 →</h2><p>先用 Android 系统语音，或按需接入讯飞、Azure Speech。</p></a>
       <a href="capabilities/"><span>04 / 更多能力</span><h2>技能与扩展 →</h2><p>浏览器、记忆、文档、应用操作，以及米家、Termux、AgentLink、WebDAV。</p></a>
     </div>
-    <section class="wiki-section" id="help"><h2>已经装好了？</h2>
-      <div class="wiki-link-list"><a href="quick-start/#troubleshooting">连接没有成功，怎么办？ →</a><a href="speech/#wake">为什么叫不醒老莫？ →</a><a href="capabilities/#privacy">哪些信息会离开手机？ →</a><a href="capabilities/#extensions">我需要安装哪些扩展？ →</a></div>
+    <section class="wiki-section" id="help"><h2>常见问题</h2>
+      <div class="wiki-link-list"><a href="#llm-and-agent">LLM 和 Agent 有什么区别？ →</a><a href="quick-start/#troubleshooting">连接没有成功，怎么办？ →</a><a href="speech/#wake">为什么叫不醒老莫？ →</a><a href="capabilities/#privacy">哪些信息会离开手机？ →</a><a href="capabilities/#extensions">我需要安装哪些扩展？ →</a></div>
+      <details class="wiki-disclosure" id="llm-and-agent"><summary>LLM 和 Agent 有什么区别？</summary><p><strong>LLM（大语言模型）</strong>负责理解和生成内容；<strong>Agent（智能体）</strong>把模型、上下文与工具结合起来，按目标分步执行任务。</p><p>例如，LLM 可以帮你写一份出行计划；老莫作为 Agent，还能使用你已授权的工具查网页、创建日程。连接 LLM 是让它能思考和回答，开启工具则让它能实际办事。</p></details>
       <p class="wiki-note">这里是使用指南。源码构建和架构说明请看<a href="https://github.com/gongpx20069/hi-mochi/tree/main/docs">开发者文档</a>。</p>
     </section>
   </main>

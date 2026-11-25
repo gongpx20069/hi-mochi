@@ -285,7 +285,7 @@ def main() -> None:
                 expected = {"groq", "modelscope", "openai", "azure", "deepseek", "kimi", "glm", "minimax", "agnes", "custom"}
                 if len(providers) != len(expected) or set(providers) != expected:
                     errors.append(f"{locale}wiki/models: incomplete provider instructions")
-                for provider, body in re.findall(r'<details[^>]+data-provider="([^"]+)"[^>]*>(.*?)</details>', source, re.S):
+                for _, provider, body in re.findall(r'<(details|section)[^>]+data-provider="([^"]+)"[^>]*>(.*?)</\1>', source, re.S):
                     if body.count("<li>") != 3:
                         errors.append(f"{locale}wiki/models: {provider} needs three setup steps")
             if guide == "speech/":

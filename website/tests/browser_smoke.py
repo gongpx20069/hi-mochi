@@ -408,8 +408,19 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                         page.screenshot(path=str(screenshots / f"{label}-overview-{width}.png"), full_page=True)
                 if guide == "models/":
                     preferred = "modelscope" if locale else "groq"
-                    assert page.locator(f"#{preferred}").evaluate("item => item.open")
+                    assert page.locator(".wiki-article > .wiki-section").first.get_attribute("id") == preferred
+                    steps = page.locator(f"section#{preferred} > ol > li")
+                    assert steps.count() == 3
+                    assert all(step.is_visible() for step in steps.all())
                     assert page.locator("[data-provider]").count() == 10
+                    assert page.locator("details[data-provider][open]").count() == 0
+                if guide == "quick-start/":
+                    speech = page.locator("section#speech")
+                    assert speech.is_visible()
+                    assert ("可选" if locale else "optional") in speech.locator("h2").inner_text()
+                    assert speech.locator('a[href="../speech/#iflytek"]').is_visible()
+                    assert speech.locator('a[href="../speech/#voices"]').is_visible()
+                    assert page.locator('.wiki-tabs a[href="#speech"]').is_visible()
                 for disclosure in page.locator("details").all():
                     summary = disclosure.locator("summary")
                     if disclosure.evaluate("item => item.open"):
@@ -447,6 +458,11 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                 if javascript and guide == "models/":
                     page.goto(base + route + "#azure")
                     assert page.locator("#azure").evaluate("item => item.open")
+                if javascript and not guide:
+                    page.locator("#llm-and-agent").evaluate("item => item.open = false")
+                    page.locator('.wiki-link-list a[href="#llm-and-agent"]').click()
+                    page.wait_for_function("document.getElementById('llm-and-agent').open")
+                    assert page.locator("#llm-and-agent p").first.is_visible()
                 if javascript and guide == "capabilities/":
                     for anchor in ("planner", "browser", "memory", "documents", "app-control",
                                    "mijia-extension", "termux-extension", "agentlink-extension", "webdav-extension"):
