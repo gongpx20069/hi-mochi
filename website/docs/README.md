@@ -285,3 +285,5 @@ The public artifact includes `wiki/`, `zh-CN/wiki/`, `agentlink/` and
 sitemap and verify canonical and language-switch links when moving pages.
 Each deployment attempt uses a distinct artifact name and waits for its metadata
 to become visible before deploying, so retries cannot select an older artifact.
+Use the Node 24-compatible Pages upload/deploy actions; include hidden files
+from the curated `_site` directory so `.nojekyll` ships with the public artifact.
