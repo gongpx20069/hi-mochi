@@ -43,6 +43,7 @@ jobs:
           cp -R website/assets website/zh-CN website/agentlink website/wiki _site/
 
       - name: Upload website artifact
+        id: artifact
         uses: actions/upload-pages-artifact@v5
         with:
           name: github-pages-${{ github.run_attempt }}
@@ -68,6 +69,44 @@ jobs:
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/github-script@v8
+        env:
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact_id }}
         with:
-          artifact_name: github-pages-${{ github.run_attempt }}
+          script: |
+            const artifactId = Number(process.env.ARTIFACT_ID)
+            if (!Number.isSafeInteger(artifactId) || artifactId <= 0) {
+              throw new Error('Missing uploaded Pages artifact ID')
+            }
+            const { data: deployment } = await github.request('POST /repos/{owner}/{repo}/pages/deployments', {
+              ...context.repo,
+              artifact_id: artifactId,
+              pages_build_version: context.sha,
+              oidc_token: await core.getIDToken()
+            })
+            core.setOutput('deployment_id', deployment.id)
+            core.setOutput('page_url', deployment.page_url)
+            const failed = new Set(['deployment_failed', 'deployment_content_failed', 'deployment_cancelled', 'deployment_lost'])
+            for (let attempt = 0; attempt < 60; attempt++) {
+              const { data } = await github.request('GET /repos/{owner}/{repo}/pages/deployments/{deployment_id}', {
+                ...context.repo,
+                deployment_id: deployment.id
+              })
+              core.info(`Pages deployment status: ${data.status}`)
+              if (data.status === 'succeed') return
+              if (failed.has(data.status)) throw new Error(`Pages deployment failed: ${data.status}`)
+              await new Promise(resolve => setTimeout(resolve, 10000))
+            }
+            throw new Error('Pages deployment did not complete within 10 minutes')
+
+      - name: Cancel unfinished Pages deployment
+        if: ${{ (failure() || cancelled()) && steps.deployment.outputs.deployment_id != '' }}
+        uses: actions/github-script@v8
+        env:
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.deployment_id }}
+        with:
+          script: |
+            await github.request('POST /repos/{owner}/{repo}/pages/deployments/{deployment_id}/cancel', {
+              ...context.repo,
+              deployment_id: process.env.DEPLOYMENT_ID
+            })
