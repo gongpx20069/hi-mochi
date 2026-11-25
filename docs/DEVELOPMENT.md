@@ -739,6 +739,8 @@ mirror file again anonymously and verifies its full size and SHA-256 against
 GitHub metadata and the original checksum manifest. Public verification
 necessarily follows publication: a failed check leaves the CNB release in place
 for diagnosis and fails the job, without reporting the mirror as verified.
+The mirror checkout must include full Git history (`fetch-depth: 0`); CNB
+rejects source-tag pushes from an incomplete shallow history.
 Conflicting assets require manual investigation, never automatic replacement.
 An incomplete already-published mirror fails by default. To intentionally expand
 an older ARM64-only mirror, select `complete_published_release` in the manual
