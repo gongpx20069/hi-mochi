@@ -1,5 +1,7 @@
 package com.example.mochi_pet.platform.browser
 
+import com.example.mochi_pet.core.agent.tool.ToolErrorReason
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.MutableContextWrapper
@@ -105,7 +107,10 @@ data class AgentBrowserUiState(
     val credentialSaveAvailable: Boolean = false,
 )
 
-open class AgentBrowserException(message: String) : Exception(message)
+open class AgentBrowserException(
+    message: String,
+    val reason: ToolErrorReason = ToolErrorReason.BROWSER_STATE_CONFLICT,
+) : Exception(message)
 
 class StaleBrowserReferenceException :
     AgentBrowserException("The page element reference is stale")
@@ -339,6 +344,7 @@ class AgentBrowserRuntime(
             throw AgentBrowserException(
                 "A previous browser observation is still pending. Use browser_read to observe it, " +
                     "or navigate elsewhere; do not repeat an unconfirmed action.",
+                ToolErrorReason.BROWSER_PENDING_OBSERVATION,
             )
         }
         val startedAt = SystemClock.uptimeMillis()
@@ -391,7 +397,7 @@ class AgentBrowserRuntime(
                 if (left == 0L) return@withContext observation("waiting", fresh = true)
                 delay(minOf(left, OBSERVATION_POLL_MILLIS))
             }
-            throw AgentBrowserException("Browser session ended")
+            throw AgentBrowserException("Browser session ended", ToolErrorReason.BROWSER_SESSION_ENDED)
         } catch (error: CancellationException) {
             owned?.cancel()
             if (pendingObservation === owned) {
@@ -448,7 +454,7 @@ class AgentBrowserRuntime(
     ): JsonObject {
         val current = ensureWebView()
         val requestedMode = BrowserMode.entries.firstOrNull { it.name.equals(mode, ignoreCase = true) }
-            ?: throw IllegalArgumentException("Browser mode must be auto, mobile, or desktop.")
+            ?: throw AgentBrowserException("Browser mode must be auto, mobile, or desktop.", ToolErrorReason.BROWSER_INVALID_MODE)
         updateAction(
             when (operation) {
                 "goto" -> "Opening page"
@@ -457,6 +463,7 @@ class AgentBrowserRuntime(
                 "reload" -> "Reloading page"
                 else -> throw AgentBrowserException(
                     "Unsupported navigation operation",
+                    ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
                 )
             },
         )
@@ -466,9 +473,14 @@ class AgentBrowserRuntime(
                     val target = url
                         ?: throw AgentBrowserException(
                             "A URL is required for goto",
+                            ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
                         )
                     val validated = withContext(Dispatchers.IO) {
-                        PublicWebUrlPolicy.validate(target).toString()
+                        try {
+                            PublicWebUrlPolicy.validate(target).toString()
+                        } catch (_: IllegalArgumentException) {
+                            throw AgentBrowserException("Browser URL is invalid", ToolErrorReason.BROWSER_INVALID_URL)
+                        }
                     }
                     val host = validated.toHttpUrlOrNull()!!.host
                     val effective = settings?.mode(host, requestedMode)
@@ -487,7 +499,10 @@ class AgentBrowserRuntime(
                         val validated = withContext(Dispatchers.IO) { PublicWebUrlPolicy.validate(target).toString() }
                         withContext(Dispatchers.Main.immediate) {
                             if (historyTarget(current, offset) != target) {
-                                throw AgentBrowserException("Browser history changed. Read the page before navigating again.")
+                                throw AgentBrowserException(
+                                    "Browser history changed. Read the page before navigating again.",
+                                    ToolErrorReason.BROWSER_HISTORY_CHANGED,
+                                )
                             }
                             allowedRedirectUrl = validated
                             current.goBackOrForward(offset)
@@ -495,7 +510,10 @@ class AgentBrowserRuntime(
                     }
                 }
                 "reload" -> withContext(Dispatchers.Main.immediate) {
-                    require(!modeLocked) { "Reload after page interaction requires user control; do not replay a submission." }
+                    if (modeLocked) throw AgentBrowserException(
+                        "Reload after page interaction requires user control; do not replay a submission.",
+                        ToolErrorReason.BROWSER_RELOAD_BLOCKED,
+                    )
                     val host = current.url?.toHttpUrlOrNull()?.host
                     val effective = host?.let { settings?.mode(it, requestedMode) }
                         ?: requestedMode.takeIf { it != BrowserMode.AUTO } ?: activeMode
@@ -506,7 +524,7 @@ class AgentBrowserRuntime(
             }
             delay(NAVIGATION_SETTLE_MILLIS)
             if (mutableState.value.error == FORM_RESUBMISSION_BLOCKED) {
-                throw AgentBrowserException(FORM_RESUBMISSION_BLOCKED)
+                throw AgentBrowserException(FORM_RESUBMISSION_BLOCKED, ToolErrorReason.BROWSER_FORM_RESUBMISSION_BLOCKED)
             }
             withContext(Dispatchers.Main.immediate) { current.url?.toHttpUrlOrNull()?.host }
                 ?.let { settings?.visited(it, activeMode) }
@@ -588,10 +606,12 @@ class AgentBrowserRuntime(
                     val targetRef = ref
                         ?: throw AgentBrowserException(
                             "A page element is required for typing",
+                            ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
                         )
                     val inputText = text
                         ?: throw AgentBrowserException(
                             "Text is required for typing",
+                            ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
                         )
                     """
                     (() => {
@@ -623,10 +643,12 @@ class AgentBrowserRuntime(
                     val targetRef = ref
                         ?: throw AgentBrowserException(
                             "A page element is required for selection",
+                            ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
                         )
                     val selectedValue = value
                         ?: throw AgentBrowserException(
                             "A value is required for selection",
+                            ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
                         )
                     """
                     (() => {
@@ -652,6 +674,7 @@ class AgentBrowserRuntime(
                     val pressedKey = key
                         ?: throw AgentBrowserException(
                             "A key is required",
+                            ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
                         )
                     val selector = ref?.let {
                         refQuery(it)
@@ -681,6 +704,7 @@ class AgentBrowserRuntime(
                 }
                 else -> throw AgentBrowserException(
                     "Unsupported input operation",
+                    ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
                 )
             }
             requestInputFocus(current)
@@ -714,7 +738,7 @@ class AgentBrowserRuntime(
     ): JsonObject {
         ref?.let(::requireValidRef)
         if (direction !in setOf("up", "down")) {
-            throw AgentBrowserException("Unsupported scroll direction")
+            throw AgentBrowserException("Unsupported scroll direction", ToolErrorReason.BROWSER_INVALID_SCROLL_DIRECTION)
         }
         val current = ensureWebView()
         updateAction("Scrolling page")
@@ -756,6 +780,7 @@ class AgentBrowserRuntime(
                 }
                 else -> throw AgentBrowserException(
                     "Unsupported scroll amount",
+                    ToolErrorReason.BROWSER_INVALID_SCROLL_AMOUNT,
                 )
             }
             if (!evaluate(current, script).booleanValue("ok")) {
@@ -773,7 +798,7 @@ class AgentBrowserRuntime(
         check(assistance.request.value == null) { "Browser is paused for user assistance." }
         check(!mutableState.value.manual) { "Browser is under manual control." }
         if (!turnActive) {
-            throw AgentBrowserException("The browser turn is not active")
+            throw AgentBrowserException("The browser turn is not active", ToolErrorReason.BROWSER_SESSION_ENDED)
         }
         webView?.let { return it }
         return withContext(Dispatchers.Main.immediate) {
@@ -821,10 +846,10 @@ class AgentBrowserRuntime(
                 refAttribute = refAttributeName,
             ),
         )
-        if (webView !== current || !turnActive) throw AgentBrowserException("Browser session ended")
+        if (webView !== current || !turnActive) throw AgentBrowserException("Browser session ended", ToolErrorReason.BROWSER_SESSION_ENDED)
         if (refAttributeName != document) throw BrowserPageChangedException()
         if (!page.booleanValue("ok")) {
-            throw AgentBrowserException("Could not read the browser page")
+            throw AgentBrowserException("Could not read the browser page", ToolErrorReason.BROWSER_PAGE_UNREADABLE)
         }
         nextElementRef = page["next_ref"]
             ?.jsonPrimitive
@@ -895,7 +920,7 @@ class AgentBrowserRuntime(
         script: String,
     ): JsonObject = withContext(Dispatchers.Main.immediate) {
         if (!turnActive || webView !== current) {
-            throw AgentBrowserException("Browser session ended")
+            throw AgentBrowserException("Browser session ended", ToolErrorReason.BROWSER_SESSION_ENDED)
         }
         val result = CompletableDeferred<JsonObject>()
         pendingScripts[result] = current
@@ -928,9 +953,13 @@ class AgentBrowserRuntime(
         }
     }
 
-    private fun failPendingScripts(current: WebView, message: String) {
+    private fun failPendingScripts(
+        current: WebView,
+        message: String,
+        reason: ToolErrorReason = ToolErrorReason.BROWSER_SESSION_ENDED,
+    ) {
         pendingScripts.filterValues { it === current }.keys.forEach {
-            it.completeExceptionally(AgentBrowserException(message))
+            it.completeExceptionally(AgentBrowserException(message, reason))
         }
     }
 
@@ -942,7 +971,7 @@ class AgentBrowserRuntime(
 
     private fun requireValidRef(ref: String) {
         if (!REF_PATTERN.matches(ref)) {
-            throw AgentBrowserException("Invalid page element reference")
+            throw AgentBrowserException("Invalid page element reference", ToolErrorReason.BROWSER_INVALID_REFERENCE)
         }
     }
 
@@ -952,8 +981,14 @@ class AgentBrowserRuntime(
 
     private fun applyMode(view: WebView, mode: BrowserMode) {
         if (mode == activeMode) return
-        require(!modeLocked) { "Cannot change browser mode after page interaction. Finish or cancel the form first." }
-        require(modeChanges < 4) { "Browser mode switch limit reached." }
+        if (modeLocked) throw AgentBrowserException(
+            "Cannot change browser mode after page interaction. Finish or cancel the form first.",
+            ToolErrorReason.BROWSER_MODE_LOCKED,
+        )
+        if (modeChanges >= 4) throw AgentBrowserException(
+            "Browser mode switch limit reached.",
+            ToolErrorReason.BROWSER_MODE_CHANGE_LIMIT,
+        )
         val defaultUa = WebSettings.getDefaultUserAgent(applicationContext)
         view.settings.userAgentString = if (mode == BrowserMode.DESKTOP) desktopUserAgent(defaultUa) else defaultUa
         view.settings.useWideViewPort = mode == BrowserMode.DESKTOP
@@ -1152,7 +1187,7 @@ class AgentBrowserRuntime(
             dontResend.sendToTarget()
             if (webView !== view) return
             mutableState.value = mutableState.value.copy(loading = false, error = FORM_RESUBMISSION_BLOCKED)
-            failPendingScripts(view, FORM_RESUBMISSION_BLOCKED)
+            failPendingScripts(view, FORM_RESUBMISSION_BLOCKED, ToolErrorReason.BROWSER_FORM_RESUBMISSION_BLOCKED)
         }
 
         override fun shouldOverrideUrlLoading(
@@ -1221,7 +1256,7 @@ class AgentBrowserRuntime(
             detail: RenderProcessGoneDetail,
         ): Boolean {
             if (webView !== view) return true
-            failPendingScripts(view, "Browser renderer stopped")
+            failPendingScripts(view, "Browser renderer stopped", ToolErrorReason.BROWSER_RENDERER_STOPPED)
             assistance.request.value?.let {
                 assistance.respond(it.id, UserAssistanceAnswer("cancelled"))
             }

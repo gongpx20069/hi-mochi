@@ -1,5 +1,7 @@
 package com.example.mochi_pet.core.agent
 
+import com.example.mochi_pet.core.agent.tool.ToolErrorReason
+
 import com.example.mochi_pet.core.agent.llm.OpenAiChatClient
 import com.example.mochi_pet.core.agent.llm.OpenAiChatMessage
 import com.example.mochi_pet.core.agent.llm.OpenAiChatContentPart
@@ -93,6 +95,7 @@ data class AgentDiagnosticEvent(
     val maxToolRounds: Int = 0,
     val durationMs: Long = 0,
     val errorType: String? = null,
+    val toolReason: ToolErrorReason? = null,
 )
 
 fun interface AgentDiagnosticLogger {
@@ -479,6 +482,7 @@ class AgentOrchestrator(
                             toolName = toolCall.function.name,
                             toolStatus = result.status,
                             toolCode = result.code,
+                            toolReason = result.reason,
                             durationMs = elapsedSince(toolStartedAt),
                         ),
                     )

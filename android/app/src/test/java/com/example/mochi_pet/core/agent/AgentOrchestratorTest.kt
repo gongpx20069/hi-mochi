@@ -1,5 +1,8 @@
 package com.example.mochi_pet.core.agent
 
+import com.example.mochi_pet.toLogMessage
+import com.example.mochi_pet.core.agent.tool.ToolErrorReason
+
 import com.example.mochi_pet.core.agent.llm.OpenAiChatClient
 import com.example.mochi_pet.core.agent.llm.OpenAiChatMessage
 import com.example.mochi_pet.core.agent.llm.OpenAiChatRequest
@@ -495,6 +498,44 @@ class AgentOrchestratorTest {
         assertEquals(1, events.last().toolCall)
         assertTrue(events.none { it.toString().contains("private") })
         assertTrue(events.none { it.toString().contains("Hello Mochi") })
+        assertTrue(client.requests[1].messages.last().content.orEmpty().contains("\"status\":\"ok\""))
+        assertTrue(!client.requests[1].messages.last().content.orEmpty().contains("\"reason\""))
+    }
+
+    @Test fun `browser failure reasons reach the model and correlated logs without private error content`() = runBlocking {
+        val events = mutableListOf<AgentDiagnosticEvent>()
+        val tool = object : AgentTool {
+            override val name = "browser_navigate"
+            override val schema = functionToolSchema(name, "Synthetic browser", buildJsonObject {}, emptyList())
+            override suspend fun execute(arguments: JsonObject, context: ToolExecutionContext): ToolResultEnvelope =
+                ToolResultEnvelope.error(
+                    ToolErrorReason.BROWSER_MODE_CHANGE_LIMIT.code,
+                    "Synthetic private error text",
+                    ToolErrorReason.BROWSER_MODE_CHANGE_LIMIT,
+                )
+        }
+        val client = QueueChatClient(
+            toolResponse("call_1", tool.name, """{"url":"https://example.com/?private=fixture"}"""),
+            finalResponse("""{"reply":"Try another approach","emotion":"neutral"}"""),
+        )
+        val reply = orchestrator(
+            client, ToolRegistry(listOf(tool)),
+            diagnosticLogger = AgentDiagnosticLogger(events::add),
+            runIdProvider = { "browser-run" },
+        ).run(request())
+        assertEquals("Try another approach", reply.reply)
+        val result = client.requests[1].messages.last().content.orEmpty()
+        assertTrue(result.contains("\"reason\":\"BROWSER_MODE_CHANGE_LIMIT\""))
+        assertTrue(result.contains("\"code\":\"CONFLICT\""))
+        val finished = events.single { it.type == AgentDiagnosticEventType.TOOL_FINISHED }
+        assertEquals(ToolErrorReason.BROWSER_MODE_CHANGE_LIMIT, finished.toolReason)
+        val log = finished.toLogMessage()
+        assertTrue(log.contains("run_id=browser-run"))
+        assertTrue(log.contains("tool_call=1"))
+        assertTrue(log.contains("reason=BROWSER_MODE_CHANGE_LIMIT"))
+        assertTrue(events.none { it.toLogMessage().contains("private", ignoreCase = true) })
+        assertTrue(events.none { it.toLogMessage().contains("example.com") })
+        assertTrue(events.none { it.toLogMessage().contains("Hello Mochi") })
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.example.mochi_pet.core.browser
 
 import com.example.mochi_pet.core.agent.tool.AgentTool
 import com.example.mochi_pet.core.agent.tool.ToolErrorCode
+import com.example.mochi_pet.core.agent.tool.ToolErrorReason
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
 import com.example.mochi_pet.core.agent.tool.ToolResultEnvelope
 import com.example.mochi_pet.core.agent.tool.functionToolSchema
@@ -251,30 +252,39 @@ private suspend fun browserResult(
         ToolResultEnvelope.error(
             ToolErrorCode.PERMISSION_DENIED,
             error.message ?: "Browser navigation was blocked",
+            ToolErrorReason.BROWSER_URL_BLOCKED,
         )
     } catch (error: WebContentException) {
         ToolResultEnvelope.error(
             ToolErrorCode.PROVIDER_ERROR,
             error.message ?: "Browser navigation failed",
+            ToolErrorReason.BROWSER_NAVIGATION_FAILED,
         )
     } catch (error: StaleBrowserReferenceException) {
         ToolResultEnvelope.error(
             ToolErrorCode.STALE_REF,
             error.message ?: "Browser element reference is stale",
+            ToolErrorReason.BROWSER_STALE_REFERENCE,
         )
     } catch (error: AgentBrowserException) {
         ToolResultEnvelope.error(
-            ToolErrorCode.CONFLICT,
+            error.reason.code,
             error.message ?: "Browser action failed",
+            error.reason,
         )
     } catch (error: IllegalArgumentException) {
         ToolResultEnvelope.error(
             ToolErrorCode.INVALID_ARGS,
             error.message ?: "Browser input is invalid",
+            ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
         )
     } catch (error: IllegalStateException) {
         if (error is kotlinx.coroutines.CancellationException) throw error
-        ToolResultEnvelope.error(ToolErrorCode.CONFLICT, error.message ?: "Browser state changed")
+        ToolResultEnvelope.error(
+            ToolErrorCode.CONFLICT,
+            error.message ?: "Browser state changed",
+            ToolErrorReason.BROWSER_STATE_CONFLICT,
+        )
     }
 
 private fun JsonObject.waitSeconds(): Long {

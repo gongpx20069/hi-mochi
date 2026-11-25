@@ -89,6 +89,22 @@ blocked navigation. Normal history movement does not authorize replaying a POST
 or an unconfirmed action. Native navigation errors remain visible until a new
 navigation starts.
 
+Browser error envelopes include a fixed `reason` identifier. Invalid mode, URL,
+scroll direction/amount, reference syntax or missing arguments use `INVALID_ARGS`.
+Mode-change limits, interaction locks, blocked reloads and unconsumed observations
+use `CONFLICT`, with distinct reasons such as `BROWSER_MODE_CHANGE_LIMIT` and
+`BROWSER_PENDING_OBSERVATION`. Stale DOM references remain `STALE_REF`; blocked
+URLs use `PERMISSION_DENIED`; unreadable pages, renderer termination and navigation
+failures use `PROVIDER_ERROR`. Other state guards retain a generic
+`BROWSER_STATE_CONFLICT` reason rather than guessing from exception text.
+
+The existing `MochiAgent` tool-finished log records the enum reason together with
+run ID, actor, tool name, model/tool round and tool-call index. It does not log
+arguments, URLs, page contents, credentials or raw error messages. This does not
+add a persistent trace store or change observation windows, mode limits, action
+dispatch, cancellation or replay protection. A completed but unconsumed
+observation still requires `browser_read`, even when `action_pending=false`.
+
 Foreground Main also receives `request_user_assistance(kind, message, options)`.
 This native Tool is available independently of Browser enablement for questions;
 browser handoff requires an already open page. Children and schedules do not

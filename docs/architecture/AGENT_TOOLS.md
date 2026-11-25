@@ -27,6 +27,13 @@ Required error codes include `INVALID_ARGS`, `NOT_FOUND`, `CONFLICT`,
 `PERMISSION_DENIED`, `CANCELLED`, `PROVIDER_ERROR`, `TIMEOUT`, and
 `INTERNAL_ERROR`.
 
+Native failures may additionally include an optional typed `reason` enum.
+Browser reasons distinguish invalid inputs, state guards and page failures;
+the broad `code` remains the recovery category. Orchestrator diagnostics carry
+only the fixed reason identifier alongside the existing run/actor/tool-call
+metadata, never raw arguments, error messages, URLs, page text or credentials.
+Success envelopes and failures without a reason retain their existing shape.
+
 Tool arguments are untrusted. Executors validate enums, lengths, timestamps,
 IDs, permissions, and state before performing side effects.
 
