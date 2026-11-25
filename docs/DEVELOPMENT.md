@@ -110,6 +110,10 @@ production update checks or dismissing unexpected dialogs in assertions.
 Loopback fixtures and adb remain available. This setup is for disposable
 CI emulators only, not a connected personal phone.
 
+The handset smoke tests that assert portrait composer geometry and agenda
+swipes temporarily request portrait orientation on their test Activity and restore
+its previous request afterward. They do not change the device's rotation settings.
+
 The API 29 job installs a pinned official Chromium x86_64 WebView snapshot
 because the image's factory WebView does not support the browser's JavaScript.
 It verifies the APK's SHA-256 and requires successful provider selection;
