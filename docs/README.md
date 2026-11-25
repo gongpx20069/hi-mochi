@@ -51,6 +51,9 @@ changelogs or detailed operating manuals. Group related Skills by user goal;
 keep paragraphs short and leave release history in GitHub Releases.
 The Chinese quick start recommends ModelScope and the English quick start
 recommends Groq for their free API allowances, without promising unlimited usage.
+Separate LLM and speech setup in quick start and provider tables; recommend
+iFlytek for speech while retaining the built-in Android option. Put Tool
+connection links directly in the relevant capability rows.
 
 The planned all-extension setup flows live in `INTERACTION_DESIGN.md`.
 [`android/extensions/README.md`](../android/extensions/README.md) contains their

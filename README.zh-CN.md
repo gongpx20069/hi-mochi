@@ -22,14 +22,18 @@
 
 1. **安装老莫。** 下载[APK](https://cnb.cool/hi-mochi/hi-mochi/-/releases/tag/v1.0.24)，
    大多数手机选 `arm64-v8a`，不确定选 `universal`。升级时覆盖安装，不要先卸载。
-2. **连接模型。** 打开**设置 > AI 连接**。
+2. **连接模型。**
+
+   **LLM 模型：** 打开**设置 > AI 连接**。
    **推荐魔搭 ModelScope，可用免费 API 额度入门：**
    [注册或登录](https://modelscope.cn/) → [获取 Access Token](https://modelscope.cn/my/myaccesstoken) 并粘贴 →
    从下拉列表选择推荐模型；也可到[模型库](https://modelscope.cn/models)选择后自定义填写。
+
+   **语音模型：推荐讯飞。** 从[控制台](https://console.xfyun.cn/)获取 AppID、APIKey 和 APISecret，
+   在**设置 > 语音与唤醒**中填写，保存并选用该账号；也可使用内置 Android 系统语音，无需额外密钥。
 3. **开始交流。** 打字或长按输入框说话，点击发送；
    切换到**陪伴**模式，叫一声 **“老莫老莫”** 即可语音交流。
 
-内置 Android 系统语音，无需额外语音密钥或扩展。
 唤醒需要陪伴页面在前台可见、屏幕解锁，不支持锁屏或后台唤醒。
 
 ## 老莫能做什么
@@ -40,8 +44,8 @@
 | 安排日常 | 管理日程、带日期的待办和提醒，定时执行 AI 任务，语音切换页面 |
 | 回忆过去 | 按需开启每日小记与回忆检索，找到之前聊过的事及原始消息 |
 | 浏览与研究 | 阅读链接、手动浏览网页、比较商品、查豆瓣评分、研究美股七姐妹 |
-| 处理文档 | 查找、起草和更新已授权的 Notion、腾讯文档、飞书云文档 |
-| 出行与找店 | 结合高德和浏览器查询路线、天气、火车与航班信息、附近商家 |
+| 处理文档 | 查找、起草和更新已授权的 [Notion](https://www.notion.com/help/notion-mcp)、[腾讯文档](https://docs.qq.com/open/auth/mcp.html)、[飞书云文档](https://open.feishu.cn/app) |
+| 出行与找店 | 结合[高德](https://console.amap.com/)和浏览器查询路线、天气、火车与航班信息、附近商家 |
 | 操作手机 | 操作允许的应用，点歌、控制播放、调节媒体音量 |
 
 > “总结一下这个网页。” · “提醒我明天下午三点赴约。” · “附近有什么咖啡店？”
@@ -52,26 +56,31 @@
 
 ## 按需连接服务
 
-**模型：** 除魔搭外，也支持以下服务和其他 OpenAI 兼容 API。
-预设会填写地址并提供配置引导，可保存多个连接；请选择支持工具调用的模型。
+### LLM 模型
 
-[OpenAI](https://platform.openai.com/api-keys) ·
-[Azure OpenAI](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) ·
-[DeepSeek](https://api-docs.deepseek.com/) ·
-[Kimi](https://platform.kimi.com/docs/get-api-key) ·
-[GLM](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) ·
-[MiniMax](https://platform.minimax.cn/docs/api-reference/text-openai-api) ·
-[Agnes-AI](https://wiki.agnes-ai.com/en/docs/overview) ·
-[Groq](https://console.groq.com/keys)（[模型库](https://console.groq.com/docs/models)）。
+在**设置 > AI 连接**中配置，选择支持工具调用的模型；预设会填写地址，也支持其他 OpenAI 兼容 API。
 
-**文档与出行：** [Notion](https://www.notion.com/help/notion-mcp) ·
-[腾讯文档](https://docs.qq.com/open/auth/mcp.html) ·
-[飞书](https://open.feishu.cn/app) · [高德 Web 服务 Key](https://console.amap.com/)。
-需要时在**工具**中连接即可。
+| 供应商 | 官方配置入口与文档 |
+| --- | --- |
+| **魔搭 ModelScope · 推荐** | [Access Token](https://modelscope.cn/my/myaccesstoken) · [模型库](https://modelscope.cn/models) |
+| Groq | [API Key](https://console.groq.com/keys) · [模型文档](https://console.groq.com/docs/models) |
+| OpenAI | [API Key](https://platform.openai.com/api-keys) · [API 文档](https://developers.openai.com/api/docs) |
+| Azure OpenAI | [创建资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) · [接入文档](https://learn.microsoft.com/azure/ai-foundry/openai/) |
+| DeepSeek | [API 文档](https://api-docs.deepseek.com/) |
+| Kimi | [获取 API Key](https://platform.kimi.com/docs/get-api-key) |
+| GLM | [API 文档](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
+| MiniMax | [国内 API 文档](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
+| Agnes-AI | [API 文档](https://wiki.agnes-ai.com/en/docs/overview) |
 
-**可选云端语音：** [讯飞](https://console.xfyun.cn/)或
-[Azure Speech](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices)，
-在**设置 > 语音与唤醒**中配置。
+### 语音模型
+
+在**设置 > 语音与唤醒**中配置，保存并选用语音账号；云端语音播报需单独开启。
+
+| 供应商 | 官方配置入口与文档 |
+| --- | --- |
+| **讯飞 · 推荐** | [控制台](https://console.xfyun.cn/) · [语音听写文档](https://www.xfyun.cn/doc/asr/voicedictation/API.html) |
+| Azure Speech | [创建资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices) · [快速开始](https://learn.microsoft.com/azure/ai-services/speech-service/get-started-speech-to-text) |
+| Android 系统语音 | 内置，无需额外 API 密钥 |
 
 ## 可选扩展
 

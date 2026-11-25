@@ -22,14 +22,19 @@
 
 1. **Install** the [latest APK](https://github.com/gongpx20069/hi-mochi/releases/latest).
    Most phones use `arm64-v8a`; choose `universal` if unsure. Update in place without uninstalling.
-2. **Connect a model** in **Settings > AI connections**.
+2. **Connect your models.**
+
+   **LLM:** open **Settings > AI connections**.
    **We recommend Groq for its free API tier:** [sign in](https://console.groq.com/),
    [get an API key](https://console.groq.com/keys), then choose a
    [Tool Use model](https://console.groq.com/docs/models).
+
+   **Speech:** we recommend **iFlytek**. Get your AppID, APIKey and APISecret from the
+   [console](https://console.xfyun.cn/), add them in **Settings > Speech and wake**,
+   then save and select the account. Or use built-in Android speech without an extra key.
 3. **Chat or talk.** Type or hold the input to dictate, then tap Send.
    Switch to **Companion** and say **“Hi Mochi”** for hands-free conversation.
 
-Android speech is built in; no extra speech key or extension is needed.
 Wake listening requires Companion to be visible with the screen unlocked.
 
 ## What you can do
@@ -40,8 +45,8 @@ Wake listening requires Companion to be visible with the screen unlocked.
 | Organize your day | Calendar events, dated todos, reminders, recurring AI tasks and voice navigation between screens |
 | Recall earlier conversations | Optional Daily journal and Memory Recall with links to original messages |
 | Research and browse | Read links, browse manually, compare products, check Douban ratings and research the Magnificent Seven |
-| Work with documents | Find, draft and update authorized Notion, Tencent Docs and Feishu documents |
-| Plan a trip | Research routes, weather, trains, flights and nearby businesses with Amap and the browser |
+| Work with documents | Find, draft and update authorized [Notion](https://www.notion.com/help/notion-mcp), [Tencent Docs](https://docs.qq.com/open/auth/mcp.html) and [Feishu](https://open.feishu.cn/app) documents |
+| Plan a trip | Research routes, weather, trains, flights and nearby businesses with [Amap](https://console.amap.com/) and the browser |
 | Use phone apps | Operate allowed apps, request music, control playback and adjust media volume |
 
 > “Summarize this page.” · “Remind me tomorrow at three.” · “Find a nearby café.”
@@ -52,27 +57,33 @@ Shopping and travel research do not place orders or bookings; stock research is 
 
 ## Connect your services
 
-**Models:** use Groq or bring another tool-capable model.
-Presets fill in the endpoint and include setup links; you can save multiple connections.
+### LLM Models
 
-[OpenAI](https://platform.openai.com/api-keys) ·
-[Azure OpenAI](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) ·
-[DeepSeek](https://api-docs.deepseek.com/) ·
-[Kimi](https://platform.kimi.com/docs/get-api-key) ·
-[GLM](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) ·
-[MiniMax](https://platform.minimax.cn/docs/api-reference/text-openai-api) ·
-[Agnes-AI](https://wiki.agnes-ai.com/en/docs/overview) ·
-[ModelScope](https://modelscope.cn/) ([Access Token](https://modelscope.cn/my/myaccesstoken),
-[models](https://modelscope.cn/models)) · other OpenAI-compatible APIs.
+Configure in **Settings > AI connections**. Choose a tool-capable model;
+presets fill in the endpoint. Other OpenAI-compatible APIs are also supported.
 
-**Documents and places:** [Notion](https://www.notion.com/help/notion-mcp) ·
-[Tencent Docs](https://docs.qq.com/open/auth/mcp.html) ·
-[Feishu](https://open.feishu.cn/app) · [Amap Web Service Key](https://console.amap.com/).
-Connect them from **Tools** when needed.
+| Provider | Official setup links |
+| --- | --- |
+| **Groq · Recommended** | [API key](https://console.groq.com/keys) · [Models](https://console.groq.com/docs/models) |
+| ModelScope | [Access Token](https://modelscope.cn/my/myaccesstoken) · [Model library](https://modelscope.cn/models) |
+| OpenAI | [API key](https://platform.openai.com/api-keys) · [API guide](https://developers.openai.com/api/docs) |
+| Azure OpenAI | [Create resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) · [Guide](https://learn.microsoft.com/azure/ai-foundry/openai/) |
+| DeepSeek | [API guide](https://api-docs.deepseek.com/) |
+| Kimi | [API key guide](https://platform.kimi.com/docs/get-api-key) |
+| GLM | [API guide](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
+| MiniMax | [China API guide](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
+| Agnes-AI | [API guide](https://wiki.agnes-ai.com/en/docs/overview) |
 
-**Optional cloud speech:** [iFlytek](https://console.xfyun.cn/) or
-[Azure Speech](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices),
-configured in **Settings > Speech and wake**.
+### Speech Models
+
+Configure in **Settings > Speech and wake**. Save and select your speech account;
+cloud voice replies are a separate opt-in.
+
+| Provider | Official setup links |
+| --- | --- |
+| **iFlytek · Recommended** | [Console](https://console.xfyun.cn/) · [Speech dictation guide](https://www.xfyun.cn/doc/asr/voicedictation/API.html) |
+| Azure Speech | [Create resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices) · [Quick start](https://learn.microsoft.com/azure/ai-services/speech-service/get-started-speech-to-text) |
+| Android system speech | Built in; no extra API key |
 
 ## Optional extensions
 
