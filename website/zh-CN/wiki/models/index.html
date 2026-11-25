@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="为老莫连接魔搭、Groq、OpenAI、Azure 等模型 API，按服务商查看所需配置。">
+  <title>模型连接 · Mochi Wiki</title>
+  <link rel="canonical" href="https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/models/">
+  <link rel="alternate" hreflang="en" href="https://gongpx20069.github.io/hi-mochi/wiki/models/">
+  <link rel="alternate" hreflang="zh-CN" href="https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/models/">
+  <link rel="alternate" hreflang="x-default" href="https://gongpx20069.github.io/hi-mochi/wiki/models/">
+  <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../styles.css"><script src="../../../scripts.js" defer></script>
+</head>
+<body class="wiki-page">
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header" data-header><div class="nav-shell">
+    <a class="brand" href="../../"><span class="brand-mark" aria-hidden="true"><span></span></span>Mochi</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">打开导航</span><span></span><span></span></button>
+    <nav class="site-nav" id="site-nav" aria-label="主导航" data-nav><a href="../../">首页</a><a href="../">Wiki</a><a href="../quick-start/">快速开始</a><a href="../../../wiki/models/" lang="en">EN</a></nav>
+  </div></header>
+  <main class="shell wiki-frame" id="main">
+    <aside class="wiki-sidebar"><nav aria-label="Wiki"><a href="../">指南首页</a><a href="../quick-start/">快速开始</a><a href="./" aria-current="page">模型连接</a><a href="../speech/">语音连接</a><a href="../capabilities/">技能与扩展</a></nav></aside>
+    <article class="wiki-article" data-provider-guide>
+      <header><a class="text-link" href="../">Mochi Wiki</a><h1>选好模型，就能开始。</h1><p class="wiki-lede">推荐魔搭 ModelScope，用免费 API 额度入门。已有其他服务？展开对应一项即可。</p></header>
+      <section class="wiki-section" id="basics"><h2>入口与基本配置</h2><p>打开<strong>设置 → AI 连接 → 添加 AI 连接</strong>，填写连接名称并选择服务商预设。地址会自动填写，再填<strong>模型 ID</strong>和<strong>密钥</strong>即可。模型需要支持工具调用。</p><p>第一个连接自动选中；后续新增连接，点击<strong>使用</strong>再切换。切换会取消正在运行的本地 Agent 任务；编辑已有连接时，密钥留空表示保留原密钥。</p></section>
+      <section class="wiki-section" id="providers"><h2>选择服务商</h2>
+        <details class="wiki-disclosure" id="modelscope" data-provider="modelscope" open><summary>魔搭 ModelScope · 推荐</summary><ol><li><a href="https://modelscope.cn/">注册或登录魔搭</a>。</li><li>获取 <a href="https://modelscope.cn/my/myaccesstoken">ModelScope Access Token</a>，粘贴到魔搭预设中。</li><li>选择下拉推荐模型；不满意可选自定义，从<a href="https://modelscope.cn/models">模型库</a>复制支持 API 和工具调用的完整 ID，然后保存。</li></ol></details>
+        <details class="wiki-disclosure" id="groq" data-provider="groq"><summary>Groq</summary><ol><li><a href="https://console.groq.com/">注册或登录</a>，然后<a href="https://console.groq.com/keys">创建 API Key</a>。</li><li>选择 Groq 预设，保持 <code>https://api.groq.com/openai/v1</code> 与 Chat Completions。</li><li>从<a href="https://console.groq.com/docs/models">模型指南</a>选择支持 Tool Use 的模型，填写完整 ID 和密钥后保存。</li></ol></details>
+        <details class="wiki-disclosure" id="openai" data-provider="openai"><summary>OpenAI</summary><ol><li>在 <a href="https://platform.openai.com/api-keys">API 控制台</a>创建密钥。</li><li>选择 OpenAI，保持 <code>https://api.openai.com/v1</code>。</li><li>填写 API 账号可用且支持工具调用的模型与密钥后保存。新连接默认使用 Responses，具体模型见<a href="https://developers.openai.com/api/docs">官方 API 指南</a>。</li></ol></details>
+        <details class="wiki-disclosure" id="azure" data-provider="azure"><summary>Azure OpenAI</summary><ol><li>创建 <a href="https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI">Azure OpenAI 资源</a>，部署支持工具调用的模型。</li><li>选择 Azure，从资源的<strong>密钥和终结点</strong>复制地址与密钥。</li><li>模型字段填写<strong>部署名称</strong>，不是模型系列名。新连接默认 Responses；选择 Chat Completions 时，还要填写支持的 Azure API 版本。参阅 <a href="https://learn.microsoft.com/azure/ai-foundry/openai/">Azure 指南</a>。</li></ol></details>
+        <details class="wiki-disclosure" id="deepseek" data-provider="deepseek"><summary>DeepSeek</summary><ol><li>按<a href="https://api-docs.deepseek.com/">官方指南</a>获取 API Key。</li><li>选择 DeepSeek：<code>https://api.deepseek.com</code>，Chat Completions。</li><li>复制当前支持工具调用的模型 ID，填入密钥并保存。</li></ol></details>
+        <details class="wiki-disclosure" id="kimi" data-provider="kimi"><summary>Kimi</summary><ol><li>按 <a href="https://platform.kimi.com/docs/get-api-key">API Key 指南</a>获取密钥。</li><li>选择 Kimi：<code>https://api.moonshot.cn/v1</code>，Chat Completions。</li><li>填写 API 文档中支持的模型 ID 和密钥并保存。使用 API 凭据，而不是编程套餐凭据。</li></ol></details>
+        <details class="wiki-disclosure" id="glm" data-provider="glm"><summary>GLM</summary><ol><li>从 <a href="https://docs.bigmodel.cn/cn/guide/develop/openai/introduction">GLM API 指南</a>获取密钥与模型 ID。</li><li>选择 GLM：<code>https://open.bigmodel.cn/api/paas/v4</code>，Chat Completions。</li><li>确认模型支持工具调用，粘贴密钥并保存。</li></ol></details>
+        <details class="wiki-disclosure" id="minimax" data-provider="minimax"><summary>MiniMax · 国内接口</summary><ol><li>按<a href="https://platform.minimax.cn/docs/api-reference/text-openai-api">国内 API 指南</a>获取密钥。</li><li>选择 MiniMax：<code>https://api.minimax.cn/v1</code>，Chat Completions。</li><li>填写对应账号可用的模型并保存；其他区域服务需按其指南修改地址。</li></ol></details>
+        <details class="wiki-disclosure" id="agnes" data-provider="agnes"><summary>Agnes-AI</summary><ol><li>通过 <a href="https://wiki.agnes-ai.com/en/docs/overview">API 与模型指南</a>获取密钥。</li><li>选择 Agnes-AI：<code>https://apihub.agnes-ai.com/v1</code>，Chat Completions。</li><li>复制当前支持工具调用的模型 ID，填入密钥并保存。</li></ol></details>
+        <details class="wiki-disclosure" id="custom" data-provider="custom"><summary>其他 OpenAI 兼容 API</summary><ol><li>选择<strong>自定义兼容 API</strong>。</li><li>填写服务商提供的 API 基础地址、完整模型 ID 和 API Key。</li><li>在高级连接设置中选择服务支持的协议并保存。聊天网页地址不等于 API 地址。</li></ol></details>
+      </section>
+      <section class="wiki-section" id="advanced"><h2>需要时，再改高级设置</h2>
+        <details class="wiki-disclosure"><summary>Responses、Chat Completions 和图片输入</summary><p>新建 OpenAI／Azure 连接默认 <strong>Responses</strong>，其他预设默认 <strong>Chat Completions</strong>。已有连接保留原协议，报错后不会自动切换。</p><p>仅在模型和接口支持图片时开启图片输入；选择模型不会自动开启图片。魔搭地址在高级设置中修改，其他预设直接显示地址字段。</p></details>
+        <details class="wiki-disclosure"><summary>连接失败，或需要更换密钥</summary><p>按服务商指南核对 API 权限、完整模型 ID、地址和协议。更换服务类型或地址主机时，需要新密钥。旧版应用若只显示模型输入框，直接粘贴完整 ID。</p><p>可运行<a href="../quick-start/#troubleshooting">配置自检</a>发送简短请求排查。不要在截图、聊天和公开反馈中暴露凭据。</p></details>
+      </section>
+      <nav class="wiki-next" aria-label="下一篇"><a href="../quick-start/">← 快速开始</a><a href="../speech/">配置语音 →</a></nav>
+    </article>
+  </main>
+  <footer class="site-footer"><div class="shell footer-bottom"><a href="../">← Wiki</a><a href="https://github.com/gongpx20069/hi-mochi/issues">反馈问题</a></div></footer>
+</body>
+</html>

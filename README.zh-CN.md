@@ -7,6 +7,7 @@
 **把 Android 手机变成你的 AI 伙伴：陪你聊天、安排日常、查资料、办事情。**
 
 [**下载 APK**](https://github.com/gongpx20069/hi-mochi/releases/latest)
+· [官网](https://gongpx20069.github.io/hi-mochi/zh-CN/) · [使用指南](https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/)
 · [观看介绍视频](https://www.bilibili.com/video/BV1u6aB6GEDD/)
 · [English](README.md) · [简体中文](README.zh-CN.md)
 

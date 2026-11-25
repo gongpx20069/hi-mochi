@@ -20,4 +20,14 @@
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/wiki/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/wiki/quick-start/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/wiki/models/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/wiki/speech/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/wiki/capabilities/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/quick-start/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/models/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/speech/</loc></url>
+  <url><loc>https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/capabilities/</loc></url>
 </urlset>

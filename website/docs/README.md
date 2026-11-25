@@ -10,6 +10,7 @@ directory.
 website/
 ├── index.html       English homepage
 ├── zh-CN/           Simplified Chinese homepage
+├── wiki/            English user guides (Chinese in zh-CN/wiki/)
 ├── agentlink/       Official AgentLink site (Chinese in zh-CN/agentlink/)
 ├── assets/          Favicon and social sharing image
 ├── docs/            Website-only documentation
@@ -35,15 +36,39 @@ Open:
 - Simplified Chinese: `http://127.0.0.1:8000/zh-CN/`
 - AgentLink: `http://127.0.0.1:8000/agentlink/` and
   `http://127.0.0.1:8000/zh-CN/agentlink/`
+- Wiki: `http://127.0.0.1:8000/wiki/` and
+  `http://127.0.0.1:8000/zh-CN/wiki/`
 
 Keep internal assets relative so both languages work under the `/hi-mochi/`
 GitHub Pages project path. The fixed `/hi-mochi/` paths in `404.html` are
 intentional because GitHub Pages serves that document for arbitrary missing
 URLs.
 
-English and Simplified Chinese homepages keep the same product feature
-structure, including named AI and speech accounts, document collaboration
-with Notion/Tencent Docs/Feishu, and the task center. Keep onboarding and
+## Homepage and user guides
+
+Both homepages are concise product introductions: a hero, six capability cards,
+three-step setup, four optional extensions, Wiki links and a brief privacy note.
+They do not contain the detailed operating manual or release history. The
+English quick start recommends Groq's free API tier; Chinese recommends
+ModelScope's free API allowance, without promising unlimited service.
+
+The bilingual Wiki has five destinations: its index, `quick-start/`, `models/`,
+`speech/` and `capabilities/`. Keep matched language-switch destinations,
+canonical/hreflang metadata and sitemap entries for every page. Use static
+HTML, shared styles, native disclosures, side navigation and short steps; no
+new runtime, build dependency, account or API key is needed to read a guide.
+The model guide covers all ten presets with three steps each; only the
+language's recommended provider starts expanded. ModelScope has only signup,
+Token and model-library links, without binding/credit tutorials.
+Speech covers Android, iFlytek and Azure, including saving credentials before
+voice previews and explicitly selecting a saved speech account.
+The quick start contains permission, update and configuration-check recovery.
+The capabilities reference retains the detailed disclosures moved off the
+homepage. Downloads stay on the homepage so Wiki pages cannot serve mismatched
+app/extension releases. Links to downloads point back to the localized homepage.
+
+Preserve named AI and speech accounts, document collaboration
+with Notion/Tencent Docs/Feishu, and task-center guidance. Keep onboarding and
 connection-switching semantics aligned with the shipped app. Ordinary
 foreground chat is not a task-center item. Feishu requires guided self-built-app
 setup and authorization; do not present it as one-click login or claim support
@@ -68,8 +93,8 @@ the choice, with one active keyword at a time. Browser copy describes visible
 text/statistics, separate interactive controls, local login reuse and user
 handoff without promising universal site compatibility or verification bypass.
 Saved passwords remain local; page content used by the Agent reaches its model.
-Keep Responses/Chat Completions guidance in the AI card disclosure and
-configuration-check guidance in the installation disclosure, including its
+Keep Responses/Chat Completions guidance in the model guide and
+configuration-check guidance in the quick start, including its
 possible model-request cost. Skill Market does not auto-enable dependent Tools.
 REST copy must distinguish its public HTTPS JSON scope from MCP support.
 
@@ -88,20 +113,21 @@ setup disclosure that remains usable without JavaScript.
 The homepage groups optional capabilities under `#extensions`: Mi Home and
 Termux are released same-signer extension APKs; WebDAV Files is a downloadable
 extension preview; AgentLink is an independent Android app with a computer-side
-Bridge. Keep all four discoverable through the capability map and feature
-cards, using installation links only for released packages. Show benefits first,
+Bridge. Keep all four discoverable through compact homepage cards and the Wiki
+capability map, using installation links only for released packages. Show benefits first,
 then setup and permissions; basic Mochi use does not require any of them.
 Mi Home setup and Termux setup use native HTML disclosures, not JavaScript.
 Termux copy must disclose automatic command execution after enablement, the
 absence of a sandbox, and model-provider access to output used by the Agent.
 
-WebDAV's preview card uses `data-release-status="released-preview"` and links
-to its matching release APK and setup guide. Disclose pending real-service validation,
+WebDAV's homepage preview card uses `data-release-status="released-preview"` and
+links to its matching release APK and Wiki setup guide. In that guide, disclose pending real-service validation,
 read-only defaults, Skill readiness gating, foreground-only access, valid HTTPS
 and explicit LAN authorization. It is not Obsidian synchronization or vault
 decryption. File text analyzed by the Agent goes to the configured model.
-The four-item map uses four desktop columns, two tablet columns and one mobile
-column; retain readable expanded disclosures in both languages.
+The four-item map and homepage extension cards use four desktop columns, two
+tablet columns and one mobile column; retain readable expanded disclosures in
+both Wiki languages.
 
 AgentLink's official website lives at `agentlink/` and `zh-CN/agentlink/`.
 Treat these as a standalone product destination, not a Mochi extension detail:
@@ -220,7 +246,7 @@ python website\tests\browser_smoke.py
 
 Alternatively, use `--channel msedge` or `--channel chrome` with an installed
 browser instead of downloading Chromium. The check serves only `website/` at
-the project path, checks all four pages at 320/390/768/1024/1280/1440 pixels, exercises
+the project path, checks all fourteen content pages at 320/390/768/1024/1280/1440 pixels, exercises
 mobile/cross-page navigation and expanded setup disclosures, and mocks GitHub
 responses to verify matching architecture/extension updates, API-outage fallback,
 missing extension assets, and rejection of untrusted download URLs.
@@ -240,6 +266,6 @@ at each tested width for visual review; keep generated images out of the site.
 `.github/workflows/pages.yml` publishes `website/` when website files change
 on `main`, or through a manual workflow dispatch. Set the repository's Pages
 source to **GitHub Actions** before the first deployment.
-The public artifact includes `agentlink/` and `zh-CN/agentlink/` alongside the
-homepages. Keep both routes in the sitemap and verify their canonical and
-language-switch links when moving pages.
+The public artifact includes `wiki/`, `zh-CN/wiki/`, `agentlink/` and
+`zh-CN/agentlink/` alongside the homepages. Keep every public route in the
+sitemap and verify canonical and language-switch links when moving pages.

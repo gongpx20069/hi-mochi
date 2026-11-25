@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Connect Groq, ModelScope, OpenAI, Azure and other model APIs to Mochi.">
+  <title>AI providers · Mochi Wiki</title>
+  <link rel="canonical" href="https://gongpx20069.github.io/hi-mochi/wiki/models/">
+  <link rel="alternate" hreflang="en" href="https://gongpx20069.github.io/hi-mochi/wiki/models/">
+  <link rel="alternate" hreflang="zh-CN" href="https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/models/">
+  <link rel="alternate" hreflang="x-default" href="https://gongpx20069.github.io/hi-mochi/wiki/models/">
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../styles.css"><script src="../../scripts.js" defer></script>
+</head>
+<body class="wiki-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header" data-header><div class="nav-shell">
+    <a class="brand" href="../../"><span class="brand-mark" aria-hidden="true"><span></span></span>Mochi</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">Open navigation</span><span></span><span></span></button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav><a href="../../">Home</a><a href="../">Wiki</a><a href="../quick-start/">Quick start</a><a href="../../zh-CN/wiki/models/" lang="zh-CN">中文</a></nav>
+  </div></header>
+  <main class="shell wiki-frame" id="main">
+    <aside class="wiki-sidebar"><nav aria-label="Wiki"><a href="../">Overview</a><a href="../quick-start/">Quick start</a><a href="./" aria-current="page">AI providers</a><a href="../speech/">Speech providers</a><a href="../capabilities/">Skills &amp; extensions</a></nav></aside>
+    <article class="wiki-article" data-provider-guide>
+      <header><a class="text-link" href="../">Mochi Wiki</a><h1>Your model. Your connection.</h1><p class="wiki-lede">Choose a provider below. Groq is our starting recommendation for its free API tier.</p></header>
+      <section class="wiki-section" id="basics"><h2>The same three fields</h2><p>Open <strong>Settings → AI connections → Add AI connection</strong>. Name the connection, choose a preset, then enter your <strong>model ID</strong> and <strong>API key</strong>. Presets fill in the endpoint. The model must support tool calling.</p><p>The first saved connection is selected automatically. Later additions stay saved until you choose <strong>Use</strong>; switching cancels running local Agent tasks. Editing a saved connection with a blank key keeps that key.</p></section>
+      <section class="wiki-section" id="providers"><h2>Choose your provider</h2>
+        <details class="wiki-disclosure" id="groq" data-provider="groq" open><summary>Groq · Recommended</summary><ol><li><a href="https://console.groq.com/">Register or sign in</a>, then <a href="https://console.groq.com/keys">create an API key</a>.</li><li>Choose the Groq preset. Keep <code>https://api.groq.com/openai/v1</code> and Chat Completions.</li><li>Pick a Tool Use model from <a href="https://console.groq.com/docs/models">the model guide</a>, paste its exact ID and your key, then save.</li></ol></details>
+        <details class="wiki-disclosure" id="modelscope" data-provider="modelscope"><summary>ModelScope</summary><ol><li><a href="https://modelscope.cn/">Register or sign in</a>.</li><li>Get a <a href="https://modelscope.cn/my/myaccesstoken">ModelScope Access Token</a> and paste it into the ModelScope preset.</li><li>Choose a suggested model, or use Custom model with an API-enabled, tool-capable ID from the <a href="https://modelscope.cn/models">model library</a>. Save the connection.</li></ol></details>
+        <details class="wiki-disclosure" id="openai" data-provider="openai"><summary>OpenAI</summary><ol><li>Create a key in the <a href="https://platform.openai.com/api-keys">API dashboard</a>.</li><li>Select OpenAI and keep <code>https://api.openai.com/v1</code>.</li><li>Enter a model available to your API account with tool support, paste the key and save. New connections use Responses. See the <a href="https://developers.openai.com/api/docs">official API guide</a>.</li></ol></details>
+        <details class="wiki-disclosure" id="azure" data-provider="azure"><summary>Azure OpenAI</summary><ol><li>Create an <a href="https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI">Azure OpenAI resource</a> and deploy a model with tool support.</li><li>Select Azure. Paste the resource endpoint and key from <strong>Keys and Endpoint</strong>.</li><li>Enter the <strong>deployment name</strong>, not the model family name. New connections use Responses; if you choose Chat Completions, also fill in the supported Azure API version. Follow the <a href="https://learn.microsoft.com/azure/ai-foundry/openai/">Azure guide</a>.</li></ol></details>
+        <details class="wiki-disclosure" id="deepseek" data-provider="deepseek"><summary>DeepSeek</summary><ol><li>Get an API key using the <a href="https://api-docs.deepseek.com/">official guide</a>.</li><li>Choose DeepSeek: <code>https://api.deepseek.com</code>, Chat Completions.</li><li>Copy a currently supported tool-capable model ID, paste your key and save.</li></ol></details>
+        <details class="wiki-disclosure" id="kimi" data-provider="kimi"><summary>Kimi</summary><ol><li>Follow the <a href="https://platform.kimi.com/docs/get-api-key">API key guide</a>.</li><li>Choose Kimi: <code>https://api.moonshot.cn/v1</code>, Chat Completions.</li><li>Enter your key and a supported model ID from the API documentation, then save. Use API credentials, not a coding subscription credential.</li></ol></details>
+        <details class="wiki-disclosure" id="glm" data-provider="glm"><summary>GLM</summary><ol><li>Get your API key and model ID from the <a href="https://docs.bigmodel.cn/cn/guide/develop/openai/introduction">GLM API guide</a>.</li><li>Choose GLM: <code>https://open.bigmodel.cn/api/paas/v4</code>, Chat Completions.</li><li>Use a model with tool calling, paste the key and save.</li></ol></details>
+        <details class="wiki-disclosure" id="minimax" data-provider="minimax"><summary>MiniMax · China endpoint</summary><ol><li>Get an API key using the <a href="https://platform.minimax.cn/docs/api-reference/text-openai-api">China API guide</a>.</li><li>Choose MiniMax: <code>https://api.minimax.cn/v1</code>, Chat Completions.</li><li>Enter a model available to that account and save. For a different regional endpoint, follow that provider's guide and edit the address.</li></ol></details>
+        <details class="wiki-disclosure" id="agnes" data-provider="agnes"><summary>Agnes-AI</summary><ol><li>Use the <a href="https://wiki.agnes-ai.com/en/docs/overview">API and model guide</a> to obtain an API key.</li><li>Choose Agnes-AI: <code>https://apihub.agnes-ai.com/v1</code>, Chat Completions.</li><li>Copy a current tool-capable model ID, paste the key and save.</li></ol></details>
+        <details class="wiki-disclosure" id="custom" data-provider="custom"><summary>Other OpenAI-compatible APIs</summary><ol><li>Choose <strong>Custom compatible API</strong>.</li><li>Enter the service's API base endpoint, full model ID and API key.</li><li>Choose its supported protocol under Advanced connection settings and save. A chat website URL is not an API endpoint.</li></ol></details>
+      </section>
+      <section class="wiki-section" id="advanced"><h2>Only change Advanced when needed</h2>
+        <details class="wiki-disclosure"><summary>Responses, Chat Completions and images</summary><p>New OpenAI/Azure connections default to <strong>Responses</strong>; other presets default to <strong>Chat Completions</strong>. Existing connections keep their saved choice. Mochi never silently switches protocols after an error.</p><p>Enable image input only for a model and endpoint that support it. Selecting a model does not automatically enable images. ModelScope's prefilled endpoint is editable under Advanced; other presets show it directly.</p></details>
+        <details class="wiki-disclosure"><summary>Connection fails or a key needs replacing</summary><p>Check API access, full model ID, endpoint and protocol against your provider's guide. Changing provider type or endpoint host requires a new key. Older app versions with a plain model field need the full ID pasted manually.</p><p>Run <a href="../quick-start/#troubleshooting">Configuration check</a> for a short model probe. Keep credentials out of screenshots, chat and issue reports.</p></details>
+      </section>
+      <nav class="wiki-next" aria-label="Next guide"><a href="../quick-start/">← Quick start</a><a href="../speech/">Set up speech →</a></nav>
+    </article>
+  </main>
+  <footer class="site-footer"><div class="shell footer-bottom"><a href="../">← Wiki</a><a href="https://github.com/gongpx20069/hi-mochi/issues">Report an issue</a></div></footer>
+</body>
+</html>

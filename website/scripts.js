@@ -1,3 +1,5 @@
+document.documentElement.classList.add("js");
+
 const header = document.querySelector("[data-header]");
 const nav = document.querySelector("[data-nav]");
 const navToggle = document.querySelector("[data-nav-toggle]");
@@ -22,6 +24,31 @@ navToggle?.addEventListener("click", () => {
 nav?.querySelectorAll("a").forEach((link) => {
   link.addEventListener("click", closeNavigation);
 });
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && navToggle?.getAttribute("aria-expanded") === "true") {
+    closeNavigation();
+    navToggle.focus();
+  }
+});
+window.matchMedia("(min-width: 761px)").addEventListener("change", closeNavigation);
+
+const revealLinkedSection = () => {
+  if (!document.body.matches(".wiki-page, .home-page")) return;
+  const target = document.getElementById(window.location.hash.slice(1));
+  let ancestor = target;
+  let opened = false;
+  while (ancestor) {
+    if (ancestor instanceof HTMLDetailsElement && !ancestor.open) {
+      ancestor.open = true;
+      opened = true;
+    }
+    ancestor = ancestor.parentElement;
+  }
+  if (opened) target.scrollIntoView();
+};
+window.addEventListener("hashchange", revealLinkedSection);
+revealLinkedSection();
 
 window.addEventListener("scroll", updateHeader, { passive: true });
 updateHeader();

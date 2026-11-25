@@ -7,6 +7,7 @@
 **Your Android AI companion for conversations, daily plans and getting things done.**
 
 [**Download APK**](https://github.com/gongpx20069/hi-mochi/releases/latest)
+· [Website](https://gongpx20069.github.io/hi-mochi/) · [Wiki](https://gongpx20069.github.io/hi-mochi/wiki/)
 · [Watch introduction (Chinese)](https://www.bilibili.com/video/BV1u6aB6GEDD/)
 · [English](README.md) · [简体中文](README.zh-CN.md)
 

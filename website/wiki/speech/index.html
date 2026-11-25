@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Set up Android speech, iFlytek or Azure Speech for Mochi, including voices and wake phrases.">
+  <title>Speech providers · Mochi Wiki</title>
+  <link rel="canonical" href="https://gongpx20069.github.io/hi-mochi/wiki/speech/">
+  <link rel="alternate" hreflang="en" href="https://gongpx20069.github.io/hi-mochi/wiki/speech/">
+  <link rel="alternate" hreflang="zh-CN" href="https://gongpx20069.github.io/hi-mochi/zh-CN/wiki/speech/">
+  <link rel="alternate" hreflang="x-default" href="https://gongpx20069.github.io/hi-mochi/wiki/speech/">
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../styles.css"><script src="../../scripts.js" defer></script>
+</head>
+<body class="wiki-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header" data-header><div class="nav-shell">
+    <a class="brand" href="../../"><span class="brand-mark" aria-hidden="true"><span></span></span>Mochi</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">Open navigation</span><span></span><span></span></button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav><a href="../../">Home</a><a href="../">Wiki</a><a href="../quick-start/">Quick start</a><a href="../../zh-CN/wiki/speech/" lang="zh-CN">中文</a></nav>
+  </div></header>
+  <main class="shell wiki-frame" id="main">
+    <aside class="wiki-sidebar"><nav aria-label="Wiki"><a href="../">Overview</a><a href="../quick-start/">Quick start</a><a href="../models/">AI providers</a><a href="./" aria-current="page">Speech providers</a><a href="../capabilities/">Skills &amp; extensions</a></nav></aside>
+    <article class="wiki-article" data-speech-guide>
+      <header><a class="text-link" href="../">Mochi Wiki</a><h1>A voice that works for you.</h1><p class="wiki-lede">Start with Android speech. Cloud speech is optional and separate from your model connection.</p></header>
+      <nav class="wiki-tabs" aria-label="On this page"><a href="#system">Android</a><a href="#iflytek">iFlytek</a><a href="#azure">Azure</a><a href="#wake">Wake phrase</a></nav>
+      <section class="wiki-section" id="system" data-speech-provider="system"><h2>Android speech · No extra key</h2><ol><li>Open <strong>Settings → Speech and wake</strong> and use the system speech connection.</li><li>Grant microphone permission and make sure your phone has a speech recognition service and a text-to-speech engine.</li><li>Choose an installed voice and try speaking in Companion. No speech account or extension APK is required.</li></ol><p class="wiki-note">System speech availability and offline support depend on your device and installed services.</p></section>
+      <section class="wiki-section" id="cloud"><h2>Prefer a cloud service?</h2><p>Open <strong>Settings → Speech and wake → Add speech connection</strong>. Saving adds an account without selecting it; tap <strong>Use</strong> when ready.</p>
+        <details class="wiki-disclosure" id="iflytek" data-speech-provider="iflytek"><summary>iFlytek · AppID, APIKey and APISecret</summary><ol><li>Register at <a href="https://console.xfyun.cn/">iFlytek Console</a> and enable <a href="https://www.xfyun.cn/services/voicedictation">Real-time Voice Dictation</a> for an application.</li><li>Choose iFlytek in Mochi. Copy that application's <strong>AppID</strong>, <strong>APIKey</strong> and <strong>APISecret</strong> into the matching fields and save.</li><li>Tap Use, then test recognition with a short phrase. For cloud replies, enable compatible speech synthesis for the same credentials and follow the voice steps below.</li></ol></details>
+        <details class="wiki-disclosure" id="azure" data-speech-provider="azure"><summary>Azure Speech · Resource endpoint and key</summary><ol><li>Create an <a href="https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices">Azure Speech resource</a>.</li><li>Copy its resource endpoint and key. In Mochi choose Azure Speech and fill in <strong>Azure Speech endpoint</strong> and <strong>Azure Speech key</strong>. The endpoint resembles <code>https://your-resource.cognitiveservices.azure.com</code>; use the value from your own resource.</li><li>Save, tap Use and try a short phrase. This is a Speech resource, not your Azure OpenAI model connection.</li></ol></details>
+      </section>
+      <section class="wiki-section" id="voices"><h2>Choose how replies sound</h2><ol><li>Edit a saved cloud connection and enable <strong>Also use this provider for speech synthesis</strong> if you want cloud replies. It is off by default.</li><li>Save, then edit again to load available voices and preview one. The credentials must already be saved; previewing does not switch your active account.</li><li>Choose a voice, save and select Use for that connection.</li></ol><p>Cloud recognition sends audio to the selected service; cloud synthesis sends reply text and may consume quota. Wake acknowledgements still use Android speech. Switching speech accounts stops the current voice interaction and preview, not text or background tasks.</p></section>
+      <section class="wiki-section" id="wake"><h2>“Hi Mochi” or “老莫老莫”</h2><p>Choose the wake phrase in Settings → Speech and wake. System language selects the default: Chinese uses “老莫老莫”; other languages use “Hi Mochi”. Only one phrase is active at a time.</p><p><strong>Keep Companion visible, in the foreground, with the screen unlocked.</strong> Chat, other pages, lock screen and background use do not listen for wake words. In Chat, hold the input to dictate and tap Send yourself.</p></section>
+      <section class="wiki-section" id="troubleshooting"><h2>Quick checks</h2>
+        <details class="wiki-disclosure"><summary>No recognition or no sound</summary><ul><li>Check microphone permission, media volume, selected speech account and installed system voice services.</li><li>For cloud speech, check network access and the resource's recognition/synthesis permissions.</li><li>Configuration check does not record audio. Test the microphone and preview a voice separately; Chat's reply-mute control can silence replies.</li></ul></details>
+        <details class="wiki-disclosure"><summary>Voice list is unavailable</summary><p>Save credentials first, then reopen Edit. Cloud synthesis must be enabled to show its voice picker. Replacing credentials requires saving again before loading or previewing voices.</p></details>
+      </section>
+      <nav class="wiki-next" aria-label="Next guide"><a href="../models/">← AI providers</a><a href="../capabilities/">Explore capabilities →</a></nav>
+    </article>
+  </main>
+  <footer class="site-footer"><div class="shell footer-bottom"><a href="../">← Wiki</a><a href="https://github.com/gongpx20069/hi-mochi/issues">Report an issue</a></div></footer>
+</body>
+</html>

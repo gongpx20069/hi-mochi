@@ -132,11 +132,7 @@ def main() -> None:
                         preview = page.locator("[data-extension-card='webdav']")
                         assert preview.get_attribute("data-release-status") == "released-preview"
                         assert preview.locator("[data-extension-download='webdav']").count() == 1
-                        assert preview.locator(".text-link").get_attribute("href").startswith(
-                            "https://github.com/gongpx20069/hi-mochi"
-                        )
-                        page.locator(".capability-map a[href='#webdav-extension']").click()
-                        assert page.url.endswith("#webdav-extension")
+                        assert preview.locator(".text-link").get_attribute("href") == "wiki/capabilities/#webdav-extension"
                         for disclosure in page.locator(
                             "[data-connections-feature] details, [data-app-control-feature] details, [data-memory-feature] details, #webdav-extension details, #install details"
                         ).all():
@@ -316,12 +312,82 @@ def main() -> None:
                     "images => images.every(image => image.complete && image.naturalWidth > 0)"
                 )
                 context.close()
+            check_wiki(browser, server.server_port, options.screenshots)
             browser.close()
-        print("Browser checks passed: 4 pages, 6 widths, localized five-ABI downloads, extension fallbacks, and cross-page navigation.")
+        print("Browser checks passed: 14 content pages, 6 widths, localized downloads, release fallbacks, Wiki navigation and no-JavaScript guides.")
     finally:
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+def check_wiki(browser, port: int, screenshots: Path | None) -> None:
+    base = f"http://127.0.0.1:{port}/hi-mochi/"
+    for locale in ("", "zh-CN/"):
+        for guide in ("", "quick-start/", "models/", "speech/", "capabilities/"):
+            for javascript in (True, False):
+                context = browser.new_context(java_script_enabled=javascript, reduced_motion="reduce")
+                failures = []
+                context.route(API_URL, lambda route: route.abort())
+                page = context.new_page()
+                page.on("pageerror", lambda error: failures.append(str(error)))
+                page.on("request", lambda request: failures.append("Wiki requested release API")
+                        if request.url == API_URL else None)
+                page.on("response", lambda response: failures.append(response.url)
+                        if response.url.startswith(base) and response.status >= 400 else None)
+                route = f"{locale}wiki/{guide}"
+                page.goto(base + route)
+                assert page.locator("h1").count() == 1
+                if guide == "models/":
+                    preferred = "modelscope" if locale else "groq"
+                    assert page.locator(f"#{preferred}").evaluate("item => item.open")
+                    assert page.locator("[data-provider]").count() == 10
+                for disclosure in page.locator("details").all():
+                    summary = disclosure.locator("summary")
+                    if disclosure.evaluate("item => item.open"):
+                        summary.focus()
+                        summary.press("Enter")
+                    summary.focus()
+                    summary.press("Enter")
+                    assert disclosure.evaluate("item => item.open")
+                    assert disclosure.locator("p, ol, ul").first.is_visible()
+                for width in (320, 390, 768, 1024, 1280, 1440):
+                    page.set_viewport_size({"width": width, "height": 900})
+                    # Poll from Python: page animation/timer callbacks do not run with JavaScript disabled.
+                    for _ in range(20):
+                        fits_viewport = page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+                        fits_text = page.locator("main").evaluate("""main =>
+                            [...main.querySelectorAll('p, h1, h2, h3, li, code, summary')].every(item =>
+                                item.scrollWidth <= item.clientWidth + 1 || getComputedStyle(item).display === 'inline')
+                        """)
+                        if fits_viewport and fits_text:
+                            break
+                        page.wait_for_timeout(50)
+                    assert fits_viewport, (route, javascript, width)
+                    assert fits_text, (route, javascript, width, "clipped text")
+                    if width < 760:
+                        if javascript:
+                            toggle = page.locator("[data-nav-toggle]")
+                            toggle.click()
+                            assert toggle.get_attribute("aria-expanded") == "true"
+                            toggle.press("Escape")
+                            assert toggle.get_attribute("aria-expanded") == "false"
+                            assert page.evaluate("document.body.style.overflow") == ""
+                        else:
+                            assert page.locator("[data-nav] a").first.is_visible()
+                    if screenshots and javascript and guide in ("", "models/") and width in (390, 1280):
+                        page.evaluate("scrollTo(0, 0)")
+                        label = (locale + "wiki-" + (guide or "overview")).strip("/").replace("/", "-")
+                        page.screenshot(path=str(screenshots / f"{label}-{width}.png"))
+                if javascript and guide == "models/":
+                    page.goto(base + route + "#azure")
+                    assert page.locator("#azure").evaluate("item => item.open")
+                other = f"{'' if locale else 'zh-CN/'}wiki/{guide}"
+                language_link = page.locator("[data-nav] a").filter(has_text="EN" if locale else "中文")
+                language_link.click()
+                assert page.url == base + other
+                assert not failures, (route, failures)
+                context.close()
 
 
 if __name__ == "__main__":

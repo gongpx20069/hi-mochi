@@ -21,6 +21,8 @@ class PageParser(HTMLParser):
         self.images: list[dict[str, str | None]] = []
         self.html_language: str | None = None
         self.canonical: str | None = None
+        self.alternates: dict[str, str] = {}
+        self.text: list[str] = []
         self.stack: list[str] = []
         self.errors: list[str] = []
 
@@ -45,6 +47,8 @@ class PageParser(HTMLParser):
             self.anchor_refs.append(href[1:])
         if tag == "link" and values.get("rel") == "canonical":
             self.canonical = values.get("href")
+        if tag == "link" and values.get("rel") == "alternate":
+            self.alternates[values.get("hreflang", "")] = values.get("href", "")
 
         key = "href" if tag in {"a", "link"} else "src" if tag in {"img", "script"} else None
         if key and (resource := values.get(key)):
@@ -55,6 +59,9 @@ class PageParser(HTMLParser):
             self.errors.append(f"unexpected closing tag: {tag}")
         else:
             self.stack.pop()
+
+    def handle_data(self, data: str) -> None:
+        self.text.append(data.strip())
 
 
 def local_resource(page: Path, value: str) -> Path | None:
@@ -87,6 +94,11 @@ def main() -> None:
     errors: list[str] = []
     pages = sorted(SITE_ROOT.rglob("*.html"))
     fallback_versions: set[str] = set()
+    sitemap_urls = {
+        item.text for item in ET.parse(SITE_ROOT / "sitemap.xml").findall(
+            ".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc",
+        )
+    }
 
     for page in pages:
         parser = PageParser()
@@ -119,8 +131,19 @@ def main() -> None:
             route = relative_page.as_posix().removesuffix("index.html")
             if parser.canonical != f"https://gongpx20069.github.io/hi-mochi/{route}":
                 errors.append(f"{relative_page}: incorrect canonical URL")
+            if parser.canonical not in sitemap_urls:
+                errors.append(f"{relative_page}: missing from sitemap")
+            if "wiki" in relative_page.parts:
+                english_route = route.removeprefix("zh-CN/")
+                expected_alternates = {
+                    "en": f"https://gongpx20069.github.io/hi-mochi/{english_route}",
+                    "zh-CN": f"https://gongpx20069.github.io/hi-mochi/zh-CN/{english_route}",
+                    "x-default": f"https://gongpx20069.github.io/hi-mochi/{english_route}",
+                }
+                if parser.alternates != expected_alternates:
+                    errors.append(f"{relative_page}: incorrect Wiki language alternates")
 
-        if page in (SITE_ROOT / "index.html", SITE_ROOT / "zh-CN" / "index.html"):
+        if relative_page.parts[-3:] == ("wiki", "capabilities", "index.html"):
             source = page.read_text(encoding="utf-8")
             for feature in (
                 "smart-home", "speech", "documents", "connections", "tasks",
@@ -139,6 +162,14 @@ def main() -> None:
                 errors.append(
                     f"{relative_page}: missing localized smart-home label",
                 )
+
+        if page in (SITE_ROOT / "index.html", SITE_ROOT / "zh-CN" / "index.html"):
+            source = page.read_text(encoding="utf-8")
+            if len(" ".join(parser.text)) > (4500 if language == "zh-CN" else 9000):
+                errors.append(f"{relative_page}: homepage is too long; move details into Wiki")
+            for guide in ("wiki/", "wiki/quick-start/", "wiki/models/", "wiki/speech/"):
+                if guide not in parser.resources:
+                    errors.append(f"{relative_page}: missing Wiki entry {guide}")
             release_root = (
                 "https://cnb.cool/hi-mochi/hi-mochi/-/releases/"
                 if language == "zh-CN"
@@ -194,6 +225,30 @@ def main() -> None:
 
     if len(fallback_versions) != 1:
         errors.append("Homepages must use the same release fallback in both languages.")
+
+    for locale in ("", "zh-CN/"):
+        for guide in ("", "quick-start/", "models/", "speech/", "capabilities/"):
+            path = SITE_ROOT / locale / "wiki" / guide / "index.html"
+            if not path.is_file():
+                errors.append(f"Missing Wiki guide: {locale}wiki/{guide}")
+                continue
+            source = path.read_text(encoding="utf-8")
+            if source.count("<h1>") != 1:
+                errors.append(f"{path.relative_to(SITE_ROOT)}: expected one guide heading")
+            if "data-release-download" in source or "data-extension-download" in source:
+                errors.append(f"{path.relative_to(SITE_ROOT)}: downloads must stay on the release-aware homepage")
+            if guide == "models/":
+                providers = re.findall(r'data-provider="([^"]+)"', source)
+                expected = {"groq", "modelscope", "openai", "azure", "deepseek", "kimi", "glm", "minimax", "agnes", "custom"}
+                if len(providers) != len(expected) or set(providers) != expected:
+                    errors.append(f"{locale}wiki/models: incomplete provider instructions")
+                for provider, body in re.findall(r'<details[^>]+data-provider="([^"]+)"[^>]*>(.*?)</details>', source, re.S):
+                    if body.count("<li>") != 3:
+                        errors.append(f"{locale}wiki/models: {provider} needs three setup steps")
+            if guide == "speech/":
+                providers = re.findall(r'data-speech-provider="([^"]+)"', source)
+                if len(providers) != 3 or set(providers) != {"system", "iflytek", "azure"}:
+                    errors.append(f"{locale}wiki/speech: incomplete speech provider instructions")
 
     for route in ("agentlink/index.html", "zh-CN/agentlink/index.html"):
         page = SITE_ROOT / route
