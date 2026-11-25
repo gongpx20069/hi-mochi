@@ -804,6 +804,10 @@ class MochiDatabaseTest {
             assertEquals(enabled, browser.enabled)
             assertFalse(skills.any { it.id == "builtin:web-search" })
             assertFalse(browser.content.contains("Old search-only instructions"))
+            assertTrue(browser.description.contains("Xiaohongshu"))
+            assertTrue(browser.content.contains("https://www.xiaohongshu.com/"))
+            assertTrue(browser.content.contains("authoritative sources"))
+            assertTrue(browser.content.contains("do not retry the same blocked search"))
             assertEquals(
                 enabled,
                 restored.listEnabledMetadata().any { it.name == "browser" },

@@ -467,6 +467,11 @@ a permission status, and an unconfirmed return is an explicit Tool error.
   directly, search retains Bing/Sogou Weixin source guidance, and valid website
   sessions are reused. Cache is not proof of freshness; saved credentials stay
   native-only and cannot be selected or filled by the model.
+- Chinese lifestyle searches may also try Xiaohongshu's own website search
+  using available browser controls. Treat posts as personal experience and
+  verify health/safety claims with authoritative sources. Login, verification
+  or app-only barriers require available user assistance or another public
+  source, not repeated blocked searches or access-control bypasses.
 - Browser requires navigate/read/scroll; click, input and human assistance are
   optional and usable only in registries that expose them. Saved enablement
   is preserved across upgrades without showing duplicate Skills.
