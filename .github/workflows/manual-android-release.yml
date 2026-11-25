@@ -77,7 +77,7 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew verifyNative verifyRelease \
-            "-PmochiVersionName=$VERSION" --no-daemon
+            "-PmochiVersionName=$VERSION" --no-daemon --stacktrace
 
       - name: Prepare and validate release assets
         env:
