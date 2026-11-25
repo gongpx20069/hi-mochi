@@ -48,6 +48,12 @@ sealed interface ProviderProfileAction {
     data class Delete(val id: String) : ProviderProfileAction
 }
 
+private val modelScopeModels = mapOf(
+    "Qwen/Qwen3.8-Flash-Next" to "Qwen3.8-Flash-Next (recommended)",
+    "deepseek-ai/DeepSeek-V4.1-Flash" to "DeepSeek-V4.1-Flash",
+    "ZhipuAI/GLM-5.2" to "GLM-5.2",
+)
+
 @Composable
 internal fun SettingsPartHeading(title: String, description: String) {
     Surface(
@@ -173,6 +179,13 @@ internal fun ProviderConnectionDialog(
     var chooseApiProtocol by remember { mutableStateOf(false) }
     var key by remember(profile) { mutableStateOf("") }
     var choosePreset by remember { mutableStateOf(false) }
+    var chooseModel by remember(profile, preset) { mutableStateOf(false) }
+    var customModel by remember(profile, preset) {
+        mutableStateOf(model.isNotBlank() && model !in modelScopeModels)
+    }
+    var customModelDraft by remember(profile, preset) {
+        mutableStateOf(if (model !in modelScopeModels) model else "")
+    }
     var advanced by remember { mutableStateOf(false) }
     var linkError by remember(preset) { mutableStateOf<String?>(null) }
     val uriHandler = LocalUriHandler.current
@@ -213,47 +226,72 @@ internal fun ProviderConnectionDialog(
                         }
                     }
                 }
-                Text("Official presets use provider APIs, not Coding Plans. Free quotas, billing, and regional availability depend on your account; endpoints remain editable.")
+                if (preset != ProviderPreset.MODELSCOPE) {
+                    Text("Official presets use provider APIs, not Coding Plans. Free quotas, billing, and regional availability depend on your account; endpoints remain editable.")
+                }
                 ProviderSetupGuide(preset, openGuide)
                 linkError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                OutlinedTextField(
-                    endpoint, { endpoint = it }, enabled = !state.isSaving,
-                    label = { Text(if (preset == ProviderPreset.AZURE) "Azure resource endpoint" else "API endpoint") },
-                    supportingText = { Text(if (preset == ProviderPreset.AZURE) {
-                        "Azure Portal → Azure OpenAI → Keys and Endpoint"
-                    } else if (apiProtocol == ApiProtocol.RESPONSES) {
-                        "Mochi uses /responses for this connection."
-                    } else "Mochi appends /chat/completions when needed.") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (preset.endpoint.isNotEmpty()) TextButton(
-                    onClick = { endpoint = preset.endpoint }, enabled = !state.isSaving,
-                ) { Text("Restore official endpoint") }
-                if (preset.documentation.isNotEmpty()) TextButton(onClick = { openGuide(preset.documentation) }) {
-                    Text("Open official API guide")
+                if (preset != ProviderPreset.MODELSCOPE) {
+                    ProviderEndpointFields(preset, endpoint, apiProtocol, state.isSaving) { endpoint = it }
+                    if (preset.documentation.isNotEmpty()) TextButton(onClick = { openGuide(preset.documentation) }) {
+                        Text("Open official API guide")
+                    }
+                } else {
+                    ProviderSecretField(key, { key = it }, preset, original.hasApiKey, state.isSaving)
+                    Column {
+                        OutlinedButton(
+                            onClick = { chooseModel = true },
+                            enabled = !state.isSaving,
+                            modifier = Modifier.fillMaxWidth().testTag("modelscope-model-picker"),
+                        ) {
+                            Text(
+                                if (customModel) "Custom model" else modelScopeModels[model] ?: "Choose a model",
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        DropdownMenu(expanded = chooseModel, onDismissRequest = { chooseModel = false }) {
+                            modelScopeModels.forEach { (id, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    enabled = !state.isSaving,
+                                    modifier = Modifier.testTag("modelscope-model-$id"),
+                                    onClick = { model = id; customModel = false; chooseModel = false },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Custom model") },
+                                enabled = !state.isSaving,
+                                modifier = Modifier.testTag("modelscope-model-custom"),
+                                onClick = { model = customModelDraft; customModel = true; chooseModel = false },
+                            )
+                        }
+                    }
                 }
 
-                OutlinedTextField(
-                    model, { model = it }, enabled = !state.isSaving,
-                    label = { Text(if (preset == ProviderPreset.AZURE) "Deployment name" else "Model name") },
-                    supportingText = { Text("Enter a model available to your account that supports tool calling.") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (preset != ProviderPreset.MODELSCOPE || customModel) {
+                    OutlinedTextField(
+                        model, { model = it; customModelDraft = it }, enabled = !state.isSaving,
+                        label = { Text(if (preset == ProviderPreset.AZURE) "Deployment name" else "Model name") },
+                        supportingText = { Text(if (preset == ProviderPreset.MODELSCOPE) {
+                            "Paste the full model ID from the model library."
+                        } else "Enter a model available to your account that supports tool calling.") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 if (preset == ProviderPreset.AZURE && apiProtocol == ApiProtocol.CHAT_COMPLETIONS) OutlinedTextField(
                     version, { version = it }, enabled = !state.isSaving,
                     label = { Text("Azure API version") }, modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    key, { key = it }, enabled = !state.isSaving,
-                    label = { Text(if (preset == ProviderPreset.MODELSCOPE) "ModelScope Access Token" else "API key") },
-                    supportingText = { Text(if (original.hasApiKey) "Leave blank to keep the stored key." else "Encrypted using Android Keystore.") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text("Changing provider or endpoint host requires a new API key.")
+                if (preset != ProviderPreset.MODELSCOPE) {
+                    ProviderSecretField(key, { key = it }, preset, original.hasApiKey, state.isSaving)
+                    Text("Changing provider or endpoint host requires a new API key.")
+                }
                 TextButton(onClick = { advanced = !advanced }) { Text("Advanced connection settings") }
                 if (advanced) {
+                    if (preset == ProviderPreset.MODELSCOPE) {
+                        ProviderEndpointFields(preset, endpoint, apiProtocol, state.isSaving) { endpoint = it }
+                        Text("Changing provider or endpoint host requires a new API key.")
+                    }
                     Column {
                         Text("API protocol")
                         OutlinedButton(
@@ -306,6 +344,47 @@ internal fun ProviderConnectionDialog(
 }
 
 @Composable
+private fun ProviderEndpointFields(
+    preset: ProviderPreset,
+    endpoint: String,
+    apiProtocol: ApiProtocol,
+    isSaving: Boolean,
+    onChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        endpoint, onChange, enabled = !isSaving,
+        label = { Text(if (preset == ProviderPreset.AZURE) "Azure resource endpoint" else "API endpoint") },
+        supportingText = { Text(if (preset == ProviderPreset.AZURE) {
+            "Azure Portal → Azure OpenAI → Keys and Endpoint"
+        } else if (apiProtocol == ApiProtocol.RESPONSES) {
+            "Mochi uses /responses for this connection."
+        } else "Mochi appends /chat/completions when needed.") },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (preset.endpoint.isNotEmpty()) TextButton(
+        onClick = { onChange(preset.endpoint) }, enabled = !isSaving,
+    ) { Text("Restore official endpoint") }
+}
+
+@Composable
+private fun ProviderSecretField(
+    key: String,
+    onChange: (String) -> Unit,
+    preset: ProviderPreset,
+    hasApiKey: Boolean,
+    isSaving: Boolean,
+) {
+    OutlinedTextField(
+        key, onChange, enabled = !isSaving,
+        label = { Text(if (preset == ProviderPreset.MODELSCOPE) "ModelScope Access Token" else "API key") },
+        supportingText = { Text(if (hasApiKey) "Leave blank to keep the stored key." else "Encrypted using Android Keystore.") },
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
 private fun ProviderSetupGuide(preset: ProviderPreset, openGuide: (String) -> Unit) {
     when (preset) {
         ProviderPreset.GROQ -> {
@@ -321,24 +400,12 @@ private fun ProviderSetupGuide(preset: ProviderPreset, openGuide: (String) -> Un
         }
         ProviderPreset.MODELSCOPE -> {
             Text("ModelScope setup", fontWeight = FontWeight.Bold)
-            Text("This preset connects Mochi to ModelScope's hosted API-Inference service.")
-            Text("1. Register or sign in to ModelScope, verify your email, and bind a real-name-verified Alibaba Cloud account for API-Inference.")
-            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/accounts/registration") }) { Text("ModelScope registration guide") }
-            TextButton(onClick = {
-                openGuide("https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization")
-            }) { Text("Alibaba Cloud binding guide") }
-            Text("2. Open Access Tokens, create a token with a suitable expiry, and paste it below. Use the ModelScope Access Token, not an Alibaba Cloud AccessKey or a DashScope key.")
-            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/accounts/token") }) { Text("ModelScope Access Token guide") }
+            Text("1. Register or sign in to ModelScope.")
+            TextButton(onClick = { openGuide("https://www.modelscope.cn/") }) { Text("Register / sign in to ModelScope") }
+            Text("2. Get an Access Token and paste it below.")
             TextButton(onClick = { openGuide("https://modelscope.cn/my/myaccesstoken") }) { Text("Create ModelScope Access Token") }
-            Text("3. Choose a currently API-enabled language model. Check Tool Calling support separately; the API-Inference badge alone is not enough. Copy the full model ID from its current API example, including the organization prefix.")
-            Text("For the community service, select ModelScope as the API provider on the model page. Other providers may require separate credentials and billing; old example models may no longer be available.")
-            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/model-service/API-Inference/limits") }) { Text("Model selection and API limits") }
+            Text("3. Choose a recommended model below, or choose Custom model and copy an API-enabled, tool-capable model's full ID from the model library.")
             TextButton(onClick = { openGuide("https://www.modelscope.cn/models") }) { Text("Browse ModelScope models") }
-            Text("4. For the community API, use https://api-inference.modelscope.cn/v1 with Chat Completions. Enter the model ID and Access Token below, then save the connection.")
-            Text("Credits expire and API limits can change. Free API-Inference has no SLA guarantee. Mochi does not claim credits or switch providers automatically.")
-            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/magicube/intro") }) { Text("ModelScope credit rules") }
-            TextButton(onClick = { openGuide("https://modelscope.cn/magicube/usage?tab=earn") }) { Text("View ModelScope credits") }
-            Text("Token and credit pages require signing in to ModelScope in your external browser.")
         }
         ProviderPreset.AGNES -> {
             Text("Agnes-AI still documents this API endpoint. Use an API key from its developer dashboard and a tool-capable model from the current guide; older Quickstart model examples may be retired.")

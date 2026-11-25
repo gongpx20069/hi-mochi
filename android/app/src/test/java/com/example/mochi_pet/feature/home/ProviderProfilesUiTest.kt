@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
@@ -24,6 +25,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import com.example.mochi_pet.core.settings.ProviderPreset
 import com.example.mochi_pet.core.agent.llm.ApiProtocol
@@ -127,37 +129,29 @@ class ProviderProfilesUiTest {
         assertEquals("synthetic-groq-key", saved!!.settings.apiKeyReplacement)
     }
 
-    @Test fun `Chinese ModelScope preset exposes token and account requirements and saves chat endpoint`() {
+    @Test fun `Chinese ModelScope setup has three links and saves an explicitly selected recommended model`() {
         Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
         var saved: ProviderProfileInput? = null
         val opened = mutableListOf<String>()
         renderEditor(onSave = { saved = it }, onOpenUri = opened::add)
         compose.onNode(hasText("OpenAI") and !hasSetTextAction()).performScrollTo().performClick()
         compose.onNodeWithText("魔搭 ModelScope").performScrollTo().performClick()
-        compose.onNodeWithText("API 端点").performScrollTo().assertTextContains("https://api-inference.modelscope.cn/v1")
-        compose.onNodeWithText("此预设将 Mochi 连接到魔搭托管的 API-Inference 服务。")
-            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("API 端点").assertDoesNotExist()
+        compose.onNodeWithText("打开官方 API 指南").assertDoesNotExist()
+        compose.onNodeWithText("模型名称").assertDoesNotExist()
+        compose.onNodeWithText("1. 注册或登录魔搭。").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("2. 获取 Access Token 并粘贴到下方。").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(
-            "1. 注册或登录魔搭，验证邮箱，并绑定已实名认证的阿里云账号以使用 API-Inference。",
+            "3. 从下方选择推荐模型；不满意可选「自定义模型」，到模型库复制支持 API 和工具调用的完整模型 ID。",
         ).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText(
-            "3. 选择当前支持 API 调用的语言模型，另外确认其支持 Tool Calling（工具调用）；只有 API-Inference 标记还不够。从模型页面的当前调用示例复制完整模型 ID，包含组织名前缀。",
-        ).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText(
-            "2. 打开访问令牌页面，创建有效期合适的令牌并粘贴到下方。应使用魔搭 Access Token，而不是阿里云 AccessKey 或百炼 DashScope Key。",
-        ).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("模型名称").performScrollTo().performTextInput("fixture/tool-model")
         compose.onNodeWithText("魔搭 Access Token").performScrollTo().performTextInput("synthetic-modelscope-token")
+        compose.onNodeWithText("保存连接").assertIsNotEnabled()
+        compose.onNodeWithTag("modelscope-model-picker").performScrollTo().performClick()
+        compose.onNodeWithText("Qwen3.8-Flash-Next（推荐）").performClick()
         for ((label, url) in listOf(
-            "魔搭注册与登录教程" to "https://www.modelscope.cn/docs/accounts/registration",
-            "阿里云账号绑定指南" to "https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization",
-            "魔搭访问令牌教程" to "https://www.modelscope.cn/docs/accounts/token",
+            "注册 / 登录魔搭" to "https://www.modelscope.cn/",
             "创建魔搭 Access Token" to "https://modelscope.cn/my/myaccesstoken",
-            "模型选择与 API 使用限制" to "https://www.modelscope.cn/docs/model-service/API-Inference/limits",
             "查看魔搭模型" to "https://www.modelscope.cn/models",
-            "魔粒获取与扣减规则" to "https://www.modelscope.cn/docs/magicube/intro",
-            "查看我的魔粒" to "https://modelscope.cn/magicube/usage?tab=earn",
-            "打开官方 API 指南" to "https://www.modelscope.cn/docs/model-service/API-Inference/intro",
         )) {
             compose.onNodeWithText(label).performScrollTo().performClick()
             assertEquals(url, opened.last())
@@ -167,7 +161,7 @@ class ProviderProfilesUiTest {
         assertEquals(ApiProtocol.CHAT_COMPLETIONS, saved!!.settings.apiProtocol)
         assertEquals("https://api-inference.modelscope.cn/v1", saved!!.settings.endpoint)
         assertEquals("synthetic-modelscope-token", saved!!.settings.apiKeyReplacement)
-        assertEquals("fixture/tool-model", saved!!.settings.model)
+        assertEquals("Qwen/Qwen3.8-Flash-Next", saved!!.settings.model)
     }
 
     @Test fun `ModelScope documentation links preserve an existing custom endpoint model and key`() {
@@ -180,9 +174,11 @@ class ProviderProfilesUiTest {
             model = "fixture/existing-model",
         ))
         renderEditor(profile = profile, onSave = { saved = it }, onOpenUri = opened::add)
-        compose.onNodeWithText("Model selection and API limits").performScrollTo().performClick()
+        compose.onNodeWithTag("modelscope-model-picker").performScrollTo().assertTextContains("Custom model")
+        compose.onNodeWithText("Model name").performScrollTo().assertTextContains(profile.settings.model)
+        compose.onNodeWithText("Browse ModelScope models").performScrollTo().performClick()
         assertEquals(
-            "https://www.modelscope.cn/docs/model-service/API-Inference/limits",
+            "https://www.modelscope.cn/models",
             opened.single(),
         )
         compose.onNodeWithText("Save connection").performClick()
@@ -191,6 +187,62 @@ class ProviderProfilesUiTest {
         assertEquals(profile.settings.model, saved!!.settings.model)
         assertEquals(profile.settings.apiProtocol, saved!!.settings.apiProtocol)
         assertEquals("", saved!!.settings.apiKeyReplacement)
+    }
+
+    @Test fun `ModelScope suggestions save full IDs without changing other settings and retain the custom draft`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var saved: ProviderProfileInput? = null
+        val profile = first.copy(preset = ProviderPreset.MODELSCOPE, settings = first.settings.copy(
+            providerType = ProviderPreset.MODELSCOPE.protocol,
+            endpoint = "https://example.com/existing/v1",
+            model = "fixture/existing-model",
+            apiProtocol = ApiProtocol.RESPONSES,
+            timeoutSeconds = 95,
+            imageInputEnabled = true,
+        ))
+        renderEditor(profile = profile, onSave = { saved = it }, onOpenUri = {})
+        compose.onNodeWithText("Model name").performScrollTo().performTextReplacement("fixture/custom-edited")
+        for (id in listOf("Qwen/Qwen3.8-Flash-Next", "deepseek-ai/DeepSeek-V4.1-Flash", "ZhipuAI/GLM-5.2")) {
+            compose.onNodeWithTag("modelscope-model-picker").performScrollTo().performClick()
+            compose.onNodeWithTag("modelscope-model-$id").performScrollTo().performClick()
+            compose.onNodeWithText("Model name").assertDoesNotExist()
+            compose.onNodeWithText("Save connection").performClick()
+            assertEquals(id, saved!!.settings.model)
+            assertEquals(profile.settings.endpoint, saved!!.settings.endpoint)
+            assertEquals(profile.settings.apiProtocol, saved!!.settings.apiProtocol)
+            assertEquals(profile.settings.timeoutSeconds, saved!!.settings.timeoutSeconds)
+            assertEquals(profile.settings.imageInputEnabled, saved!!.settings.imageInputEnabled)
+            assertEquals("", saved!!.settings.apiKeyReplacement)
+        }
+        compose.onNodeWithTag("modelscope-model-picker").performScrollTo().performClick()
+        compose.onNodeWithTag("modelscope-model-custom").performScrollTo().performClick()
+        compose.onNodeWithText("Model name").performScrollTo().assertTextContains("fixture/custom-edited")
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals("fixture/custom-edited", saved!!.settings.model)
+        compose.onNodeWithText("Advanced connection settings").performScrollTo().performClick()
+        compose.onNodeWithText("API endpoint").performScrollTo().assertTextContains(profile.settings.endpoint)
+        compose.onNodeWithText("Restore official endpoint").performScrollTo().performClick()
+        compose.onNodeWithText("API endpoint").performScrollTo().assertTextContains(ProviderPreset.MODELSCOPE.endpoint)
+    }
+
+    @Test fun `saved ModelScope suggestion stays selected and a new custom model requires input`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var saved: ProviderProfileInput? = null
+        val profile = first.copy(preset = ProviderPreset.MODELSCOPE, settings = first.settings.copy(
+            providerType = ProviderPreset.MODELSCOPE.protocol,
+            model = "ZhipuAI/GLM-5.2",
+        ))
+        renderEditor(profile = profile, onSave = { saved = it }, onOpenUri = {})
+        compose.onNodeWithTag("modelscope-model-picker").performScrollTo().assertTextContains("GLM-5.2")
+        compose.onNodeWithText("Model name").assertDoesNotExist()
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals(profile.settings.model, saved!!.settings.model)
+        compose.onNodeWithTag("modelscope-model-picker").performScrollTo().performClick()
+        compose.onNodeWithTag("modelscope-model-custom").performScrollTo().performClick()
+        compose.onNodeWithText("Save connection").assertIsNotEnabled()
+        compose.onNodeWithText("Model name").performScrollTo().performTextInput("fixture/new-model")
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals("fixture/new-model", saved!!.settings.model)
     }
 
     @Test fun `Agnes keeps saved configuration and opens current model documentation`() {

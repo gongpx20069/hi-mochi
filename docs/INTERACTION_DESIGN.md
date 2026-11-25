@@ -538,21 +538,24 @@ These controls do not complete schedules or execute Mochi tasks.
 AI connections shows named saved cards with current selection and Use/Edit/Delete.
 Add opens a screenshot-protected editor; OpenAI is prefilled, and presets also
 include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Groq, ModelScope, Azure, and custom. Each
-links to its official guide. Endpoint remains editable; model is supplied by
-the user because account access varies. Provider APIs are not Coding Plans;
+links to its official site or guide. Endpoint remains editable; model is chosen
+by the user because account access varies. Provider APIs are not Coding Plans;
 free quotas and billing depend on the account. Groq has three localized setup
 steps and explicit Console signup, key creation, model-list and account-limit
-links. ModelScope guidance covers only direct use of hosted API-Inference.
-It labels the secret as Access Token and links official registration, verified
-Alibaba Cloud binding, Token management, model selection/API limits and credit
-rules, with separate sign-in-required Token and credit account pages.
-The model-library link is not a guarantee of API availability: users check the
-current model-page example and verify Tool Calling support separately from the
-API-Inference badge. Community API selection is explicit; other API providers
-may require separate credentials and billing. Older example models may retire.
-The guide distinguishes ModelScope tokens from Alibaba Cloud AccessKeys and
-DashScope keys, explains token expiry and the organization/model ID format, and
-notes changing quotas, expiring credits and the lack of a free-service SLA.
+links. ModelScope has only three short setup steps: register/sign in, obtain
+and paste an Access Token, then choose a model. Its only external links are
+the ModelScope homepage, Access Token account page and model-library homepage.
+It does not show account-binding, key comparisons, deployment, quota or credit
+tutorials. The third step is one paragraph explaining recommended choices or a
+custom full model ID with API and tool-calling support.
+The Token field precedes a model dropdown: Qwen3.8-Flash-Next (recommended),
+DeepSeek-V4.1-Flash, GLM-5.2, then Custom model. New connections require an
+explicit choice. Only Custom model reveals the free-text model ID field.
+Existing unlisted IDs open as Custom model unchanged; switching suggestions
+and back retains the custom draft. Model selection does not change keys,
+endpoint, protocol, timeout or image-input policy. The official endpoint is
+prefilled and its editor/restore control is under Advanced for ModelScope;
+the other presets retain their existing layout.
 Links open only on explicit taps in the external browser, contain no entered
 credentials, and preserve editor state. An unavailable browser shows a safe error.
 Agnes-AI retains its preset and links the current overview/model guide rather than

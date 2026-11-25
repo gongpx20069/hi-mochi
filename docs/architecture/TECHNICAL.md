@@ -384,39 +384,36 @@ automatic retry, provider switch, credit claim, or billing upgrade.
 
 ### ModelScope direct API setup
 
-The ModelScope preset and Settings guide cover direct API-Inference use only.
-The official sources below were checked on 2026-11-25; available models,
-account requirements and allowances remain subject to the live service.
+The Settings guide covers direct API use in three steps only:
 
-1. Follow the [registration and sign-in guide](https://www.modelscope.cn/docs/accounts/registration).
-   Complete email verification for credit use and
-   [bind a real-name-verified Alibaba Cloud account](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization)
-   as required by API-Inference.
-2. Read the [Access Token guide](https://www.modelscope.cn/docs/accounts/token),
-   then create a token in the [Token account page](https://modelscope.cn/my/myaccesstoken).
-   Supply this ModelScope Access Token, not an Alibaba Cloud AccessKey or
-   DashScope key. Token and personal credit pages require browser sign-in.
-3. Use the [model-selection and API-limit guide](https://www.modelscope.cn/docs/model-service/API-Inference/limits)
-   when browsing the [model library](https://www.modelscope.cn/models).
-   Choose a currently API-enabled language model and separately verify Tool
-   Calling support; an API-Inference badge alone does not establish that.
-   For the community service, select ModelScope as the API provider on the
-   model page and copy its current full model ID, including the organization
-   prefix. Do not assume an older tutorial's example model remains available.
-4. Keep the preset's Chat Completions base
-   `https://api-inference.modelscope.cn/v1` and enter the model ID and Token.
-   The [official API-Inference guide](https://www.modelscope.cn/docs/model-service/API-Inference/intro)
-   documents the protocol; the current model-page example governs model-specific
-   requirements. Other API providers may require separate credentials and billing.
-5. Review the [credit rules](https://www.modelscope.cn/docs/magicube/intro)
-   and [personal credit balance](https://modelscope.cn/magicube/usage?tab=earn).
-   Credits expire, model costs and concurrency limits can change, and the free
-   service does not guarantee an SLA. Mochi neither claims credits nor changes
-   providers automatically.
+1. Register or sign in at [ModelScope](https://www.modelscope.cn/).
+2. Get an [Access Token](https://modelscope.cn/my/myaccesstoken) and paste it.
+3. Choose a recommended model, or use Custom model to enter a full model ID
+   supporting API and tool calling from the [model library](https://www.modelscope.cn/models).
 
-Opening these documentation links does not probe an API, save settings, replace
-credentials or change a selected model. Public documentation was checked without
-signing into a personal account; this is not an authenticated service test.
+The preset supplies `https://api-inference.modelscope.cn/v1` with Chat
+Completions. Endpoint editing remains available under Advanced.
+The curated dropdown stores full IDs, not display labels:
+
+| Model ID | Selection rationale for Mochi |
+| --- | --- |
+| `Qwen/Qwen3.8-Flash-Next` | First recommendation for general chat and tool-based tasks; its model card reports real-world and multimodal tool-use evaluation. |
+| `deepseek-ai/DeepSeek-V4.1-Flash` | Alternative for reasoning, research and input-heavy agent tasks. |
+| `ZhipuAI/GLM-5.2` | Alternative for longer multi-step tool workflows, supported by its MCP-Atlas and Tool-Decathlon results. |
+
+All three IDs were present in the public
+[ModelScope API model list](https://api-inference.modelscope.cn/v1/models)
+on 2026-11-25. Capability evidence comes from their official model cards:
+[Qwen](https://www.modelscope.cn/models/Qwen/Qwen3.8-Flash-Next),
+[DeepSeek](https://www.modelscope.cn/models/deepseek-ai/DeepSeek-V4.1-Flash), and
+[GLM](https://www.modelscope.cn/models/ZhipuAI/GLM-5.2).
+This is a documentation-based shortlist, not an authenticated Mochi latency or
+tool-loop benchmark. The editor does not fetch this catalog or probe models.
+Selections require explicit user action; existing IDs, including unlisted ones,
+are never rewritten. Custom model input remains available if the catalog changes.
+Choosing a model changes only the draft model ID, not protocol, image input,
+endpoint, timeouts or credentials. Opening external links does not save settings,
+replace credentials or change the selected model.
 
 ### Other provider compatibility
 
