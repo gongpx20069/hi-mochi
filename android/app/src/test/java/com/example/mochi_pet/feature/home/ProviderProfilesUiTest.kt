@@ -129,7 +129,7 @@ class ProviderProfilesUiTest {
         assertEquals("synthetic-groq-key", saved!!.settings.apiKeyReplacement)
     }
 
-    @Test fun `Chinese ModelScope setup has three links and saves an explicitly selected recommended model`() {
+    @Test fun `Chinese ModelScope setup includes binding help and saves an explicitly selected recommended model`() {
         Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
         var saved: ProviderProfileInput? = null
         val opened = mutableListOf<String>()
@@ -139,8 +139,8 @@ class ProviderProfilesUiTest {
         compose.onNodeWithText("API 端点").assertDoesNotExist()
         compose.onNodeWithText("打开官方 API 指南").assertDoesNotExist()
         compose.onNodeWithText("模型名称").assertDoesNotExist()
-        compose.onNodeWithText("1. 注册或登录魔搭。").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("2. 获取 Access Token 并粘贴到下方。").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("1. 注册或登录魔搭，在右上角头像菜单中绑定阿里云账号。").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("2. 获取该魔搭账号的 Access Token，并粘贴到下方。").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(
             "3. 从下方选择推荐模型；不满意可选「自定义模型」，到模型库复制支持 API 和工具调用的完整模型 ID。",
         ).performScrollTo().assertIsDisplayed()
@@ -150,6 +150,7 @@ class ProviderProfilesUiTest {
         compose.onNodeWithText("Qwen3.8-Flash-Next（推荐）").performClick()
         for ((label, url) in listOf(
             "注册 / 登录魔搭" to "https://www.modelscope.cn/",
+            "绑定阿里云账号（官方教程）" to "https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization",
             "创建魔搭 Access Token" to "https://modelscope.cn/my/myaccesstoken",
             "查看魔搭模型" to "https://www.modelscope.cn/models",
         )) {
@@ -176,9 +177,9 @@ class ProviderProfilesUiTest {
         renderEditor(profile = profile, onSave = { saved = it }, onOpenUri = opened::add)
         compose.onNodeWithTag("modelscope-model-picker").performScrollTo().assertTextContains("Custom model")
         compose.onNodeWithText("Model name").performScrollTo().assertTextContains(profile.settings.model)
-        compose.onNodeWithText("Browse ModelScope models").performScrollTo().performClick()
+        compose.onNodeWithText("Alibaba Cloud binding guide").performScrollTo().performClick()
         assertEquals(
-            "https://www.modelscope.cn/models",
+            "https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization",
             opened.single(),
         )
         compose.onNodeWithText("Save connection").performClick()

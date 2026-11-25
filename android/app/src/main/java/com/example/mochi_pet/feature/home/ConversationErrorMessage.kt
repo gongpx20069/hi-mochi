@@ -2,6 +2,7 @@ package com.example.mochi_pet.feature.home
 
 import com.example.mochi_pet.core.agent.llm.ProviderConfigurationException
 import com.example.mochi_pet.core.agent.llm.ProviderHttpException
+import com.example.mochi_pet.core.agent.llm.ProviderHttpErrorReason
 import com.example.mochi_pet.core.agent.llm.ProviderNetworkException
 import com.example.mochi_pet.core.agent.llm.ProviderProtocolException
 import com.example.mochi_pet.core.agent.llm.ProviderResponseTooLargeException
@@ -20,7 +21,11 @@ internal fun conversationErrorMessage(error: Throwable): String =
             408, 504 ->
                 "The AI service timed out. Check your network and provider status."
             401, 403 ->
-                "AI service access was denied. Check your API key and model permissions in Settings."
+                if (error.reason == ProviderHttpErrorReason.MODELSCOPE_ACCOUNT_BINDING_REQUIRED) {
+                    "ModelScope requires a linked Alibaba Cloud account. Sign in to the ModelScope account that owns this Access Token and bind Alibaba Cloud from the avatar menu. See the ModelScope setup guide in Settings."
+                } else {
+                    "AI service access was denied. Check your API key and model permissions in Settings."
+                }
             429 ->
                 "The AI service is rate-limited or out of quota. Check your quota or try again later."
             in 500..599 ->

@@ -214,6 +214,25 @@
   color: var(--muted);
 }
 
+.wiki-figure {
+  max-width: 400px;
+  margin: 20px 0;
+}
+
+.wiki-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.wiki-figure figcaption {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
 .wiki-disclosure {
   margin-block: 12px;
   padding: 20px 24px;

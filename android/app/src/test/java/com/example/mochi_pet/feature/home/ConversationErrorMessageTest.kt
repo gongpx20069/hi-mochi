@@ -2,6 +2,7 @@ package com.example.mochi_pet.feature.home
 
 import com.example.mochi_pet.core.agent.llm.ProviderConfigurationException
 import com.example.mochi_pet.core.agent.llm.ProviderHttpException
+import com.example.mochi_pet.core.agent.llm.ProviderHttpErrorReason
 import com.example.mochi_pet.core.agent.llm.ProviderNetworkException
 import com.example.mochi_pet.core.agent.llm.ProviderProtocolException
 import com.example.mochi_pet.core.agent.llm.ProviderResponseTooLargeException
@@ -42,6 +43,10 @@ class ConversationErrorMessageTest {
                 "AI 服务拒绝访问，请在设置中检查 API Key 和模型权限。",
             ProviderHttpException(403, "private") to
                 "AI 服务拒绝访问，请在设置中检查 API Key 和模型权限。",
+            ProviderHttpException(401, "private", ProviderHttpErrorReason.MODELSCOPE_ACCOUNT_BINDING_REQUIRED) to
+                "魔搭要求先绑定阿里云账号。请登录生成此 Access Token 的魔搭账号，在右上角头像菜单中完成绑定。绑定教程见设置中的魔搭接入指南。",
+            ProviderHttpException(403, "private", ProviderHttpErrorReason.MODELSCOPE_ACCOUNT_BINDING_REQUIRED) to
+                "魔搭要求先绑定阿里云账号。请登录生成此 Access Token 的魔搭账号，在右上角头像菜单中完成绑定。绑定教程见设置中的魔搭接入指南。",
             ProviderHttpException(429, "private") to
                 "AI 服务请求受限或额度不足，请检查额度或稍后重试。",
             ProviderHttpException(503, "private") to

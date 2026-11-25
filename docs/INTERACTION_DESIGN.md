@@ -116,6 +116,9 @@ directive is applied before the accepted Agent reply is sent to speech synthesis
 Provider failures use localized, actionable status messages distinguishing
 timeout, connectivity, access denial, rate/quota limits, service availability,
 configuration, and response errors. Raw provider error text is not displayed.
+The recognized ModelScope account-binding rejection instead explains that the
+Token-owning ModelScope account must bind Alibaba Cloud from its avatar menu,
+and points to the Settings setup guide. Unknown access rejections remain generic.
 These messages do not claim that device actions were skipped or rolled back:
 an earlier Tool may already have executed before a later model request failed.
 
@@ -542,11 +545,12 @@ links to its official site or guide. Endpoint remains editable; model is chosen
 by the user because account access varies. Provider APIs are not Coding Plans;
 free quotas and billing depend on the account. Groq has three localized setup
 steps and explicit Console signup, key creation, model-list and account-limit
-links. ModelScope has only three short setup steps: register/sign in, obtain
-and paste an Access Token, then choose a model. Its only external links are
-the ModelScope homepage, Access Token account page and model-library homepage.
-It does not show account-binding, key comparisons, deployment, quota or credit
-tutorials. The third step is one paragraph explaining recommended choices or a
+links. ModelScope has three short setup steps: register/sign in and bind Alibaba
+Cloud from the avatar menu, obtain and paste that account's Access Token, then
+choose a model. Its external links are the ModelScope homepage,
+[official account-binding guide](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization),
+Access Token account page and model-library homepage. It does not show key
+comparisons, deployment, quota or credit tutorials. The third step is one paragraph explaining recommended choices or a
 custom full model ID with API and tool-calling support.
 The Token field precedes a model dropdown: Qwen3.8-Flash-Next (recommended),
 DeepSeek-V4.1-Flash, GLM-5.2, then Custom model. New connections require an

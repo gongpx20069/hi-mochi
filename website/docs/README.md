@@ -70,8 +70,14 @@ LLMs versus Agents, with a concrete example and the authorized-tool boundary.
 The model guide covers all ten presets with three steps each. Put the language's
 recommended provider (Chinese: ModelScope; English: Groq) in the first content
 section, with always-visible steps rather than a disclosure. The Wiki index
-also names that recommendation. Other providers start collapsed. ModelScope has only signup,
-Token and model-library links, without binding/credit tutorials.
+also names that recommendation. Other providers start collapsed. ModelScope's
+first step combines signup with Alibaba Cloud binding from the avatar menu,
+linking the official account-binding guide. Its Token must come from that same
+ModelScope account. Keep the three-step format without adding credit tutorials.
+The bilingual model guides and Chinese quick start include the locally bundled,
+original `assets/modelscope-binding.svg` entry illustration, with localized alt
+text and captions identifying it as a schematic rather than a screenshot.
+Do not embed account data or load third-party tutorial images at runtime.
 Speech covers Android, iFlytek and Azure, including saving credentials before
 voice previews and explicitly selecting a saved speech account.
 Link iFlytek credential help directly to `https://console.xfyun.cn/services/iat`;

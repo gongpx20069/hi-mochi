@@ -400,9 +400,12 @@ private fun ProviderSetupGuide(preset: ProviderPreset, openGuide: (String) -> Un
         }
         ProviderPreset.MODELSCOPE -> {
             Text("ModelScope setup", fontWeight = FontWeight.Bold)
-            Text("1. Register or sign in to ModelScope.")
+            Text("1. Register or sign in to ModelScope, then bind your Alibaba Cloud account from the avatar menu.")
             TextButton(onClick = { openGuide("https://www.modelscope.cn/") }) { Text("Register / sign in to ModelScope") }
-            Text("2. Get an Access Token and paste it below.")
+            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization") }) {
+                Text("Alibaba Cloud binding guide")
+            }
+            Text("2. Get an Access Token from that ModelScope account and paste it below.")
             TextButton(onClick = { openGuide("https://modelscope.cn/my/myaccesstoken") }) { Text("Create ModelScope Access Token") }
             Text("3. Choose a recommended model below, or choose Custom model and copy an API-enabled, tool-capable model's full ID from the model library.")
             TextButton(onClick = { openGuide("https://www.modelscope.cn/models") }) { Text("Browse ModelScope models") }

@@ -232,9 +232,12 @@ sealed class OpenAiProviderException(
 class ProviderConfigurationException(message: String) :
     OpenAiProviderException(message)
 
+enum class ProviderHttpErrorReason { MODELSCOPE_ACCOUNT_BINDING_REQUIRED }
+
 class ProviderHttpException(
     val statusCode: Int,
     message: String,
+    val reason: ProviderHttpErrorReason? = null,
 ) : OpenAiProviderException(message)
 
 class ProviderProtocolException(message: String) :

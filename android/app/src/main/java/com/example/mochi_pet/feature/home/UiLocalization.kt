@@ -613,9 +613,10 @@ private val ZH_UI_TEXT = mapOf(
     "Free-tier requests and tokens are limited. Check reset times in Groq Console; Mochi does not retry quota errors, switch providers, or upgrade billing automatically." to "免费层有请求数和 token 限额，恢复时间请查看 Groq 控制台。Mochi 不会自动重试额度错误、切换服务商或升级付费。",
     "Check Groq limits" to "查看 Groq 额度",
     "ModelScope setup" to "魔搭接入指南",
-    "1. Register or sign in to ModelScope." to "1. 注册或登录魔搭。",
+    "1. Register or sign in to ModelScope, then bind your Alibaba Cloud account from the avatar menu." to "1. 注册或登录魔搭，在右上角头像菜单中绑定阿里云账号。",
     "Register / sign in to ModelScope" to "注册 / 登录魔搭",
-    "2. Get an Access Token and paste it below." to "2. 获取 Access Token 并粘贴到下方。",
+    "Alibaba Cloud binding guide" to "绑定阿里云账号（官方教程）",
+    "2. Get an Access Token from that ModelScope account and paste it below." to "2. 获取该魔搭账号的 Access Token，并粘贴到下方。",
     "Create ModelScope Access Token" to "创建魔搭 Access Token",
     "3. Choose a recommended model below, or choose Custom model and copy an API-enabled, tool-capable model's full ID from the model library." to "3. 从下方选择推荐模型；不满意可选「自定义模型」，到模型库复制支持 API 和工具调用的完整模型 ID。",
     "Browse ModelScope models" to "查看魔搭模型",
@@ -1324,6 +1325,8 @@ private val ZH_UI_TEXT = mapOf(
         "无法连接 AI 服务，请检查网络、代理和服务地址。",
     "AI service access was denied. Check your API key and model permissions in Settings." to
         "AI 服务拒绝访问，请在设置中检查 API Key 和模型权限。",
+    "ModelScope requires a linked Alibaba Cloud account. Sign in to the ModelScope account that owns this Access Token and bind Alibaba Cloud from the avatar menu. See the ModelScope setup guide in Settings." to
+        "魔搭要求先绑定阿里云账号。请登录生成此 Access Token 的魔搭账号，在右上角头像菜单中完成绑定。绑定教程见设置中的魔搭接入指南。",
     "The AI service is rate-limited or out of quota. Check your quota or try again later." to
         "AI 服务请求受限或额度不足，请检查额度或稍后重试。",
     "The AI service is temporarily unavailable. Try again later." to

@@ -430,6 +430,11 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                     summary.press("Enter")
                     assert disclosure.evaluate("item => item.open")
                     assert disclosure.locator("p, ol, ul").first.is_visible()
+                if guide == "models/" or (guide == "quick-start/" and locale):
+                    illustration = page.locator("[data-modelscope-binding] img")
+                    assert illustration.count() == 1 and illustration.is_visible()
+                    assert illustration.get_attribute("alt")
+                    assert illustration.evaluate("image => image.complete && image.naturalWidth > 0")
                 for width in (320, 390, 768, 1024, 1280, 1440):
                     page.set_viewport_size({"width": width, "height": 900})
                     # Poll from Python: page animation/timer callbacks do not run with JavaScript disabled.

@@ -26,7 +26,8 @@
 
    **LLM 模型：** 打开**设置 > AI 连接**。
    **推荐魔搭 ModelScope，可用免费 API 额度入门：**
-   [注册或登录](https://modelscope.cn/) → [获取 Access Token](https://modelscope.cn/my/myaccesstoken) 并粘贴 →
+   [注册或登录](https://modelscope.cn/)并[绑定阿里云账号](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization) →
+   [获取该账号的 Access Token](https://modelscope.cn/my/myaccesstoken) 并粘贴 →
    从下拉列表选择推荐模型；也可到[模型库](https://modelscope.cn/models)选择后自定义填写。
 
    **语音模型：推荐讯飞。** 在[语音听写控制台](https://console.xfyun.cn/services/iat)创建或选择 WebAPI 应用，

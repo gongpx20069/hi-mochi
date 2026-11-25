@@ -386,8 +386,11 @@ automatic retry, provider switch, credit claim, or billing upgrade.
 
 The Settings guide covers direct API use in three steps only:
 
-1. Register or sign in at [ModelScope](https://www.modelscope.cn/).
-2. Get an [Access Token](https://modelscope.cn/my/myaccesstoken) and paste it.
+1. Register or sign in at [ModelScope](https://www.modelscope.cn/), then bind
+   Alibaba Cloud from the avatar menu using the
+   [official binding guide](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization).
+2. Get an [Access Token](https://modelscope.cn/my/myaccesstoken) from that
+   ModelScope account and paste it.
 3. Choose a recommended model, or use Custom model to enter a full model ID
    supporting API and tool calling from the [model library](https://www.modelscope.cn/models).
 
@@ -446,6 +449,12 @@ error; intermediate commentary alone is not a final reply.
 
 Provider errors are bounded and redact the configured key. Endpoints must be
 absolute HTTP(S) URLs without embedded credentials.
+The transport classifies the exact known Alibaba Cloud binding rejection on
+HTTP 401/403 from `api-inference.modelscope.cn` as a typed
+`MODELSCOPE_ACCOUNT_BINDING_REQUIRED` reason. Chat and configuration checks map
+that reason to localized guidance, not raw response text. Other hosts, statuses
+and messages retain the existing generic error mapping; no automatic retry or
+account operation is performed.
 
 ### Transport observations
 

@@ -62,8 +62,9 @@ class OkHttpOpenAiChatClient(
             .writeTimeout(config.timeoutSeconds, TimeUnit.SECONDS)
             .callTimeout(config.timeoutSeconds, TimeUnit.SECONDS)
             .build()
+        val httpRequest = requestBuilder.build()
         val response = try {
-            client.newCall(requestBuilder.build()).await(config.maxResponseBytes)
+            client.newCall(httpRequest).await(config.maxResponseBytes)
         } catch (error: IOException) {
             throw ProviderNetworkException(
                 "Provider network request failed",
@@ -72,13 +73,16 @@ class OkHttpOpenAiChatClient(
         }
         val responseText = response.text
         if (response.code !in 200..299) {
+            val message = providerErrorMessage(response.code, responseText, config.apiKey)
+            val reason = if (
+                (response.code == 401 || response.code == 403) &&
+                httpRequest.url.host == "api-inference.modelscope.cn" &&
+                message.trim().equals("Please bind your Alibaba Cloud account before use.", ignoreCase = true)
+            ) ProviderHttpErrorReason.MODELSCOPE_ACCOUNT_BINDING_REQUIRED else null
             throw ProviderHttpException(
                 statusCode = response.code,
-                message = providerErrorMessage(
-                    statusCode = response.code,
-                    responseText = responseText,
-                    apiKey = config.apiKey,
-                ),
+                message = message,
+                reason = reason,
             )
         }
         val parsed = try {

@@ -275,6 +275,38 @@ class OkHttpOpenAiChatClientTest {
     }
 
     @Test
+    fun `classifies only the known ModelScope access rejection as requiring account binding`() {
+        val bindingMessage = "Please bind your Alibaba Cloud account before use."
+        val official = "https://api-inference.modelscope.cn/v1"
+        val cases = listOf(
+            Triple(official, 401, bindingMessage),
+            Triple(official, 403, "  ${bindingMessage.uppercase()}  "),
+            Triple(official, 403, "Invalid Access Token"),
+            Triple(official, 429, bindingMessage),
+            Triple("https://api-inference.modelscope.cn.example.com/v1", 403, bindingMessage),
+            Triple(official, 403, "$bindingMessage private response detail"),
+        )
+        cases.forEachIndexed { index, (endpoint, status, detail) ->
+            var calls = 0
+            val intercepted = OkHttpOpenAiChatClient(OkHttpClient.Builder().addInterceptor { chain ->
+                calls++
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                    .code(status).message("Rejected")
+                    .body("""{"error":{"message":"$detail"}}""".toResponseBody()).build()
+            }.build())
+            val error = assertThrows(ProviderHttpException::class.java) {
+                runBlocking { intercepted.complete(config(endpoint), request()) }
+            }
+            assertEquals(status, error.statusCode)
+            assertEquals(
+                if (index < 2) ProviderHttpErrorReason.MODELSCOPE_ACCOUNT_BINDING_REQUIRED else null,
+                error.reason,
+            )
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
     fun `rejects response larger than configured limit`() {
         server.enqueue(
             MockResponse()

@@ -288,6 +288,8 @@ def main() -> None:
                 for _, provider, body in re.findall(r'<(details|section)[^>]+data-provider="([^"]+)"[^>]*>(.*?)</\1>', source, re.S):
                     if body.count("<li>") != 3:
                         errors.append(f"{locale}wiki/models: {provider} needs three setup steps")
+                    if provider == "modelscope" and 'href="https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization"' not in body:
+                        errors.append(f"{locale}wiki/models: ModelScope needs the official account-binding guide")
             if guide == "speech/":
                 providers = re.findall(r'data-speech-provider="([^"]+)"', source)
                 if len(providers) != 3 or set(providers) != {"system", "iflytek", "azure"}:

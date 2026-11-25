@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="280" viewBox="0 0 400 280" role="img" aria-labelledby="title desc">
+  <title id="title">ModelScope account-binding entry</title>
+  <desc id="desc">Illustration, not a screenshot. Open the top-right avatar menu, then choose Bind Alibaba Cloud.</desc>
+  <rect width="400" height="280" rx="20" fill="#f5f6fa"/>
+  <rect x="16" y="16" width="368" height="218" rx="12" fill="#fff" stroke="#d1d7e2"/>
+  <path d="M16 88H384" stroke="#d1d7e2"/>
+  <g font-family="Arial, 'Microsoft YaHei', sans-serif">
+    <text x="32" y="60" font-size="24" font-weight="700" fill="#203047">ModelScope</text>
+    <circle cx="348" cy="52" r="22" fill="#fff0dc" stroke="#bd541f" stroke-width="2"/>
+    <circle cx="348" cy="46" r="6" fill="#52647f"/>
+    <path d="M337 63C337 52 359 52 359 63" fill="#52647f"/>
+    <circle cx="376" cy="25" r="14" fill="#bd541f"/>
+    <text x="376" y="31" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">1</text>
+    <path d="M348 76V95" stroke="#bd541f" stroke-width="2" stroke-dasharray="4 3"/>
+    <rect x="110" y="96" width="260" height="126" rx="10" fill="#fff" stroke="#d1d7e2"/>
+    <rect x="128" y="110" width="110" height="7" rx="3" fill="#e1e6ee"/>
+    <rect x="122" y="130" width="236" height="74" rx="8" fill="#fff0dc" stroke="#bd541f" stroke-width="2"/>
+    <text x="138" y="160" font-size="24" font-weight="700" fill="#723614">绑定阿里云账号</text>
+    <text x="138" y="187" font-size="20" fill="#723614">Bind Alibaba Cloud</text>
+    <circle cx="89" cy="167" r="14" fill="#bd541f"/>
+    <text x="89" y="173" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">2</text>
+    <path d="M104 167H119" stroke="#bd541f" stroke-width="2"/>
+    <path d="M32 112H70M32 130H60M32 148H68" stroke="#e1e6ee" stroke-width="7" stroke-linecap="round"/>
+    <text x="200" y="259" text-anchor="middle" font-size="18" fill="#52647f">modelscope.cn</text>
+  </g>
+</svg>
