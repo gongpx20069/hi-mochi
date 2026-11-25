@@ -89,6 +89,22 @@ blocked navigation. Normal history movement does not authorize replaying a POST
 or an unconfirmed action. Native navigation errors remain visible until a new
 navigation starts.
 
+Browser error envelopes include a fixed `reason` identifier. Invalid mode, URL,
+scroll direction/amount, reference syntax or missing arguments use `INVALID_ARGS`.
+Mode-change limits, interaction locks, blocked reloads and unconsumed observations
+use `CONFLICT`, with distinct reasons such as `BROWSER_MODE_CHANGE_LIMIT` and
+`BROWSER_PENDING_OBSERVATION`. Stale DOM references remain `STALE_REF`; blocked
+URLs use `PERMISSION_DENIED`; unreadable pages, renderer termination and navigation
+failures use `PROVIDER_ERROR`. Other state guards retain a generic
+`BROWSER_STATE_CONFLICT` reason rather than guessing from exception text.
+
+The existing `MochiAgent` tool-finished log records the enum reason together with
+run ID, actor, tool name, model/tool round and tool-call index. It does not log
+arguments, URLs, page contents, credentials or raw error messages. This does not
+add a persistent trace store or change observation windows, mode limits, action
+dispatch, cancellation or replay protection. A completed but unconsumed
+observation still requires `browser_read`, even when `action_pending=false`.
+
 Foreground Main also receives `request_user_assistance(kind, message, options)`.
 This native Tool is available independently of Browser enablement for questions;
 browser handoff requires an already open page. Children and schedules do not
@@ -334,9 +350,10 @@ Tool contract table.
 
 Website management is a secure full-screen dialog with a Bing search/address
 field centered beneath the Mochi logo, a top-right Close button, and a separate
-translucent website-list panel, not dashboard cards. Its entry is a rounded
-settings row matching App Control, with globe icon, detail and chevron; the
-management dialog and login flow remain unchanged. Opening a website row shows a secure second
+low-contrast website-list panel, not dashboard cards. Tools opens it from a rounded
+settings row matching App Control, with globe icon, detail and chevron; Chat and
+Companion also provide the header Browse shortcut, outside full screen. All entries
+share the same management dialog and login flow. Opening a website row shows a secure second
 list containing one shared Cookie/site-data entry, when detected, plus its
 password/SMS accounts. Blue data and purple credential badges include text labels.
 Credential swipes reveal Edit/Delete; data swipes reveal only Delete. A shared
@@ -350,7 +367,8 @@ Selecting an account matching the current exact origin explicitly fills its
 login form without submission; other origins navigate to that account's site.
 The homepage Close action ends the manual session. Manual browsing retains
 exclusive Browser ownership even while Home or the account sheet is visible;
-wake listening pauses and no Agent snapshots/actions run. Closing restores Tools.
+wake listening pauses and no Agent snapshots/actions run. Closing restores the
+originating Mochi or Tools surface without changing the mode or clearing the draft.
 Further manual navigation keeps that WebView's selected mode, avoiding a UA
 change on an already interacted-with form.
 

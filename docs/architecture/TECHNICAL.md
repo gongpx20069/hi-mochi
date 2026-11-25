@@ -382,6 +382,41 @@ The originating assistant tool call retains the function name. Free allowances
 are not hardcoded: quota exhaustion remains a visible Provider failure, with no
 automatic retry, provider switch, credit claim, or billing upgrade.
 
+### ModelScope direct API setup
+
+The Settings guide covers direct API use in three steps only:
+
+1. Register or sign in at [ModelScope](https://www.modelscope.cn/).
+2. Get an [Access Token](https://modelscope.cn/my/myaccesstoken) and paste it.
+3. Choose a recommended model, or use Custom model to enter a full model ID
+   supporting API and tool calling from the [model library](https://www.modelscope.cn/models).
+
+The preset supplies `https://api-inference.modelscope.cn/v1` with Chat
+Completions. Endpoint editing remains available under Advanced.
+The curated dropdown stores full IDs, not display labels:
+
+| Model ID | Selection rationale for Mochi |
+| --- | --- |
+| `Qwen/Qwen3.8-Flash-Next` | First recommendation for general chat and tool-based tasks; its model card reports real-world and multimodal tool-use evaluation. |
+| `deepseek-ai/DeepSeek-V4.1-Flash` | Alternative for reasoning, research and input-heavy agent tasks. |
+| `ZhipuAI/GLM-5.2` | Alternative for longer multi-step tool workflows, supported by its MCP-Atlas and Tool-Decathlon results. |
+
+All three IDs were present in the public
+[ModelScope API model list](https://api-inference.modelscope.cn/v1/models)
+on 2026-11-25. Capability evidence comes from their official model cards:
+[Qwen](https://www.modelscope.cn/models/Qwen/Qwen3.8-Flash-Next),
+[DeepSeek](https://www.modelscope.cn/models/deepseek-ai/DeepSeek-V4.1-Flash), and
+[GLM](https://www.modelscope.cn/models/ZhipuAI/GLM-5.2).
+This is a documentation-based shortlist, not an authenticated Mochi latency or
+tool-loop benchmark. The editor does not fetch this catalog or probe models.
+Selections require explicit user action; existing IDs, including unlisted ones,
+are never rewritten. Custom model input remains available if the catalog changes.
+Choosing a model changes only the draft model ID, not protocol, image input,
+endpoint, timeouts or credentials. Opening external links does not save settings,
+replace credentials or change the selected model.
+
+### Other provider compatibility
+
 Agnes-AI remains supported: its official
 [overview](https://wiki.agnes-ai.com/en/docs/overview) and
 [Agnes 3.0 Flash guide](https://wiki.agnes-ai.com/en/docs/agnes-30-flash)

@@ -50,6 +50,21 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ProviderProfilesSmokeTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    private var originalOrientation: Int? = null
+
+    private fun usePortraitLayout() {
+        compose.runOnUiThread {
+            val activity = compose.activity
+            originalOrientation = activity.requestedOrientation
+            activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        compose.waitUntil(10_000) {
+            val activity = compose.activity
+            activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT &&
+                activity.window.decorView.height > activity.window.decorView.width
+        }
+        compose.waitForIdle()
+    }
 
     private fun hideKeyboard() {
         compose.waitForIdle()
@@ -66,8 +81,11 @@ class ProviderProfilesSmokeTest {
         compose.waitForIdle()
     }
 
-    @After fun clearTestScreenFlag() {
-        compose.runOnUiThread { compose.activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    @After fun restoreTestWindowState() {
+        compose.runOnUiThread {
+            compose.activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            originalOrientation?.let { compose.activity.requestedOrientation = it }
+        }
     }
 
     @Test fun holdGestureFinalizesAndCancelsWithoutRecordingOrSending() {
@@ -109,6 +127,26 @@ class ProviderProfilesSmokeTest {
         hideKeyboard()
         compose.onNodeWithTag("conversation-layout").performTouchInput { swipeDown() }
         assertEquals(false, state.value.quickEntry)
+    }
+
+    @Test fun homeBrowserShortcutReturnsToBothModesWithoutChangingTheDraft() {
+        compose.onNode(hasText("Mochi") and hasClickAction()).performClick()
+        compose.onNode(hasText(localizeUiText("Chat")) and hasClickAction()).performClick()
+        compose.onNodeWithTag("conversation-input").performTextInput("Browser shortcut draft")
+        hideKeyboard()
+        compose.onNodeWithTag("mochi-browse").performClick()
+        compose.onNodeWithTag("browser-search").assertIsDisplayed()
+        compose.onNodeWithTag("browser-management-close").performClick()
+        compose.onNodeWithTag("conversation-input").assertIsDisplayed()
+        assertTrue(compose.onNodeWithTag("conversation-input").fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text.contains("Browser shortcut draft"))
+        compose.onNodeWithTag("conversation-input").performTextClearance()
+        hideKeyboard()
+        compose.onNode(hasText(localizeUiText("Companion")) and hasClickAction()).performClick()
+        compose.onNodeWithTag("mochi-browse").performClick()
+        compose.onNodeWithTag("browser-management").assertIsDisplayed()
+        compose.onNodeWithTag("browser-management-close").performClick()
+        compose.onNode(hasText(localizeUiText("Companion")) and hasClickAction()).assertIsSelected()
     }
 
     @Test fun compactComposerAndCapabilityPagesRemainReachableWithoutSending() {
@@ -209,6 +247,7 @@ class ProviderProfilesSmokeTest {
     }
 
     @Test fun agendaSwipesReplaceDifferentContentsWithoutMovingTheCalendar() {
+        usePortraitLayout()
         val today = java.time.LocalDate.of(2026, 11, 30)
         val selected = mutableStateOf(today)
         val base = java.time.Instant.parse("2026-11-30T08:00:00Z")
@@ -238,6 +277,7 @@ class ProviderProfilesSmokeTest {
     }
 
     @Test fun externalReturnCentersIdleChatButPauseAndInternalNavigationDoNot() {
+        usePortraitLayout()
         compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         if (compose.onAllNodesWithText(localizeUiText("Settings")).fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithText(localizeUiText("Settings")).performClick()
@@ -268,6 +308,7 @@ class ProviderProfilesSmokeTest {
         }
         assertEquals(false, historyAvailable())
         val bottom = compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top
+        val initialLayout = compose.onNodeWithTag("conversation-layout").getUnclippedBoundsInRoot()
         compose.onNodeWithTag("conversation-input").performTextInput("Synthetic return draft")
         hideKeyboard()
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.STARTED)
@@ -276,7 +317,10 @@ class ProviderProfilesSmokeTest {
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
         awaitCentralEntry()
-        assertTrue(compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top < bottom)
+        val entry = compose.onNodeWithTag("conversation-composer").getUnclippedBoundsInRoot().top
+        val entryLayout = compose.onNodeWithTag("conversation-layout").getUnclippedBoundsInRoot()
+        assertTrue("Composer top: normal=$bottom, entry=$entry; layouts: normal=$initialLayout, entry=$entryLayout",
+            entry < bottom)
         compose.activityRule.scenario.recreate()
         assertTrue(historyAvailable())
         compose.onNodeWithTag("conversation-layout").performTouchInput { swipeDown() }

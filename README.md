@@ -1,590 +1,260 @@
 <div align="center">
 
-<img src="docs/assets/mochi-banner.svg" alt="Mochi — a native Android voice AI companion" width="100%">
+<img src="docs/assets/mochi-banner.svg" alt="Mochi — your Android AI companion" width="100%">
 
 # Mochi
 
-**Turn an old Android phone into an always-ready, voice-first life agent.
-Local-first data, BYOK intelligence, native actions.**
+**An AI companion for your Android phone. Talk, plan your day, research the web,
+and get things done with the model you choose.**
 
 [**Download APK**](https://github.com/gongpx20069/hi-mochi/releases/latest)
-· [**Watch introduction (Chinese, Bilibili)**](https://www.bilibili.com/video/BV1u6aB6GEDD/)
-· [**Build from source**](docs/DEVELOPMENT.md)
+· [**Watch introduction (Chinese)**](https://www.bilibili.com/video/BV1u6aB6GEDD/)
+· [English](README.md) · [简体中文](README.zh-CN.md)
 
-**Android 8.0+** · **`arm64-v8a` recommended** ·
-**OpenAI, Azure OpenAI, or compatible provider required**
+**Android 8.0+ · Bring your own model API key · No Mochi account required**
 
-> **Local-first, not fully offline:** Persona, conversations, memory, planner
-> data, and credentials stay on-device by default. Model requests, optional
-> cloud speech, and enabled external Tools use the providers you configure.
-
-[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#requirements--current-status)
-[![Native Kotlin](https://img.shields.io/badge/Native-Kotlin-7F52FF?logo=kotlin&logoColor=white)](android)
-[![Open Source](https://img.shields.io/badge/Open%20Source-Free-06B6D4)](#license)
 [![CI](https://github.com/gongpx20069/hi-mochi/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gongpx20069/hi-mochi/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-MIT-111827)](#license)
-
-[English](README.md) · [简体中文](README.zh-CN.md) · [Documentation](docs/README.md)
+[![License](https://img.shields.io/badge/License-MIT-111827)](LICENSE)
 
 </div>
 
 ---
 
-Say your selected phrase, **“Hi Mochi”** or **“老莫老莫”**, to remember something,
-research public information, plan daily life, or open the right native screen.
-Native Android voice, memory,
-planning, Tools, and Skills turn a spare phone into a dedicated companion,
-desk display, and planner.
+Give a spare phone a place on your desk, or use Mochi on your everyday phone.
+Type a question, dictate a message, or say **“Hi Mochi”** in Companion mode.
+Your conversations, planner and settings live on your device; AI requests use
+the provider you configure.
 
-[Quick start](#quick-start-choose-the-right-apk) · [Configuration](#configuration) ·
-[Core features](#core-features) · [Skills and Tools](#skills-and-tools) ·
-[Optional extensions](#optional-extensions)
+[Get started](#get-started) · [What you can do](#what-you-can-do) ·
+[Connect services](#connect-services) · [Optional extensions](#optional-extensions) ·
+[Privacy and control](#privacy-and-control)
 
-## Quick start: choose the right APK
+## Get started
 
-Open the [latest GitHub Release](https://github.com/gongpx20069/hi-mochi/releases/latest)
-and choose the APK that matches the device:
+1. **Install Mochi** from [GitHub Releases](https://github.com/gongpx20069/hi-mochi/releases/latest).
+   Choose `arm64-v8a` for most phones, or `universal` if unsure.
+   Older ARM devices use `armeabi-v7a`; Intel devices and emulators use `x86_64` or `x86`.
+   All packages have the same features. Keep the same signing channel when updating;
+   there is no need to uninstall.
+2. **Connect a model** in **Settings > AI connections > Add AI connection**.
+   Choose a provider, follow its registration/key guide, and enter an available
+   model that supports tool calling. You need your own provider API access;
+   a consumer chat subscription does not necessarily include it.
+3. **Start talking or typing.** In **Chat**, tap the input to type or hold to
+   dictate. Release adds words to your draft; tap Send when ready.
+   In **Companion**, grant microphone permission and use the selected wake phrase.
+   Connect other services only when you need them.
 
-| Device | APK to install |
+Android speech is built in; no separate speech API key or extension APK is
+required to start. Recognition and installed voices depend on the phone.
+If setup is unclear, **Settings > Configuration check** checks the model connection
+and related configuration. It sends a short model request that may consume quota.
+
+## What you can do
+
+### Chat, or keep a companion on your desk
+
+**Chat** and **Companion** share your conversation history. Chat supports typing,
+hold-to-dictate and a reply-mute button. Companion shows Mochi's expressions and
+supports spoken replies and follow-up listening. Full screen gives Mochi, the
+date and the time more room on a desk display.
+
+Choose **“Hi Mochi”** or **“老莫老莫”** in **Settings > Speech and wake**.
+Wake listening works only while Companion is visible, the app is in the
+foreground and the screen is unlocked—not while locked or in the background.
+You can also choose English or Chinese UI and edit Mochi's personality in Settings.
+
+### Plan your day and remember what matters
+
+Ask Mochi to create schedules, manage dated todos, show a day's agenda or set
+up a recurring Agent task. For example:
+
+> “Remind me about my appointment tomorrow at 3.”
+>
+> “Every morning, research this topic and summarize what you find.”
+>
+> “What did we decide about the trip last week?”
+
+Calendar reminders and scheduled Agent tasks are different: one reminds you of
+an event, while the other asks the model to do work and saves its result to chat.
+Use **Tasks** to inspect schedules, execution results and connected extension tasks.
+Notifications and Android background restrictions affect delivery and timing.
+
+Conversation history stays on the phone. Optional **Daily journal** and
+**Memory Recall** help find past details and their original messages; they are
+off by default. Relevant history may be included in requests to your model.
+
+### Research the web and browse yourself
+
+Ask Mochi to read a link, compare products, research travel options or summarize
+public information. Its browser can reuse local website sessions and ask you
+to handle login or verification when needed.
+
+For manual browsing, tap **Browse** in the Chat or Companion header, or open
+**Tools > Agent Browser > Websites and logins**. Search, enter an address, and
+manage saved website accounts there. The browser has Back, Forward, Home and
+Sites controls. Home keeps the page available through **Return to page**;
+Close ends manual browsing.
+
+Passwords are stored locally with encryption and are not sent to the model.
+SMS accounts save a website and phone number, never verification codes.
+Enter credentials in the website or its native account dialog, not in chat.
+Agent web research in Chat does not automatically open an interactive page for you.
+
+### Work with your documents and apps
+
+Connect **Notion**, **Tencent Docs** or **Feishu** to find your own material,
+organize research, draft documents and write updates to authorized workspaces.
+Connect **Amap** for routes, weather and nearby places.
+
+With **App Control**, choose which installed apps Mochi may operate and
+explicitly enable Android accessibility assistance. **Media Control** can
+request songs in supported players, control playback and adjust media volume.
+Player access is optional and requires Android notification access; Mochi does
+not read message notifications. App compatibility varies, and sensitive steps
+may still need your help.
+
+### Add skills as you need them
+
+**Tools** are capabilities Mochi can call; **Skills** guide how it uses them.
+Enable only what you need. A Skill does not automatically enable its required
+Tools; the Skills page shows missing dependencies.
+
+| Built-in Skill | What it helps with | Setup |
+| --- | --- | --- |
+| Memory Recall | Find earlier conversations using journals and original messages | Enable Daily journal |
+| Mochi Planner | Calendar events and dated todos | No extra service |
+| Voice Navigation | Open the relevant Mochi screen | No extra service |
+| Scheduled Automations | One-time or recurring Agent tasks | Notification permission; exact-alarm access optional |
+| Browser | Read links, compare pages, search Bing or WeChat sources | Enable Agent Browser tools |
+| App Assistant | Operate allowed apps and verify results | App Control and accessibility permission |
+| Product Search | Compare public product information, without ordering or payment | Browser tools |
+| Douban Ratings | Movie/book ratings and review themes | Browser tools |
+| US Stock Analysis | Research the Magnificent Seven using public market and company information | Browser tools; not financial advice |
+| Notion Knowledge | Find, draft and update workspace pages | Notion connection |
+| Tencent Docs Knowledge | Find, draft and update documents | Tencent Docs connection |
+| Feishu Knowledge | Search, read, create and update cloud documents | Feishu connection |
+| Travel Planning | Routes, weather, train and flight research—not booking | Amap and Browser |
+| Merchant Discovery | Compare nearby businesses and available details | Amap |
+
+Browse the built-in **skills.sh market** to discover and install community
+Skills. You can also connect an MCP service or define tools for your own public
+HTTPS JSON REST API under **Tools > Add tool**, without writing an extension.
+REST API previews are offline; testing sends a real request and may change data
+or consume quota. REST writes require confirmation.
+
+## Connect services
+
+### Choose your AI provider
+
+Mochi supports multiple named model connections. Choose **Use** to activate one;
+switching cancels running local Agent tasks. API charges, quotas, model
+availability and regional access are determined by your provider.
+
+| Provider | Where to get started |
 | --- | --- |
-| Most current Android phones and tablets | **`arm64-v8a` — recommended** |
-| Older 32-bit ARM phones and tablets | `armeabi-v7a` |
-| 64-bit Android emulator or rare Intel device | `x86_64` |
-| 32-bit Android emulator or older Intel device | `x86` |
-| Architecture is unknown, or one file must support different devices | `universal` — largest download |
+| OpenAI | [API keys](https://platform.openai.com/api-keys) |
+| Azure OpenAI | [Azure resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI); use the deployment name as the model |
+| Groq | [Console and API keys](https://console.groq.com/keys) · [Tool Use models](https://console.groq.com/docs/models) · [Account limits](https://console.groq.com/settings/limits) |
+| ModelScope | [Register](https://modelscope.cn/) · [Access Token](https://modelscope.cn/my/myaccesstoken) · [Models](https://modelscope.cn/models) · [Daily credits](https://modelscope.cn/magicube/usage?tab=earn) |
+| DeepSeek | [API guide](https://api-docs.deepseek.com/) |
+| Kimi | [API key guide](https://platform.kimi.com/docs/get-api-key) |
+| GLM | [API guide](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
+| MiniMax (China) | [API guide](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
+| Agnes-AI | [API and model guide](https://wiki.agnes-ai.com/en/docs/overview) |
+| Other OpenAI-compatible services | Enter the HTTPS endpoint, API key and tool-capable model supplied by your provider |
 
-1. Download and install the matching APK from the release page above.
-2. Open **Settings > AI connections > Add AI connection**, choose an official
-   preset or custom endpoint, and enter your model and API key.
-   Optionally add a [speech connection](#supported-speech-providers) and tap **Use**.
-3. Start a conversation by text or microphone; grant microphone permission
-   for voice input and enable the wake word when ready. In **Settings > Speech
-   and wake**, **Follow system** is the default: Chinese device languages use
-   **“老莫老莫”**; other languages use **“Hi Mochi”**. You can manually select
-   either phrase or return to Follow system; existing saved choices are retained.
-   Configure additional Tools and Skills only as you need them.
+Official presets include setup links and prefilled endpoints. Use a model
+available to your account, and select its supported API protocol—Responses or
+Chat Completions—in advanced settings. Enable image input only for a model that
+supports images.
 
-The ABI-specific APKs contain the same Mochi features as the universal APK;
-they omit native speech libraries for other CPU architectures and are
-therefore much smaller. Developers can check a connected device with
-`adb shell getprop ro.product.cpu.abi`.
+**ModelScope setup:** verify your email and
+[bind a real-name-verified Alibaba Cloud account](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization).
+Use a **ModelScope Access Token**, not an Alibaba Cloud AccessKey or DashScope key,
+and copy the API-Inference model's full ID including its organization.
+Claim any daily credits on ModelScope itself; Mochi does not claim them or
+guarantee free usage. Groq free-tier limits likewise depend on your account.
 
-**Start with the base Mochi APK.** Optional extension APKs are not required
-for conversation, voice, memory, or Mochi Planner. Update through the same
-signing channel to preserve app data; do not uninstall just to upgrade.
+### Optional speech and connected services
 
-## Configuration
-
-### Supported LLM Providers
-
-An LLM Provider is required. First launch opens Settings when none is configured;
-Settings remains available from the top-right action.
-
-| Provider | Configuration | Credentials |
-| --- | --- | --- |
-| OpenAI | Prefilled `https://api.openai.com/v1`; enter model | [OpenAI API key](https://platform.openai.com/api-keys) |
-| Azure OpenAI | Azure resource endpoint and **deployment name** as the model; API version for Chat Completions only | [Azure OpenAI resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI) |
-| Groq | Prefilled `https://api.groq.com/openai/v1`; choose a Tool Use model | [Create API key](https://console.groq.com/keys) |
-| ModelScope | Prefilled `https://api-inference.modelscope.cn/v1`; enter a tool-capable API-Inference model ID | [Create Access Token](https://modelscope.cn/my/myaccesstoken) |
-| DeepSeek | Prefilled `https://api.deepseek.com`; enter model | [Official API guide](https://api-docs.deepseek.com/) |
-| Kimi | Prefilled `https://api.moonshot.cn/v1`; enter model | [Official API guide](https://platform.kimi.com/docs/get-api-key) |
-| GLM | Prefilled `https://open.bigmodel.cn/api/paas/v4`; enter model | [Official API guide](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
-| MiniMax (China) | Prefilled `https://api.minimax.cn/v1`; enter model and verify account region | [Official API guide](https://platform.minimax.cn/docs/api-reference/text-openai-api) |
-| Agnes-AI | Prefilled `https://apihub.agnes-ai.com/v1`; enter model | [Official API guide](https://wiki.agnes-ai.com/en/docs/overview) |
-| Custom OpenAI-compatible | User-defined HTTPS endpoint and model supporting tool calls through the selected API protocol | API key issued by that provider |
-
-**Settings > AI connections** saves multiple named accounts and models, with
-editable official endpoint presets for OpenAI, DeepSeek, Kimi, GLM, MiniMax
-(China), Agnes-AI, Groq, and ModelScope. Supply your own API key/Access Token
-and a tool-capable model from the linked official guide. These are provider
-APIs, not Coding Plan endpoints; free quotas, billing, and regional availability
-depend on your account.
-Adding another connection preserves the current choice. **Use** switches and
-cancels running local Agent tasks; future schedules remain enabled. Existing
-single-provider settings migrate without re-entering the key.
-
-**Groq:** [Register or sign in](https://console.groq.com/), open **API Keys**,
-create a key, and paste it into Mochi. Choose an available model with **Tool Use**
-from the [model list](https://console.groq.com/docs/models) and copy its exact ID.
-Check [account limits](https://console.groq.com/settings/limits) for free-tier
-quota/reset information; Mochi does not retry quota errors or upgrade billing.
-
-**ModelScope:** [Register or sign in](https://modelscope.cn/), verify your email,
-and [bind a real-name-verified Alibaba Cloud account](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization).
-Create an [Access Token](https://modelscope.cn/my/myaccesstoken) with a suitable
-expiry. This is a ModelScope token, **not** an Alibaba Cloud AccessKey or
-DashScope key. In the [model catalog](https://modelscope.cn/models), choose a
-tool-capable API-Inference model, select **ModelScope** as the API provider,
-and copy its model ID including the organization prefix. Claim daily credits
-on [ModelScope](https://modelscope.cn/magicube/usage?tab=earn); expiry and
-consumption depend on current platform rules. Mochi does not claim credits.
-Both presets include these setup links in the editor. Keep Chat Completions
-selected unless the chosen model supports another protocol, and enable image
-input only for image-capable models.
-
-**Agnes-AI:** its [current model guide](https://wiki.agnes-ai.com/en/docs/agnes-30-flash)
-still documents the existing endpoint and tool calling. The older
-[Agnes 2.5 Flash](https://wiki.agnes-ai.com/en/docs/agnes-25-flash) is scheduled
-to retire on November 30, 2026. Choose an available current model; Mochi never
-rewrites saved model selections. Documentation availability does not verify
-your account's API access.
-
-Each connection's **Advanced connection settings > API protocol** selects Responses
-or Chat Completions. New OpenAI/Azure connections default to Responses; other
-presets and existing connections retain Chat Completions unless changed.
-Switching only the protocol reuses the saved key. Choose a protocol supported by
-the endpoint and model; Mochi never switches automatically after an error.
-
-Settings starts with **Share/import**, followed by AI connections, Speech/wake,
-Conversation/persona, and Display/language. Sharing can include multiple checked
-LLM and speech connections. Import adds them instead of overwriting saved accounts
-and selects each shared active connection. Shared v5 links include API protocol
-and require a v5-compatible receiver; import accepts v2/v3/v4/v5 links. Anyone holding a full link can use the
-included API credentials.
-Receivers must also support any new preset names in the shared connections;
-update both devices before sharing Groq or ModelScope profiles.
-
-### Supported Speech Providers
-
-Open **Settings > Speech and wake**. Android speech is the
-default; cloud speech is optional and separate from the LLM configuration.
-
-| Provider | Default | Configuration |
-| --- | --- | --- |
-| Android system speech | Yes | No API credential; recognition and offline TTS voices depend on installed device services |
-| iFlytek | No | App ID, API Key, and API Secret from [Real-time Voice Dictation](https://www.xfyun.cn/services/voicedictation); manage synthesis access in the [iFlytek console](https://console.xfyun.cn/) |
-| Azure Speech | No | Speech endpoint and API key from an [Azure Speech resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices) |
-
-For iFlytek or Azure, **Also use this provider for speech synthesis** reuses
-the saved speech credentials for replies. It is off by default. Choose and
-preview a voice, then **Save speech connection** to apply it. Cloud synthesis
-sends reply text to that Provider; previews also consume its service quota.
-Listed voices do not guarantee account access or free usage. Wake
-acknowledgements remain local.
-
-Speech uses the same named-card/editor pattern as AI connections, including
-multiple accounts of the same provider. **Add** saves without switching; **Use**
-selects the account and stops only the current voice interaction/preview, leaving
-text conversations and background Agent tasks running. Edit any saved account
-to preview its voices without activating it. Existing accounts, keys and voices
-migrate in place. Android remains built in; switch away before deleting an active
-cloud account.
-
-Need another LLM or Speech Provider? Please
-[open an issue](https://github.com/gongpx20069/hi-mochi/issues/new) describing
-the provider and API compatibility, or submit a pull request.
-
-### Tools and Skills setup
-
-Most Tools have independent switches; Memory Recall follows the Daily journal
-setting instead. Provider-backed Tools also require a connected, enabled
-provider. Enable only the capabilities you want to use.
-Skills describe workflows; enabling a Skill does not automatically enable
-its dependencies. The Skills screen names any missing Tool groups.
-
-For maps and merchant discovery, create an [Amap Web Service Key](https://console.amap.com/).
-Select **Web Service**, not Android: no release/debug SHA1 is required.
-Mochi's optional Security Key is not a SHA1 value; enter it only when digital
-signatures are enabled in the Amap console.
-
-For document collaboration, use [Notion MCP OAuth](https://www.notion.com/help/notion-mcp)
-or a [Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html), then
-enable the corresponding Tools and Skill.
-
-**Feishu:** open **Tools > Feishu MCP > Connect Feishu** for guided
-[enterprise self-built app setup](https://open.feishu.cn/app), permissions,
-publication, and account authorization. Copy the exact redirect URL shown by
-Mochi into Feishu Security Settings; a temporary phone-local callback means no
-server deployment. Enter your own App ID/Secret only in that dialog, not chat.
-Search, wiki browsing, reading, creation, and updates are enabled after connection;
-enable **Feishu Knowledge** separately. Whole-document deletion, native
-spreadsheets, Bitable, and PPT editing are not supported.
-
-### Connect your own REST API
-
-Open **Tools > Add tool > Connect REST API**. Save a named service origin
-(for example `https://api.example.com`) and choose no authentication, Bearer
-Token, an API-key header, or a complete Authorization value. Tokens stay encrypted
-on the phone and are reused by that connection's API tools.
-
-Tap **Add API tool**, describe when Mochi should use it, choose its method/path,
-and add any parameters/defaults. **Preview** is offline; **Test API** asks before
-sending a real request, which can consume quota or change remote data. Select
-returned fields and their meanings/units, save, and enable both the Tool and
-connection switches. Selected results go to your configured model.
-
-This first version supports public HTTPS:443 JSON APIs and scalar fields.
-Writes require explicit user intent/confirmation; GET may opt out only when
-trusted and read-only. No Python, OAuth, local-network endpoints, Provider
-sharing, Scheduled Agent, or Subagent access is included. Existing MCP creation
-remains under **Add tool > Connect MCP service**.
-
-### Language, updates, and Provider sharing
-
-Mochi follows the Android system language by default and can be fixed to
-English or Chinese in Settings. It checks the latest stable GitHub Release
-each time it opens; you decide whether to download an available update.
-
-**Share Providers**, at the top of Settings, lets you select multiple saved
-LLM and speech accounts. Only the current ready account of each kind starts
-selected; other accounts, Amap, Tencent Docs, and manual MCP Tool credentials
-start unselected. Import adds accounts instead of overwriting them. The encrypted link also contains
-its decryption key: **anyone holding the full link can use the selected API
-resources and consume their quota**. Persona, memories, planner data, Feishu/Notion
-OAuth, Mi Home sessions, and Android permissions are not shared.
-
-## Core features
-
-### Local-first memory, with a path back to the source
-
-Mochi combines **automatic context** (recent turns and relevant older messages),
-**daily journals** (concise highlights from conversations, schedules, and task
-results), and **explicit recall**. The built-in Memory Recall Skill uses journals
-to find candidate dates, then searches and reads original conversation turns
-for detail. Journal misses fall back to conversations; summaries are not quotes.
-
-History and indexes stay on-device, without a separate vector service.
-Daily journal and explicit recall share one default-off setting; turning it
-off leaves ordinary conversation context unchanged. Relevant excerpts can
-reach your selected AI provider. See the [memory architecture](docs/architecture/MEMORY_DESIGN.md).
-
-### Unified task center
-
-Open **Tasks** in the app header for scheduled Agent runs, all schedules,
-Termux tasks, and authorized AgentLink chat task snapshots. Ordinary chat and
-its foreground Subagents stay in the conversation, not the task list. Stop supported
-tasks, open conversation results, inspect command output, or open the native
-AgentLink chat. Stopping an Agent does not stop already submitted Shell or
-remote work. Closing the task center does not stop execution. Agent run
-observations cover this app process; schedules and extension records retain
-their original owners.
-
-**Settings > Configuration check** makes one fixed-text model request (which
-may consume quota), checks speech configuration, extension connections and
-Skill prerequisites, and links to repair settings. Results distinguish Passed,
-Needs attention, Not tested and Not enabled. It never changes settings, records
-audio or executes Shell commands. Real speech operation still requires a
-microphone test and voice preview.
-
-### Chat or hands-free Companion
-
-- The **Mochi** tab switches between **Chat** and **Companion**.
-- Chat: tap the one-line input to type, or hold to dictate. Release fills/appends
-  the draft; move outside to cancel. Only explicit Send submits the message.
-- In visible, unlocked Companion, wake Mochi with **“Hi Mochi”** or **“老莫老莫”**.
-  Chat, other pages, background and lock pause wake listening without changing
-  your saved enable setting. **Full screen** is a separate Companion display option.
-- Continue speaking naturally through automatic follow-up listening.
-- Use Android speech recognition by default, or optionally connect built-in
-  iFlytek/Azure Speech-to-Text settings for greater reliability.
-- Hear responses through Android text-to-speech or opt-in iFlytek/Azure synthesis.
-- Let the conversation open the relevant date, weather, planner, or result
-  screen automatically.
-
-### More than a chat screen
-
-| Voice first | Remember what matters | Get real work done |
-| --- | --- | --- |
-| Selectable English/Chinese wake phrase and continuous voice conversation | [Local conversation history and memory recall](docs/architecture/MEMORY_DESIGN.md) | Built-in Tools for planning, schedules, location, weather, web, maps, documents, and local calculations |
-| Android speech by default, with optional iFlytek/Azure recognition and synthesis; text input remains available | Editable `SOUL`, `USER`, and `AGENTS` persona files | Trusted cards, native navigation, and serial Researcher/Analyst Subagents surface useful results |
-
-| Cowork with **Notion** and **Tencent Docs** | Expand through the Skill Market |
+| Service | Setup |
 | --- | --- |
-| Turn your authorized workspaces into private, writable knowledge bases. Mochi can find your material, research new topics, organize sources, cowork with you to draft documents, and publish the finished work back into **Notion** or **Tencent Docs**. | Discover and install community Agent Skills from the built-in skills.sh market |
+| Android speech | Default; availability depends on installed recognition services and voices |
+| iFlytek | [Real-time Voice Dictation](https://www.xfyun.cn/services/voicedictation): App ID, API Key and API Secret; [console](https://console.xfyun.cn/) for synthesis access |
+| Azure Speech | [Speech resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices): endpoint and API key |
+| Amap | [Web Service Key](https://console.amap.com/), not an Android SDK key |
+| Notion | [MCP OAuth authorization](https://www.notion.com/help/notion-mcp) from Tools |
+| Tencent Docs | [MCP token](https://docs.qq.com/open/auth/mcp.html) |
+| Feishu | Tools > Feishu MCP guides [self-built app setup](https://open.feishu.cn/app) and user authorization; no separate callback server needed |
 
-### Cowork with **Notion** and **Tencent Docs**
-
-Mochi connects your authorized **Notion** or **Tencent Docs** workspace as a
-private, writable knowledge base—not merely a read-only search source. It can
-find relevant material from your own documents, use enabled research Tools to
-investigate new topics, collect and organize sources, and cowork with you to
-draft a new page or document. Mochi can then write the finished work back to
-the selected workspace and continue updating it through the official MCP
-integration.
-
-Feishu cloud documents are also available through the guided self-built-app
-connection described above, with search, creation, updates and readback
-verification; each service's actual permissions and Tool scope still apply.
-
-### Serial Subagents
-
-The Main Agent can delegate a focused task to an isolated **Researcher** or
-**Analyst** and receive the result before continuing. Delegation is serial,
-limited to two child runs per request, and never grants a child access to
-planner mutations, device location, credentials, UI navigation, or other
-foreground-only capabilities. Researcher uses enabled Browser and approved
-read-only MCP Tools; Analyst can additionally use the local JavaScript
-sandbox. Both roles may also use [Termux](#run-local-commands-with-termux)
-once its provider is connected and its Tools are enabled.
-
-## Skills and Tools
-
-### Built-in Skills
-
-| Skill | Default | What it does | Required setup |
-| --- | --- | --- | --- |
-| Memory Recall | Follows Daily journal | Finds candidate dates in journals, then reads original saved conversation turns | Enable Daily journal in Settings; no separate Skill/Tool switch |
-| Mochi Planner | Enabled | Manages Mochi calendar events and dated todos | None |
-| Voice Navigation | Enabled | Opens the relevant native Mochi surface from conversation intent | None |
-| Scheduled Automations | Enabled | Runs one-time or recurring Agent prompts and writes results to Conversation | Notification permission; exact-alarm access is optional |
-| Browser | Enabled | Opens links, reads/compares web pages, searches Bing or WeChat sources, and reuses website sessions | None; requires Agent Browser read Tools |
-| App Assistant | Enabled | Guides selected-app operation, safe popup dismissal, result verification and return to Mochi; explains setup when Tools are unavailable | None for guidance; operations require App Control and manual accessibility authorization |
-| Product Search | Enabled | Finds and compares public product pages without ordering or payment | None |
-| Douban Ratings | Enabled | Reads public Douban ratings, counts, and review themes | None |
-| US Stock Analysis | Enabled | Compares the Magnificent Seven using quotes, capital flow, support/resistance, ratings, targets, financials, and news | None; uses public Baidu Stock and issuer pages |
-| **Notion Knowledge** | Disabled | Coworks with you to research, organize material, draft new pages, and find or update information in your authorized private knowledge base | [Connect through Notion MCP OAuth](https://www.notion.com/help/notion-mcp) |
-| **Tencent Docs Knowledge** | Disabled | Coworks with you to research, organize material, draft new documents, and find or update information in your authorized private knowledge base | [Get a Tencent Docs MCP token](https://docs.qq.com/open/auth/mcp.html) |
-| **Feishu Knowledge** | Disabled | Searches and browses authorized cloud documents, reads before editing, and verifies requested creation/updates by readback | Tools > Feishu MCP; [self-built app and user authorization](https://open.feishu.cn/app) |
-| Travel Planning | Enabled | Uses Amap for grounded routes and weather, then Agent Browser to research train or flight options without booking | [Create an Amap Web Service Key](https://console.amap.com/); enable Agent Browser |
-| Merchant Discovery | Enabled | Finds and compares merchants using available Amap ratings, average cost, hours, phone, tags, and photos | [Create an Amap Web Service Key](https://console.amap.com/) |
-
-Skills requiring separately installed apps are listed under
-[Optional extensions](#optional-extensions), not required for the core setup.
-
-### Built-in Tools
-
-| Group | Included Tools | Purpose and setup |
-| --- | --- | --- |
-| **Planner** | `manage_mochi_calendar` | Create, edit and complete user schedules, expand recurrence and enable opt-in local reminders. No additional service setup. |
-| **Automations** | `manage_mochi_schedule` | Manage one-time and recurring Agent prompts. Notification permission is required; exact-alarm access is optional. |
-| **Device context** | `get_current_location`<br>`get_current_weather` | Read permission-gated location or local weather. Location returns WGS-84 and, inside China, GCJ-02 coordinates. |
-| **Agent Browser** | `browser_read` · `browser_navigate`<br>`browser_click` · `browser_input` · `browser_scroll` | Browse public HTTPS websites with reusable local login and Agent-selected mobile/desktop mode. |
-| **App Control** | `app_read` · `app_navigate` · `app_click`<br>`app_input` · `app_scroll` | Read and operate user-selected apps through optional accessibility assistance. |
-| **Media Control** | `media_read` · `media_play_from_search`<br>`media_control` · `media_volume` | Request supported songs, control playback and adjust local media volume. No extra APK. |
-| **Native UX** | `navigate_mochi_ui`<br>`run_sandboxed_javascript` | Open trusted Mochi surfaces or run bounded pure JavaScript calculations locally. |
-| **Amap Maps** | Place search · Merchant details · Routes<br>Geocoding · Reverse geocoding · Weather | Search places and merchants, compare available ratings and average cost, and plan routes with trusted GCJ-02 coordinates. Requires a Web Service Key. |
-| **Connected MCP** | **Notion** · **Tencent Docs** · **Feishu**<br>Manually configured MCP servers | Search private knowledge, conduct research, and collaboratively create or update documents in authorized workspaces. |
-
-Agent Browser, Mochi built-ins, and provider Tool details are grouped and
-collapsed by default in Tools. Scheduled runs receive only the read-only
-Browser subset; foreground conversations may also click and enter page data.
-Provider Tools have independent switches, and provider-backed Tools also require
-their provider switch to be enabled.
-
-**App Control** and **Media Control** appear in that order between Agent Browser
-and Amap Maps, outside Mochi built-ins, with independent master and child switches.
-The five app Tools are foreground-only; the four media Tools also support
-Scheduled Agents, not Subagents. App launch requires a foreground conversation
-with Mochi visible and the phone unlocked; schedules can request songs only
-through existing supported sessions. Grant notification access from its card to
-control active players and verify song requests; Mochi does not read message notifications. Track metadata
-may reach your model Provider. Local volume works without that grant and also
-affects Mochi speech, not ringtone, alarms or cast devices. Player compatibility
-depends on the installed app's supported media-session actions and search Intents.
-An accepted app launch is not proof of playback; unconfirmed song requests are
-reported rather than automatically retried.
-
-Use **Allowed apps** in App Control to choose the shared scope.
-Music apps are selected by default; you may explicitly add other launchable
-apps or deselect all. **App assistance** separately opens Android
-accessibility settings after disclosure. It lets the model use filtered
-controls rather than fixed app-specific scripts; related interface text may
-reach your model Provider and conversation history. Explicit safe close/cancel
-controls can dismiss obstructing ads and popups. Sensitive operations
-require manual help, and unsupported interfaces may not be operable.
-App operations do not require player access. With that optional access,
-`media_read` can verify the exact playing song before `app_navigate` returns
-to Mochi, preserving its screen and Focus mode; navigation itself never claims verified playback.
-Mochi Navigation also supports entering and exiting Focus mode by request.
-**App Control > Background pop-up permission** opens Mochi's system app settings
-for manually allowing Mochi to open while another app is in the foreground.
-For UI song requests, playback and return to Mochi are verified separately.
-
-**Tools > Agent Browser > Websites and logins** opens a Bing search/address field
-and website list. Known websites with detected local data or saved accounts appear
-automatically. Open a website item for its blue Cookie/site-data entry and purple
-password/SMS accounts; labels distinguish them without relying on color.
-Swipe credentials halfway left for Edit/Delete, or site data for Delete only;
-swiping never removes a row. The browser's four bottom controls are Back,
-Forward, Home and Sites. Home keeps the current page for resuming;
-Sites opens the same website lists in a popup. Supported login-form submissions offer to save
-the website, username and password locally with Keystore encryption and native
-confirmation. Passwords never go to the model. Selecting an account allows
-explicit same-origin filling without automatic submission. SMS logins save only
-the website and phone number, never verification codes; expired logins still need
-a new code. **Sites > ... > Add SMS login account** can record an already
-completed or unsupported login without signing out. Deleting an account
-preserves the current website login; separate website-data clearing keeps saved
-passwords. Per-site deletion includes subdomains, warns about sign-out and closes
-the current manual page first. Stored website data is not proof of valid login.
-Mochi chooses the appropriate
-mobile/desktop view; no manual mode setting is needed. Resource
-cache can be cleared separately without logging out. Existing login is reused;
-when human login or verification is needed, Main's `request_user_assistance`
-pauses the task and speaks its explanation. Enter login credentials in the page, not chat,
-then choose Continue; Mochi checks the page before proceeding. Questions use
-choices or typed answers. Complete deletion requires a compatible updated
-System WebView and affects the parent domain's shared subdomain login.
-This version has one shared session store, not isolated account profiles, and
-cannot resume a pending task after process death. Capture supports top-level forms
-and recognizable login buttons, not every AJAX, iframe or external authentication flow.
-
-Travel Planning uses the normal visible controls on public HTTPS pages. Train
-research starts from the official 12306 query page; flight research prefers
-official airline sites. Mochi reuses working sessions or asks the user to handle
-login/verification; it never bypasses verification, enters passenger or payment
-data, or continues into booking or checkout.
-
-### Skill Market
-
-The built-in Skill Market makes Mochi extensible beyond its default
-capabilities. Browse trending Skills, search the skills.sh ecosystem, install
-the ones you need, and enable them when you want Mochi to use them.
-
-> Enabling a Skill never enables its required Tools automatically.
-
-## Privacy by design
-
-Persona files, settings, conversations, memories, calendar items, and todos
-stay on the device by default. Provider credentials use Android
-Keystore-backed local storage.
-
-Conversation bubbles show the locally stored send date and time beside
-**Mochi** or **You**, including restored history and Scheduled Agent results.
-
-When answering, Mochi sends the necessary conversation context to the AI
-provider you configured. An external Tool receives only the information needed
-for an enabled Tool call. When `get_current_location` is called, its
-permission-gated coordinates are included in Tool evidence sent to that
-configured AI provider; the Tool can be disabled independently in Tools.
-
-## Requirements & current status
-
-- Android 8.0 or newer.
-- An OpenAI, Azure OpenAI, or compatible provider configuration.
-- Microphone permission for voice input.
-- Optional location and notification permissions for related features.
-
-Stable builds are distributed as signed APKs through GitHub Releases. Mochi
-remains under active development; speech recognition, wake behavior, audio
-focus, reminders, and background operation can vary by device and
-manufacturer.
+Cloud speech is optional. In **Settings > Speech and wake**, you can choose
+recognition and opt into using the same provider for reply synthesis.
+Voice previews and cloud speech may consume service quota.
+Feishu support covers cloud documents, not native spreadsheets, Bitable or slides.
 
 ## Optional extensions
 
-These integrations add capabilities to Mochi but are **not required for its
-core features**. Install only what you need. Mi Home, Termux and WebDAV use optional
-Mochi-signed extension APKs; AgentLink connects through its independent
-companion app. Mi Home, WebDAV and AgentLink are foreground Main-Agent integrations;
-Termux also serves Subagents and Scheduled Agents automatically once connected
-and enabled. Installation alone never enables its provider.
+The base app is enough for chat, voice, planner and browser features.
+Install extensions only for the additional capabilities you want, then connect
+and enable their Tools and Skills.
 
-| Integration | Built-in Skill (default) | Additional capabilities | Installation |
-| --- | --- | --- | --- |
-| Mi Home | Mi Home Smart Home — disabled | Selected device state/control, manual scenes, latest camera event images | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Mijia-Extension` |
-| [AgentLink](https://github.com/gongpx20069/android-agent-link) | AgentLink — disabled | `agentlink_workspace` · `agentlink_chat` · `agentlink_control` for shared remote coding chats | [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases) |
-| Termux | Termux — disabled | `termux_exec` · `termux_task` for unrestricted local shell and task management | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Termux-Extension`, plus [official Termux](https://github.com/termux/termux-app#installation) |
-| WebDAV Files (preview) | WebDAV Files — disabled | Scoped file listing/search, text editing, conditional copy/move/delete and native binary transfer | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): matching Mochi + `Mochi-WebDAV-Extension` |
+| Integration / built-in Skill | What it adds | Installation |
+| --- | --- | --- |
+| Mi Home Smart Home | Control selected devices, run manual scenes and view the latest camera event image | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Mijia-Extension` |
+| AgentLink | Send coding tasks to authorized desktop workspaces and continue shared chats | [AgentLink app and desktop Bridge](https://github.com/gongpx20069/android-agent-link) · [APK](https://github.com/gongpx20069/android-agent-link/releases) |
+| Termux | Run local shell commands and inspect their tasks/output | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): `Mochi-Termux-Extension`, plus [Termux](https://github.com/termux/termux-app#installation) |
+| WebDAV Files (preview) | Search file names, read/edit text and transfer files within an allowed folder | [Mochi Releases](https://github.com/gongpx20069/hi-mochi/releases): matching `Mochi-WebDAV-Extension` |
 
-### WebDAV files: Nutstore, compatible clouds and NAS
+Use matching, same-signed Mochi extension packages and follow their connection
+guides in Tools. These Skills start disabled.
 
-Install matching, same-signed Mochi and WebDAV extension APKs. Open **Tools >
-Extensions > WebDAV Files > Connect WebDAV**, enter the HTTPS WebDAV address,
-existing allowed folder, account and application password, then check and save.
-For Nutstore, the preset uses `https://dav.jianguoyun.com/dav/`; create a
-third-party application password in Nutstore rather than entering credentials
-in chat. Other services must expose compatible WebDAV, not just a web login page.
-No separately deployed MCP server is required.
+- **Mi Home:** an unofficial connector; supported actions depend on the device.
+  Camera images are cloud events, not live video. Connection uses Mi Home QR authorization.
+- **AgentLink:** requires its Android app and desktop Bridge. Authorize the
+  workspaces you want to share. Remote work can continue after Mochi closes;
+  background result delivery is subject to Android scheduling.
+- **Termux:** this is a full shell under Termux permissions, not a sandbox.
+  Once connected and enabled, foreground, scheduled and child Agents can run
+  enabled commands without per-command approval. Output may reach your model.
+  Closing Mochi or stopping a parent Agent does not stop submitted commands.
+- **WebDAV:** use an HTTPS WebDAV address, an allowed folder and an application
+  password. Nutstore uses `https://dav.jianguoyun.com/dav/`. Writing, management,
+  transfers and LAN/VPN access require separate enablement. Text is limited to
+  32 KiB and binary files to 32 MiB; existing-file changes require strong ETags.
+  This is not a synchronization engine, and service/device compatibility varies.
 
-Choose **Enable tools and Skill** to allow reading; write, management and
-transfer Tools remain off unless explicitly enabled. The Skill is suspended
-whenever the extension or either required read Tool is unavailable.
-LAN/VPN NAS access needs a separate opt-in, and Android 17 also requires the
-extension's local-network permission. HTTPS must have a valid trusted certificate.
+## Privacy and control
 
-For binary uploads, use **Connection and files > Choose a file for upload**.
-Mochi can stage a download, but **Save to device** is needed to choose its final
-destination. Limits: 32 MiB/file, four staged files, 64 MiB total and one-hour
-expiry. Text reads/writes are limited to 32 KiB UTF-8. Search matches names,
-not contents, and reports truncation. Existing-file changes require strong
-ETags; servers without them cannot support guarded changes here. This is not
-Obsidian synchronization, and encrypted vault contents are not decoded.
-Real Nutstore/NAS compatibility and device acceptance remain pending.
+**Local-first does not mean fully offline.** Settings, persona, history, memory,
+planner data and credentials stay on-device by default. Model requests send
+necessary conversation context and tool results to the provider you choose.
+Cloud speech and external services process the information needed for their work.
+App interface text, location or document contents may reach the model when you
+enable and use those capabilities.
 
-### Mi Home smart-home devices
+Credentials use Android Keystore-backed storage. **Share/import** can transfer
+selected connections, but the full sharing link includes access to their API
+credentials: send it only to people you trust. It does not share conversation
+history, memories or Android permissions.
 
-Install `Mochi-Mijia-Extension` from the same Release/signing channel as Mochi.
-Open **Tools > Extensions > Mi Home > Connect Mi Home**, scan the QR code
-using another phone already signed into Mi Home, and confirm the connection.
-Search and select supported devices by home, then save. On the verified return,
-**Enable tools and Skill** enables the provider and the Skill's required Tools;
-**Not now** leaves it connected but disabled. Existing enablement choices are
-preserved when managing an already enabled extension.
+You control connections, allowed apps and permissions. Enabled browser actions
+and Termux commands can run without individual approval prompts, so review what
+you enable. Stopping an Agent does not undo completed changes or necessarily
+stop work already submitted to an extension or remote service.
 
-This is an unofficial connector. Capabilities depend on each selected device;
-unsupported actions are not exposed. Camera images are the latest available
-cloud events, **not a live view**. Xiaomi credentials stay in the extension;
-Mochi never asks you to paste an account password.
+Mochi is actively developed. Voice quality, app compatibility, reminder timing
+and background execution vary by device and Android restrictions. Keep System
+WebView and your speech services up to date; do not rely on Mochi for critical alerts.
 
-### Control shared AgentLink coding chats
+## Help and contribute
 
-Download the Android APK from [AgentLink Releases](https://github.com/gongpx20069/android-agent-link/releases)
-(currently marked **Pre-release**). See the [AgentLink repository](https://github.com/gongpx20069/android-agent-link)
-for desktop Bridge setup and connection instructions.
-After installing and connecting AgentLink, open **Tools > AgentLink > Connect/Open AgentLink**.
-Approve the scoped access request in AgentLink and return to Mochi. Enable the
-provider, its three switches (`agentlink_workspace`, `agentlink_chat`,
-`agentlink_control`), and the built-in **AgentLink** Skill.
-Mochi can discover authorized machines/workspaces, create or continue the same
-CLI/App chat, read changes, send work and request cancellation/configuration.
-Linked chat buttons open the trusted native AgentLink view; Refresh and
-Manage access/Revoke remain available in Tools.
+[Report a problem or request a provider](https://github.com/gongpx20069/hi-mochi/issues)
+· [Documentation](docs/README.md)
+· [Build from source](docs/DEVELOPMENT.md)
+· [Contributing](CONTRIBUTING.md)
 
-Remote tasks continue when Mochi closes. Human CLI/App changes override stale
-automation: conflicts stop follow-ups instead of retrying. Credentials remain
-in AgentLink, never Mochi exports/share. No browser/network bypass or default
-Subagent/Scheduled Agent access is provided. Linked chats are not cached-live
-task monitors by themselves. Newly submitted Mochi tasks are followed separately
-with durable, encrypted result cards in the conversation and task center.
-Update both AgentLink and its Bridge for this feature. Background collection is
-best effort, not instant push. On your next wake, a short local briefing may
-replace “Yes?”. Input wins: unsupported simultaneous speech skips the brief.
-Repeating the selected wake phrase dismisses the current brief and unread markers without
-deleting history or cancelling the remote task.
-
-### Run local commands with Termux
-
-Install `Mochi-Termux-Extension` from the same Release/signing channel as Mochi
-and install [official Termux](https://github.com/termux/termux-app#installation)
-separately. Open **Tools > Extensions > Termux > Configure Termux**. The wizard
-checks installation and Android command permission, then checks the connection.
-Already configured Termux needs no terminal visit. For first-time setup, choose
-**First connection? Set up Termux**, copy the command, paste it at the Termux
-prompt and press Enter. Returning automatically checks the connection.
-`MOCHI_SETUP_SAVED` confirms the settings were saved; `[1]` alone is only a
-terminal background-job number, not a successful connection.
-After verification, choose **Enable tools and Skill** or **Not now**.
-
-Speak normally to Mochi; once connected and enabled, commands execute
-automatically for **foreground conversations, all Scheduled Agents, and
-Subagents**, without per-command confirmation or an App switch. There is no
-separate background authorization setting. Provider and individual Tool
-switches still apply; disabling or disconnecting blocks new calls but does not
-stop submitted work. Existing enabled providers adopt this behavior on update,
-preserving individual Tool choices. Keep Mochi and its Termux extension updated.
-
-This is unrestricted shell under Termux permissions, not root or a sandbox.
-Agent-visible output is sent to your chosen model Provider.
-**Termux tasks** lets you inspect output locally, refresh, stop and clean up
-completed tasks. Closing Mochi does not stop submitted commands, Android can
-kill background work, and detached processes may survive a stop request.
-
----
-
-## Documentation
-
-Product design, architecture, source builds, and contribution guidance live in
-[`docs/README.md`](docs/README.md).
-
-## Contribute
-
-Contributions are welcome. Bug reports, feature proposals, provider requests,
-documentation improvements, tests, and code changes can be submitted through
-[GitHub Issues](https://github.com/gongpx20069/hi-mochi/issues) and
-[Pull Requests](https://github.com/gongpx20069/hi-mochi/pulls).
-
-Before opening a PR, read [`CONTRIBUTING.md`](CONTRIBUTING.md), keep changes
-focused, and include the smallest relevant verification.
+Version-specific changes are in [GitHub Releases](https://github.com/gongpx20069/hi-mochi/releases).
 
 ## License
 

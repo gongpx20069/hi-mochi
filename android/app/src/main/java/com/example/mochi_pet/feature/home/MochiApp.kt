@@ -50,6 +50,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -63,6 +65,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -78,6 +81,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
@@ -526,8 +530,7 @@ private fun MochiAppContent(
         viewModel.cameraSnapshot.collectAsStateWithLifecycle()
     val browserState by viewModel.browserState.collectAsStateWithLifecycle()
     val assistanceRequest by viewModel.assistanceRequest.collectAsStateWithLifecycle()
-    var showBrowserManager by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(surface) { if (surface != MochiSurface.Tools) showBrowserManager = false }
+    var showBrowserManager by rememberSaveable(surface) { mutableStateOf(false) }
     var addTodoRequest by remember { mutableStateOf<AddTodoRequest?>(null) }
     val focusMode by viewModel.focusMode.collectAsStateWithLifecycle()
     var focusStandby by rememberSaveable { mutableStateOf(false) }
@@ -999,6 +1002,7 @@ private fun MochiAppContent(
             ) {
                 MochiTopBar(
                     surface = surface,
+                    onBrowse = { showBrowserManager = true },
                     onTasks = { taskCenter.open() },
                     onSettings = {
                         if (surface == MochiSurface.Settings) viewModel.openMochi()
@@ -1227,31 +1231,50 @@ internal fun MochiTopBar(
     surface: MochiSurface,
     onTasks: () -> Unit,
     onSettings: () -> Unit,
+    onBrowse: () -> Unit = {},
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth().testTag("mochi-header"),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "Mochi",
-            modifier = Modifier.weight(1f),
             color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        TextButton(onTasks) { Text("Tasks") }
-        OutlinedButton(
-            onClick = onSettings,
-            shape = RoundedCornerShape(18.dp),
-        ) {
-            Text(
-                if (surface == MochiSurface.Settings) {
-                    "Done"
-                } else {
-                    "Settings"
-                },
+        Row(Modifier.width(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (surface.isHomePresentation() || surface == MochiSurface.Conversation) {
+                MochiHeaderAction("Browse", ToolGlyph.WEBSITES, "mochi-browse", onBrowse)
+            }
+            MochiHeaderAction("Tasks", ToolGlyph.TASKS, "mochi-tasks", onTasks)
+            MochiHeaderAction(
+                if (surface == MochiSurface.Settings) "Done" else "Settings",
+                if (surface == MochiSurface.Settings) ToolGlyph.CHECK else ToolGlyph.SETTINGS,
+                "mochi-settings",
+                onSettings,
             )
+        }
+    }
+}
+
+@Composable
+private fun MochiHeaderAction(label: String, glyph: ToolGlyph, tag: String, onClick: () -> Unit) {
+    TextButton(
+        onClick,
+        modifier = Modifier.widthIn(min = 48.dp).heightIn(min = 48.dp).testTag(tag),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            ToolGlyphIcon(glyph, Modifier.size(18.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
     }
 }
@@ -6588,7 +6611,7 @@ internal fun MochiModeSwitch(
 }
 
 @Composable
-private fun NavigationBar(
+internal fun NavigationBar(
     surface: MochiSurface,
     onNavigate: (MochiNavigationIntent) -> Unit,
     onOpenMochi: () -> Unit,
@@ -6606,6 +6629,7 @@ private fun NavigationBar(
         ) {
             MochiNavigationItem(
                 label = "Mochi",
+                glyph = ToolGlyph.MOCHI,
                 selected =
                     surface == MochiSurface.Face ||
                         surface == MochiSurface.DateTime ||
@@ -6617,6 +6641,7 @@ private fun NavigationBar(
             )
             MochiNavigationItem(
                 label = "Planner",
+                glyph = ToolGlyph.CALENDAR,
                 selected =
                     surface == MochiSurface.Today ||
                     surface is MochiSurface.CalendarMonth ||
@@ -6627,12 +6652,14 @@ private fun NavigationBar(
             )
             MochiNavigationItem(
                 label = "Skills",
+                glyph = ToolGlyph.SKILLS,
                 selected = surface == MochiSurface.Skills,
                 onClick = { onNavigate(MochiNavigationIntent.ShowSkills) },
                 modifier = Modifier.weight(1f),
             )
             MochiNavigationItem(
                 label = "Tools",
+                glyph = ToolGlyph.TOOLS,
                 selected = surface == MochiSurface.Tools,
                 onClick = { onNavigate(MochiNavigationIntent.ShowTools) },
                 modifier = Modifier.weight(1f),
@@ -6644,6 +6671,7 @@ private fun NavigationBar(
 @Composable
 private fun MochiNavigationItem(
     label: String,
+    glyph: ToolGlyph,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -6660,19 +6688,29 @@ private fun MochiNavigationItem(
                 },
             )
             .selectable(selected = selected, role = Role.Tab, onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            maxLines = 1,
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            ToolGlyphIcon(
+                glyph,
+                Modifier.size(18.dp),
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = label,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
     }
 }

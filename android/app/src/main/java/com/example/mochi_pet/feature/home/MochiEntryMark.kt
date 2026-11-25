@@ -1,0 +1,63 @@
+package com.example.mochi_pet.feature.home
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@Composable
+internal fun MochiEntryMark(label: String, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier.clearAndSetSemantics {},
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Canvas(Modifier.size(width = 60.dp, height = 45.dp)) {
+            scale(size.width / 48f, size.height / 36f, pivot = Offset.Zero) {
+                val mark = Path().apply {
+                    moveTo(7f, 29f)
+                    lineTo(7f, 9f)
+                    quadraticTo(7f, 6f, 9f, 8f)
+                    lineTo(24f, 23f)
+                    lineTo(39f, 8f)
+                    quadraticTo(41f, 6f, 41f, 9f)
+                    lineTo(41f, 29f)
+                }
+                drawPath(
+                    mark,
+                    Brush.linearGradient(
+                        listOf(colors.primary, colors.secondary),
+                        start = Offset(7f, 7f),
+                        end = Offset(41f, 29f),
+                    ),
+                    style = Stroke(1.6f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+            }
+        }
+        Text(
+            label,
+            color = colors.secondary,
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
+}

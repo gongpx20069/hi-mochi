@@ -12,6 +12,19 @@
 | Tools | Provider connections and individual Tool controls |
 
 Bottom navigation is **Mochi / Planner / Skills / Tools**. The Mochi header
+uses a **Browse** shortcut in both Chat and Companion, opening the existing
+secure website/search dialog without changing modes or clearing the draft.
+It is absent in Companion full screen and on other destinations; Tools retains
+its Websites and logins entry. Closing the dialog returns to its originating
+surface and still ends manual browsing. Chat instructions do not gain a new
+browser-opening action.
+Bottom destinations pair short labels with consistent outline icons: Mochi face,
+calendar, puzzle and toolbox. Their 18 dp glyphs, small labels and restrained
+selection weight keep the bar compact; minimum 48 dp touch targets remain.
+Browse, Tasks and Settings share the same 18 dp outline-icon-over-label treatment.
+Settings uses a checkmark and Done while that page is open. Header actions retain
+their labels at larger font sizes, moving below the brand when necessary.
+The Mochi header
 switches **Chat / Companion** (**对话 / 陪伴**); Face and its information cards
 belong to Companion, and Conversation belongs to Chat. Both share history and
 tasks. Returning from another destination restores the selected mode. Selection
@@ -343,7 +356,13 @@ Muting stops current playback without cancelling the Agent or changing the
 draft; Companion, dictation and voice previews are unaffected.
 
 Returning from outside the app into idle Chat opens a quiet quick-entry view:
-the same one-line composer sits in the center, with a small Mochi logo above it.
+the same one-line composer sits in the center, with a thin M mark on a 60 by
+45 dp canvas and a compact 15 sp **Mochi Chat** wordmark above it, without a filled
+mascot tile. The line blends the theme's peach primary into its lavender secondary;
+the wordmark uses the same lavender. The browser homepage uses this shared
+component, size and palette with the wordmark **Mochi Explore**. Both use tight
+mark-to-wordmark spacing and modest letter spacing, without a hyphen. These
+English brand labels stay unchanged across UI languages; navigation icons remain compact.
 The logo fades away when history opens. Its empty placeholder combines
 **点击输入 · 长按说话 · 下滑历史**, without a separate hint below the field.
 Tap to type and hold/release to dictate still work;
@@ -519,14 +538,24 @@ These controls do not complete schedules or execute Mochi tasks.
 AI connections shows named saved cards with current selection and Use/Edit/Delete.
 Add opens a screenshot-protected editor; OpenAI is prefilled, and presets also
 include DeepSeek, Kimi, GLM, MiniMax (China), Agnes-AI, Groq, ModelScope, Azure, and custom. Each
-links to its official guide. Endpoint remains editable; model is supplied by
-the user because account access varies. Provider APIs are not Coding Plans;
+links to its official site or guide. Endpoint remains editable; model is chosen
+by the user because account access varies. Provider APIs are not Coding Plans;
 free quotas and billing depend on the account. Groq has three localized setup
 steps and explicit Console signup, key creation, model-list and account-limit
-links. ModelScope labels the secret as Access Token and links registration,
-verified Alibaba Cloud binding, token creation, model selection and daily credits.
-Its guidance distinguishes ModelScope tokens from Alibaba Cloud AccessKeys and
-DashScope keys, and explains token expiry and the organization/model ID format.
+links. ModelScope has only three short setup steps: register/sign in, obtain
+and paste an Access Token, then choose a model. Its only external links are
+the ModelScope homepage, Access Token account page and model-library homepage.
+It does not show account-binding, key comparisons, deployment, quota or credit
+tutorials. The third step is one paragraph explaining recommended choices or a
+custom full model ID with API and tool-calling support.
+The Token field precedes a model dropdown: Qwen3.8-Flash-Next (recommended),
+DeepSeek-V4.1-Flash, GLM-5.2, then Custom model. New connections require an
+explicit choice. Only Custom model reveals the free-text model ID field.
+Existing unlisted IDs open as Custom model unchanged; switching suggestions
+and back retains the custom draft. Model selection does not change keys,
+endpoint, protocol, timeout or image-input policy. The official endpoint is
+prefilled and its editor/restore control is under Advanced for ModelScope;
+the other presets retain their existing layout.
 Links open only on explicit taps in the external browser, contain no entered
 credentials, and preserve editor state. An unavailable browser shows a safe error.
 Agnes-AI retains its preset and links the current overview/model guide rather than
@@ -712,11 +741,14 @@ expandable card rather than appearing as separate built-in cards.
 **Websites and logins** stays outside its collapsed Tool list as the same rounded
 settings row used by App Control, with a globe icon, short detail and chevron.
 Only the entry styling changes; it opens the existing secure full-screen dialog with a Bing
-search/address field centered in the page, Mochi's launcher logo above it, and
+search/address field centered in the page, the shared peach-to-lavender Mochi entry mark above it, and
 an always-visible Close action at the top right. The logo and concise
-"Search the web. Save accounts safely." caption share a softly tinted brand area.
-A separate rounded translucent
-frosted-look panel below search contains website groups and the compact data
+"Search the web. Save accounts safely." caption sit on the plain theme background,
+using the same mark size and theme palette as central Chat, without a mascot tile.
+The search field keeps its soft outline.
+At large font sizes or short heights, the brand area can scroll independently
+so that the search field keeps its full text height and Close remains reachable.
+A separate rounded, low-contrast surface below search contains website groups and the compact data
 overflow menu. There are no introductory or session-status cards.
 Each website row shows its registrable domain and badges for local data and
 saved credentials. Clicking it opens a second secure bottom-sheet list.
@@ -728,7 +760,8 @@ changes; swiping never removes a row. Explicit actions also have accessibility
 alternatives. Color is supplementary, never the only type indicator.
 Search opens a full-screen manual browser with only four bottom controls:
 Back, Forward, Home, and Sites (Chinese: 网站), in an inset rounded navigation
-bar. History uses arrow icons with accessible labels and disabled states;
+bar, using the same subtle outline and flat tonal surface as Mochi navigation,
+without a floating shadow. History uses arrow icons with accessible labels and disabled states;
 Home and Sites use icons with short single-line labels. Sites is the
 emphasized action; its English label must not wrap on a 320 dp screen.
 Home reveals the search/account homepage without destroying or reloading
@@ -751,7 +784,7 @@ Editing supports username, website and replacement password for password account
 changing their website requires password re-entry. SMS editing offers only website
 and phone. Confirmed account deletion preserves current login.
 The overflow menu has separate cache and confirmed all-website-data deletion;
-both preserve saved passwords. Closing reveals the unchanged Tools page.
+both preserve saved passwords. Closing reveals the unchanged originating Mochi or Tools page.
 There is no mode selector; Mochi chooses mobile/desktop as needed. Legacy manual
 preferences do not override that decision.
 Website-data deletion includes shared login, unlike saved-account deletion.

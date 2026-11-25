@@ -153,6 +153,43 @@ class BrowserCredentialsUiTest {
         assertTrue(closed)
     }
 
+    @Test fun `Explore branding leaves search and close reachable with large text`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var closed = false
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                MochiTheme {
+                    BrowserManagementLayout(
+                        onClose = { closed = true }, closeEnabled = true,
+                        search = {
+                            OutlinedTextField("", {}, placeholder = { Text("Search Bing or enter a website") },
+                                modifier = Modifier.fillMaxWidth().testTag("browser-search"), singleLine = true)
+                        },
+                    ) {
+                        BrowserWebsiteList(listOf(fixtureWebsite()), {}, Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+        val logo = compose.onNodeWithTag("browser-logo").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val search = compose.onNodeWithTag("browser-search").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val close = compose.onNodeWithTag("browser-management-close").assertIsDisplayed()
+        assertTrue(close.fetchSemanticsNode().boundsInRoot.bottom < logo.top)
+        assertTrue(logo.bottom < search.top)
+        assertTrue(search.bottom < compose.onNodeWithTag("browser-accounts-panel").fetchSemanticsNode().boundsInRoot.top)
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("Search Bing or enter a website", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val placeholder = layouts.single()
+        assertTrue("Branding must leave the search line its full height",
+            placeholder.getLineBottom(0) <= placeholder.size.height)
+        compose.onNodeWithText(localizeUiText("Search the web. Save accounts safely.")).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("example.com").assertIsDisplayed()
+        captureFixture("browser-management", "browser-brand-large-text.png")
+        close.performClick()
+        assertTrue(closed)
+    }
+
     @Test fun `compact navigation keeps account label on one line and respects history availability`() {
         Locale.setDefault(Locale.ENGLISH)
         var back = false

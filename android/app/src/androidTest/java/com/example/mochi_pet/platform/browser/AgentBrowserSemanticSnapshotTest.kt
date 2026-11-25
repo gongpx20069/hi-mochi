@@ -386,7 +386,12 @@ class AgentBrowserSemanticSnapshotTest {
             try {
                 runtime.navigate(operation, "$origin/search", mode = mode, waitSeconds = 0)
                 runtime.snapshot()
-            } catch (_: IllegalArgumentException) {
+            } catch (error: AgentBrowserException) {
+                assertEquals(
+                    if (operation == "reload") com.example.mochi_pet.core.agent.tool.ToolErrorReason.BROWSER_RELOAD_BLOCKED
+                    else com.example.mochi_pet.core.agent.tool.ToolErrorReason.BROWSER_MODE_LOCKED,
+                    error.reason,
+                )
                 rejected = true
             }
             assertTrue("Interaction must still block $operation / $mode", rejected)

@@ -9,16 +9,20 @@ import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import androidx.test.core.app.ApplicationProvider
 import com.example.mochi_pet.core.agent.tool.ToolExecutionContext
+import com.example.mochi_pet.core.agent.tool.ToolErrorReason
 import com.example.mochi_pet.core.browser.BrowserClickTool
 import com.example.mochi_pet.core.browser.BrowserNavigateTool
 import com.example.mochi_pet.core.browser.BrowserReadTool
+import com.example.mochi_pet.core.browser.BrowserScrollTool
 import com.example.mochi_pet.core.browser.UserAssistanceAnswer
 import com.example.mochi_pet.core.model.MochiSurface
 import java.time.Duration
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -128,6 +132,7 @@ class BrowserObservationTest {
             val callback = checkNotNull(shadowOf(page).lastEvaluatedJavascriptCallback)
             val second = BrowserClickTool(runtime).execute(args, context)
             assertEquals("CONFLICT", second.code)
+            assertEquals(ToolErrorReason.BROWSER_PENDING_OBSERVATION, second.reason)
             assertSame(callback, shadowOf(page).lastEvaluatedJavascriptCallback)
             callback.onReceiveValue(JsonPrimitive("""{"ok":true}""").toString())
             idle(500)
@@ -161,6 +166,8 @@ class BrowserObservationTest {
             })
             assertTrue(read.isCompleted)
             assertEquals("error", read.await().status)
+            assertEquals("PROVIDER_ERROR", read.await().code)
+            assertEquals(ToolErrorReason.BROWSER_RENDERER_STOPPED, read.await().reason)
             assertEquals("Browser renderer stopped", read.await().message)
             callback.onReceiveValue(snapshot("Late"))
             assertFalse(runtime.state.value.active)
@@ -178,6 +185,7 @@ class BrowserObservationTest {
             idle(0)
             assertEquals(listOf(1), decisions)
             assertEquals("error", read.await().status)
+            assertEquals(ToolErrorReason.BROWSER_FORM_RESUBMISSION_BLOCKED, read.await().reason)
             assertTrue(runtime.state.value.error.orEmpty().contains("Form resubmission"))
             BrowserReadTool(runtime).execute(buildJsonObject { put("wait_seconds", 0) }, context)
             shadowOf(page).lastEvaluatedJavascriptCallback.onReceiveValue(snapshot("Current page"))
@@ -248,7 +256,81 @@ class BrowserObservationTest {
         for (value in listOf("-1", "\"30\"", "1.5", "true", "null", "9223372036854775807")) {
             val result = BrowserReadTool(runtime).execute(Json.parseToJsonElement("""{"wait_seconds":$value}""").jsonObject, context)
             assertEquals("INVALID_ARGS", result.code)
+            assertEquals(ToolErrorReason.BROWSER_INVALID_ARGUMENTS, result.reason)
             assertFalse(runtime.state.value.active)
+        }
+    }
+
+    @Test fun `mode budget and interaction guards report state conflicts without reloading`() = runBlocking {
+        withBrowser { runtime, page ->
+            AgentBrowserRuntime::class.java.getDeclaredField("modeChanges").apply {
+                isAccessible = true
+                setInt(runtime, 4)
+            }
+            val desktop = buildJsonObject { put("operation", "reload"); put("mode", "desktop") }
+            val limited = BrowserNavigateTool(runtime).execute(desktop, context)
+            assertEquals("CONFLICT", limited.code)
+            assertEquals(ToolErrorReason.BROWSER_MODE_CHANGE_LIMIT, limited.reason)
+            assertEquals(0, shadowOf(page).reloadInvocations)
+            AgentBrowserRuntime::class.java.getDeclaredField("modeLocked").apply {
+                isAccessible = true
+                setBoolean(runtime, true)
+            }
+            val locked = BrowserNavigateTool(runtime).execute(desktop, context)
+            assertEquals("CONFLICT", locked.code)
+            assertEquals(ToolErrorReason.BROWSER_RELOAD_BLOCKED, locked.reason)
+            assertEquals(0, shadowOf(page).reloadInvocations)
+        }
+    }
+
+    @Test fun `invalid browser arguments are not classified as state conflicts`() = runBlocking {
+        withBrowser { runtime, page ->
+            val scrollCases = listOf(
+                buildJsonObject { put("direction", "sideways") } to ToolErrorReason.BROWSER_INVALID_SCROLL_DIRECTION,
+                buildJsonObject { put("direction", "down"); put("amount", "invalid") } to ToolErrorReason.BROWSER_INVALID_SCROLL_AMOUNT,
+                buildJsonObject { put("direction", "down"); put("ref", "invalid") } to ToolErrorReason.BROWSER_INVALID_REFERENCE,
+            )
+            for ((args, reason) in scrollCases) {
+                val result = BrowserScrollTool(runtime).execute(args, context)
+                assertEquals("INVALID_ARGS", result.code)
+                assertEquals(reason, result.reason)
+            }
+            val navigationCases = listOf(
+                buildJsonObject { put("operation", "goto"); put("mode", "invalid") } to ToolErrorReason.BROWSER_INVALID_MODE,
+                buildJsonObject { put("operation", "goto") } to ToolErrorReason.BROWSER_INVALID_ARGUMENTS,
+                buildJsonObject { put("operation", "goto"); put("url", "not-an-absolute-url") } to ToolErrorReason.BROWSER_INVALID_URL,
+            )
+            for ((args, reason) in navigationCases) {
+                val call = async(Dispatchers.Main.immediate) { BrowserNavigateTool(runtime).execute(args, context) }
+                withTimeout(5_000) {
+                    while (!call.isCompleted) {
+                        idle(10)
+                        delay(1)
+                    }
+                }
+                val result = call.await()
+                assertEquals("INVALID_ARGS", result.code)
+                assertEquals(reason, result.reason)
+            }
+            assertNull(shadowOf(page).lastLoadedUrl)
+        }
+    }
+
+    @Test fun `completed observations retain their guard and reason until consumed without replay`() = runBlocking {
+        withBrowser { runtime, page ->
+            val zeroWait = buildJsonObject { put("wait_seconds", 0) }
+            val waiting = BrowserReadTool(runtime).execute(zeroWait, context)
+            assertEquals(JsonPrimitive(false), waiting.data!!.jsonObject["action_pending"])
+            val callback = checkNotNull(shadowOf(page).lastEvaluatedJavascriptCallback)
+            callback.onReceiveValue(snapshot("Synthetic article"))
+            idle(0)
+            val scrollArgs = buildJsonObject { put("direction", "down"); put("wait_seconds", 0) }
+            val blocked = BrowserScrollTool(runtime).execute(scrollArgs, context)
+            assertEquals("CONFLICT", blocked.code)
+            assertEquals(ToolErrorReason.BROWSER_PENDING_OBSERVATION, blocked.reason)
+            assertSame(callback, shadowOf(page).lastEvaluatedJavascriptCallback)
+            assertEquals(JsonPrimitive(true), BrowserReadTool(runtime).execute(zeroWait, context).data!!.jsonObject["snapshot_fresh"])
+            assertEquals("ok", BrowserScrollTool(runtime).execute(scrollArgs, context).status)
         }
     }
 

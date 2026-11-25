@@ -4,29 +4,21 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
-import com.example.mochi_pet.R
 
 @Composable
 internal fun ConversationEntryLayout(
@@ -66,12 +58,7 @@ internal fun ConversationEntryLayout(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { composer() }
             Box(Modifier.graphicsLayer { alpha = 1f - progress }) {
                 if (quickEntry || progress < 1f) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(24.dp))
-                            .background(Color(0xFFB7A7F2)).testTag("conversation-entry-logo"),
-                    )
+                    MochiEntryMark("Mochi Chat", Modifier.testTag("conversation-entry-logo"))
                 }
             }
         },

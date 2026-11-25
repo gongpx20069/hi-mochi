@@ -25,6 +25,7 @@ data class ToolResultEnvelope(
     val data: JsonElement? = null,
     @Transient
     val modelImages: List<ModelImageAttachment> = emptyList(),
+    val reason: ToolErrorReason? = null,
 ) {
     companion object {
         fun success(
@@ -40,11 +41,13 @@ data class ToolResultEnvelope(
         fun error(
             code: ToolErrorCode,
             message: String,
+            reason: ToolErrorReason? = null,
         ): ToolResultEnvelope =
             ToolResultEnvelope(
                 status = "error",
                 code = code.name,
                 message = message,
+                reason = reason,
             )
     }
 
@@ -89,6 +92,29 @@ enum class ToolErrorCode {
     PROVIDER_ERROR,
     TIMEOUT,
     INTERNAL_ERROR,
+}
+
+@Serializable
+enum class ToolErrorReason(val code: ToolErrorCode) {
+    BROWSER_INVALID_ARGUMENTS(ToolErrorCode.INVALID_ARGS),
+    BROWSER_INVALID_URL(ToolErrorCode.INVALID_ARGS),
+    BROWSER_INVALID_MODE(ToolErrorCode.INVALID_ARGS),
+    BROWSER_INVALID_SCROLL_DIRECTION(ToolErrorCode.INVALID_ARGS),
+    BROWSER_INVALID_SCROLL_AMOUNT(ToolErrorCode.INVALID_ARGS),
+    BROWSER_INVALID_REFERENCE(ToolErrorCode.INVALID_ARGS),
+    BROWSER_PENDING_OBSERVATION(ToolErrorCode.CONFLICT),
+    BROWSER_MODE_CHANGE_LIMIT(ToolErrorCode.CONFLICT),
+    BROWSER_MODE_LOCKED(ToolErrorCode.CONFLICT),
+    BROWSER_RELOAD_BLOCKED(ToolErrorCode.CONFLICT),
+    BROWSER_HISTORY_CHANGED(ToolErrorCode.CONFLICT),
+    BROWSER_SESSION_ENDED(ToolErrorCode.CONFLICT),
+    BROWSER_STATE_CONFLICT(ToolErrorCode.CONFLICT),
+    BROWSER_FORM_RESUBMISSION_BLOCKED(ToolErrorCode.CONFLICT),
+    BROWSER_STALE_REFERENCE(ToolErrorCode.STALE_REF),
+    BROWSER_URL_BLOCKED(ToolErrorCode.PERMISSION_DENIED),
+    BROWSER_NAVIGATION_FAILED(ToolErrorCode.PROVIDER_ERROR),
+    BROWSER_PAGE_UNREADABLE(ToolErrorCode.PROVIDER_ERROR),
+    BROWSER_RENDERER_STOPPED(ToolErrorCode.PROVIDER_ERROR),
 }
 
 data class ToolExecutionContext(

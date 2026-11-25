@@ -313,7 +313,7 @@ private fun MochiApplication.taskDiagnosticLogger(
         }
     }
 
-private fun AgentDiagnosticEvent.toLogMessage(): String = buildString {
+internal fun AgentDiagnosticEvent.toLogMessage(): String = buildString {
     append("event=")
     append(type.name.lowercase())
     append(" run_id=")
@@ -353,6 +353,10 @@ private fun AgentDiagnosticEvent.toLogMessage(): String = buildString {
             toolCode?.let {
                 append(" code=")
                 append(it)
+            }
+            toolReason?.let {
+                append(" reason=")
+                append(it.name)
             }
             errorType?.let {
                 append(" error=")
