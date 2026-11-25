@@ -47,8 +47,12 @@ URLs.
 ## Homepage and user guides
 
 Mochi's primary navigation has only Home and Wiki, plus a separate language
-switch. Keep it visible even on mobile, without a hamburger menu. Quick start,
-model setup and speech setup belong under Wiki, not in the primary navigation.
+switch. Keep it visible even on mobile, without a hamburger menu.
+All Mochi headers also have a right-aligned GitHub logo/Star link outside the
+primary navigation. It opens the repository in a new tab, with a localized
+accessible label; narrow screens show only the logo. Bundle the Octicons logo
+locally with its MIT notice, without third-party widgets or star-count requests.
+Quick start, model setup and speech setup belong under Wiki, not in the primary navigation.
 Both homepages are concise product introductions: a hero, six linked capability
 cards, four optional extension cards and a brief privacy note. Cards lead to
 the relevant Wiki page or section. Do not duplicate setup steps or the Wiki

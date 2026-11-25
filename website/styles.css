@@ -485,6 +485,7 @@ img {
 .mochi-nav {
   display: flex;
   align-items: center;
+  margin-left: auto;
   gap: 18px;
   font-size: 0.88rem;
   font-weight: 600;
@@ -504,6 +505,41 @@ img {
   border-left: 1px solid var(--line);
   padding-left: 18px;
   color: var(--muted);
+}
+
+.home-page .nav-shell,
+.wiki-page .nav-shell {
+  gap: 12px;
+}
+
+.github-star {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.github-star img {
+  flex-shrink: 0;
+}
+
+.github-star:hover,
+.github-star:focus-visible {
+  border-color: var(--peach);
+  color: var(--peach);
+}
+
+.github-star:focus-visible {
+  outline: 2px solid var(--peach);
+  outline-offset: 3px;
 }
 
 .site-nav > a {
@@ -2972,6 +3008,22 @@ img {
 }
 
 @media (max-width: 480px) {
+  .mochi-nav {
+    gap: 10px;
+  }
+
+  .mochi-nav a[lang] {
+    padding-left: 10px;
+  }
+
+  .github-star {
+    padding: 8px;
+  }
+
+  .github-star span {
+    display: none;
+  }
+
   .hero-actions {
     align-items: stretch;
     flex-direction: column;

@@ -360,6 +360,24 @@ def check_mochi_navigation(page, chinese: bool) -> None:
     assert page.locator("[data-nav]").evaluate("""item =>
         item.getBoundingClientRect().left >= document.querySelector('.brand').getBoundingClientRect().right
     """)
+    star = page.locator(".site-header > .nav-shell > .github-star")
+    assert star.count() == 1
+    assert star.is_visible()
+    assert star.get_attribute("href") == "https://github.com/gongpx20069/hi-mochi"
+    assert star.get_attribute("target") == "_blank"
+    assert {"noopener", "noreferrer"} <= set(star.get_attribute("rel").split())
+    assert ("给 Mochi 点 Star" if chinese else "Star Mochi on GitHub") in star.get_attribute("aria-label")
+    assert star.locator("img").evaluate("image => image.complete && image.naturalWidth > 0")
+    assert star.evaluate("""item => {
+        const box = item.getBoundingClientRect();
+        const nav = document.querySelector('[data-nav]').getBoundingClientRect();
+        return box.left >= nav.right && box.right <= innerWidth &&
+            box.top >= nav.top - 8 && box.bottom <= nav.bottom + 8;
+    }""")
+    assert star.locator("span").is_visible() == (page.viewport_size["width"] > 480)
+    page.locator("[data-nav] a[lang]").focus()
+    page.keyboard.press("Tab")
+    assert star.evaluate("item => document.activeElement === item")
 
 
 def check_wiki(browser, port: int, screenshots: Path | None) -> None:
