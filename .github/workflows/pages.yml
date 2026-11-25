@@ -54,8 +54,8 @@ jobs:
           ARTIFACT_NAME: github-pages-${{ github.run_attempt }}
         run: |
           for attempt in {1..12}; do
-            count="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
-              --paginate --slurp --jq "[.[].artifacts[] | select(.name == \"$ARTIFACT_NAME\" and .expired == false)] | length")"
+            count="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$ARTIFACT_NAME" \
+              --jq '.total_count')"
             if [ "$count" = "1" ]; then
               exit 0
             fi
