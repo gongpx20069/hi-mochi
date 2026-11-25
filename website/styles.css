@@ -37,7 +37,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.home-cards article,
+.home-cards > a,
 .home-extensions article,
 .guide-grid > a {
   min-width: 0;
@@ -77,7 +77,9 @@
 }
 
 .guide-grid > a:hover,
-.guide-grid > a:focus-visible {
+.guide-grid > a:focus-visible,
+.home-cards > a:hover,
+.home-cards > a:focus-visible {
   border-color: var(--peach);
   background: var(--panel);
 }
@@ -162,7 +164,7 @@
   max-width: 840px;
 }
 
-.wiki-article a:not(.text-link),
+.wiki-article a:not(.text-link):not(.button),
 .wiki-link-list a,
 .wiki-note a {
   color: var(--peach);
@@ -493,6 +495,30 @@ img {
   font-weight: 600;
 }
 
+.mochi-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.mochi-nav a {
+  padding-block: 12px;
+}
+
+.mochi-nav a[aria-current],
+.mochi-nav a:hover,
+.mochi-nav a:focus-visible {
+  color: var(--peach);
+}
+
+.mochi-nav a[lang] {
+  border-left: 1px solid var(--line);
+  padding-left: 18px;
+  color: var(--muted);
+}
+
 .site-nav > a {
   transition: color 160ms ease;
 }
@@ -608,7 +634,6 @@ img {
 .hero h1,
 .section-heading h2,
 .privacy-copy h2,
-.install-heading h2,
 .open-copy h2 {
   margin: 0;
   font-weight: 720;
@@ -638,7 +663,6 @@ img {
 }
 
 .hero-actions,
-.install-actions,
 .open-actions {
   display: flex;
   align-items: center;
@@ -949,7 +973,6 @@ img {
 
 .section-heading h2,
 .privacy-copy h2,
-.install-heading h2,
 .open-copy h2 {
   margin-top: 13px;
   font-size: clamp(2.3rem, 4.6vw, 4.1rem);
@@ -1828,106 +1851,6 @@ img {
   font-size: 0.76rem;
 }
 
-.install-panel {
-  position: relative;
-  padding: 72px;
-  overflow: hidden;
-  border-radius: 36px;
-  background: linear-gradient(125deg, #ffd2c6, #f0c4d7 47%, #cbb8f2);
-  box-shadow: 0 35px 100px rgba(0, 0, 0, 0.3);
-  color: #211823;
-}
-
-.install-panel::before,
-.install-panel::after {
-  position: absolute;
-  border: 1px solid rgba(60, 34, 65, 0.08);
-  border-radius: 50%;
-  content: "";
-}
-
-.install-panel::before {
-  top: -170px;
-  right: -90px;
-  width: 470px;
-  height: 470px;
-}
-
-.install-panel::after {
-  right: 110px;
-  bottom: -280px;
-  width: 540px;
-  height: 540px;
-}
-
-.install-heading,
-.install-steps,
-.install-panel .extension-setup,
-.install-actions {
-  position: relative;
-  z-index: 2;
-}
-
-.install-heading {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  align-items: end;
-  gap: 70px;
-}
-
-.install-heading .kicker {
-  grid-column: 1 / -1;
-  color: #6d4d66;
-}
-
-.install-heading h2 {
-  margin-top: -3px;
-  font-size: clamp(2.4rem, 4.7vw, 4.2rem);
-}
-
-.install-heading p {
-  margin: 0 0 5px;
-  color: #604f61;
-}
-
-.install-steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 38px;
-  padding: 0;
-  margin: 65px 0 0;
-  list-style: none;
-}
-
-.install-steps li {
-  display: flex;
-  align-items: flex-start;
-  gap: 15px;
-}
-
-.install-steps li > span {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  border: 1px solid rgba(40, 25, 45, 0.18);
-  border-radius: 50%;
-  font-size: 0.73rem;
-  font-weight: 800;
-  place-items: center;
-}
-
-.install-steps strong {
-  font-size: 1rem;
-}
-
-.install-steps p {
-  margin: 5px 0 0;
-  color: #675565;
-  font-size: 0.8rem;
-  line-height: 1.55;
-}
-
 .button-light {
   background: #211823;
   color: #fff8f5;
@@ -1949,15 +1872,16 @@ img {
   flex-direction: column;
   gap: 5px;
   padding: 16px;
-  border: 1px solid rgba(40, 25, 45, 0.18);
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.25);
-  color: #211823;
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
 }
 
 .architecture-downloads a:hover,
 .architecture-downloads a:focus-visible {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--panel-light);
 }
 
 .architecture-downloads span {
@@ -2246,14 +2170,6 @@ img {
   padding: 10px 0;
   color: var(--mint);
   cursor: pointer;
-}
-
-.install-panel .extension-setup {
-  border-color: rgba(60, 34, 65, 0.2);
-}
-
-.install-panel .extension-setup summary {
-  color: inherit;
 }
 
 #webdav-extension {
@@ -2810,7 +2726,6 @@ img {
   }
 
   .split-heading,
-  .install-heading,
   .privacy-grid,
   .open-grid {
     grid-template-columns: 1fr;
@@ -2823,14 +2738,6 @@ img {
 
   .privacy-visual {
     min-height: 420px;
-  }
-
-  .install-heading .kicker {
-    grid-column: auto;
-  }
-
-  .install-heading h2 {
-    margin-top: -20px;
   }
 
 }
@@ -3066,21 +2973,6 @@ img {
     margin-top: 45px;
   }
 
-  .install-panel {
-    padding: 45px 27px;
-    border-radius: 28px;
-  }
-
-  .install-heading h2 {
-    margin-top: -10px;
-  }
-
-  .install-steps {
-    grid-template-columns: 1fr;
-    gap: 25px;
-    margin-top: 45px;
-  }
-
   .footer-grid {
     grid-template-columns: 1fr;
   }
@@ -3093,8 +2985,7 @@ img {
 }
 
 @media (max-width: 480px) {
-  .hero-actions,
-  .install-actions {
+  .hero-actions {
     align-items: stretch;
     flex-direction: column;
   }

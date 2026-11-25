@@ -44,17 +44,18 @@ def main() -> None:
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(channel=options.channel)
-            for language in ("", "zh-CN/", "agentlink/", "zh-CN/agentlink/"):
-                is_home = "agentlink/" not in language
-                expects_api = is_home and language == ""
-                release_root = CNB_RELEASE_ROOT if language == "zh-CN/" else RELEASE_ROOT
+            for language in ("", "zh-CN/", "wiki/quick-start/", "zh-CN/wiki/quick-start/", "agentlink/", "zh-CN/agentlink/"):
+                is_home = language in ("", "zh-CN/")
+                is_download = "agentlink/" not in language
+                expects_api = is_download and not language.startswith("zh-CN/")
+                release_root = CNB_RELEASE_ROOT if language.startswith("zh-CN/") else RELEASE_ROOT
                 source = (SITE_ROOT / language / "index.html").read_text(encoding="utf-8")
-                fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1) if is_home else None
+                fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1) if is_download else None
                 modes = (
                     "latest", "unavailable", "untrusted", "missing-extension",
                     "untrusted-extension", "missing-webdav", "untrusted-webdav",
                     "missing-architecture", "untrusted-architecture",
-                ) if expects_api else ("latest", "unavailable") if is_home else ("standalone",)
+                ) if expects_api else ("latest", "unavailable") if is_download else ("standalone",)
                 for mode in modes:
                     context = browser.new_context(reduced_motion="reduce")
                     asset_name = f"Mochi-{TEST_VERSION}-arm64-v8a.apk"
@@ -114,7 +115,9 @@ def main() -> None:
                     page.goto(f"http://127.0.0.1:{server.server_port}/hi-mochi/{language}")
                     page.wait_for_load_state("networkidle")
                     expected = TEST_VERSION if mode == "latest" and expects_api else fallback
-                    assert page.locator("[data-release-version]").all_text_contents() == ([expected] * 3 if is_home else [])
+                    assert page.locator("[data-release-version]").all_text_contents() == (
+                        [expected] * (2 if is_home else 1) if is_download else []
+                    )
                     for link in page.locator("[data-release-download]").all():
                         abi = link.get_attribute("data-release-download") or "arm64-v8a"
                         assert link.get_attribute("href") == (
@@ -127,8 +130,12 @@ def main() -> None:
                             assert page.locator(f"[data-extension-download='{extension}']").get_attribute("href") == (
                                 f"{release_root}download/{expected}/Mochi-{name}-Extension-{expected}.apk"
                             )
-                    if is_home:
+                    if is_download and not is_home:
                         assert page.locator("#download-options [data-release-download]").count() == 5
+                        assert page.locator("#install > p > [data-release-download]").is_visible()
+                    if is_home:
+                        assert page.locator("#install, #wiki, #download-options").count() == 0
+                        assert page.locator(".home-cards > a").count() == 6
                         preview = page.locator("[data-extension-card='webdav']")
                         assert preview.get_attribute("data-release-status") == "released-preview"
                         assert preview.locator("[data-extension-download='webdav']").count() == 1
@@ -142,7 +149,7 @@ def main() -> None:
                             assert disclosure.evaluate("(item) => item.open")
                             summary.press("Enter")
                             assert not disclosure.evaluate("(item) => item.open")
-                    if not is_home:
+                    if not is_download:
                         assert page.locator("[data-agent]").count() == 5
                         assert page.locator("[data-image-feature]").count() == 1
                         assert page.locator("[data-agent] img").evaluate_all("""images =>
@@ -173,7 +180,7 @@ def main() -> None:
 
                     for width in (320, 390, 768, 1024, 1280, 1440):
                         page.set_viewport_size({"width": width, "height": 900})
-                        if is_home:
+                        if is_download and not is_home:
                             for link in page.locator("#download-options a").all():
                                 assert link.is_visible()
                                 assert link.evaluate("""item => {
@@ -197,7 +204,7 @@ def main() -> None:
                                 "[data-connections-feature], [data-tasks-feature], " +
                                 "[data-browser-feature], [data-app-control-feature], [data-skills-feature], [data-api-feature], " +
                                 "[data-extension-card], .link-benefits article, .link-stage, " +
-                                ".al-agent-card, .al-feature-grid article, .al-setup-grid li"
+                                ".al-agent-card, .al-feature-grid article, .al-setup-grid li, .home-cards > a"
                             );
                             for (const card of cards) {
                                 const bounds = card.getBoundingClientRect();
@@ -233,14 +240,16 @@ def main() -> None:
                             return errors;
                         }""")
                         assert not layout_errors, (language, mode, width, layout_errors)
-                        if width < 760:
+                        if is_download:
+                            check_mochi_navigation(page, language.startswith("zh-CN/"))
+                        if width < 760 and not is_download:
                             toggle = page.locator("[data-nav-toggle]")
                             toggle.click()
                             assert toggle.get_attribute("aria-expanded") == "true"
                             page.locator("[data-nav] a[href='#features']").click()
                             assert toggle.get_attribute("aria-expanded") == "false"
                             assert page.evaluate("document.body.style.overflow") == ""
-                        if not is_home:
+                        if not is_download:
                             for agent in page.locator("[data-agent]").all():
                                 assert agent.locator("a").get_attribute("href").startswith(
                                     "https://github.com/gongpx20069/android-agent-link/blob/master/"
@@ -265,17 +274,29 @@ def main() -> None:
                         page.wait_for_load_state("networkidle")
                         page.locator(".site-nav a[href='../']").click()
                         assert page.url.endswith(f"/hi-mochi/{language}")
-                    else:
+                    elif not is_download:
                         assert page.locator(".hero-actions a").first.get_attribute("href") == (
                             "https://github.com/gongpx20069/android-agent-link/releases"
                         )
                         language_link = "../zh-CN/agentlink/" if language == "agentlink/" else "../../agentlink/"
                         page.locator(f".site-nav a[href='{language_link}']").click()
                         assert page.url.endswith("/zh-CN/agentlink/" if language == "agentlink/" else "/hi-mochi/agentlink/")
+                    else:
+                        filename = f"Mochi-{expected}-arm64-v8a.apk"
+                        page.route("**/*.apk", lambda route: route.fulfill(
+                            content_type="application/vnd.android.package-archive",
+                            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                            body="download fixture",
+                        ))
+                        before_download = page.url
+                        with page.expect_download() as download:
+                            page.locator("#install > p > [data-release-download]").click()
+                        assert download.value.suggested_filename == filename
+                        assert page.url == before_download
                     page.wait_for_load_state("networkidle")
                     assert not failures, failures
                     context.close()
-            for language in ("", "zh-CN/", "agentlink/", "zh-CN/agentlink/"):
+            for language in ("", "zh-CN/", "wiki/quick-start/", "zh-CN/wiki/quick-start/", "agentlink/", "zh-CN/agentlink/"):
                 context = browser.new_context(java_script_enabled=False)
                 page = context.new_page()
                 page.goto(f"http://127.0.0.1:{server.server_port}/hi-mochi/{language}")
@@ -283,7 +304,8 @@ def main() -> None:
                 if "agentlink/" not in language:
                     source = (SITE_ROOT / language / "index.html").read_text(encoding="utf-8")
                     fallback = re.search(r"data-release-version>(v[^<]+)</span>", source).group(1)
-                    release_root = CNB_RELEASE_ROOT if language == "zh-CN/" else RELEASE_ROOT
+                    release_root = CNB_RELEASE_ROOT if language.startswith("zh-CN/") else RELEASE_ROOT
+                    check_mochi_navigation(page, language.startswith("zh-CN/"))
                     for link in page.locator("[data-release-download]").all():
                         abi = link.get_attribute("data-release-download") or "arm64-v8a"
                         assert link.get_attribute("href") == (
@@ -295,9 +317,12 @@ def main() -> None:
                         disclosure.locator("summary").click()
                         assert disclosure.evaluate("(item) => item.open")
                         assert disclosure.locator("p, ol").first.is_visible()
-                    assert page.locator("[data-extension-download='webdav']").get_attribute("href") == (
-                        f"{release_root}download/{fallback}/Mochi-WebDAV-Extension-{fallback}.apk"
-                    )
+                    if "wiki/" not in language:
+                        assert page.locator("[data-extension-download='webdav']").get_attribute("href") == (
+                            f"{release_root}download/{fallback}/Mochi-WebDAV-Extension-{fallback}.apk"
+                        )
+                    else:
+                        assert page.locator("#download-options [data-release-download]").count() == 5
                     context.close()
                     continue
                 assert page.locator(".agentlink-hero .reveal").first.evaluate(
@@ -321,6 +346,22 @@ def main() -> None:
         thread.join()
 
 
+def check_mochi_navigation(page, chinese: bool) -> None:
+    assert page.locator("[data-nav] a:not([lang])").all_text_contents() == (
+        ["首页", "Wiki"] if chinese else ["Home", "Wiki"]
+    )
+    assert page.locator("[data-nav-toggle]").count() == 0
+    for link in page.locator("[data-nav] a").all():
+        assert link.is_visible()
+        assert link.evaluate("""item => {
+            const box = item.getBoundingClientRect();
+            return box.left >= 0 && box.right <= innerWidth;
+        }""")
+    assert page.locator("[data-nav]").evaluate("""item =>
+        item.getBoundingClientRect().left >= document.querySelector('.brand').getBoundingClientRect().right
+    """)
+
+
 def check_wiki(browser, port: int, screenshots: Path | None) -> None:
     base = f"http://127.0.0.1:{port}/hi-mochi/"
     for locale in ("", "zh-CN/"):
@@ -332,7 +373,7 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                 page = context.new_page()
                 page.on("pageerror", lambda error: failures.append(str(error)))
                 page.on("request", lambda request: failures.append("Wiki requested release API")
-                        if request.url == API_URL else None)
+                        if request.url == API_URL and not (guide == "quick-start/" and not locale) else None)
                 page.on("response", lambda response: failures.append(response.url)
                         if response.url.startswith(base) and response.status >= 400 else None)
                 route = f"{locale}wiki/{guide}"
@@ -365,16 +406,7 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                         page.wait_for_timeout(50)
                     assert fits_viewport, (route, javascript, width)
                     assert fits_text, (route, javascript, width, "clipped text")
-                    if width < 760:
-                        if javascript:
-                            toggle = page.locator("[data-nav-toggle]")
-                            toggle.click()
-                            assert toggle.get_attribute("aria-expanded") == "true"
-                            toggle.press("Escape")
-                            assert toggle.get_attribute("aria-expanded") == "false"
-                            assert page.evaluate("document.body.style.overflow") == ""
-                        else:
-                            assert page.locator("[data-nav] a").first.is_visible()
+                    check_mochi_navigation(page, bool(locale))
                     if screenshots and javascript and guide in ("", "models/") and width in (390, 1280):
                         page.evaluate("scrollTo(0, 0)")
                         label = (locale + "wiki-" + (guide or "overview")).strip("/").replace("/", "-")

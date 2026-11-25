@@ -15,15 +15,28 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header" data-header><div class="nav-shell">
     <a class="brand" href="../../"><span class="brand-mark" aria-hidden="true"><span></span></span>Mochi</a>
-    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">Open navigation</span><span></span><span></span></button>
-    <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav><a href="../../">Home</a><a href="../">Wiki</a><a href="./" aria-current="page">Quick start</a><a href="../../zh-CN/wiki/quick-start/" lang="zh-CN">中文</a></nav>
+    <nav class="mochi-nav" aria-label="Primary navigation" data-nav><a href="../../">Home</a><a href="../" aria-current="true">Wiki</a><a href="../../zh-CN/wiki/quick-start/" lang="zh-CN">中文</a></nav>
   </div></header>
   <main class="shell wiki-frame" id="main">
     <aside class="wiki-sidebar"><nav aria-label="Wiki"><a href="../">Overview</a><a href="./" aria-current="page">Quick start</a><a href="../models/">AI providers</a><a href="../speech/">Speech providers</a><a href="../capabilities/">Skills &amp; extensions</a></nav></aside>
     <article class="wiki-article">
       <header><a class="text-link" href="../">Mochi Wiki</a><h1>Your first conversation.</h1><p class="wiki-lede">You need an Android 8.0+ phone, internet access and a model API key. No Mochi account or extension is required.</p></header>
       <nav class="wiki-tabs" aria-label="On this page"><a href="#install">Install</a><a href="#model">Connect</a><a href="#chat">Try it</a><a href="#troubleshooting">Get help</a></nav>
-      <section class="wiki-section" id="install"><h2>1. Install Mochi</h2><ol><li>Open <a href="../../#install">Downloads</a>. Choose ARM64 for most phones or universal if unsure.</li><li>Open the APK and allow installation from that download app if Android asks.</li><li>For updates, install over the existing app using the same signing channel. Do not uninstall or clear data.</li></ol><p class="wiki-note">You do not need to grant every permission now. Start with text; enable microphone, notifications and other access when you use those features.</p></section>
+      <section class="wiki-section" id="install"><h2>1. Install Mochi</h2>
+        <p><a class="button button-primary" data-release-download href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-arm64-v8a.apk">Download APK <span data-release-version>v1.0.24</span> ↓</a></p>
+        <p>ARM64 fits most phones. Open the APK and allow installation from that download app if Android asks. For updates, install over the existing app using the same signing channel; do not uninstall or clear data.</p>
+        <details class="wiki-disclosure" id="download-options"><summary>Other architectures</summary><p>All builds have the same features. Choose universal if unsure; it is a larger download.</p>
+          <div class="architecture-downloads">
+            <a data-release-download="arm64-v8a" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-arm64-v8a.apk"><strong>ARM64 ↓</strong><span>Most phones</span></a>
+            <a data-release-download="armeabi-v7a" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-armeabi-v7a.apk"><strong>32-bit ARM ↓</strong><span>Older phones</span></a>
+            <a data-release-download="x86" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-x86.apk"><strong>x86 ↓</strong><span>32-bit Intel</span></a>
+            <a data-release-download="x86_64" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-x86_64.apk"><strong>x86_64 ↓</strong><span>64-bit Intel / emulators</span></a>
+            <a data-release-download="universal" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-universal.apk"><strong>Universal ↓</strong><span>All architectures</span></a>
+          </div>
+        </details>
+        <p><a data-release-page href="https://github.com/gongpx20069/hi-mochi/releases/tag/v1.0.24">Release notes and checksums →</a></p>
+        <p class="wiki-note">You do not need to grant every permission now. Start with text; enable microphone, notifications and other access when you use those features.</p>
+      </section>
       <section class="wiki-section" id="model"><h2>2. Connect a model</h2><p><strong>Recommended: Groq</strong>, with a free API tier.</p><ol><li><a href="https://console.groq.com/">Register or sign in</a>, then <a href="https://console.groq.com/keys">create an API key</a>.</li><li>In Mochi, open <strong>Settings → AI connections → Add AI connection</strong> and choose Groq. Its endpoint is prefilled.</li><li>Copy a tool-capable model ID from <a href="https://console.groq.com/docs/models">Groq's model guide</a>, paste the key and save. The first connection is selected automatically; use <strong>Use</strong> to switch later.</li></ol><p>Already have a provider? Follow the <a href="../models/">AI connection guide</a> instead.</p></section>
       <section class="wiki-section" id="chat"><h2>3. Say hello</h2><ol><li>Open <strong>Chat</strong>, type “Hello” and tap Send. Confirm a reply before adding other services.</li><li>Hold the input to dictate; releasing fills your draft rather than sending it.</li><li>For hands-free speech, switch to <strong>Companion</strong>, allow microphone access and say the selected wake phrase. Choose “Hi Mochi” or “老莫老莫” in Settings → Speech and wake.</li></ol><p>Keep Companion visible and the screen unlocked. Android speech is built in; <a href="../speech/">cloud speech is optional</a>.</p></section>
       <section class="wiki-section" id="next"><h2>Then add only what you need.</h2><p>Try a calendar reminder or read a web link. The Skills page explains missing Tools. Journals and explicit memory recall start off; enable Daily journal if you want them. See <a href="../capabilities/">capabilities and permissions</a> before connecting documents, apps or extensions.</p></section>

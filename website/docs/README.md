@@ -46,9 +46,13 @@ URLs.
 
 ## Homepage and user guides
 
-Both homepages are concise product introductions: a hero, six capability cards,
-three-step setup, four optional extensions, Wiki links and a brief privacy note.
-They do not contain the detailed operating manual or release history. The
+Mochi's primary navigation has only Home and Wiki, plus a separate language
+switch. Keep it visible even on mobile, without a hamburger menu. Quick start,
+model setup and speech setup belong under Wiki, not in the primary navigation.
+Both homepages are concise product introductions: a hero, six linked capability
+cards, four optional extension cards and a brief privacy note. Cards lead to
+the relevant Wiki page or section. Do not duplicate setup steps or the Wiki
+directory on the homepage. They do not contain the operating manual or release history. The
 English quick start recommends Groq's free API tier; Chinese recommends
 ModelScope's free API allowance, without promising unlimited service.
 
@@ -64,8 +68,9 @@ Speech covers Android, iFlytek and Azure, including saving credentials before
 voice previews and explicitly selecting a saved speech account.
 The quick start contains permission, update and configuration-check recovery.
 The capabilities reference retains the detailed disclosures moved off the
-homepage. Downloads stay on the homepage so Wiki pages cannot serve mismatched
-app/extension releases. Links to downloads point back to the localized homepage.
+homepage. Quick start provides a direct recommended APK download and a disclosure
+for all five architectures, not a link back to a homepage card. Its checked-in
+release bundle must match the homepage in both languages.
 
 Preserve named AI and speech accounts, document collaboration
 with Notion/Tencent Docs/Feishu, and task-center guidance. Keep onboarding and
@@ -188,31 +193,32 @@ link to the user guide for cache and compatibility details.
 
 ## Release links
 
-Both homepages provide direct APK links for `arm64-v8a`, `armeabi-v7a`, `x86`,
-`x86_64`, and `universal`, plus the three official extension APKs. The hero and
-primary installation button recommend ARM64; a native installation disclosure
-provides all five architectures, including without JavaScript.
+Both homepages provide a direct ARM64 APK link and three official extension
+downloads. The quick-start pages recommend ARM64 and offer `arm64-v8a`,
+`armeabi-v7a`, `x86`, `x86_64`, and `universal` in a native disclosure, including
+without JavaScript.
 
-The Chinese homepage downloads from the public CNB mirror at
+The Chinese homepage and quick start download from the public CNB mirror at
 `https://cnb.cool/hi-mochi/hi-mochi`, without a token, login, or GitHub API request.
 It pins the verified bundled release rather than following GitHub's latest tag:
 GitHub publication can precede successful CNB mirroring. Never manufacture CNB
 links from unverified GitHub metadata. Source, documentation, issue links and
 the independent AgentLink downloads retain their original GitHub destinations.
 
-The English homepage keeps GitHub downloads and a checked-in fallback. On page
+The English homepage and quick start keep GitHub downloads and a checked-in fallback. On page
 load, `scripts.js` reads GitHub's public `releases/latest` API, validates the
 returned repository URLs, and updates the displayed version, all architecture
 downloads, release page links, and all three extension APK links. All assets and repository
-URLs are validated before any link changes, so missing/untrusted extensions
+URLs are validated even when some downloads are not displayed on that page.
+Validation completes before any link changes, so missing/untrusted extensions
 preserve the matching bundled release as a whole. If the API is unavailable or
 rate-limited, the fallback remains usable. AgentLink pages do not request the
 Mochi release API.
 
 The bundled release is **v1.0.24**. After publishing a new release and completing
 full anonymous download and SHA-256 verification of all nine CNB mirror files,
-update both homepages' architecture/extension URLs, release-page URLs, and version
-labels together. Retain the last verified Chinese version if mirroring fails;
+update both homepages and quick-start guides' architecture/extension URLs,
+release-page URLs, and version labels together. Retain the last verified Chinese version if mirroring fails;
 do not switch to GitHub or advertise a CNB APK that has not been mirrored.
 The static check enforces consistency within and between languages; it does
 not query GitHub or infer an unpublished version. An API outage must not send

@@ -24,9 +24,8 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header" data-header><div class="nav-shell">
     <a class="brand" href="./"><span class="brand-mark" aria-hidden="true"><span></span></span>Mochi</a>
-    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">Open navigation</span><span></span><span></span></button>
-    <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav>
-      <a href="#features">Features</a><a href="#extensions">Extensions</a><a href="wiki/">Wiki</a><a href="#install">Download</a><a href="zh-CN/" lang="zh-CN">中文</a><a href="https://github.com/gongpx20069/hi-mochi">GitHub ↗</a>
+    <nav class="mochi-nav" aria-label="Primary navigation" data-nav>
+      <a href="./" aria-current="page">Home</a><a href="wiki/">Wiki</a><a href="zh-CN/" lang="zh-CN">中文</a>
     </nav>
   </div></header>
   <main id="main">
@@ -39,7 +38,7 @@
           <a class="button button-primary" data-release-download href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-arm64-v8a.apk">Download <span data-release-version>v1.0.24</span> ↓</a>
           <a class="button button-secondary" href="wiki/quick-start/">Quick start →</a>
         </div>
-        <p class="hero-note">Android 8.0+ · Your model · No Mochi account<br>ARM64 for most phones · <a href="#download-options">Other downloads</a></p>
+        <p class="hero-note">Android 8.0+ · Your model · No Mochi account<br>ARM64 for most phones · <a href="wiki/quick-start/#download-options">Other downloads</a></p>
       </div>
       <div class="companion-stage" aria-label="Illustration of Mochi opening your planner">
         <div class="orbit orbit-one" aria-hidden="true"></div><div class="orbit orbit-two" aria-hidden="true"></div>
@@ -51,33 +50,15 @@
     <section class="section" id="features"><div class="shell">
       <div class="section-heading"><span class="kicker">More than a conversation</span><h2>A little help with everyday life.</h2></div>
       <div class="home-cards">
-        <article><span class="feature-label">Chat &amp; Companion</span><h3>Type. Talk. Stay a while.</h3><p>Text, hold-to-dictate, spoken replies and a full-screen desk companion.</p></article>
-        <article><span class="feature-label">Planner &amp; Tasks</span><h3>Make room for your day.</h3><p>Events, todos, reminders and recurring AI tasks with saved results.</p></article>
-        <article><span class="feature-label">Browser</span><h3>Follow your curiosity.</h3><p>Read links, compare products and research trips—or browse yourself.</p></article>
-        <article><span class="feature-label">Memory</span><h3>Pick up where you left off.</h3><p>Optional daily journals and recall help find earlier conversations.</p></article>
-        <article><span class="feature-label">Documents</span><h3>Work with your own knowledge.</h3><p>Find, draft and update authorized Notion, Tencent Docs and Feishu documents.</p></article>
-        <article><span class="feature-label">Apps &amp; Skills</span><h3>Turn words into actions.</h3><p>Operate allowed apps, control music and add community Skills or connected tools.</p></article>
+        <a href="wiki/speech/"><span class="feature-label">Chat &amp; Companion</span><h3>Type. Talk. Stay a while. →</h3><p>Text, hold-to-dictate, spoken replies and a full-screen desk companion.</p></a>
+        <a href="wiki/capabilities/#planner"><span class="feature-label">Planner &amp; Tasks</span><h3>Make room for your day. →</h3><p>Events, todos, reminders and recurring AI tasks with saved results.</p></a>
+        <a href="wiki/capabilities/#browser"><span class="feature-label">Browser</span><h3>Follow your curiosity. →</h3><p>Read links, compare products and research trips—or browse yourself.</p></a>
+        <a href="wiki/capabilities/#memory"><span class="feature-label">Memory</span><h3>Pick up where you left off. →</h3><p>Optional daily journals and recall help find earlier conversations.</p></a>
+        <a href="wiki/capabilities/#documents"><span class="feature-label">Documents</span><h3>Work with your own knowledge. →</h3><p>Find, draft and update authorized Notion, Tencent Docs and Feishu documents.</p></a>
+        <a href="wiki/capabilities/#app-control"><span class="feature-label">Apps &amp; Skills</span><h3>Turn words into actions. →</h3><p>Operate allowed apps, control music and add community Skills or connected tools.</p></a>
       </div>
       <p class="section-link"><a class="text-link" href="wiki/capabilities/">Explore capabilities and required access →</a></p>
     </div></section>
-    <section class="section" id="install"><div class="shell"><div class="install-panel">
-      <div class="install-heading"><span class="kicker">Start small</span><h2>Three steps. Your first conversation.</h2></div>
-      <ol class="install-steps">
-        <li><span>1</span><div><strong>Install Mochi</strong><p>Download <span data-release-version>v1.0.24</span>. Update in place to keep your data.</p></div></li>
-        <li><span>2</span><div><strong>Connect a model</strong><p>We recommend Groq for its free API tier. Add a key and a Tool Use model in Settings.</p></div></li>
-        <li><span>3</span><div><strong>Say hello</strong><p>Start in Chat. Android speech is included; no extension is needed.</p></div></li>
-      </ol>
-      <div class="install-actions"><a class="button button-light" data-release-download href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-arm64-v8a.apk">Download for most phones ↓</a><a class="text-link light-link" href="wiki/quick-start/">Follow the quick start →</a><a class="text-link light-link" data-release-page href="https://github.com/gongpx20069/hi-mochi/releases/tag/v1.0.24">Release &amp; checksums →</a></div>
-      <details class="extension-setup" id="download-options"><summary>Other architectures and universal APK</summary><p>All builds have the same features. Choose universal if unsure; it is a larger download.</p>
-        <div class="architecture-downloads">
-          <a data-release-download="arm64-v8a" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-arm64-v8a.apk"><strong>ARM64 ↓</strong><span>Most phones</span></a>
-          <a data-release-download="armeabi-v7a" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-armeabi-v7a.apk"><strong>32-bit ARM ↓</strong><span>Older phones</span></a>
-          <a data-release-download="x86" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-x86.apk"><strong>x86 ↓</strong><span>32-bit Intel</span></a>
-          <a data-release-download="x86_64" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-x86_64.apk"><strong>x86_64 ↓</strong><span>64-bit Intel / emulators</span></a>
-          <a data-release-download="universal" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-v1.0.24-universal.apk"><strong>Universal ↓</strong><span>All architectures</span></a>
-        </div>
-      </details>
-    </div></div></section>
     <section class="section" id="extensions"><div class="shell">
       <div class="section-heading"><span class="kicker">Optional, not required</span><h2>Connect more of your world.</h2></div>
       <div class="home-extensions">
@@ -86,10 +67,6 @@
         <article id="agentlink-extension" data-extension-card="agentlink"><h3>AgentLink</h3><p>Shared coding chats with your computer.</p><a class="text-link" href="wiki/capabilities/#agentlink-extension">How it connects →</a><a class="button button-secondary" href="agentlink/">AgentLink →</a></article>
         <article id="webdav-extension" data-extension-card="webdav" data-release-status="released-preview"><h3>WebDAV · Preview</h3><p>Read, edit and transfer files in an allowed folder.</p><a class="text-link" href="wiki/capabilities/#webdav-extension">Preview guide →</a><a class="button button-secondary" data-extension-download="webdav" href="https://github.com/gongpx20069/hi-mochi/releases/download/v1.0.24/Mochi-WebDAV-Extension-v1.0.24.apk">Extension ↓</a></article>
       </div>
-    </div></section>
-    <section class="section" id="wiki"><div class="shell">
-      <div class="section-heading"><span class="kicker">Mochi Wiki</span><h2>Just the guide you need.</h2></div>
-      <div class="guide-grid"><a href="wiki/quick-start/"><span>01 / START</span><h3>Your first conversation →</h3><p>Install, connect and try Mochi.</p></a><a href="wiki/models/"><span>02 / MODELS</span><h3>Connect an AI provider →</h3><p>Groq, ModelScope, OpenAI and more.</p></a><a href="wiki/speech/"><span>03 / VOICE</span><h3>Set up speech →</h3><p>Android, iFlytek or Azure Speech.</p></a><a href="wiki/"><span>04 / EXPLORE</span><h3>Browse the Wiki →</h3><p>Skills, extensions and troubleshooting.</p></a></div>
     </div></section>
     <section class="section" id="privacy"><div class="shell home-privacy"><h2>Your phone. Your choices.</h2><p>History stays local; necessary context goes to your chosen model. You control connections and permissions. Browser and Termux actions can run without per-action approval.</p><a class="text-link" href="wiki/capabilities/#privacy">Privacy and control →</a></div></section>
   </main>

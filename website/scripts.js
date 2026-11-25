@@ -94,8 +94,7 @@ const updateLatestRelease = async () => {
     throw new Error("GitHub returned an unexpected release URL");
   }
 
-  const appDownloads = [...document.querySelectorAll("[data-release-download]")].map((link) => {
-    const abi = link.dataset.releaseDownload || "arm64-v8a";
+  const appDownloads = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64", "universal"].map((abi) => {
     const filename = `Mochi-${version}-${abi}.apk`;
     const asset = release.assets?.find((item) => item.name === filename);
     const url = asset && trustedReleaseUrl(
@@ -105,12 +104,11 @@ const updateLatestRelease = async () => {
     if (!url) {
       throw new Error(`GitHub release ${version} has no trusted ${abi} APK`);
     }
-    return { link, url };
+    return { abi, url };
   });
 
   const extensionNames = { mijia: "Mijia", termux: "Termux", webdav: "WebDAV" };
-  const extensionDownloads = [...document.querySelectorAll("[data-extension-download]")].map((link) => {
-    const name = extensionNames[link.dataset.extensionDownload];
+  const extensionDownloads = Object.entries(extensionNames).map(([extensionId, name]) => {
     const filename = `Mochi-${name}-Extension-${version}.apk`;
     const extension = release.assets.find((item) => item.name === filename);
     const url = extension && trustedReleaseUrl(
@@ -120,7 +118,7 @@ const updateLatestRelease = async () => {
     if (!url) {
       throw new Error(`GitHub release ${version} has no trusted ${name} extension`);
     }
-    return { link, url };
+    return { extensionId, url };
   });
 
   document.querySelectorAll("[data-release-version]").forEach((element) => {
@@ -129,11 +127,15 @@ const updateLatestRelease = async () => {
   document.querySelectorAll("[data-release-page]").forEach((element) => {
     element.href = releasePage;
   });
-  appDownloads.forEach(({ link, url }) => {
-    link.href = url;
+  appDownloads.forEach(({ abi, url }) => {
+    const selector = `[data-release-download="${abi}"]` +
+      (abi === "arm64-v8a" ? ', [data-release-download=""]' : "");
+    document.querySelectorAll(selector).forEach((link) => { link.href = url; });
   });
-  extensionDownloads.forEach(({ link, url }) => {
-    link.href = url;
+  extensionDownloads.forEach(({ extensionId, url }) => {
+    document.querySelectorAll(`[data-extension-download="${extensionId}"]`).forEach((link) => {
+      link.href = url;
+    });
   });
 };
 

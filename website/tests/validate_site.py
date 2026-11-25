@@ -25,6 +25,8 @@ class PageParser(HTMLParser):
         self.text: list[str] = []
         self.stack: list[str] = []
         self.errors: list[str] = []
+        self.in_primary_nav = False
+        self.primary_links: list[dict[str, str | None]] = []
 
     def handle_starttag(
         self,
@@ -32,6 +34,10 @@ class PageParser(HTMLParser):
         attrs: list[tuple[str, str | None]],
     ) -> None:
         values = dict(attrs)
+        if tag == "nav" and "data-nav" in values:
+            self.in_primary_nav = True
+        if tag == "a" and self.in_primary_nav:
+            self.primary_links.append(values)
         if tag not in {"area", "base", "br", "col", "embed", "hr", "img", "input",
                        "link", "meta", "param", "source", "track", "wbr"}:
             self.stack.append(tag)
@@ -55,6 +61,8 @@ class PageParser(HTMLParser):
             self.resources.append(resource)
 
     def handle_endtag(self, tag: str) -> None:
+        if tag == "nav":
+            self.in_primary_nav = False
         if not self.stack or self.stack[-1] != tag:
             self.errors.append(f"unexpected closing tag: {tag}")
         else:
@@ -102,8 +110,21 @@ def main() -> None:
 
     for page in pages:
         parser = PageParser()
-        parser.feed(page.read_text(encoding="utf-8"))
+        source = page.read_text(encoding="utf-8")
+        parser.feed(source)
         relative_page = page.relative_to(SITE_ROOT)
+        is_home = page in (SITE_ROOT / "index.html", SITE_ROOT / "zh-CN" / "index.html")
+        is_quick_start = relative_page.parts[-3:] == ("wiki", "quick-start", "index.html")
+        if is_home or "wiki" in relative_page.parts:
+            primary = [link for link in parser.primary_links if "lang" not in link]
+            expected_home = SITE_ROOT / ("zh-CN" if "zh-CN" in relative_page.parts else "") / "index.html"
+            expected_wiki = expected_home.parent / "wiki" / "index.html"
+            if [local_resource(page, link.get("href") or "") for link in primary] != [
+                expected_home.resolve(), expected_wiki.resolve(),
+            ]:
+                errors.append(f"{relative_page}: primary navigation must contain only Home and Wiki")
+            if len(parser.primary_links) != 3 or "data-nav-toggle" in source:
+                errors.append(f"{relative_page}: keep Home, Wiki and one language switch visible without a menu")
         errors.extend(f"{relative_page}: {error}" for error in parser.errors)
         if parser.stack:
             errors.append(f"{relative_page}: unclosed tags {parser.stack}")
@@ -163,13 +184,25 @@ def main() -> None:
                     f"{relative_page}: missing localized smart-home label",
                 )
 
-        if page in (SITE_ROOT / "index.html", SITE_ROOT / "zh-CN" / "index.html"):
-            source = page.read_text(encoding="utf-8")
+        if is_home:
             if len(" ".join(parser.text)) > (4500 if language == "zh-CN" else 9000):
                 errors.append(f"{relative_page}: homepage is too long; move details into Wiki")
-            for guide in ("wiki/", "wiki/quick-start/", "wiki/models/", "wiki/speech/"):
+            for guide in ("wiki/", "wiki/quick-start/"):
                 if guide not in parser.resources:
                     errors.append(f"{relative_page}: missing Wiki entry {guide}")
+            cards = re.search(r'<div class="home-cards">(.*?)</div>', source, re.S)
+            card_links = re.findall(r'<a href="([^"]+)"', cards.group(1)) if cards else []
+            if len(card_links) != 6 or not all(link.startswith("wiki/") for link in card_links):
+                errors.append(f"{relative_page}: every capability card must link to a Wiki guide")
+            if {"install", "wiki", "download-options"} & parser.ids:
+                errors.append(f"{relative_page}: setup and guide directories belong in Wiki, not homepage sections")
+            for extension in ("mijia", "termux", "agentlink", "webdav"):
+                if source.count(f'data-extension-card="{extension}"') != 1:
+                    errors.append(f"{relative_page}: missing or duplicate {extension} card")
+            if "extensions" not in parser.ids:
+                errors.append(f"{relative_page}: missing extensions section")
+
+        if is_home or is_quick_start:
             release_root = (
                 "https://cnb.cool/hi-mochi/hi-mochi/-/releases/"
                 if language == "zh-CN"
@@ -191,7 +224,7 @@ def main() -> None:
                 source,
             )
             versions = set(download_versions + page_versions + label_versions)
-            for abi in abis:
+            for abi in abis if is_quick_start else ():
                 abi_versions = re.findall(
                     rf'data-release-download="{abi}" href="{trusted_root}download/'
                     rf'(v1\.0\.[1-9][0-9]*)/Mochi-\1-{abi}\.apk"', source,
@@ -204,19 +237,16 @@ def main() -> None:
                     rf'download/(v1\.0\.[1-9][0-9]*)/'
                     rf'Mochi-{name}-Extension-\1\.apk"', source,
                 )
-                if len(extension_versions) != 1 or set(extension_versions) != versions:
+                if (is_home and (len(extension_versions) != 1 or set(extension_versions) != versions)) or (
+                    is_quick_start and extension_versions
+                ):
                     errors.append(f"{relative_page}: inconsistent {extension} download")
-            for extension in ("mijia", "termux", "agentlink", "webdav"):
-                if source.count(f'data-extension-card="{extension}"') != 1:
-                    errors.append(f"{relative_page}: missing or duplicate {extension} card")
-            if "extensions" not in parser.ids:
-                errors.append(f"{relative_page}: missing extensions section")
             fallback_versions.update(versions)
             if (
-                len(download_versions) != 7
-                or source.count("data-release-download") != 7
-                or len(page_versions) != 2
-                or len(label_versions) != 3
+                len(download_versions) != (1 if is_home else 6)
+                or source.count("data-release-download") != (1 if is_home else 6)
+                or len(page_versions) != 1
+                or len(label_versions) != (2 if is_home else 1)
                 or len(versions) != 1
             ):
                 errors.append(
@@ -224,7 +254,7 @@ def main() -> None:
                 )
 
     if len(fallback_versions) != 1:
-        errors.append("Homepages must use the same release fallback in both languages.")
+        errors.append("Homepages and quick-start guides must share one release fallback in both languages.")
 
     for locale in ("", "zh-CN/"):
         for guide in ("", "quick-start/", "models/", "speech/", "capabilities/"):
@@ -235,8 +265,8 @@ def main() -> None:
             source = path.read_text(encoding="utf-8")
             if source.count("<h1>") != 1:
                 errors.append(f"{path.relative_to(SITE_ROOT)}: expected one guide heading")
-            if "data-release-download" in source or "data-extension-download" in source:
-                errors.append(f"{path.relative_to(SITE_ROOT)}: downloads must stay on the release-aware homepage")
+            if guide != "quick-start/" and ("data-release-download" in source or "data-extension-download" in source):
+                errors.append(f"{path.relative_to(SITE_ROOT)}: unexpected release download outside quick start")
             if guide == "models/":
                 providers = re.findall(r'data-provider="([^"]+)"', source)
                 expected = {"groq", "modelscope", "openai", "azure", "deepseek", "kimi", "glm", "minimax", "agnes", "custom"}

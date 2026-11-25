@@ -17,8 +17,7 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header" data-header><div class="nav-shell">
     <a class="brand" href="../../"><span class="brand-mark" aria-hidden="true"><span></span></span>Mochi</a>
-    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span class="sr-only">Open navigation</span><span></span><span></span></button>
-    <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav><a href="../../">Home</a><a href="../">Wiki</a><a href="../quick-start/">Quick start</a><a href="../models/">AI models</a><a href="../speech/">Speech</a><a href="../../zh-CN/wiki/capabilities/">中文</a></nav>
+    <nav class="mochi-nav" aria-label="Primary navigation" data-nav><a href="../../">Home</a><a href="../" aria-current="true">Wiki</a><a href="../../zh-CN/wiki/capabilities/" lang="zh-CN">中文</a></nav>
   </div></header>
   <main id="main">
     <div class="shell wiki-heading"><a class="text-link" href="../">Mochi Wiki</a><h1>Skills, tools &amp; extensions</h1><p>Connect what you need. Grant only the access you trust.</p>
@@ -66,7 +65,7 @@
               <a class="text-link" href="https://github.com/gongpx20069/hi-mochi/blob/main/docs/architecture/MEMORY_DESIGN.md">Explore the memory architecture →</a>
             </article>
 
-            <article class="feature-card planner-feature reveal">
+            <article class="feature-card planner-feature reveal" id="planner">
               <div class="feature-icon planner-icon" aria-hidden="true"><span>12</span></div>
               <span class="feature-label">Planner</span>
               <h3>Dates become a view, not just an answer.</h3>
@@ -74,7 +73,7 @@
               <div class="date-strip" aria-hidden="true"><span><small>MON</small>10</span><span><small>TUE</small>11</span><span class="selected"><small>WED</small>12</span><span><small>THU</small>13</span></div>
             </article>
 
-            <article class="feature-card knowledge-feature reveal" data-documents-feature>
+            <article class="feature-card knowledge-feature reveal" id="documents" data-documents-feature>
               <div class="feature-icon knowledge-icon" aria-hidden="true"><span></span><i></i></div>
               <span class="feature-label">Notion · Tencent Docs · Feishu</span>
               <h3>Cowork inside your private knowledge base.</h3>
@@ -102,7 +101,7 @@
               <p class="feature-note">The optional signed Termux extension connects a separately installed Termux. Stopping an Agent does not stop work already submitted to Shell or a remote service.</p>
             </article>
 
-            <article class="feature-card feature-wide tools-feature reveal" data-browser-feature>
+            <article class="feature-card feature-wide tools-feature reveal" id="browser" data-browser-feature>
               <div class="tools-copy">
                 <div class="feature-icon tools-icon" aria-hidden="true"><span></span><i></i></div>
                 <span class="feature-label">Native Android Agent Browser</span>
