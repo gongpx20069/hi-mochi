@@ -1,7 +1,6 @@
 package com.example.mochi_pet.feature.home
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -17,16 +16,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-internal fun MochiEntryMark(modifier: Modifier = Modifier) {
+internal fun MochiEntryMark(label: String, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     Column(
         modifier = modifier.clearAndSetSemantics {},
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Canvas(Modifier.size(width = 60.dp, height = 45.dp)) {
             scale(size.width / 48f, size.height / 36f, pivot = Offset.Zero) {
@@ -51,13 +50,14 @@ internal fun MochiEntryMark(modifier: Modifier = Modifier) {
             }
         }
         Text(
-            "Mochi",
+            label,
             color = colors.secondary,
             style = MaterialTheme.typography.labelMedium,
             fontSize = 15.sp,
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,
-            letterSpacing = 2.5.sp,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center,
         )
     }
 }

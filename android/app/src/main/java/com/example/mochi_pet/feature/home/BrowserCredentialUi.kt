@@ -387,11 +387,12 @@ internal fun BrowserManagementLayout(
                         verticalArrangement = Arrangement.Bottom,
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxWidth(0.85f).testTag("browser-brand").padding(16.dp),
+                            modifier = Modifier.weight(1f, fill = false).fillMaxWidth(0.85f)
+                                .testTag("browser-brand").verticalScroll(rememberScrollState()).padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            MochiEntryMark(Modifier.testTag("browser-logo"))
+                            MochiEntryMark("Mochi Explore", Modifier.testTag("browser-logo"))
                             Text("Search the web. Save accounts safely.", style = MaterialTheme.typography.bodySmall,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -357,10 +357,12 @@ draft; Companion, dictation and voice previews are unaffected.
 
 Returning from outside the app into idle Chat opens a quiet quick-entry view:
 the same one-line composer sits in the center, with a thin M mark on a 60 by
-45 dp canvas and a lightly spaced 15 sp Mochi wordmark above it, without a filled
+45 dp canvas and a compact 15 sp **Mochi Chat** wordmark above it, without a filled
 mascot tile. The line blends the theme's peach primary into its lavender secondary;
 the wordmark uses the same lavender. The browser homepage uses this shared
-component, size and palette; navigation icons remain compact.
+component, size and palette with the wordmark **Mochi Explore**. Both use tight
+mark-to-wordmark spacing and modest letter spacing, without a hyphen. These
+English brand labels stay unchanged across UI languages; navigation icons remain compact.
 The logo fades away when history opens. Its empty placeholder combines
 **点击输入 · 长按说话 · 下滑历史**, without a separate hint below the field.
 Tap to type and hold/release to dictate still work;
@@ -734,6 +736,8 @@ an always-visible Close action at the top right. The logo and concise
 "Search the web. Save accounts safely." caption sit on the plain theme background,
 using the same mark size and theme palette as central Chat, without a mascot tile.
 The search field keeps its soft outline.
+At large font sizes or short heights, the brand area can scroll independently
+so that the search field keeps its full text height and Close remains reachable.
 A separate rounded, low-contrast surface below search contains website groups and the compact data
 overflow menu. There are no introductory or session-status cards.
 Each website row shows its registrable domain and badges for local data and

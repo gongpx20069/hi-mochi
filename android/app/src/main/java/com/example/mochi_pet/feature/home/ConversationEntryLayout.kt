@@ -58,7 +58,7 @@ internal fun ConversationEntryLayout(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { composer() }
             Box(Modifier.graphicsLayer { alpha = 1f - progress }) {
                 if (quickEntry || progress < 1f) {
-                    MochiEntryMark(Modifier.testTag("conversation-entry-logo"))
+                    MochiEntryMark("Mochi Chat", Modifier.testTag("conversation-entry-logo"))
                 }
             }
         },
