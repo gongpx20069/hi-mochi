@@ -269,3 +269,5 @@ source to **GitHub Actions** before the first deployment.
 The public artifact includes `wiki/`, `zh-CN/wiki/`, `agentlink/` and
 `zh-CN/agentlink/` alongside the homepages. Keep every public route in the
 sitemap and verify canonical and language-switch links when moving pages.
+Each deployment attempt uses a distinct artifact name and waits for its metadata
+to become visible before deploying, so retries cannot select an older artifact.
