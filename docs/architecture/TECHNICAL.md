@@ -382,6 +382,44 @@ The originating assistant tool call retains the function name. Free allowances
 are not hardcoded: quota exhaustion remains a visible Provider failure, with no
 automatic retry, provider switch, credit claim, or billing upgrade.
 
+### ModelScope direct API setup
+
+The ModelScope preset and Settings guide cover direct API-Inference use only.
+The official sources below were checked on 2026-11-25; available models,
+account requirements and allowances remain subject to the live service.
+
+1. Follow the [registration and sign-in guide](https://www.modelscope.cn/docs/accounts/registration).
+   Complete email verification for credit use and
+   [bind a real-name-verified Alibaba Cloud account](https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization)
+   as required by API-Inference.
+2. Read the [Access Token guide](https://www.modelscope.cn/docs/accounts/token),
+   then create a token in the [Token account page](https://modelscope.cn/my/myaccesstoken).
+   Supply this ModelScope Access Token, not an Alibaba Cloud AccessKey or
+   DashScope key. Token and personal credit pages require browser sign-in.
+3. Use the [model-selection and API-limit guide](https://www.modelscope.cn/docs/model-service/API-Inference/limits)
+   when browsing the [model library](https://www.modelscope.cn/models).
+   Choose a currently API-enabled language model and separately verify Tool
+   Calling support; an API-Inference badge alone does not establish that.
+   For the community service, select ModelScope as the API provider on the
+   model page and copy its current full model ID, including the organization
+   prefix. Do not assume an older tutorial's example model remains available.
+4. Keep the preset's Chat Completions base
+   `https://api-inference.modelscope.cn/v1` and enter the model ID and Token.
+   The [official API-Inference guide](https://www.modelscope.cn/docs/model-service/API-Inference/intro)
+   documents the protocol; the current model-page example governs model-specific
+   requirements. Other API providers may require separate credentials and billing.
+5. Review the [credit rules](https://www.modelscope.cn/docs/magicube/intro)
+   and [personal credit balance](https://modelscope.cn/magicube/usage?tab=earn).
+   Credits expire, model costs and concurrency limits can change, and the free
+   service does not guarantee an SLA. Mochi neither claims credits nor changes
+   providers automatically.
+
+Opening these documentation links does not probe an API, save settings, replace
+credentials or change a selected model. Public documentation was checked without
+signing into a personal account; this is not an authenticated service test.
+
+### Other provider compatibility
+
 Agnes-AI remains supported: its official
 [overview](https://wiki.agnes-ai.com/en/docs/overview) and
 [Agnes 3.0 Flash guide](https://wiki.agnes-ai.com/en/docs/agnes-30-flash)

@@ -135,8 +135,13 @@ class ProviderProfilesUiTest {
         compose.onNode(hasText("OpenAI") and !hasSetTextAction()).performScrollTo().performClick()
         compose.onNodeWithText("魔搭 ModelScope").performScrollTo().performClick()
         compose.onNodeWithText("API 端点").performScrollTo().assertTextContains("https://api-inference.modelscope.cn/v1")
+        compose.onNodeWithText("此预设将 Mochi 连接到魔搭托管的 API-Inference 服务。")
+            .performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(
             "1. 注册或登录魔搭，验证邮箱，并绑定已实名认证的阿里云账号以使用 API-Inference。",
+        ).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(
+            "3. 选择当前支持 API 调用的语言模型，另外确认其支持 Tool Calling（工具调用）；只有 API-Inference 标记还不够。从模型页面的当前调用示例复制完整模型 ID，包含组织名前缀。",
         ).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(
             "2. 打开访问令牌页面，创建有效期合适的令牌并粘贴到下方。应使用魔搭 Access Token，而不是阿里云 AccessKey 或百炼 DashScope Key。",
@@ -144,11 +149,15 @@ class ProviderProfilesUiTest {
         compose.onNodeWithText("模型名称").performScrollTo().performTextInput("fixture/tool-model")
         compose.onNodeWithText("魔搭 Access Token").performScrollTo().performTextInput("synthetic-modelscope-token")
         for ((label, url) in listOf(
-            "注册 / 登录魔搭" to "https://modelscope.cn/",
+            "魔搭注册与登录教程" to "https://www.modelscope.cn/docs/accounts/registration",
             "阿里云账号绑定指南" to "https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization",
+            "魔搭访问令牌教程" to "https://www.modelscope.cn/docs/accounts/token",
             "创建魔搭 Access Token" to "https://modelscope.cn/my/myaccesstoken",
-            "查看魔搭模型" to "https://modelscope.cn/models",
-            "魔搭每日额度" to "https://modelscope.cn/magicube/usage?tab=earn",
+            "模型选择与 API 使用限制" to "https://www.modelscope.cn/docs/model-service/API-Inference/limits",
+            "查看魔搭模型" to "https://www.modelscope.cn/models",
+            "魔粒获取与扣减规则" to "https://www.modelscope.cn/docs/magicube/intro",
+            "查看我的魔粒" to "https://modelscope.cn/magicube/usage?tab=earn",
+            "打开官方 API 指南" to "https://www.modelscope.cn/docs/model-service/API-Inference/intro",
         )) {
             compose.onNodeWithText(label).performScrollTo().performClick()
             assertEquals(url, opened.last())
@@ -158,6 +167,30 @@ class ProviderProfilesUiTest {
         assertEquals(ApiProtocol.CHAT_COMPLETIONS, saved!!.settings.apiProtocol)
         assertEquals("https://api-inference.modelscope.cn/v1", saved!!.settings.endpoint)
         assertEquals("synthetic-modelscope-token", saved!!.settings.apiKeyReplacement)
+        assertEquals("fixture/tool-model", saved!!.settings.model)
+    }
+
+    @Test fun `ModelScope documentation links preserve an existing custom endpoint model and key`() {
+        Locale.setDefault(Locale.ENGLISH)
+        var saved: ProviderProfileInput? = null
+        val opened = mutableListOf<String>()
+        val profile = first.copy(preset = ProviderPreset.MODELSCOPE, settings = first.settings.copy(
+            providerType = ProviderPreset.MODELSCOPE.protocol,
+            endpoint = "https://example.com/existing/v1",
+            model = "fixture/existing-model",
+        ))
+        renderEditor(profile = profile, onSave = { saved = it }, onOpenUri = opened::add)
+        compose.onNodeWithText("Model selection and API limits").performScrollTo().performClick()
+        assertEquals(
+            "https://www.modelscope.cn/docs/model-service/API-Inference/limits",
+            opened.single(),
+        )
+        compose.onNodeWithText("Save connection").performClick()
+        assertEquals(ProviderPreset.MODELSCOPE, saved!!.preset)
+        assertEquals(profile.settings.endpoint, saved!!.settings.endpoint)
+        assertEquals(profile.settings.model, saved!!.settings.model)
+        assertEquals(profile.settings.apiProtocol, saved!!.settings.apiProtocol)
+        assertEquals("", saved!!.settings.apiKeyReplacement)
     }
 
     @Test fun `Agnes keeps saved configuration and opens current model documentation`() {

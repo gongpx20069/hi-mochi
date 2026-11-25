@@ -542,10 +542,17 @@ links to its official guide. Endpoint remains editable; model is supplied by
 the user because account access varies. Provider APIs are not Coding Plans;
 free quotas and billing depend on the account. Groq has three localized setup
 steps and explicit Console signup, key creation, model-list and account-limit
-links. ModelScope labels the secret as Access Token and links registration,
-verified Alibaba Cloud binding, token creation, model selection and daily credits.
-Its guidance distinguishes ModelScope tokens from Alibaba Cloud AccessKeys and
-DashScope keys, and explains token expiry and the organization/model ID format.
+links. ModelScope guidance covers only direct use of hosted API-Inference.
+It labels the secret as Access Token and links official registration, verified
+Alibaba Cloud binding, Token management, model selection/API limits and credit
+rules, with separate sign-in-required Token and credit account pages.
+The model-library link is not a guarantee of API availability: users check the
+current model-page example and verify Tool Calling support separately from the
+API-Inference badge. Community API selection is explicit; other API providers
+may require separate credentials and billing. Older example models may retire.
+The guide distinguishes ModelScope tokens from Alibaba Cloud AccessKeys and
+DashScope keys, explains token expiry and the organization/model ID format, and
+notes changing quotas, expiring credits and the lack of a free-service SLA.
 Links open only on explicit taps in the external browser, contain no entered
 credentials, and preserve editor state. An unavailable browser shows a safe error.
 Agnes-AI retains its preset and links the current overview/model guide rather than

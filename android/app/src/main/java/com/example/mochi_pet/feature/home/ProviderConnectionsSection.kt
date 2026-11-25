@@ -321,17 +321,24 @@ private fun ProviderSetupGuide(preset: ProviderPreset, openGuide: (String) -> Un
         }
         ProviderPreset.MODELSCOPE -> {
             Text("ModelScope setup", fontWeight = FontWeight.Bold)
+            Text("This preset connects Mochi to ModelScope's hosted API-Inference service.")
             Text("1. Register or sign in to ModelScope, verify your email, and bind a real-name-verified Alibaba Cloud account for API-Inference.")
-            TextButton(onClick = { openGuide("https://modelscope.cn/") }) { Text("Register / sign in to ModelScope") }
+            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/accounts/registration") }) { Text("ModelScope registration guide") }
             TextButton(onClick = {
                 openGuide("https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization")
             }) { Text("Alibaba Cloud binding guide") }
             Text("2. Open Access Tokens, create a token with a suitable expiry, and paste it below. Use the ModelScope Access Token, not an Alibaba Cloud AccessKey or a DashScope key.")
+            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/accounts/token") }) { Text("ModelScope Access Token guide") }
             TextButton(onClick = { openGuide("https://modelscope.cn/my/myaccesstoken") }) { Text("Create ModelScope Access Token") }
-            Text("3. Choose a tool-capable model with the API-Inference badge. Select ModelScope as the API provider and copy the model ID from its example, including the organization prefix.")
-            TextButton(onClick = { openGuide("https://modelscope.cn/models") }) { Text("Browse ModelScope models") }
-            Text("Claim daily credits by signing in on ModelScope. Credits expire and models have different costs; Mochi does not claim credits or switch providers automatically.")
-            TextButton(onClick = { openGuide("https://modelscope.cn/magicube/usage?tab=earn") }) { Text("ModelScope daily credits") }
+            Text("3. Choose a currently API-enabled language model. Check Tool Calling support separately; the API-Inference badge alone is not enough. Copy the full model ID from its current API example, including the organization prefix.")
+            Text("For the community service, select ModelScope as the API provider on the model page. Other providers may require separate credentials and billing; old example models may no longer be available.")
+            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/model-service/API-Inference/limits") }) { Text("Model selection and API limits") }
+            TextButton(onClick = { openGuide("https://www.modelscope.cn/models") }) { Text("Browse ModelScope models") }
+            Text("4. For the community API, use https://api-inference.modelscope.cn/v1 with Chat Completions. Enter the model ID and Access Token below, then save the connection.")
+            Text("Credits expire and API limits can change. Free API-Inference has no SLA guarantee. Mochi does not claim credits or switch providers automatically.")
+            TextButton(onClick = { openGuide("https://www.modelscope.cn/docs/magicube/intro") }) { Text("ModelScope credit rules") }
+            TextButton(onClick = { openGuide("https://modelscope.cn/magicube/usage?tab=earn") }) { Text("View ModelScope credits") }
+            Text("Token and credit pages require signing in to ModelScope in your external browser.")
         }
         ProviderPreset.AGNES -> {
             Text("Agnes-AI still documents this API endpoint. Use an API key from its developer dashboard and a tool-capable model from the current guide; older Quickstart model examples may be retired.")
