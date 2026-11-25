@@ -29,8 +29,9 @@
    [get an API key](https://console.groq.com/keys), then choose a
    [Tool Use model](https://console.groq.com/docs/models).
 
-   **Speech:** we recommend **iFlytek**. Get your AppID, APIKey and APISecret from the
-   [console](https://console.xfyun.cn/), add them in **Settings > Speech and wake**,
+   **Speech:** we recommend **iFlytek**. In the [Voice Dictation console](https://console.xfyun.cn/services/iat),
+   create/select a WebAPI app and enable **Voice Dictation (Streaming)**.
+   Copy that app's AppID, APIKey and APISecret into **Settings > Speech and wake**,
    then save and select the account. Or use built-in Android speech without an extra key.
 3. **Chat or talk.** Type or hold the input to dictate, then tap Send.
    Switch to **Companion** and say **“Hi Mochi”** for hands-free conversation.
@@ -81,7 +82,7 @@ cloud voice replies are a separate opt-in.
 
 | Provider | Official setup links |
 | --- | --- |
-| **iFlytek · Recommended** | [Console](https://console.xfyun.cn/) · [Speech dictation guide](https://www.xfyun.cn/doc/asr/voicedictation/API.html) |
+| **iFlytek · Recommended** | [Get credentials](https://console.xfyun.cn/services/iat) · [Speech dictation guide](https://www.xfyun.cn/doc/asr/voicedictation/API.html) |
 | Azure Speech | [Create resource](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices) · [Quick start](https://learn.microsoft.com/azure/ai-services/speech-service/get-started-speech-to-text) |
 | Android system speech | Built in; no extra API key |
 

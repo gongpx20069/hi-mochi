@@ -181,11 +181,13 @@ internal fun SpeechConnectionDialog(
                     }
                 } else Text(provider.connectionTitle)
                 if (provider == SpeechProvider.IFLYTEK) {
+                    Text("Create or select a WebAPI app and enable Voice Dictation (Streaming) to get its AppID, APIKey and APISecret.",
+                        style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { uri.openUri("https://console.xfyun.cn/services/iat") }) { Text("Get iFlytek credentials") }
                     OutlinedTextField(appId, { appId = it }, label = { Text("iFlytek AppID") },
                         enabled = !state.isSaving, modifier = Modifier.fillMaxWidth())
                     SpeechSecretField(key, { key = it }, "iFlytek APIKey", original.hasIFlytekApiKey, !state.isSaving)
                     SpeechSecretField(secret, { secret = it }, "iFlytek APISecret", original.hasIFlytekApiSecret, !state.isSaving)
-                    TextButton(onClick = { uri.openUri("https://www.xfyun.cn/services/voicedictation") }) { Text("Open iFlytek registration") }
                 }
                 if (provider == SpeechProvider.AZURE) {
                     OutlinedTextField(endpoint, { endpoint = it }, label = { Text("Azure Speech endpoint") },

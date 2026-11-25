@@ -1525,7 +1525,9 @@ private val ZH_UI_TEXT = mapOf(
     "iFlytek APIKey" to "讯飞 APIKey",
     "iFlytek APISecret" to "讯飞 APISecret",
     "Leave blank to keep the stored secret." to "留空以保留已保存的密钥。",
-    "Open iFlytek registration" to "打开讯飞注册页面",
+    "Get iFlytek credentials" to "获取讯飞凭据",
+    "Create or select a WebAPI app and enable Voice Dictation (Streaming) to get its AppID, APIKey and APISecret." to
+        "创建或选择 WebAPI 应用，开通「语音听写（流式版）」后，获取该应用的 AppID、APIKey 和 APISecret。",
     "Azure Speech endpoint" to "Azure Speech 端点",
     "Azure Speech key" to "Azure Speech 密钥",
     "Open Azure Speech setup" to "打开 Azure Speech 配置页面",

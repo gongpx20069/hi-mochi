@@ -74,6 +74,9 @@ also names that recommendation. Other providers start collapsed. ModelScope has 
 Token and model-library links, without binding/credit tutorials.
 Speech covers Android, iFlytek and Azure, including saving credentials before
 voice previews and explicitly selecting a saved speech account.
+Link iFlytek credential help directly to `https://console.xfyun.cn/services/iat`;
+explain the WebAPI app and Voice Dictation (Streaming) service prerequisites.
+AppID, APIKey and APISecret must come from the same selected application.
 The quick start separates LLM setup from an explicit optional speech-model step,
 with an on-page navigation link. Recommend iFlytek, retain Android speech without
 extra credentials, and link directly to provider setup and cloud voice selection.

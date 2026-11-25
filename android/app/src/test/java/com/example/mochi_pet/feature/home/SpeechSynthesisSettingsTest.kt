@@ -2,6 +2,9 @@ package com.example.mochi_pet.feature.home
 
 import android.app.Application
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnySibling
@@ -38,6 +41,7 @@ class SpeechSynthesisSettingsTest {
     val compose = createComposeRule()
     private val originalLocale = Locale.getDefault()
     private val saved = mutableListOf<SpeechSettingsInput>()
+    private val openedUrls = mutableListOf<String>()
 
     @Before
     fun setLanguage() {
@@ -78,6 +82,26 @@ class SpeechSynthesisSettingsTest {
     }
 
     @Test
+    fun `new iFlytek connection opens credential console without losing the app ID draft`() {
+        show(SpeechSettingsSummary(provider = SpeechProvider.IFLYTEK), newConnection = true)
+        compose.onNodeWithText("iFlytek AppID").performScrollTo().performTextReplacement("draft-app")
+        compose.onNodeWithText("Get iFlytek credentials").performScrollTo().performClick()
+        assertEquals(listOf("https://console.xfyun.cn/services/iat"), openedUrls)
+        compose.onNodeWithText("draft-app").assertExists()
+        assertTrue(saved.isEmpty())
+    }
+
+    @Test
+    fun `Chinese iFlytek editor provides the same credential link`() {
+        Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
+        show(SpeechSettingsSummary(provider = SpeechProvider.IFLYTEK, iFlytekAppId = "test-app"))
+        compose.onNodeWithText("获取讯飞凭据").performScrollTo().performClick()
+        assertEquals(listOf("https://console.xfyun.cn/services/iat"), openedUrls)
+        compose.onNodeWithText("test-app").assertExists()
+        assertTrue(saved.isEmpty())
+    }
+
+    @Test
     fun `saved Azure synthesis selection and voice are displayed`() {
         show(
             SpeechSettingsSummary(
@@ -99,16 +123,21 @@ class SpeechSynthesisSettingsTest {
         compose.onNodeWithText(text).performScrollTo()
     }
 
-    private fun show(summary: SpeechSettingsSummary) {
+    private fun show(summary: SpeechSettingsSummary, newConnection: Boolean = false) {
         compose.setContent {
             MaterialTheme {
-                SpeechConnectionDialog(
-                    profile = com.example.mochi_pet.core.settings.SpeechProfileSummary("test", "Test", summary),
-                    state = SpeechSettingsUiState(summary = summary, isLoading = false),
-                    catalog = SpeechVoiceUiState(), playback = com.example.mochi_pet.core.voice.VoiceRuntimeState(),
-                    onDismiss = {}, onSave = { saved += it.settings },
-                    onLoadVoices = { _, _ -> }, onPreview = { _, _, _ -> }, onStopPreview = {},
-                )
+                CompositionLocalProvider(LocalUriHandler provides object : UriHandler {
+                    override fun openUri(uri: String) { openedUrls += uri }
+                }) {
+                    SpeechConnectionDialog(
+                        profile = if (newConnection) null else
+                            com.example.mochi_pet.core.settings.SpeechProfileSummary("test", "Test", summary),
+                        state = SpeechSettingsUiState(summary = summary, isLoading = false),
+                        catalog = SpeechVoiceUiState(), playback = com.example.mochi_pet.core.voice.VoiceRuntimeState(),
+                        onDismiss = {}, onSave = { saved += it.settings },
+                        onLoadVoices = { _, _ -> }, onPreview = { _, _, _ -> }, onStopPreview = {},
+                    )
+                }
             }
         }
     }

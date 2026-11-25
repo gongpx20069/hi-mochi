@@ -588,6 +588,10 @@ need this permission. Browser and REST public-URL restrictions remain unchanged.
 Add speech connection button. Android is a built-in, nondeletable default card;
 iFlytek and Azure support multiple named accounts. Add/Edit opens a masked,
 screenshot-protected dialog. New accounts never inherit another account's keys.
+The iFlytek fields have a localized **Get iFlytek credentials** link to the
+[Voice Dictation console](https://console.xfyun.cn/services/iat), with a short
+hint to create/select a WebAPI application, enable Voice Dictation (Streaming),
+and copy that application's AppID, APIKey and APISecret.
 Blank secret fields preserve only the edited account. A changed Azure host
 requires a new key. Adding saves without activating; Use changes the selection.
 Active cloud connections cannot be deleted until another connection is selected.

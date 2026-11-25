@@ -29,7 +29,8 @@
    [注册或登录](https://modelscope.cn/) → [获取 Access Token](https://modelscope.cn/my/myaccesstoken) 并粘贴 →
    从下拉列表选择推荐模型；也可到[模型库](https://modelscope.cn/models)选择后自定义填写。
 
-   **语音模型：推荐讯飞。** 从[控制台](https://console.xfyun.cn/)获取 AppID、APIKey 和 APISecret，
+   **语音模型：推荐讯飞。** 在[语音听写控制台](https://console.xfyun.cn/services/iat)创建或选择 WebAPI 应用，
+   开通**语音听写（流式版）**后，获取该应用的 AppID、APIKey 和 APISecret，
    在**设置 > 语音与唤醒**中填写，保存并选用该账号；也可使用内置 Android 系统语音，无需额外密钥。
 3. **开始交流。** 打字或长按输入框说话，点击发送；
    切换到**陪伴**模式，叫一声 **“老莫老莫”** 即可语音交流。
@@ -78,7 +79,7 @@
 
 | 供应商 | 官方配置入口与文档 |
 | --- | --- |
-| **讯飞 · 推荐** | [控制台](https://console.xfyun.cn/) · [语音听写文档](https://www.xfyun.cn/doc/asr/voicedictation/API.html) |
+| **讯飞 · 推荐** | [获取凭据](https://console.xfyun.cn/services/iat) · [语音听写文档](https://www.xfyun.cn/doc/asr/voicedictation/API.html) |
 | Azure Speech | [创建资源](https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices) · [快速开始](https://learn.microsoft.com/azure/ai-services/speech-service/get-started-speech-to-text) |
 | Android 系统语音 | 内置，无需额外 API 密钥 |
 
