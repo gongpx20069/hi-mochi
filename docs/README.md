@@ -46,6 +46,11 @@ root [`README.md`](../README.md), including complete built-in Skills coverage
 across the core and optional-extension tables. Keep both README languages
 aligned: installation and essential configuration first, core features next,
 and optional Mi Home, AgentLink, Termux, and WebDAV integrations in a later section.
+READMEs are concise end-user introductions to current capabilities, not
+changelogs or detailed operating manuals. Group related Skills by user goal;
+keep paragraphs short and leave release history in GitHub Releases.
+The Chinese quick start recommends ModelScope and the English quick start
+recommends Groq for their free API allowances, without promising unlimited usage.
 
 The planned all-extension setup flows live in `INTERACTION_DESIGN.md`.
 [`android/extensions/README.md`](../android/extensions/README.md) contains their
