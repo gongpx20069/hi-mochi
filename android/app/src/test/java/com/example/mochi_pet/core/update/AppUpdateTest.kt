@@ -16,6 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import java.io.IOException
+import java.util.Locale
 import org.junit.Test
 
 class AppUpdateTest {
@@ -126,6 +127,65 @@ class AppUpdateTest {
     }
 
     @Test
+    fun `Chinese system locales use the verified CNB APK and release page`() = runBlocking {
+        val name = "Mochi-v9.0.0-arm64-v8a.apk"
+        for (languageTag in listOf("zh-CN", "zh-TW", "zh-HK", "zh-Hans-SG")) {
+            val requests = mutableListOf<String>()
+            val update = checkNotNull(clientFor(
+                release(listOf(asset(name), asset("Mochi-v9.0.0-universal.apk"))),
+                mirrorStatus = 200,
+                mirrorSize = 1024,
+            ) { requests += it }.check(listOf("arm64-v8a", "armeabi-v7a"), Locale.forLanguageTag(languageTag)))
+            assertEquals("$CNB_RELEASE_ROOT/v9.0.0/$name", update.apkUrl)
+            assertEquals("$CNB_RELEASE_PAGE_ROOT/v9.0.0", update.releaseUrl)
+            assertEquals(listOf(LATEST_RELEASE_API, update.apkUrl), requests)
+        }
+    }
+
+    @Test
+    fun `non Chinese systems keep GitHub downloads regardless of the app locale`() = runBlocking {
+        val previous = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
+            for (languageTag in listOf("en-US", "ja-JP", "fr-FR", "en-CN")) {
+                val requests = mutableListOf<String>()
+                val name = "Mochi-v9.0.0-universal.apk"
+                val update = checkNotNull(clientFor(release(listOf(asset(name)))) { requests += it }
+                    .check(listOf("x86"), Locale.forLanguageTag(languageTag)))
+                assertEquals(downloadUrl(name), update.apkUrl)
+                assertEquals("https://github.com/$UPDATE_RELEASE_REPOSITORY/releases/tag/v9.0.0", update.releaseUrl)
+                assertEquals(listOf(LATEST_RELEASE_API), requests)
+            }
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun `Chinese update waits for the same complete mirrored asset without falling back to GitHub`() = runBlocking {
+        val release = release(listOf(asset("Mochi-v9.0.0-universal.apk")))
+        for ((status, size) in listOf(404 to 0L, 500 to 1024L, 200 to 0L, 200 to 1023L)) {
+            assertNull(clientFor(release, mirrorStatus = status, mirrorSize = size)
+                .check(listOf("arm64-v8a"), Locale.CHINESE))
+        }
+        val update = checkNotNull(clientFor(release, mirrorStatus = 200, mirrorSize = 1024)
+            .check(listOf("arm64-v8a"), Locale.CHINESE))
+        assertEquals("$CNB_RELEASE_ROOT/v9.0.0/Mochi-v9.0.0-universal.apk", update.apkUrl)
+    }
+
+    @Test
+    fun `Chinese release page fallback requires a published mirrored checksum manifest`() = runBlocking {
+        assertNull(clientFor(release(emptyList())).check(listOf("x86"), Locale.CHINESE))
+        val update = checkNotNull(clientFor(
+            release(listOf(asset("Mochi-v9.0.0-SHA256SUMS.txt"))),
+            mirrorStatus = 200,
+            mirrorSize = 1024,
+        ).check(listOf("x86"), Locale.CHINESE))
+        assertNull(update.apkUrl)
+        assertEquals("$CNB_RELEASE_PAGE_ROOT/v9.0.0", update.releaseUrl)
+    }
+
+    @Test
     fun `update check targets current Hi Mochi repository`() {
         assertEquals("gongpx20069/hi-mochi", UPDATE_RELEASE_REPOSITORY)
         assertEquals(
@@ -166,7 +226,7 @@ class AppUpdateTest {
         }
 
     private fun checkAssets(assets: List<JsonObject>, abis: List<String>): AppUpdate = runBlocking {
-        checkNotNull(clientFor(release(assets)).check(abis))
+        checkNotNull(clientFor(release(assets)).check(abis, Locale.ENGLISH))
     }
 
     private fun release(assets: List<JsonObject>, tag: String = "v9.0.0", draft: Boolean = false, prerelease: Boolean = false) =
@@ -178,11 +238,18 @@ class AppUpdateTest {
             put("assets", JsonArray(assets))
         }
 
-    private fun clientFor(response: JsonElement, onRequest: (String) -> Unit = {}): AppUpdateClient {
+    private fun clientFor(
+        response: JsonElement,
+        mirrorStatus: Int = 404,
+        mirrorSize: Long = 0,
+        onRequest: (String) -> Unit = {},
+    ): AppUpdateClient {
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             onRequest(chain.request().url.toString())
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
-                .code(200).message("OK").body(response.toString().toResponseBody()).build()
+                .code(if (chain.request().method == "HEAD") mirrorStatus else 200)
+                .header("Content-Length", mirrorSize.toString())
+                .message("OK").body(response.toString().toResponseBody()).build()
         }.build()
         return AppUpdateClient(client)
     }

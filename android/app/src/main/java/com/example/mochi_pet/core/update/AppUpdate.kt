@@ -2,6 +2,7 @@ package com.example.mochi_pet.core.update
 
 import com.example.mochi_pet.BuildConfig
 import java.io.IOException
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,7 +33,7 @@ class AppUpdateClient(
         .build()
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun check(supportedAbis: List<String>): AppUpdate? = withContext(Dispatchers.IO) {
+    suspend fun check(supportedAbis: List<String>, systemLocale: Locale): AppUpdate? = withContext(Dispatchers.IO) {
         val release = try {
             json.decodeFromString<GitHubRelease>(fetch(LATEST_RELEASE_API))
         } catch (_: IOException) {
@@ -50,14 +51,23 @@ class AppUpdateClient(
         if (latest <= current) {
             return@withContext null
         }
-        val apkUrl = (supportedAbis + "universal").firstNotNullOfOrNull { abi ->
-            release.apkUrl(UPDATE_RELEASE_REPOSITORY, "Mochi-v$latest-$abi.apk")
+        val apk = (supportedAbis + "universal").firstNotNullOfOrNull { abi ->
+            release.publishedAsset(UPDATE_RELEASE_REPOSITORY, "Mochi-v$latest-$abi.apk")
+        }
+        val useCnb = systemLocale.language == Locale.CHINESE.language
+        val cnbRoot = "$CNB_RELEASE_ROOT/${release.tagName}"
+        if (useCnb) {
+            val mirrorAsset = apk ?: release.publishedAsset(
+                UPDATE_RELEASE_REPOSITORY,
+                "Mochi-v$latest-SHA256SUMS.txt",
+            ) ?: return@withContext null
+            if (!mirrorAvailable("$cnbRoot/${mirrorAsset.name}", mirrorAsset.size)) return@withContext null
         }
         AppUpdate(
             version = latest.toString(),
-            releaseUrl = release.htmlUrl,
+            releaseUrl = if (useCnb) "$CNB_RELEASE_PAGE_ROOT/${release.tagName}" else release.htmlUrl,
             notes = release.body.trim().take(MAX_NOTES_CHARS),
-            apkUrl = apkUrl,
+            apkUrl = apk?.let { if (useCnb) "$cnbRoot/${it.name}" else it.browserDownloadUrl },
         )
     }
 
@@ -84,8 +94,24 @@ class AppUpdateClient(
             ExtensionApk.WEBDAV -> "Mochi-WebDAV-Extension-v$version.apk"
             ExtensionApk.AGENTLINK -> "agentlink-$version.apk"
         }
-        val url = release.apkUrl(repository, name) ?: throw IOException("The extension APK is not available in this release.")
+        val url = release.publishedAsset(repository, name)?.browserDownloadUrl
+            ?: throw IOException("The extension APK is not available in this release.")
         ApkDownload(url, release.prerelease)
+    }
+
+    private fun mirrorAvailable(url: String, expectedSize: Long): Boolean {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "Mochi-Android/${BuildConfig.VERSION_NAME}")
+            .head()
+            .build()
+        return try {
+            client.newCall(request).execute().use { response ->
+                response.code == 200 && response.header("Content-Length")?.toLongOrNull() == expectedSize
+            }
+        } catch (_: IOException) {
+            false
+        }
     }
 
     private fun fetch(url: String): String {
@@ -142,11 +168,11 @@ private data class GitHubRelease(
     val prerelease: Boolean = false,
     val assets: List<GitHubReleaseAsset> = emptyList(),
 ) {
-    fun apkUrl(repository: String, name: String): String? {
+    fun publishedAsset(repository: String, name: String): GitHubReleaseAsset? {
         val expectedUrl = "https://github.com/$repository/releases/download/$tagName/$name"
         return assets.firstOrNull {
             it.name == name && it.state == "uploaded" && it.size > 0 && it.browserDownloadUrl == expectedUrl
-        }?.browserDownloadUrl
+        }
     }
 }
 
@@ -161,6 +187,8 @@ private data class GitHubReleaseAsset(
 
 internal const val UPDATE_RELEASE_REPOSITORY = "gongpx20069/hi-mochi"
 internal const val AGENTLINK_RELEASE_REPOSITORY = "gongpx20069/android-agent-link"
+internal const val CNB_RELEASE_ROOT = "https://cnb.cool/hi-mochi/hi-mochi/-/releases/download"
+internal const val CNB_RELEASE_PAGE_ROOT = "https://cnb.cool/hi-mochi/hi-mochi/-/releases/tag"
 internal const val LATEST_RELEASE_API =
     "https://api.github.com/repos/" +
         "$UPDATE_RELEASE_REPOSITORY/releases/latest"

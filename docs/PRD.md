@@ -634,6 +634,21 @@ Connection summaries are not proof of a successful device or Shell action.
 Remediation opens the relevant Settings, Tools, Skills or trusted setup flow.
 Raw Provider errors and secrets never enter the report, logs or exports.
 
+### 3.13 Application updates
+
+Automatic update checks use the canonical stable GitHub Release and select an
+APK by the device's supported ABI order, then the universal package. Download
+destinations follow the Android system language, not an in-app language override:
+Chinese (`zh`, including regional/script variants) uses the official CNB mirror;
+all other languages retain GitHub Releases.
+
+Chinese updates are offered only after the same-version CNB file responds
+successfully with the size recorded in the canonical release. Missing, incomplete
+or unreachable mirror files defer the prompt rather than linking to a missing
+APK or silently switching to GitHub. If no compatible APK exists, the CNB release
+page fallback requires its published checksum manifest to pass the same check.
+The browser downloads the APK and Android retains installation confirmation.
+
 ## 4. Local agent
 
 The agent uses:

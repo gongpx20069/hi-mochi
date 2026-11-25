@@ -65,4 +65,18 @@ class AppUpdateUiTest {
         compose.onNodeWithText("查看发布页面").assertIsDisplayed().performClick()
         assertEquals(release, opened)
     }
+
+    @Test fun `Chinese download action preserves the selected CNB file URL`() {
+        Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
+        val cnbApk = "https://cnb.cool/hi-mochi/hi-mochi/-/releases/download/v9.0.0/Mochi-v9.0.0-arm64-v8a.apk"
+        val cnbRelease = "https://cnb.cool/hi-mochi/hi-mochi/-/releases/tag/v9.0.0"
+        var opened: String? = null
+        compose.setContent {
+            MochiTheme {
+                AppUpdateDialog(AppUpdate("9.0.0", cnbRelease, "", cnbApk), {}, { opened = it })
+            }
+        }
+        compose.onNodeWithText(localizeUiText("Download APK")).performClick()
+        assertEquals(cnbApk, opened)
+    }
 }

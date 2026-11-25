@@ -11,6 +11,7 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
@@ -623,7 +624,10 @@ private fun MochiAppContent(
         }
     }
     LaunchedEffect(Unit) {
-        availableUpdate = application.appUpdateClient.check(android.os.Build.SUPPORTED_ABIS.toList())
+        availableUpdate = application.appUpdateClient.check(
+            android.os.Build.SUPPORTED_ABIS.toList(),
+            systemLocale = Resources.getSystem().configuration.locales[0],
+        )
     }
     LaunchedEffect(providerShareState.shareLink) {
         val shareLink = providerShareState.shareLink ?: return@LaunchedEffect

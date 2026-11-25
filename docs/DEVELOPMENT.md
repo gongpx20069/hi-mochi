@@ -714,7 +714,12 @@ authentication as above before relying on the API fallback.
 GitHub remains the canonical signed release publisher. The optional CNB mirror
 copies all five published app APKs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`,
 and `universal`), all three official extension APKs, and the original SHA-256
-manifest without rebuilding or resigning anything. App update URLs are unchanged.
+manifest without rebuilding or resigning anything. App update downloads use CNB
+for Chinese Android system locales and GitHub for other languages, independently
+of the in-app language override. GitHub remains the update metadata source;
+the app verifies the same-version CNB file's availability and size before showing
+a Chinese update prompt. Mirror API credentials are never required on the phone.
+See [Application updates](PRD.md#313-application-updates) for fallback behavior.
 
 Create a dedicated public repository at `https://cnb.cool/`. Configure GitHub
 **Settings > Secrets and variables > Actions**:
