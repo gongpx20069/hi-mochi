@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -21,13 +22,13 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun MochiEntryMark(modifier: Modifier = Modifier) {
-    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    val colors = MaterialTheme.colorScheme
     Column(
         modifier = modifier.clearAndSetSemantics {},
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Canvas(Modifier.size(width = 48.dp, height = 36.dp)) {
+        Canvas(Modifier.size(width = 60.dp, height = 45.dp)) {
             scale(size.width / 48f, size.height / 36f, pivot = Offset.Zero) {
                 val mark = Path().apply {
                     moveTo(7f, 29f)
@@ -38,15 +39,25 @@ internal fun MochiEntryMark(modifier: Modifier = Modifier) {
                     quadraticTo(41f, 6f, 41f, 9f)
                     lineTo(41f, 29f)
                 }
-                drawPath(mark, color, style = Stroke(1.6f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(
+                    mark,
+                    Brush.linearGradient(
+                        listOf(colors.primary, colors.secondary),
+                        start = Offset(7f, 7f),
+                        end = Offset(41f, 29f),
+                    ),
+                    style = Stroke(1.6f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
             }
         }
         Text(
             "Mochi",
-            color = color,
+            color = colors.secondary,
             style = MaterialTheme.typography.labelMedium,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,
-            letterSpacing = 2.sp,
+            letterSpacing = 2.5.sp,
         )
     }
 }
