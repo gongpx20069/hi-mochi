@@ -35,11 +35,38 @@
         <details class="wiki-disclosure" id="tasks" data-tasks-feature><summary>Tasks and scheduled work</summary>
           <p>Track scheduled runs, Termux jobs, and authorized AgentLink remote work in Tasks. Open results and stop supported work without mixing ordinary chats or foreground Subagents into the list.</p>
           <p>The optional signed Termux extension connects a separately installed Termux. Stopping an Agent does not stop work already submitted to Shell or a remote service.</p>
+          <figure class="app-walkthrough" data-app-illustration="tasks" data-app-version="v1.0.25">
+            <div class="app-shot" role="img" aria-label="Task center illustration with fictional tasks: one running scheduled briefing and one completed Termux job. Summary counts filter tasks; task cards open progress or output.">
+              <div aria-hidden="true">
+                <small class="app-shot-subtitle">MOCHI / CONTROL</small>
+                <strong class="app-shot-title">Task center</strong>
+                <div class="app-shot-heading"><span>Check setup</span><span>Close</span></div>
+                <div class="app-shot-card app-shot-overview"><strong>Mochi is on it <b class="app-shot-pin">1</b></strong><small>Your tasks are moving forward</small><div class="app-shot-metrics"><span><strong>1</strong>In progress</span><span><strong>0</strong>Needs attention</span><span><strong>1</strong>Finished</span></div></div>
+                <span class="app-shot-omitted">Activity filters and times omitted</span>
+                <div class="app-shot-card"><div class="app-shot-heading"><strong>Morning briefing</strong><span>+</span></div><small>Scheduled Agent</small><span class="app-shot-status">Running <b class="app-shot-pin">2</b></span><small>Tap to see progress</small></div>
+                <div class="app-shot-card"><div class="app-shot-heading"><strong>Shell task</strong><span>+</span></div><small>Termux</small><span class="app-shot-status is-finished">Completed <b class="app-shot-pin">3</b></span><small>Tap for output and controls</small></div>
+              </div>
+            </div>
+            <figcaption><strong>Follow work beyond the chat</strong><ol><li>Tap <strong>Tasks</strong> in the app header. The summary counts filter work that is running, needs attention or has ended.</li><li>Open a running card to inspect its progress and available controls. Calendar events live under <strong>Planner</strong>; ordinary foreground chat stays in Chat.</li><li>Open a finished job for its output or result entry. Check the actual result: an ended run does not by itself prove your goal was met.</li></ol><small>Mochi v1.0.25 · HTML/CSS illustration, not a screenshot. Fictional task names, counts and states, not live activity. Icons, filters, progress animation and timestamps are omitted.</small></figcaption>
+          </figure>
         </details>
         <details class="wiki-disclosure" id="browser" data-browser-feature><summary>Browser and web research</summary>
           <p>Read, navigate, click, input, and scroll on supported public HTTPS pages. Page reading keeps visible text and labeled statistics, such as likes and favorites, while identifying interactive controls separately.</p>
-          <p>Reuse valid logins inside Mochi. Take over the page for login or verification, then select Continue. Manage website data and saved accounts locally; passwords are not sent to the model. Compatibility varies: verification is not bypassed, and not every page detail can be read.</p>
+          <p>Reuse valid logins inside Mochi. Take over the page for login or verification, then select <strong>Return to Mochi</strong>. Manage website data and saved accounts locally; passwords are not sent to the model. Compatibility varies: verification is not bypassed, and not every page detail can be read.</p>
           <p>Enabled browser actions can run without per-action approval. Page content used by the Agent reaches your selected model provider.</p>
+          <figure class="app-walkthrough" data-app-illustration="browser" data-app-version="v1.0.25">
+            <div class="app-shot" role="img" aria-label="Manual browser illustration: Mochi Explore has a search field and Websites panel. A separate excerpt shows the Back, Forward, Home and Sites controls after opening a page.">
+              <div aria-hidden="true">
+                <div class="app-shot-heading"><span></span><span>Close</span></div>
+                <div class="app-shot-entry app-shot-browser-entry"><svg viewBox="0 0 48 36"><path d="M7 29V9Q7 6 9 8L24 23 39 8Q41 6 41 9V29"></path></svg><span>Mochi Explore</span><small>Search the web. Save accounts safely.</small></div>
+                <div class="app-shot-search"><span>Search Bing or enter a website <b class="app-shot-pin">1</b></span><span>Go</span></div>
+                <div class="app-shot-card"><div class="app-shot-heading"><strong>Websites <b class="app-shot-pin">2</b></strong><span>...</span></div><div class="app-shot-empty">Websites with saved accounts or local data appear here.</div></div>
+                <span class="app-shot-omitted">While viewing a page · bottom bar excerpt <b class="app-shot-pin">3</b></span>
+                <div class="app-shot-nav"><span><svg viewBox="0 0 24 24"><path d="m14 5-7 7 7 7"></path></svg></span><span><svg viewBox="0 0 24 24"><path d="m10 5 7 7-7 7"></path></svg></span><span><svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8M6 9v12h12V9"></path></svg>Home</span><span class="is-selected"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3v18"></path></svg>Sites</span></div>
+              </div>
+            </div>
+            <figcaption><strong>Browse yourself, or ask Mochi to research</strong><ol><li>Tap <strong>Browse</strong> above Chat or Companion to open this manual browser. Enter a search or website, then tap <strong>Go</strong>.</li><li><strong>Websites</strong> groups saved accounts and local website data. This example has none; passwords are never displayed here.</li><li>On a webpage, use Back/Forward, <strong>Home</strong> or <strong>Sites</strong>. Home keeps your page; <strong>Return to page</strong> appears while that session exists. Close ends manual browsing.</li></ol><p>Asking the Agent to read a webpage is a separate flow, not a command that automatically opens this manual view.</p><small>Mochi v1.0.25 · HTML/CSS illustration, not a screenshot. Two separate views combined; webpage content is omitted. No real account data.</small></figcaption>
+          </figure>
         </details>
         <details class="wiki-disclosure" id="memory" data-memory-feature><summary>Daily journal and memory recall</summary>
           <ul><li>Recent turns and relevant older messages provide conversation context automatically.</li><li>Optional daily journals distill meaningful events from conversations, schedules, and Mochi task results.</li><li>Memory Recall uses journals to find candidate dates, then searches and reads original conversation turns for detail.</li></ul>
@@ -63,6 +90,19 @@
         </details>
         <details class="wiki-disclosure" id="skills" data-skills-feature><summary>Community Skills</summary>
           <p>Browse, search, and install community Skills from the built-in skills.sh market. Skills guide Mochi through tasks; enabling one does not automatically enable its Tools. Check dependencies and grant only the access you need.</p>
+          <figure class="app-walkthrough" data-app-illustration="skills" data-app-version="v1.0.25">
+            <div class="app-shot" role="img" aria-label="Skill dependency illustration: the built-in Browser skill is enabled but suspended because browser_read is disabled. Tools has a separate Agent Browser switch and an individual Read Page switch.">
+              <div aria-hidden="true">
+                <strong class="app-shot-title">Skills</strong><small class="app-shot-subtitle">Built-in and installed capabilities</small>
+                <div class="app-shot-tabs"><span class="is-selected">Installed</span><span>Explore</span></div>
+                <div class="app-shot-card"><div class="app-shot-toggle"><span><strong>Browser <b class="app-shot-pin">1</b></strong><small class="app-shot-subtitle">Built-in · Suspended</small></span><span class="app-shot-switch is-on"></span></div><small>Description omitted</small><span class="app-shot-warning">Enable required Tool groups first: browser_read</span><span class="app-shot-link">View</span></div>
+                <span class="app-shot-omitted">Switch to Tools · browser group excerpt</span>
+                <strong class="app-shot-title">Tools</strong><small class="app-shot-subtitle">Choose what Mochi may call</small>
+                <div class="app-shot-card"><div class="app-shot-toggle"><strong>Agent Browser <b class="app-shot-pin">2</b></strong><span class="app-shot-switch is-on"></span></div><span class="app-shot-link">Websites and logins</span><span class="app-shot-link">Hide tools (5)</span><div class="app-shot-toggle"><span><strong>Read Page <b class="app-shot-pin">3</b></strong><small class="app-shot-subtitle">browser_read</small></span><span class="app-shot-switch"></span></div><small>Other tools and descriptions omitted</small></div>
+              </div>
+            </div>
+            <figcaption><strong>A Skill is a workflow, not permission</strong><ol><li>Open <strong>Skills → Installed</strong> to check dependencies. This built-in Browser example is enabled but suspended because <code>browser_read</code> is off.</li><li>Go to <strong>Tools</strong>. The provider switch and its individual tools are separate controls; the provider is already on in this example.</li><li>Expand its tools and decide whether to enable <strong>Read Page</strong>. Check every required dependency; do not enable unrelated tools just to remove a warning.</li></ol><p>The same permission boundary applies to community Skills. Enabling browser actions allows calls without per-action approval; page content used by the Agent reaches your model.</p><small>Mochi v1.0.25 · HTML/CSS illustration, not a screenshot. Two page excerpts and a deliberately disabled tool, not your actual settings. Supporting text is shortened.</small></figcaption>
+          </figure>
         </details>
         <details class="wiki-disclosure" id="api" data-api-feature><summary>Connect REST APIs and MCP services</summary>
           <p>Use Tools → Add tool to connect a REST API or MCP service. For REST APIs, configure requests, authentication, and returned fields. Preview stays offline; a real API test asks first.</p>

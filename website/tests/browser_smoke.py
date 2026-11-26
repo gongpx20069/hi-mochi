@@ -134,6 +134,7 @@ def main() -> None:
                         assert page.locator("#download-options [data-release-download]").count() == 5
                         assert page.locator("#install > p > [data-release-download]").is_visible()
                     if is_home:
+                        check_app_illustrations(page, ["companion"])
                         assert page.locator("#install, #wiki, #download-options").count() == 0
                         assert page.locator(".home-cards > a").count() == 6
                         preview = page.locator("[data-extension-card='webdav']")
@@ -240,6 +241,14 @@ def main() -> None:
                             return errors;
                         }""")
                         assert not layout_errors, (language, mode, width, layout_errors)
+                        if is_home:
+                            check_illustration_layout(page, (language, mode, width))
+                            if options.screenshots and mode == "unavailable" and width in (390, 1280):
+                                label = "zh-CN-home" if language else "home"
+                                capture_illustrations(page, options.screenshots, label, width)
+                                page.locator(".hero").screenshot(
+                                    path=str(options.screenshots / f"{label}-hero-{width}.png"),
+                                )
                         if is_download:
                             check_mochi_navigation(page, language.startswith("zh-CN/"))
                         if width < 760 and not is_download:
@@ -318,6 +327,10 @@ def main() -> None:
                         assert disclosure.evaluate("(item) => item.open")
                         assert disclosure.locator("p, ol").first.is_visible()
                     if "wiki/" not in language:
+                        check_app_illustrations(page, ["companion"])
+                        for width in (320, 390, 768, 1024, 1280, 1440):
+                            page.set_viewport_size({"width": width, "height": 900})
+                            check_illustration_layout(page, (language, "no JavaScript", width))
                         assert page.locator("[data-extension-download='webdav']").get_attribute("href") == (
                             f"{release_root}download/{fallback}/Mochi-WebDAV-Extension-{fallback}.apk"
                         )
@@ -380,6 +393,62 @@ def check_mochi_navigation(page, chinese: bool) -> None:
     assert star.evaluate("item => document.activeElement === item")
 
 
+def check_app_illustrations(page, expected: list[str]) -> None:
+    chinese = page.locator("html").get_attribute("lang") == "zh-CN"
+    figures = page.locator("[data-app-illustration]")
+    assert figures.evaluate_all(
+        "figures => figures.map(figure => figure.dataset.appIllustration)"
+    ) == expected
+    for figure in figures.all():
+        panel = figure.locator(".app-shot[role='img']")
+        assert panel.count() == 1 and panel.is_visible()
+        assert panel.get_attribute("aria-label")
+        assert panel.locator(":scope > [aria-hidden='true']").count() == 1
+        assert panel.locator(
+            "a, button, input, select, textarea, [tabindex], [contenteditable], [role='button']"
+        ).count() == 0, "Illustrations must not accept input or act as app controls"
+        assert panel.locator("img").evaluate_all(
+            "images => images.every(image => image.complete && image.naturalWidth > 0)"
+        )
+        caption = figure.locator("figcaption")
+        is_companion = figure.get_attribute("data-app-illustration") == "companion"
+        assert panel.locator(".app-shot-pin").all_text_contents() == (
+            [] if is_companion else ["1", "2", "3"]
+        )
+        assert caption.locator("ol > li").count() == (0 if is_companion else 3)
+        assert figure.get_attribute("data-app-version") in caption.inner_text()
+        assert ("非真实截图" if chinese else "not a screenshot") in caption.inner_text()
+
+
+def check_illustration_layout(page, context: tuple) -> None:
+    for figure in page.locator("[data-app-illustration]").all():
+        # Nested grids can finish reflowing after the outer page fits a resized viewport.
+        for _ in range(20):
+            fits = figure.locator(".app-shot, .app-shot *").evaluate_all("""items =>
+                items.every(item => {
+                    const box = item.getBoundingClientRect();
+                    return box.left >= 0 && box.right <= innerWidth + 1 &&
+                        (getComputedStyle(item).display === 'inline' ||
+                         item.scrollWidth <= item.clientWidth + 1);
+                })
+            """)
+            if fits:
+                break
+            page.wait_for_timeout(50)
+        assert fits, (*context, "clipped illustration")
+
+
+def capture_illustrations(page, directory: Path, label: str, width: int) -> None:
+    for figure in page.locator("[data-app-illustration]").all():
+        kind = figure.get_attribute("data-app-illustration")
+        figure.screenshot(
+            path=str(directory / f"{label}-{kind}-{width}.png"),
+            style=".site-header, .skip-link { visibility: hidden !important; }",
+        )
+        for link in page.locator("[data-nav] a").all():
+            link.wait_for(state="visible")
+
+
 def check_wiki(browser, port: int, screenshots: Path | None) -> None:
     base = f"http://127.0.0.1:{port}/hi-mochi/"
     for locale in ("", "zh-CN/"):
@@ -406,6 +475,11 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                         page.set_viewport_size({"width": width, "height": 900})
                         label = (locale + "wiki-capabilities").replace("/", "-")
                         page.screenshot(path=str(screenshots / f"{label}-overview-{width}.png"), full_page=True)
+                if guide == "capabilities/":
+                    figures = page.locator("[data-app-illustration]")
+                    assert figures.count() == 3
+                    assert all(not figure.is_visible() for figure in figures.all())
+                    assert page.locator("details > [data-app-illustration]").count() == 3
                 if guide == "models/":
                     preferred = "modelscope" if locale else "groq"
                     assert page.locator(".wiki-article > .wiki-section").first.get_attribute("id") == preferred
@@ -438,24 +512,9 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                 expected_illustrations = {
                     "quick-start/": ["chat"], "models/": ["model"],
                     "speech/": ["speech", "voice"],
+                    "capabilities/": ["tasks", "browser", "skills"],
                 }.get(guide, [])
-                walkthroughs = page.locator("[data-app-illustration]")
-                assert walkthroughs.evaluate_all(
-                    "figures => figures.map(figure => figure.dataset.appIllustration)"
-                ) == expected_illustrations
-                for figure in walkthroughs.all():
-                    panel = figure.locator(".app-shot[role='img']")
-                    assert panel.count() == 1 and panel.is_visible()
-                    assert panel.get_attribute("aria-label")
-                    assert panel.locator(":scope > [aria-hidden='true']").count() == 1
-                    assert panel.locator(
-                        "a, button, input, select, textarea, [tabindex], [contenteditable], [role='button']"
-                    ).count() == 0, "Illustrations must not accept input or act as app controls"
-                    assert panel.locator(".app-shot-pin").all_text_contents() == ["1", "2", "3"]
-                    caption = figure.locator("figcaption")
-                    assert caption.locator("ol > li").count() == 3
-                    assert figure.get_attribute("data-app-version") in caption.inner_text()
-                    assert ("非真实截图" if locale else "not a screenshot") in caption.inner_text()
+                check_app_illustrations(page, expected_illustrations)
                 for width in (320, 390, 768, 1024, 1280, 1440):
                     page.set_viewport_size({"width": width, "height": 900})
                     # Poll from Python: page animation/timer callbacks do not run with JavaScript disabled.
@@ -470,24 +529,10 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                         page.wait_for_timeout(50)
                     assert fits_viewport, (route, javascript, width)
                     assert fits_text, (route, javascript, width, "clipped text")
-                    for figure in walkthroughs.all():
-                        assert figure.locator(".app-shot, .app-shot *").evaluate_all("""items =>
-                            items.every(item => {
-                                const box = item.getBoundingClientRect();
-                                return box.left >= 0 && box.right <= innerWidth + 1 &&
-                                    (getComputedStyle(item).display === 'inline' ||
-                                     item.scrollWidth <= item.clientWidth + 1);
-                            })
-                        """), (route, javascript, width, "clipped illustration")
-                        if screenshots and javascript and width in (390, 1280):
-                            label = (locale + "wiki-" + guide).strip("/").replace("/", "-")
-                            kind = figure.get_attribute("data-app-illustration")
-                            figure.screenshot(
-                                path=str(screenshots / f"{label}-{kind}-{width}.png"),
-                                style=".site-header, .skip-link { visibility: hidden !important; }",
-                            )
-                            for link in page.locator("[data-nav] a").all():
-                                link.wait_for(state="visible")
+                    check_illustration_layout(page, (route, javascript, width))
+                    if screenshots and javascript and width in (390, 1280):
+                        label = (locale + "wiki-" + guide).strip("/").replace("/", "-")
+                        capture_illustrations(page, screenshots, label, width)
                     check_mochi_navigation(page, bool(locale))
                     if guide:
                         assert page.locator(".wiki-sidebar").evaluate("""(sidebar) => {

@@ -57,6 +57,10 @@ Both homepages are concise product introductions: a hero, six linked capability
 cards, four optional extension cards and a brief privacy note. Cards lead to
 the relevant Wiki page or section. Do not duplicate setup steps or the Wiki
 directory on the homepage. They do not contain the operating manual or release history. The
+hero shows a versioned Companion interface illustration, using the released
+character rather than the old floating mascot/chat-bubble composition. Keep its
+wake-state caption explicit about foreground visibility and an unlocked screen;
+it is a static preview, not live microphone activity.
 English quick start recommends Groq's free API tier; Chinese recommends
 ModelScope's free API allowance, without promising unlimited service.
 
@@ -90,7 +94,9 @@ It also contains permission, update and configuration-check recovery.
 All four guides share the same `wiki-frame`, `wiki-sidebar`, `wiki-article`,
 `wiki-section` and `wiki-disclosure` layout. Skills and extensions use a
 single-column reference with collapsed capability/setup entries, not homepage
-feature cards, illustrations or reveal animations. Preserve existing topic
+feature cards or reveal animations. Browser, task-center and Skill/Tool
+illustrations live inside their corresponding native disclosures, hidden until
+expanded, rather than forming an always-visible gallery. Preserve existing topic
 anchors so homepage links open the relevant disclosure directly.
 Quick start provides a direct recommended APK download and a disclosure
 for all five architectures, not a link back to a homepage card. Its checked-in
@@ -98,16 +104,18 @@ release bundle must match the homepage in both languages.
 
 ### App interface illustrations
 
-Quick start, model setup and speech setup include static HTML/CSS illustrations
-in `figure.app-walkthrough`, styled by the shared stylesheet. They show the Chat
-entry, a provider form and saved connection, iFlytek credentials, and the saved
-voice editor. English uses Groq; Chinese uses ModelScope. Keep the capabilities
-reference text-only.
+Quick start, model setup, speech setup and selected capability disclosures include
+static HTML/CSS illustrations in `figure.app-walkthrough`, styled by the shared
+stylesheet. They show the Chat entry, a provider form and saved connection,
+iFlytek credentials, the saved voice editor, manual browsing, task status/result
+entries, and Skill dependencies versus Tool permissions. English uses Groq;
+Chinese uses ModelScope. Each homepage also has a `figure.home-app-preview`
+showing Companion, without a numbered setup tutorial.
 
 The source baseline is **v1.0.25**, commit `3b26af0`. Each figure has
 `data-app-illustration` and `data-app-version`; its visible caption identifies
 the version, the image as an illustration rather than a screenshot, and any
-omitted content. Numbered highlights correspond to three real instructions.
+omitted content. Wiki numbered highlights correspond to three real instructions.
 The rendered panel has `role="img"` and a localized `aria-label`; its decorative
 children are hidden from assistive technology, while the caption remains normal
 readable text. Use spans, not fake form controls or focusable buttons. Never
@@ -120,11 +128,24 @@ Android source references (all under
 | Illustration | Source reference |
 | --- | --- |
 | Chat entry and mode switch | `MochiApp.kt`, `ConversationEntryLayout.kt`, `MochiEntryMark.kt` |
+| Companion and idle character | `CompanionFace.kt`, `MochiApp.kt` |
 | Model form and saved/active distinction | `ProviderConnectionsSection.kt` |
 | Speech credentials, synthesis toggle and voice selection | `SpeechConnectionsSection.kt`, `SpeechVoicePicker.kt` |
+| Browser management and page controls | `BrowserCredentialUi.kt`, `BrowserExperience.kt` |
+| Task overview, cards and states | `TaskCenterUi.kt`, `TaskDashboard.kt` |
+| Skill dependency warning and separate Tool switches | `MochiApp.kt`; definitions in `core/skills/Skills.kt` and `core/tools/ToolCatalog.kt` |
 | Localized labels | `UiLocalization.kt` |
 
 Colors follow `android/extension-ui/src/main/java/com/example/mochi_ui/MochiTheme.kt`.
+The original local `assets/mochi-companion-idle.svg` translates the released
+`CompanionCharacter` idle paths and colors; it is decorative inside the labeled
+Companion illustration. Keep it static and bundled, with no external image loads.
+Capability figures use fictional task names/counts and synthetic settings. Label
+combined page excerpts clearly; never imply that the browser home and webpage
+controls are simultaneously one screen. Distinguish manual browsing from Agent
+browsing, ordinary chat from task-center work, and an ended run from a verified
+outcome. The Browser Skill example has `browser_read` off while the provider and
+other required tools are on; its suspended state is intentional, not a bug.
 These are maintenance references only: the website must not read Kotlin, depend
 on an Android build, or require JavaScript to display the figures. Preserve field
 order, conditional fields, Save versus Use behavior, and foreground-only wake
@@ -327,10 +348,12 @@ setup, all five loaded local logos, reading order, image-input visibility,
 language switching, and desktop navigation bounds.
 Use `--screenshots <directory>` to save AgentLink hero, agent, and feature-section images
 at each tested width for visual review; keep generated images out of the site.
-The same option saves all eight localized app walkthrough figures at 390 and
-1280 pixels. Browser checks exercise them with and without JavaScript, verify
+The same option saves all sixteen localized app figures at 390 and 1280 pixels,
+plus both homepage heroes. Browser checks exercise them with and without JavaScript, verify
 accessible descriptions and numbered instructions, reject interactive controls
 inside the simulated UI, and check that figure text fits at all six widths.
+Capability figures must be hidden in the default collapsed view and remain
+available through keyboard-operated disclosures without JavaScript.
 
 ## Deployment
 

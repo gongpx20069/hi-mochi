@@ -35,11 +35,38 @@
         <details class="wiki-disclosure" id="tasks" data-tasks-feature><summary>任务中心与定时工作</summary>
           <p>在任务中心查看定时执行、Termux 工作和已授权的 AgentLink 远端任务，打开结果或停止支持取消的工作。普通聊天及其前台 Subagent 留在对话中，不挤进任务列表。</p>
           <p>可选的 Mochi 签名 Termux 扩展需要另行安装 Termux。停止 Agent 不会自动停止已经提交的 Shell 或远端工作。</p>
+          <figure class="app-walkthrough" data-app-illustration="tasks" data-app-version="v1.0.25">
+            <div class="app-shot" role="img" aria-label="任务中心示意，使用虚构任务：一个执行中的定时简报和一个已完成的 Termux 工作。概览数字用于筛选，任务卡片打开进展或输出。">
+              <div aria-hidden="true">
+                <small class="app-shot-subtitle">MOCHI / 控制台</small>
+                <strong class="app-shot-title">任务中心</strong>
+                <div class="app-shot-heading"><span>自检</span><span>关闭</span></div>
+                <div class="app-shot-card app-shot-overview"><strong>Mochi 正在忙 <b class="app-shot-pin">1</b></strong><small>任务正在推进，稍后回来看看</small><div class="app-shot-metrics"><span><strong>1</strong>进行中</span><span><strong>0</strong>需要处理</span><span><strong>1</strong>已结束</span></div></div>
+                <span class="app-shot-omitted">此处省略任务筛选栏与时间</span>
+                <div class="app-shot-card"><div class="app-shot-heading"><strong>每日早间简报</strong><span>+</span></div><small>Scheduled Agent</small><span class="app-shot-status">执行中 <b class="app-shot-pin">2</b></span><small>轻点查看进展与操作</small></div>
+                <div class="app-shot-card"><div class="app-shot-heading"><strong>Shell 任务</strong><span>+</span></div><small>Termux</small><span class="app-shot-status is-finished">已完成 <b class="app-shot-pin">3</b></span><small>轻点查看输出与控制</small></div>
+              </div>
+            </div>
+            <figcaption><strong>不必留在聊天里等结果</strong><ol><li>点击 App 顶部的<strong>任务</strong>。概览数字可筛选进行中、需要处理或已结束的工作。</li><li>打开执行中的卡片，查看进展及可用操作。日历事件在<strong>日程</strong>页管理；普通前台聊天仍留在对话中。</li><li>打开已结束的工作，查看输出或结果入口。还要核对实际结果：运行结束本身不代表你的目标已经达成。</li></ol><small>Mochi v1.0.25 · HTML/CSS 界面示意，非真实截图。任务名、数字和状态均为虚构示例，并非实时活动；省略图标、筛选栏、进度动画及时间。</small></figcaption>
+          </figure>
         </details>
         <details class="wiki-disclosure" id="browser" data-browser-feature><summary>浏览器与网页研究</summary>
           <p>在支持的公开 HTTPS 网页上阅读、导航、点击、输入和滚动。页面读取保留可见正文以及点赞、收藏等统计的标签与数值；可操作控件单独识别。</p>
-          <p>复用 Mochi 内的有效网站登录。需要登录或验证时，由你接管网页，完成后点击“继续”；网站与登录管理可保存账号、管理网站数据。密码留在本机，不发送给模型。网站兼容性有差异，不绕过验证码，也不保证所有页面信息都可读取。</p>
+          <p>复用 Mochi 内的有效网站登录。需要登录或验证时，由你接管网页，完成后点击<strong>交还 Mochi</strong>；网站与登录管理可保存账号、管理网站数据。密码留在本机，不发送给模型。网站兼容性有差异，不绕过验证码，也不保证所有页面信息都可读取。</p>
           <p>已开启的浏览器操作可不经逐次审批执行。供 Agent 使用的页面内容会发送给你选择的模型服务。</p>
+          <figure class="app-walkthrough" data-app-illustration="browser" data-app-version="v1.0.25">
+            <div class="app-shot" role="img" aria-label="手动浏览器示意：Mochi Explore 中有搜索框和网站面板。另一个局部展示打开网页后的返回、前进、主页与网站操作栏。">
+              <div aria-hidden="true">
+                <div class="app-shot-heading"><span></span><span>关闭</span></div>
+                <div class="app-shot-entry app-shot-browser-entry"><svg viewBox="0 0 48 36"><path d="M7 29V9Q7 6 9 8L24 23 39 8Q41 6 41 9V29"></path></svg><span>Mochi Explore</span><small>搜索网页，安全保存账号。</small></div>
+                <div class="app-shot-search"><span>搜索 Bing 或输入网址 <b class="app-shot-pin">1</b></span><span>搜索</span></div>
+                <div class="app-shot-card"><div class="app-shot-heading"><strong>网站 <b class="app-shot-pin">2</b></strong><span>...</span></div><div class="app-shot-empty">有保存账号或本地数据的网站会显示在这里。</div></div>
+                <span class="app-shot-omitted">打开网页之后 · 底部操作栏局部 <b class="app-shot-pin">3</b></span>
+                <div class="app-shot-nav"><span><svg viewBox="0 0 24 24"><path d="m14 5-7 7 7 7"></path></svg></span><span><svg viewBox="0 0 24 24"><path d="m10 5 7 7-7 7"></path></svg></span><span><svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8M6 9v12h12V9"></path></svg>主页</span><span class="is-selected"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3v18"></path></svg>网站</span></div>
+              </div>
+            </div>
+            <figcaption><strong>自己浏览，和请老莫研究，是两种用法</strong><ol><li>点击对话或陪伴页面上方的<strong>浏览</strong>，打开手动浏览器。输入搜索词或网址，再点<strong>搜索</strong>。</li><li><strong>网站</strong>集中展示已保存账号与本地网站数据。此例尚无记录；不会在这里明文展示密码。</li><li>网页底部有返回、前进、<strong>主页</strong>和<strong>网站</strong>。回主页会保留当前网页，有会话时可点<strong>返回网页</strong>继续；关闭则结束手动浏览。</li></ol><p>在聊天里让 Agent 阅读网页是另一条流程，不等于自动打开这个手动浏览界面。</p><small>Mochi v1.0.25 · HTML/CSS 界面示意，非真实截图。组合展示两个不同视图，省略网页内容，不包含真实账号数据。</small></figcaption>
+          </figure>
         </details>
         <details class="wiki-disclosure" id="memory" data-memory-feature><summary>每日小记与回忆检索</summary>
           <ul><li>近期对话与相关旧消息自动进入上下文，让交流保持连贯。</li><li>可选的每日小记，从对话、日程和 Mochi 任务结果中提炼有意义的事件。</li><li>回忆检索先从简短小记定位候选日期，再按需搜索、读取原始对话。</li></ul>
@@ -63,6 +90,19 @@
         </details>
         <details class="wiki-disclosure" id="skills" data-skills-feature><summary>社区技能</summary>
           <p>从内置 skills.sh 市场浏览、搜索和安装社区技能，让 Mochi 按流程处理你关心的任务。启用技能不会自动打开它依赖的工具；先检查依赖，再决定授权。</p>
+          <figure class="app-walkthrough" data-app-illustration="skills" data-app-version="v1.0.25">
+            <div class="app-shot" role="img" aria-label="技能依赖示意：内置网页浏览技能已开启，但 browser_read 关闭，因此暂不可用。工具页另有智能体浏览器总开关和 Read Page 单项开关。">
+              <div aria-hidden="true">
+                <strong class="app-shot-title">技能</strong><small class="app-shot-subtitle">内置及已安装能力</small>
+                <div class="app-shot-tabs"><span class="is-selected">已安装</span><span>探索</span></div>
+                <div class="app-shot-card"><div class="app-shot-toggle"><span><strong>网页浏览 <b class="app-shot-pin">1</b></strong><small class="app-shot-subtitle">内置 · 暂不可用</small></span><span class="app-shot-switch is-on"></span></div><small>此处省略技能描述</small><span class="app-shot-warning">请先启用所需的工具组：browser_read</span><span class="app-shot-link">查看</span></div>
+                <span class="app-shot-omitted">切换到工具页 · 浏览器分组局部</span>
+                <strong class="app-shot-title">工具</strong><small class="app-shot-subtitle">选择 Mochi 可以调用的工具</small>
+                <div class="app-shot-card"><div class="app-shot-toggle"><strong>智能体浏览器 <b class="app-shot-pin">2</b></strong><span class="app-shot-switch is-on"></span></div><span class="app-shot-link">网站与登录管理</span><span class="app-shot-link">收起工具 (5)</span><div class="app-shot-toggle"><span><strong>Read Page <b class="app-shot-pin">3</b></strong><small class="app-shot-subtitle">browser_read</small></span><span class="app-shot-switch"></span></div><small>此处省略其他工具与描述</small></div>
+              </div>
+            </div>
+            <figcaption><strong>技能是做事的方法，不是权限</strong><ol><li>进入<strong>技能 → 已安装</strong>查看依赖。图中以内置网页浏览为例：技能已开启，但 <code>browser_read</code> 关闭，所以暂不可用。</li><li>进入<strong>工具</strong>页。服务商总开关和每个工具的开关相互独立；图中的浏览器总开关已开启。</li><li>展开工具，决定是否启用 <strong>Read Page</strong>（读取网页）。逐项核对必需依赖，不要为了消除提示就打开无关权限。</li></ol><p>社区技能也遵循相同的授权边界。开启后的浏览器操作不逐次审批，交给 Agent 使用的页面内容会发送给模型。</p><small>Mochi v1.0.25 · HTML/CSS 界面示意，非真实截图。组合展示两个页面局部及故意关闭的工具，并非你的实际设置；辅助文字已精简。</small></figcaption>
+          </figure>
         </details>
         <details class="wiki-disclosure" id="api" data-api-feature><summary>连接 REST API 与 MCP 服务</summary>
           <p>从“工具 → 添加工具”连接 REST API 或 MCP 服务。REST API 可配置请求、鉴权与需要的返回字段；预览不联网，真实测试前会询问。</p>
