@@ -984,15 +984,13 @@ private fun MochiAppContent(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
                         ) {
-                            OutlinedButton(
+                            FullscreenToggleButton(
+                                fullscreen = true,
                                 onClick = {
                                     focusStandby = false
                                     viewModel.setFocusMode(false)
                                 },
-                                shape = RoundedCornerShape(18.dp),
-                            ) {
-                                Text("Exit full screen")
-                            }
+                            )
                         }
                         ChatPipelineIndicator(state = visiblePipelineState)
                         TextButton({ taskCenter.open() }) { Text("Task center") }
@@ -1034,7 +1032,9 @@ private fun MochiAppContent(
                         onSetChatMuted = viewModel::setChatMuted,
                     )
                 }
-                ChatPipelineIndicator(state = visiblePipelineState)
+                if (!companionFaceVisible) {
+                    ChatPipelineIndicator(state = visiblePipelineState)
+                }
                 if (surface == MochiSurface.Settings) {
                     TextButton({ taskCenter.open(diagnostics = true) }) { Text("Configuration check") }
                 }
@@ -1054,6 +1054,10 @@ private fun MochiAppContent(
                             onStop = viewModel::cancelConversation,
                             modifier = Modifier.fillMaxSize(),
                         )
+                    } else if (companionFaceVisible) {
+                        CompanionPipelineOverlay(visiblePipelineState) {
+                            renderSurface(Modifier.fillMaxSize())
+                        }
                     } else {
                         renderSurface(
                             if (homePresentation) {
@@ -1302,64 +1306,69 @@ internal fun ChatPipelineIndicator(state: ChatPipelineUiState) {
         enter = fadeIn(tween(220)) + expandVertically(tween(260)),
         exit = fadeOut(tween(160)) + shrinkVertically(tween(220)),
     ) {
-        val accent by animateColorAsState(
-            targetValue = state.stage.accentColor(),
-            animationSpec = tween(320),
-            label = "pipeline-accent",
-        )
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("chat-pipeline")
-                .semantics {
-                    contentDescription =
-                        "${localizeUiText(state.stage.displayText())}. " +
-                        localizeUiText(state.stage.supportingText())
-                },
-            color = Color(0xFF211C28),
-            shape = RoundedCornerShape(16.dp),
+        PipelineCard(state)
+    }
+}
+
+@Composable
+private fun PipelineCard(state: ChatPipelineUiState) {
+    val accent by animateColorAsState(
+        targetValue = state.stage.accentColor(),
+        animationSpec = tween(320),
+        label = "pipeline-accent",
+    )
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("chat-pipeline")
+            .semantics {
+                contentDescription =
+                    "${localizeUiText(state.stage.displayText())}. " +
+                    localizeUiText(state.stage.supportingText())
+            },
+        color = Color(0xFF211C28),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    PipelinePulse(accent = accent)
-                    Column(modifier = Modifier.weight(1f)) {
+                PipelinePulse(accent = accent)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = state.stage.displayText(),
+                        color = Color(0xFFF8F2FA),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    val detail = state.detail
+                        ?.take(120)
+                        ?.takeIf(String::isNotBlank)
+                    if (detail == null) {
                         Text(
-                            text = state.stage.displayText(),
-                            color = Color(0xFFF8F2FA),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
+                            text = state.stage.supportingText(),
+                            color = Color(0xFFBDB3C2),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
                         )
-                        val detail = state.detail
-                            ?.take(120)
-                            ?.takeIf(String::isNotBlank)
-                        if (detail == null) {
-                            Text(
-                                text = state.stage.supportingText(),
-                                color = Color(0xFFBDB3C2),
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2,
-                            )
-                        } else {
-                            MaterialText(
-                                text = detail,
-                                color = Color(0xFFBDB3C2),
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2,
-                            )
-                        }
+                    } else {
+                        MaterialText(
+                            text = detail,
+                            color = Color(0xFFBDB3C2),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                        )
                     }
                 }
-                PipelineTrack(
-                    stage = state.stage,
-                    accent = accent,
-                )
             }
+            PipelineTrack(
+                stage = state.stage,
+                accent = accent,
+            )
         }
     }
 }

@@ -30,9 +30,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -47,7 +44,6 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -71,21 +67,34 @@ internal fun CompanionFocusFrame(
     onExit: () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.CenterEnd) {
+            FullscreenToggleButton(
+                fullscreen = true,
+                onClick = onExit,
+                modifier = Modifier.testTag("companion-exit-fullscreen"),
+            )
+        }
+        Box(Modifier.weight(1f)) {
+            CompanionPipelineOverlay(pipelineState, content = content)
+        }
+    }
+}
+
+@Composable
+internal fun CompanionPipelineOverlay(
+    pipelineState: ChatPipelineUiState,
+    content: @Composable () -> Unit,
+) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        var controlsHeight by remember { mutableIntStateOf(0) }
-        val density = LocalDensity.current
-        val faceHeight = (maxHeight - with(density) { controlsHeight.toDp() }).coerceAtLeast(240.dp)
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Column(
-                Modifier.fillMaxWidth().onSizeChanged { controlsHeight = it.height }.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(
-                    onExit, Modifier.align(Alignment.End), shape = RoundedCornerShape(18.dp),
-                ) { Text("Exit full screen") }
-                ChatPipelineIndicator(pipelineState)
-            }
-            Box(Modifier.fillMaxWidth().height(faceHeight)) { content() }
+        content()
+        Box(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                .heightIn(max = maxHeight / 3)
+                .verticalScroll(rememberScrollState())
+                .testTag("companion-pipeline-overlay"),
+        ) {
+            ChatPipelineIndicator(pipelineState)
         }
     }
 }
@@ -185,32 +194,48 @@ internal fun MochiFace(
             }
             if (!focusMode) {
                 Spacer(Modifier.height(28.dp))
-                OutlinedButton(
+                FullscreenToggleButton(
+                    fullscreen = false,
                     onClick = onFocus,
-                    modifier = Modifier.testTag("companion-fullscreen").heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color(0xFF75665D)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDDC8BB)),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(9.dp),
-                    ) {
-                        Canvas(Modifier.size(15.dp)) {
-                            val stroke = 1.4.dp.toPx()
-                            val edge = size.width
-                            val arm = edge * .3f
-                            for (x in listOf(0f, edge)) {
-                                for (y in listOf(0f, edge)) {
-                                    drawLine(Color(0xFFDDC8BB), Offset(x, y), Offset(if (x == 0f) arm else edge - arm, y), stroke)
-                                    drawLine(Color(0xFFDDC8BB), Offset(x, y), Offset(x, if (y == 0f) arm else edge - arm), stroke)
-                                }
-                            }
-                        }
-                        Text("Full screen", style = MaterialTheme.typography.labelLarge)
+                    modifier = Modifier.testTag("companion-fullscreen"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun FullscreenToggleButton(
+    fullscreen: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 48.dp).widthIn(min = 168.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF75665D)),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDDC8BB)),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Canvas(Modifier.size(15.dp).testTag(if (fullscreen) "fullscreen-collapse-icon" else "fullscreen-expand-icon")) {
+                val stroke = 1.4.dp.toPx()
+                val edge = size.width
+                val arm = edge * .3f
+                for (x in listOf(0f, edge)) {
+                    for (y in listOf(0f, edge)) {
+                        val innerX = if (x == 0f) arm else edge - arm
+                        val innerY = if (y == 0f) arm else edge - arm
+                        val corner = if (fullscreen) Offset(innerX, innerY) else Offset(x, y)
+                        drawLine(Color(0xFFDDC8BB), corner, Offset(innerX, y), stroke)
+                        drawLine(Color(0xFFDDC8BB), corner, Offset(x, innerY), stroke)
                     }
                 }
             }
+            Text(if (fullscreen) "Exit full screen" else "Full screen", style = MaterialTheme.typography.labelLarge)
         }
     }
 }

@@ -4,7 +4,6 @@ import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +28,7 @@ import com.example.mochi_pet.ui.theme.MochiTheme
 import java.io.File
 import java.util.Locale
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -57,10 +57,16 @@ class CompanionFaceTest {
         compose.onNodeWithText("很高兴见到你").assertDoesNotExist()
         checkGeometry()
         saveFixture("companion-native-portrait.png")
+        val entryBounds = compose.onNodeWithTag("companion-fullscreen").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("fullscreen-expand-icon", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("全屏显示").performClick()
         compose.onNodeWithTag("companion-fullscreen").assertDoesNotExist()
         compose.onNodeWithText("叫我 老莫老莫").assertIsDisplayed()
         compose.onNodeWithText("退出全屏").assertIsDisplayed()
+        compose.onNodeWithTag("fullscreen-collapse-icon", useUnmergedTree = true).assertIsDisplayed()
+        val exitBounds = compose.onNodeWithTag("companion-exit-fullscreen").fetchSemanticsNode().boundsInRoot
+        assertEquals("Both controls use the same height", entryBounds.height, exitBounds.height, .1f)
+        assertEquals("Both controls use the same width", entryBounds.width, exitBounds.width, .1f)
         checkGeometry()
         saveFixture("companion-native-fullscreen.png")
         compose.onNodeWithText("退出全屏").performClick()
@@ -107,6 +113,23 @@ class CompanionFaceTest {
     }
 
     @Test
+    fun `pipeline appearance and changing details keep mascot anchored in normal and fullscreen modes`() {
+        render()
+        checkStablePosition()
+        compose.runOnIdle { focused.value = true }
+        checkStablePosition()
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h640dp")
+    fun `large fonts keep popup stage and transcript changes independent of mascot position`() {
+        render(fontScale = 2f)
+        checkStablePosition()
+        compose.runOnIdle { focused.value = true }
+        checkStablePosition()
+    }
+
+    @Test
     @Config(qualifiers = "w320dp-h640dp")
     fun `narrow screens wrap enlarged text without obscuring eyes or hiding fullscreen`() {
         render(fontScale = 2f)
@@ -129,7 +152,7 @@ class CompanionFaceTest {
         compose.onNodeWithTag("chat-pipeline-track").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("companion-bubble").assertDoesNotExist()
         compose.onNodeWithTag("companion-character").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Exit full screen").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Exit full screen").assertIsDisplayed()
     }
 
     private fun render(locale: Locale = Locale.ENGLISH, fontScale: Float = 1f) {
@@ -143,17 +166,38 @@ class CompanionFaceTest {
                                 MochiFace(pipeline.value, wake.value, true, {})
                             }
                         } else {
-                            Column(Modifier.fillMaxSize()) {
-                                ChatPipelineIndicator(pipeline.value)
-                                Box(Modifier.weight(1f)) {
-                                    MochiFace(pipeline.value, wake.value, false, { focused.value = true })
-                                }
+                            CompanionPipelineOverlay(pipeline.value) {
+                                MochiFace(pipeline.value, wake.value, false, { focused.value = true })
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    private fun checkStablePosition() {
+        val initialFace = compose.onNodeWithTag("companion-face").fetchSemanticsNode().boundsInRoot
+        val initialCenter = compose.onNodeWithTag("companion-character").fetchSemanticsNode().boundsInRoot.center
+        for (stage in ChatPipelineStage.entries) {
+            for (detail in listOf(null, "Short transcript", "A synthetic long transcript that wraps across multiple lines. ".repeat(3))) {
+                compose.runOnIdle { pipeline.value = ChatPipelineUiState(stage, detail) }
+                val face = compose.onNodeWithTag("companion-face").fetchSemanticsNode().boundsInRoot
+                val center = compose.onNodeWithTag("companion-character").fetchSemanticsNode().boundsInRoot.center
+                assertEquals("Face viewport changed at $stage", initialFace, face)
+                assertEquals("Mascot moved vertically at $stage", initialCenter.y, center.y, 1f)
+                assertEquals("Mascot moved horizontally at $stage", initialCenter.x, center.x, 1f)
+                if (stage != ChatPipelineStage.IDLE) {
+                    val popup = compose.onNodeWithTag("companion-pipeline-overlay").fetchSemanticsNode().boundsInRoot
+                    assertEquals("Popup must overlay rather than reserve layout space", face.top, popup.top, 1f)
+                    assertTrue("Popup must remain in the upper third", popup.height <= face.height / 3 + 1f)
+                }
+            }
+        }
+        compose.runOnIdle { pipeline.value = ChatPipelineUiState() }
+        val restoredCenter = compose.onNodeWithTag("companion-character").fetchSemanticsNode().boundsInRoot.center
+        assertEquals("Returning to idle moved mascot", initialCenter.y, restoredCenter.y, 1f)
+        compose.onNodeWithTag("chat-pipeline").assertDoesNotExist()
     }
 
     private fun checkGeometry() {

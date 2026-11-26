@@ -199,8 +199,14 @@ and failed capture also hide it. Its layout space stays reserved to avoid jumps;
 hidden bubble text is not exposed to accessibility.
 The bubble never displays stage names, transcripts or errors. The original
 pipeline card and progress track carry stage feedback and the bounded two-line
-partial transcript/tool detail. Full-screen Face lays this card above rather
-than over the character. Text may wrap at large font scales; compact viewports
+partial transcript/tool detail. In normal and full-screen Face, the card keeps its
+expand/fade popup effect in an independent overlay at the top of the Face viewport.
+It reserves no layout space while hidden. Showing/hiding the bar, changing stages,
+and wrapping a transcript never resize the Face viewport or move Mochi's anchor;
+breathing and expressive head tilts remain independent. The popup is bounded to
+the upper third and can scroll independently on compact screens or with large
+fonts, rather than growing over the character. The full-screen exit stays above
+this overlay and remains reachable. Text may wrap at large font scales; compact viewports
 can scroll rather than clip controls. Full responses remain in the shared Chat
 history and detailed wake errors in Settings.
 
@@ -209,6 +215,10 @@ including while the pipeline is active. There are no greeting/helper paragraphs,
 **Talk to Mochi**, or **View today** buttons; Chat and Planner remain available
 through existing navigation. Full-screen Face enlarges the character and retains
 the explicit top-right exit, without a second entry button or idle task shortcut.
+Entry and exit share one control style: a minimum 48 dp touch height, 16 dp
+corners, thin muted outline, warm light text, and paired expand/collapse icons.
+Only the icon and localized action label change; information presentations use
+the same exit control.
 This design does not change the static monochrome low-power standby below.
 
 Current time/date requests transform the full Home content area into a live
