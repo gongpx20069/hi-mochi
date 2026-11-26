@@ -25,7 +25,25 @@
       <section class="wiki-section" id="modelscope" data-provider="modelscope"><h2>首选：魔搭 ModelScope</h2><p>打开<strong>设置 → AI 连接 → 添加 AI 连接</strong>，选择<strong>魔搭 ModelScope</strong>，然后完成三步：</p><ol><li><a href="https://modelscope.cn/">注册或登录魔搭</a>，在右上角头像菜单中绑定阿里云账号（<a href="https://www.modelscope.cn/docs/accounts/aliyun-binding-and-authorization">官方绑定教程</a>）。</li><li>获取该魔搭账号的 <a href="https://modelscope.cn/my/myaccesstoken">Access Token</a>，粘贴到老莫。</li><li>选择下拉推荐模型；不满意可选自定义，从<a href="https://modelscope.cn/models">模型库</a>复制支持 API 和工具调用的完整 ID，然后保存。</li></ol>
         <figure class="wiki-figure" data-modelscope-binding><img src="../../../assets/modelscope-binding.svg" width="400" height="280" alt="魔搭绑定入口：1. 点击右上角头像；2. 选择绑定阿里云账号。"><figcaption>入口示意图，非实际截图，界面以魔搭官网为准。点击右上角头像 → 绑定阿里云账号，再按提示登录阿里云并确认授权。</figcaption></figure>
       </section>
-      <section class="wiki-section" id="basics"><h2>入口与基本配置</h2><p>打开<strong>设置 → AI 连接 → 添加 AI 连接</strong>，填写连接名称并选择服务商预设。地址会自动填写，再填<strong>模型 ID</strong>和<strong>密钥</strong>即可。模型需要支持工具调用。</p><p>第一个连接自动选中；后续新增连接，点击<strong>使用</strong>再切换。切换会取消正在运行的本地 Agent 任务；编辑已有连接时，密钥留空表示保留原密钥。</p></section>
+      <section class="wiki-section" id="basics"><h2>入口与基本配置</h2><p>打开<strong>设置 → AI 连接 → 添加 AI 连接</strong>，填写连接名称并选择服务商预设。地址会自动填写，再填<strong>模型 ID</strong>和<strong>密钥</strong>即可。模型需要支持工具调用。</p><p>第一个连接自动选中；后续新增连接，点击<strong>使用</strong>再切换。切换会取消正在运行的本地 Agent 任务；编辑已有连接时，密钥留空表示保留原密钥。</p>
+        <figure class="app-walkthrough" id="connection-example" data-app-illustration="model" data-app-version="v1.0.25">
+          <div class="app-shot" role="img" aria-label="魔搭连接示意：选择魔搭，填写 Access Token，再选择模型并保存连接。后续新增的连接需要点击使用。">
+            <div aria-hidden="true">
+              <strong class="app-shot-title">添加 AI 连接</strong>
+              <div class="app-shot-field"><small>连接名称</small>魔搭 ModelScope</div>
+              <div class="app-shot-choice">魔搭 ModelScope <span>⌄ <b class="app-shot-pin">1</b></span></div>
+              <span class="app-shot-omitted">此处省略注册与绑定指引</span>
+              <div class="app-shot-field"><small>魔搭 Access Token</small>•••••••••••• <b class="app-shot-pin">2</b></div>
+              <div class="app-shot-choice">Qwen3.8-Flash-Next（推荐）<span>⌄</span></div>
+              <span class="app-shot-link">高级连接设置</span>
+              <div class="app-shot-actions"><span>取消</span><span class="app-shot-button">保存连接 <b class="app-shot-pin">3</b></span></div>
+              <span class="app-shot-omitted">保存之后 · 连接列表局部</span>
+              <div class="app-shot-card"><strong>魔搭 ModelScope</strong><small>已保存</small><small>此处省略模型与地址</small><div class="app-shot-actions"><span class="app-shot-choice">使用</span><span>编辑</span><span>删除</span></div></div>
+            </div>
+          </div>
+          <figcaption><strong>拿到 Token 后，在老莫里这样填</strong><ol><li>选择<strong>魔搭 ModelScope</strong>。先完成上方账号注册与阿里云绑定。</li><li>填写同一魔搭账号的 <strong>Access Token</strong>，再从下拉列表选择可用模型；不是填写阿里云 AccessKey。图中模型来自此版本的推荐列表，可用性以账号为准。</li><li>点击<strong>保存连接</strong>。第一个连接自动选中；已有其他连接时，新连接显示<strong>已保存</strong>，需再点<strong>使用</strong>。</li></ol><small>Mochi v1.0.25 · HTML/CSS 界面示意，非真实截图。说明文字已精简，凭据均为占位内容；请在 App 中操作。</small></figcaption>
+        </figure>
+      </section>
       <section class="wiki-section" id="providers"><h2>其他服务商</h2>
         <details class="wiki-disclosure" id="groq" data-provider="groq"><summary>Groq</summary><ol><li><a href="https://console.groq.com/">注册或登录</a>，然后<a href="https://console.groq.com/keys">创建 API Key</a>。</li><li>选择 Groq 预设，保持 <code>https://api.groq.com/openai/v1</code> 与 Chat Completions。</li><li>从<a href="https://console.groq.com/docs/models">模型指南</a>选择支持 Tool Use 的模型，填写完整 ID 和密钥后保存。</li></ol></details>
         <details class="wiki-disclosure" id="openai" data-provider="openai"><summary>OpenAI</summary><ol><li>在 <a href="https://platform.openai.com/api-keys">API 控制台</a>创建密钥。</li><li>选择 OpenAI，保持 <code>https://api.openai.com/v1</code>。</li><li>填写 API 账号可用且支持工具调用的模型与密钥后保存。新连接默认使用 Responses，具体模型见<a href="https://developers.openai.com/api/docs">官方 API 指南</a>。</li></ol></details>

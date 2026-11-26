@@ -233,6 +233,279 @@
   line-height: 1.6;
 }
 
+.app-walkthrough {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+  margin: 28px 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: linear-gradient(145deg, #211b29, var(--ink-soft));
+}
+
+.app-walkthrough figcaption {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.app-walkthrough figcaption > strong {
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.app-walkthrough figcaption > small {
+  display: block;
+  margin-top: 18px;
+  font-size: 0.8rem;
+}
+
+.app-shot {
+  min-width: 0;
+  width: 100%;
+  max-width: 360px;
+  margin-inline: auto;
+  padding: 20px;
+  border: 1px solid #57515f;
+  border-radius: 28px;
+  background: #1a1820;
+  color: #f7f1f2;
+  box-shadow: 0 16px 40px #0004;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.app-shot-title {
+  display: block;
+  margin-bottom: 20px;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.app-shot-field {
+  position: relative;
+  margin-block: 18px;
+  padding: 12px;
+  border: 1px solid #57515f;
+  border-radius: 5px;
+}
+
+.app-shot-field > small {
+  position: absolute;
+  top: -10px;
+  left: 8px;
+  max-width: calc(100% - 16px);
+  padding-inline: 4px;
+  background: #1a1820;
+  color: #d4cdd6;
+  font-size: 11px;
+}
+
+.app-shot-choice,
+.app-shot-button {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid #57515f;
+  border-radius: 20px;
+  color: #ffb7a5;
+}
+
+.app-shot-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app-shot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  color: #ffb7a5;
+}
+
+.app-shot-button {
+  background: #ffb7a5;
+  border-color: #ffb7a5;
+  color: #3b1810;
+  text-align: center;
+}
+
+.app-shot-omitted {
+  display: block;
+  margin-block: 16px;
+  padding-block: 8px;
+  border-block: 1px dashed #57515f;
+  color: #d4cdd6;
+  font-size: 11px;
+  text-align: center;
+}
+
+.app-shot-link {
+  display: block;
+  margin-top: 14px;
+  color: #ffb7a5;
+}
+
+.app-shot-pin {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-inline-start: 4px;
+  border-radius: 50%;
+  background: #d6c2ff;
+  color: #24143d;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.app-shot-card {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #27242e;
+}
+
+.app-shot-card > small {
+  display: block;
+  color: #d4cdd6;
+}
+
+.app-shot-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-block: 18px;
+}
+
+.app-shot-switch {
+  display: block;
+  width: 40px;
+  padding: 3px;
+  flex-shrink: 0;
+  border: 1px solid #57515f;
+  border-radius: 20px;
+  background: #27242e;
+}
+
+.app-shot-switch::after {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #d4cdd6;
+}
+
+.app-shot-switch.is-on {
+  background: #ffb7a5;
+}
+
+.app-shot-switch.is-on::after {
+  margin-left: auto;
+  background: #3b1810;
+}
+
+.app-shot-phone {
+  padding: 16px 12px 10px;
+  background: #0e0d12;
+}
+
+.app-shot-toolbar,
+.app-shot-tabs,
+.app-shot-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.app-shot-toolbar > span,
+.app-shot-nav > span {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  color: #d4cdd6;
+  font-size: 10px;
+}
+
+.app-shot svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shot-tabs {
+  justify-content: flex-start;
+  margin-top: 18px;
+}
+
+.app-shot-tabs > span,
+.app-shot-nav > span {
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.app-shot .is-selected {
+  background: #35282b;
+  color: #ffb7a5;
+}
+
+.app-shot-entry {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding-top: 62px;
+  color: #d6c2ff;
+  letter-spacing: 1px;
+}
+
+.app-shot-entry svg {
+  width: 60px;
+  height: 45px;
+}
+
+.app-shot-composer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 20px 0 66px;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid #57515f;
+  border-radius: 28px;
+  background: #27242e;
+}
+
+.app-shot-nav {
+  padding: 4px;
+  border-radius: 16px;
+  background: #27242e;
+}
+
+@media (max-width: 760px) {
+  .app-walkthrough {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: 18px;
+  }
+}
+
 .wiki-disclosure {
   margin-block: 12px;
   padding: 20px 24px;

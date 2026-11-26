@@ -34,7 +34,7 @@ class SiteHandler(SimpleHTTPRequestHandler):
 def main() -> None:
     arguments = argparse.ArgumentParser()
     arguments.add_argument("--channel", help="Use installed msedge or chrome instead of Chromium")
-    arguments.add_argument("--screenshots", type=Path, help="Save AgentLink viewport and agent-card screenshots")
+    arguments.add_argument("--screenshots", type=Path, help="Save AgentLink, Wiki and app-illustration screenshots")
     options = arguments.parse_args()
     if options.screenshots:
         options.screenshots.mkdir(parents=True, exist_ok=True)
@@ -435,6 +435,27 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                     assert illustration.count() == 1 and illustration.is_visible()
                     assert illustration.get_attribute("alt")
                     assert illustration.evaluate("image => image.complete && image.naturalWidth > 0")
+                expected_illustrations = {
+                    "quick-start/": ["chat"], "models/": ["model"],
+                    "speech/": ["speech", "voice"],
+                }.get(guide, [])
+                walkthroughs = page.locator("[data-app-illustration]")
+                assert walkthroughs.evaluate_all(
+                    "figures => figures.map(figure => figure.dataset.appIllustration)"
+                ) == expected_illustrations
+                for figure in walkthroughs.all():
+                    panel = figure.locator(".app-shot[role='img']")
+                    assert panel.count() == 1 and panel.is_visible()
+                    assert panel.get_attribute("aria-label")
+                    assert panel.locator(":scope > [aria-hidden='true']").count() == 1
+                    assert panel.locator(
+                        "a, button, input, select, textarea, [tabindex], [contenteditable], [role='button']"
+                    ).count() == 0, "Illustrations must not accept input or act as app controls"
+                    assert panel.locator(".app-shot-pin").all_text_contents() == ["1", "2", "3"]
+                    caption = figure.locator("figcaption")
+                    assert caption.locator("ol > li").count() == 3
+                    assert figure.get_attribute("data-app-version") in caption.inner_text()
+                    assert ("非真实截图" if locale else "not a screenshot") in caption.inner_text()
                 for width in (320, 390, 768, 1024, 1280, 1440):
                     page.set_viewport_size({"width": width, "height": 900})
                     # Poll from Python: page animation/timer callbacks do not run with JavaScript disabled.
@@ -449,6 +470,24 @@ def check_wiki(browser, port: int, screenshots: Path | None) -> None:
                         page.wait_for_timeout(50)
                     assert fits_viewport, (route, javascript, width)
                     assert fits_text, (route, javascript, width, "clipped text")
+                    for figure in walkthroughs.all():
+                        assert figure.locator(".app-shot, .app-shot *").evaluate_all("""items =>
+                            items.every(item => {
+                                const box = item.getBoundingClientRect();
+                                return box.left >= 0 && box.right <= innerWidth + 1 &&
+                                    (getComputedStyle(item).display === 'inline' ||
+                                     item.scrollWidth <= item.clientWidth + 1);
+                            })
+                        """), (route, javascript, width, "clipped illustration")
+                        if screenshots and javascript and width in (390, 1280):
+                            label = (locale + "wiki-" + guide).strip("/").replace("/", "-")
+                            kind = figure.get_attribute("data-app-illustration")
+                            figure.screenshot(
+                                path=str(screenshots / f"{label}-{kind}-{width}.png"),
+                                style=".site-header, .skip-link { visibility: hidden !important; }",
+                            )
+                            for link in page.locator("[data-nav] a").all():
+                                link.wait_for(state="visible")
                     check_mochi_navigation(page, bool(locale))
                     if guide:
                         assert page.locator(".wiki-sidebar").evaluate("""(sidebar) => {
