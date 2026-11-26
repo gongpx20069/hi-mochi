@@ -28,9 +28,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text as MaterialText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -45,23 +47,48 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mochi_pet.core.wake.WakeCaptureStatus
 import com.example.mochi_pet.core.wake.WakeRuntimeState
 import kotlin.math.roundToInt
+
+@Composable
+internal fun CompanionFocusFrame(
+    pipelineState: ChatPipelineUiState,
+    onExit: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        var controlsHeight by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
+        val faceHeight = (maxHeight - with(density) { controlsHeight.toDp() }).coerceAtLeast(240.dp)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.fillMaxWidth().onSizeChanged { controlsHeight = it.height }.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onExit, Modifier.align(Alignment.End), shape = RoundedCornerShape(18.dp),
+                ) { Text("Exit full screen") }
+                ChatPipelineIndicator(pipelineState)
+            }
+            Box(Modifier.fillMaxWidth().height(faceHeight)) { content() }
+        }
+    }
+}
 
 @Composable
 internal fun MochiFace(
@@ -71,35 +98,20 @@ internal fun MochiFace(
     onFocus: () -> Unit,
 ) {
     val inviting = !pipelineState.isActive && wakeState.status == WakeCaptureStatus.LISTENING
-    val detail = pipelineState.detail?.takeIf { pipelineState.isActive && it.isNotBlank() }?.take(120)
-    val label = localizeUiText(
-        if (pipelineState.isActive) {
-            pipelineState.stage.displayText()
-        } else {
-            when (wakeState.status) {
-                WakeCaptureStatus.LISTENING -> "Say \u201c${wakeState.keyword.phrase}\u201d"
-                WakeCaptureStatus.DISABLED -> "Wake word off"
-                WakeCaptureStatus.STARTING -> "Preparing wake word"
-                WakeCaptureStatus.PAUSED -> "Wake word paused"
-                WakeCaptureStatus.ERROR -> "Wake unavailable"
-            }
-        },
-    )
+    val label = localizeUiText("Say \u201c${wakeState.keyword.phrase}\u201d")
     val bubbleText = buildAnnotatedString {
         append(label)
-        if (inviting) {
-            val start = label.indexOf(wakeState.keyword.phrase)
-            if (start >= 0) {
-                addStyle(
-                    SpanStyle(color = Color(0xFFEDE4DC), fontWeight = FontWeight.Medium),
-                    start, start + wakeState.keyword.phrase.length,
-                )
-            }
+        val start = label.indexOf(wakeState.keyword.phrase)
+        if (start >= 0) {
+            addStyle(
+                SpanStyle(color = Color(0xFFEDE4DC), fontWeight = FontWeight.Medium),
+                start, start + wakeState.keyword.phrase.length,
+            )
         }
     }
     BoxWithConstraints(
         Modifier.fillMaxSize().testTag("companion-face")
-            .padding(start = 12.dp, end = 12.dp, top = if (focusMode) 80.dp else 16.dp, bottom = 16.dp),
+            .padding(horizontal = 12.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         val availableHeight = maxHeight
@@ -114,8 +126,7 @@ internal fun MochiFace(
                 content = {
                     CompanionCharacter(pipelineState.stage, Modifier.testTag("companion-character"))
                     Box(
-                        Modifier.testTag("companion-bubble")
-                            .semantics { liveRegion = LiveRegionMode.Polite }
+                        (if (inviting) Modifier.testTag("companion-bubble") else Modifier.clearAndSetSemantics {})
                             .drawWithCache {
                                 val inset = 1.dp.toPx()
                                 val w = size.width - inset
@@ -154,8 +165,7 @@ internal fun MochiFace(
                 val bubbleWidth = minOf(constraints.maxWidth, (224.dp * fontScale).roundToPx())
                 val bubble = measurables[1].measure(Constraints.fixedWidth(bubbleWidth))
                 val buttonSpace = if (focusMode) 0 else (80.dp * fontScale).roundToPx()
-                val detailSpace = if (detail == null) 0 else (64.dp * fontScale).roundToPx()
-                val room = (availableHeight.roundToPx() - bubble.height - buttonSpace - detailSpace).coerceAtLeast(0)
+                val room = (availableHeight.roundToPx() - bubble.height - buttonSpace).coerceAtLeast(0)
                 val characterWidth = minOf(
                     constraints.maxWidth,
                     (if (focusMode) 288.dp else 248.dp).roundToPx(),
@@ -170,16 +180,8 @@ internal fun MochiFace(
                     character.placeRelative((constraints.maxWidth - character.width) / 2, characterY)
                     val bubbleX = ((constraints.maxWidth - bubble.width) / 2 + 42.dp.roundToPx())
                         .coerceAtMost(constraints.maxWidth - bubble.width)
-                    bubble.placeRelative(bubbleX, 0)
+                    if (inviting) bubble.placeRelative(bubbleX, 0)
                 }
-            }
-            if (detail != null) {
-                MaterialText(
-                    detail,
-                    Modifier.widthIn(max = 360.dp).padding(top = 12.dp).testTag("companion-detail"),
-                    color = Color(0xFFBCB3AD), style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                )
             }
             if (!focusMode) {
                 Spacer(Modifier.height(28.dp))
@@ -222,17 +224,37 @@ private fun CompanionCharacter(stage: ChatPipelineStage, modifier: Modifier) {
         label = "companion-breath-scale",
     )
     val openness by animateFloatAsState(
-        if (stage == ChatPipelineStage.SUMMARY) .4f else if (stage == ChatPipelineStage.SPEAKING) .8f else 1f,
+        when (stage) {
+            ChatPipelineStage.LISTENING -> 1.15f
+            ChatPipelineStage.SKILLING -> .95f
+            ChatPipelineStage.THINKING -> .85f
+            ChatPipelineStage.SUBAGENT -> 1.05f
+            ChatPipelineStage.TOOL -> .75f
+            ChatPipelineStage.SUMMARY -> .3f
+            ChatPipelineStage.SPEAKING -> .9f
+            ChatPipelineStage.IDLE -> 1f
+        },
         tween(280), label = "companion-eyes",
     )
     val gaze by animateFloatAsState(
         when (stage) {
-            ChatPipelineStage.SKILLING -> -5f
-            ChatPipelineStage.THINKING -> 5f
-            ChatPipelineStage.SUBAGENT, ChatPipelineStage.TOOL -> 3f
+            ChatPipelineStage.SKILLING -> -7f
+            ChatPipelineStage.THINKING -> 7f
+            ChatPipelineStage.SUBAGENT -> -3f
+            ChatPipelineStage.TOOL -> 2f
             else -> 0f
         },
         tween(360), label = "companion-gaze",
+    )
+    val tilt by animateFloatAsState(
+        when (stage) {
+            ChatPipelineStage.SKILLING -> -4f
+            ChatPipelineStage.THINKING -> 4f
+            ChatPipelineStage.SUBAGENT -> -2f
+            ChatPipelineStage.TOOL -> 2f
+            else -> 0f
+        },
+        tween(420), label = "companion-head-tilt",
     )
     val speech = if (stage == ChatPipelineStage.SPEAKING) {
         val speaking = rememberInfiniteTransition(label = "companion-speaking")
@@ -244,8 +266,11 @@ private fun CompanionCharacter(stage: ChatPipelineStage, modifier: Modifier) {
         0f
     }
     Box(
-        modifier.semantics { contentDescription = "Mochi" }
-            .graphicsLayer { scaleX = breath; scaleY = breath }
+        modifier.semantics {
+            contentDescription = "Mochi"
+            if (stage != ChatPipelineStage.IDLE) stateDescription = localizeUiText(stage.displayText())
+        }
+            .graphicsLayer { scaleX = breath; scaleY = breath; rotationZ = tilt }
             .drawWithCache {
                 val body = PathParser().parsePathString(
                     "M44 154C28 126 34 76 64 52C85 34 113 30 140 31C176 29 209 41 230 69" +
@@ -253,13 +278,18 @@ private fun CompanionCharacter(stage: ChatPipelineStage, modifier: Modifier) {
                 ).toPath()
                 val leftPaw = PathParser().parsePathString("M61 174C48 176 45 190 54 198C63 207 84 207 91 198Z").toPath()
                 val rightPaw = PathParser().parsePathString("M187 198C198 208 218 204 225 196C232 187 225 176 215 174Z").toPath()
+                val raisedLeftPaw = PathParser().parsePathString("M63 176C42 174 36 150 48 143C62 136 77 157 74 173Z").toPath()
+                val raisedRightPaw = PathParser().parsePathString("M217 176C238 174 244 150 232 143C218 136 203 157 206 173Z").toPath()
                 val highlight = PathParser().parsePathString("M66 65Q95 43 127 43").toPath()
-                val smile = PathParser().parsePathString("M131 145Q140 156 149 145").toPath()
+                val smile = PathParser().parsePathString("M125 154Q132 167 140 155Q148 167 155 154").toPath()
+                val grin = PathParser().parsePathString("M123 153Q140 162 157 153Q154 178 140 178Q126 178 123 153Z").toPath()
+                val curiousMouth = PathParser().parsePathString("M127 156Q137 171 153 155").toPath()
+                val thoughtfulMouth = PathParser().parsePathString("M126 160Q135 154 144 160").toPath()
                 val bodyBrush = Brush.radialGradient(
                     listOf(Color(0xFFFFFDF5), Color(0xFFF3E8DC), Color(0xFFD3B5A6)),
                     center = Offset(118f, 60f), radius = 230f,
                 )
-                val eyeBrush = Brush.verticalGradient(listOf(Color(0xFF4B3833), Color(0xFF261F22)), 91f, 137f)
+                val eyeBrush = Brush.verticalGradient(listOf(Color(0xFF4B3833), Color(0xFF261F22)), 80f, 145f)
                 onDrawBehind {
                     withTransform({ scale(size.width / 280f, size.height / 240f, Offset.Zero) }) {
                         drawCircle(
@@ -270,33 +300,81 @@ private fun CompanionCharacter(stage: ChatPipelineStage, modifier: Modifier) {
                         )
                         drawOval(Color.Black.copy(alpha = .15f), Offset(66f, 207f), Size(148f, 20f))
                         drawPath(body, bodyBrush)
-                        drawPath(leftPaw, Color(0xFFE8D6C8))
-                        drawPath(rightPaw, Color(0xFFE8D6C8))
-                        for (x in listOf(101f + gaze, 180f + gaze)) {
-                            val radius = if (stage == ChatPipelineStage.LISTENING) 18f else 16f
-                            drawOval(eyeBrush, Offset(x - radius, 114f - 23f * openness), Size(radius * 2, 46f * openness))
-                            if (openness > .55f) {
-                                drawOval(Color.White.copy(alpha = .94f), Offset(x - 11f, 97f), Size(12f, 16f))
-                                drawCircle(Color(0xFFD9B8A4), 3f, Offset(x + 6f, 126f))
+                        drawPath(
+                            if (stage == ChatPipelineStage.SKILLING || stage == ChatPipelineStage.SUBAGENT) raisedLeftPaw else leftPaw,
+                            Color(0xFFE8D6C8),
+                        )
+                        if (stage == ChatPipelineStage.THINKING) {
+                            drawOval(Color(0xFFE8D6C8), Offset(174f, 153f), Size(30f, 37f))
+                            drawArc(Color(0xFFBDA18E), 195f, 100f, false, Offset(181f, 160f), Size(15f, 20f), style = Stroke(2f))
+                        } else {
+                            drawPath(if (stage == ChatPipelineStage.SUBAGENT) raisedRightPaw else rightPaw, Color(0xFFE8D6C8))
+                        }
+                        for ((index, x) in listOf(98f + gaze, 182f + gaze).withIndex()) {
+                            val radius = if (stage == ChatPipelineStage.LISTENING) 23f else 20f
+                            val eyeHalfHeight = 28f * openness * if (stage == ChatPipelineStage.THINKING && index == 1) .6f else 1f
+                            if (stage == ChatPipelineStage.SUMMARY) {
+                                drawArc(
+                                    Color(0xFF4B3833), 180f, 180f, false, Offset(x - 19f, 106f), Size(38f, 26f),
+                                    style = Stroke(6f, cap = StrokeCap.Round),
+                                )
+                            } else {
+                                drawOval(eyeBrush, Offset(x - radius, 113f - eyeHalfHeight), Size(radius * 2, eyeHalfHeight * 2))
+                                drawOval(
+                                    Color.White.copy(alpha = .94f), Offset(x - 12f, 119f - eyeHalfHeight),
+                                    Size(14f, minOf(18f, eyeHalfHeight * .65f)),
+                                )
+                                drawCircle(Color(0xFFD9B8A4), 3.5f, Offset(x + 8f, 113f + eyeHalfHeight - 8f))
+                            }
+                            if (stage == ChatPipelineStage.LISTENING || stage == ChatPipelineStage.SKILLING || stage == ChatPipelineStage.THINKING) {
+                                val browY = when (stage) {
+                                    ChatPipelineStage.LISTENING -> 70f
+                                    ChatPipelineStage.SKILLING -> if (index == 0) 73f else 83f
+                                    else -> if (index == 0) 83f else 73f
+                                }
+                                drawArc(
+                                    Color(0xFF9D7B6C), 190f, 150f, false, Offset(x - 18f, browY), Size(36f, 16f),
+                                    style = Stroke(3f, cap = StrokeCap.Round),
+                                )
+                            } else if (stage == ChatPipelineStage.TOOL) {
+                                drawLine(
+                                    Color(0xFF9D7B6C), Offset(x - 16f, if (index == 0) 85f else 90f),
+                                    Offset(x + 16f, if (index == 0) 90f else 85f), 3f, StrokeCap.Round,
+                                )
                             }
                         }
                         for (x in listOf(71f, 209f)) {
                             drawOval(
                                 Brush.radialGradient(
-                                    listOf(Color(0x70E99C86), Color.Transparent), Offset(x, 145f), 26f,
+                                    listOf(Color(0x70E99C86), Color.Transparent), Offset(x, 151f), 27f,
                                 ),
-                                Offset(x - 26f, 129f), Size(52f, 32f),
+                                Offset(x - 27f, 135f), Size(54f, 32f),
                             )
                         }
                         when (stage) {
-                            ChatPipelineStage.SPEAKING ->
-                                drawOval(Color(0xFF7A5145), Offset(131f, 141f), Size(18f, 8f + speech * 12f))
-                            ChatPipelineStage.LISTENING ->
-                                drawCircle(Color(0xFF7A5145), 6f, Offset(140f, 149f))
-                            ChatPipelineStage.IDLE, ChatPipelineStage.SUMMARY ->
-                                drawPath(smile, Color(0xFF7A5145), style = Stroke(3f, cap = StrokeCap.Round))
-                            else ->
-                                drawLine(Color(0xFF7A5145), Offset(133f, 148f), Offset(147f, 148f), 3f, StrokeCap.Round)
+                            ChatPipelineStage.SPEAKING -> {
+                                val height = 14f + speech * 16f
+                                drawOval(Color(0xFF7A5145), Offset(126f, 149f), Size(28f, height))
+                                drawOval(Color(0xFFE5A092), Offset(133f, 149f + height * .58f), Size(14f, height * .3f))
+                            }
+                            ChatPipelineStage.LISTENING -> {
+                                drawOval(Color(0xFF7A5145), Offset(130f, 150f), Size(20f, 24f))
+                                drawOval(Color(0xFFE5A092), Offset(135f, 164f), Size(10f, 6f))
+                            }
+                            ChatPipelineStage.SUMMARY, ChatPipelineStage.SUBAGENT -> {
+                                drawPath(grin, Color(0xFF7A5145))
+                                drawOval(Color(0xFFE5A092), Offset(132f, 168f), Size(16f, 8f))
+                            }
+                            ChatPipelineStage.THINKING ->
+                                drawPath(thoughtfulMouth, Color(0xFF7A5145), style = Stroke(3.5f, cap = StrokeCap.Round))
+                            ChatPipelineStage.SKILLING ->
+                                drawPath(curiousMouth, Color(0xFF7A5145), style = Stroke(3.5f, cap = StrokeCap.Round))
+                            ChatPipelineStage.IDLE, ChatPipelineStage.TOOL -> {
+                                drawPath(smile, Color(0xFF7A5145), style = Stroke(3.5f, cap = StrokeCap.Round))
+                                if (stage == ChatPipelineStage.TOOL) {
+                                    drawOval(Color(0xFFE5A092), Offset(144f, 161f), Size(10f, 9f))
+                                }
+                            }
                         }
                         for (y in listOf(135f, 144f)) {
                             drawLine(Color(0xA6B38D7B), Offset(61f, y), Offset(48f, y + if (y == 135f) -3f else 2f), 2f, StrokeCap.Round)

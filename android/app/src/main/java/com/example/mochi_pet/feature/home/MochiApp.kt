@@ -951,6 +951,16 @@ private fun MochiAppContent(
                     FocusStandbyScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
+                } else if (companionFaceVisible) {
+                    CompanionFocusFrame(
+                        pipelineState = visiblePipelineState,
+                        onExit = {
+                            focusStandby = false
+                            viewModel.setFocusMode(false)
+                        },
+                    ) {
+                        renderSurface(Modifier.fillMaxSize())
+                    }
                 } else {
                     if (browserState.active && !browserState.manual && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
@@ -984,10 +994,8 @@ private fun MochiAppContent(
                                 Text("Exit full screen")
                             }
                         }
-                        if (!companionFaceVisible) {
-                            ChatPipelineIndicator(state = visiblePipelineState)
-                            TextButton({ taskCenter.open() }) { Text("Task center") }
-                        }
+                        ChatPipelineIndicator(state = visiblePipelineState)
+                        TextButton({ taskCenter.open() }) { Text("Task center") }
                     }
                 }
             }
@@ -1026,9 +1034,7 @@ private fun MochiAppContent(
                         onSetChatMuted = viewModel::setChatMuted,
                     )
                 }
-                if (!companionFaceVisible) {
-                    ChatPipelineIndicator(state = visiblePipelineState)
-                }
+                ChatPipelineIndicator(state = visiblePipelineState)
                 if (surface == MochiSurface.Settings) {
                     TextButton({ taskCenter.open(diagnostics = true) }) { Text("Configuration check") }
                 }
@@ -1290,7 +1296,7 @@ private fun MochiHeaderAction(label: String, glyph: ToolGlyph, tag: String, onCl
 }
 
 @Composable
-private fun ChatPipelineIndicator(state: ChatPipelineUiState) {
+internal fun ChatPipelineIndicator(state: ChatPipelineUiState) {
     AnimatedVisibility(
         visible = state.isActive,
         enter = fadeIn(tween(220)) + expandVertically(tween(260)),
@@ -1304,6 +1310,7 @@ private fun ChatPipelineIndicator(state: ChatPipelineUiState) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
+                .testTag("chat-pipeline")
                 .semantics {
                     contentDescription =
                         "${localizeUiText(state.stage.displayText())}. " +
@@ -1411,7 +1418,7 @@ private fun PipelineTrack(
     }
     val activeIndex = stages.indexOf(stage)
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("chat-pipeline-track"),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         stages.forEachIndexed { index, _ ->
