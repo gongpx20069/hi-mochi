@@ -216,7 +216,7 @@ including while the pipeline is active. There are no greeting/helper paragraphs,
 through existing navigation. Full-screen Face enlarges the character and retains
 the explicit top-right exit, without a second entry button or idle task shortcut.
 Entry and exit share one control style: a minimum 48 dp touch height, 16 dp
-corners, thin muted outline, warm light text, and paired expand/collapse icons.
+corners, a faint outline, muted warm-gray text, and paired expand/collapse icons.
 Only the icon and localized action label change; information presentations use
 the same exit control.
 This design does not change the static monochrome low-power standby below.

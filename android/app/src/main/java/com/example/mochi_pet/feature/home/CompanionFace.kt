@@ -210,12 +210,13 @@ internal fun FullscreenToggleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val contentColor = Color(0xFFAAA09A)
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = 48.dp).widthIn(min = 168.dp),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Color(0xFF75665D)),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDDC8BB)),
+        border = BorderStroke(1.dp, Color(0xFF494340)),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -230,8 +231,8 @@ internal fun FullscreenToggleButton(
                         val innerX = if (x == 0f) arm else edge - arm
                         val innerY = if (y == 0f) arm else edge - arm
                         val corner = if (fullscreen) Offset(innerX, innerY) else Offset(x, y)
-                        drawLine(Color(0xFFDDC8BB), corner, Offset(innerX, y), stroke)
-                        drawLine(Color(0xFFDDC8BB), corner, Offset(x, innerY), stroke)
+                        drawLine(contentColor, corner, Offset(innerX, y), stroke)
+                        drawLine(contentColor, corner, Offset(x, innerY), stroke)
                     }
                 }
             }
