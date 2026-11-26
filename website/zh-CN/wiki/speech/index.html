@@ -25,10 +25,43 @@
       <nav class="wiki-tabs" aria-label="本页内容"><a href="#system">系统语音</a><a href="#iflytek">讯飞</a><a href="#azure">Azure</a><a href="#wake">唤醒词</a></nav>
       <section class="wiki-section" id="system" data-speech-provider="system"><h2>Android 系统语音 · 不用额外密钥</h2><ol><li>打开<strong>设置 → 语音与唤醒</strong>，使用系统语音连接。</li><li>授予麦克风权限，确认手机安装了语音识别服务和文字转语音引擎。</li><li>选择可用的系统音色，在陪伴模式说句话试试。无需语音账号或扩展 APK。</li></ol><p class="wiki-note">能否离线使用、支持哪些语言，取决于手机和已安装的系统语音服务。</p></section>
       <section class="wiki-section" id="cloud"><h2>想使用云端语音？</h2><p>打开<strong>设置 → 语音与唤醒 → 添加语音连接</strong>。保存只会新增账号，准备好后点击<strong>使用</strong>再切换。</p>
-        <details class="wiki-disclosure" id="iflytek" data-speech-provider="iflytek"><summary>讯飞 · AppID、APIKey、APISecret</summary><ol><li>登录<a href="https://console.xfyun.cn/">讯飞控制台</a>，在「我的应用」中创建或选择 WebAPI 应用，开通<a href="https://www.xfyun.cn/services/voicedictation">语音听写（流式版）</a>。</li><li>打开<a href="https://console.xfyun.cn/services/iat">语音听写服务页获取凭据</a>，选择该应用。将其 <strong>AppID、APIKey、APISecret</strong> 填入老莫的讯飞连接并保存；第三项是 APISecret，不是 Token。</li><li>点击使用，说一句短句测试识别。若要云端播报，为同一套凭据开通兼容的语音合成能力，再按下方步骤选择音色。</li></ol></details>
+        <details class="wiki-disclosure" id="iflytek" data-speech-provider="iflytek"><summary>讯飞 · AppID、APIKey、APISecret</summary><ol><li>登录<a href="https://console.xfyun.cn/">讯飞控制台</a>，在「我的应用」中创建或选择 WebAPI 应用，开通<a href="https://www.xfyun.cn/services/voicedictation">语音听写（流式版）</a>。</li><li>打开<a href="https://console.xfyun.cn/services/iat">语音听写服务页获取凭据</a>，选择该应用。将其 <strong>AppID、APIKey、APISecret</strong> 填入老莫的讯飞连接并保存；第三项是 APISecret，不是 Token。</li><li>点击使用，说一句短句测试识别。若要云端播报，为同一套凭据开通兼容的语音合成能力，再按下方步骤选择音色。</li></ol>
+          <figure class="app-walkthrough" data-app-illustration="speech" data-app-version="v1.0.25">
+            <div class="app-shot" role="img" aria-label="添加语音连接示意：讯飞 AppID、APIKey、APISecret 分别填写，语音合成默认关闭。保存语音连接并不切换当前账号。">
+              <div aria-hidden="true">
+                <strong class="app-shot-title">添加语音连接</strong>
+                <div class="app-shot-field"><small>连接名称</small>讯飞语音</div>
+                <div class="app-shot-choice">讯飞语音 <span>⌄</span></div>
+                <span class="app-shot-omitted">此处省略 WebAPI 开通说明</span>
+                <span class="app-shot-link">获取讯飞凭据</span>
+                <div class="app-shot-field"><small>讯飞 AppID</small>你的应用 ID <b class="app-shot-pin">1</b></div>
+                <div class="app-shot-field"><small>讯飞 APIKey</small>••••••••••••</div>
+                <div class="app-shot-field"><small>讯飞 APISecret</small>••••••••••••</div>
+                <div class="app-shot-toggle"><span>同时用于语音合成 <b class="app-shot-pin">2</b></span><span class="app-shot-switch"></span></div>
+                <div class="app-shot-actions"><span>取消</span><span class="app-shot-button">保存语音连接 <b class="app-shot-pin">3</b></span></div>
+              </div>
+            </div>
+            <figcaption><strong>三个凭据，来自同一个应用</strong><ol><li>从<strong>同一 WebAPI 应用</strong>复制三项内容，分别填写。第三项是 APISecret，不是 Token。</li><li>先保持语音合成关闭，即可使用讯飞识别、Android 播报。云端播报是可选项，需要对应的合成权限。</li><li><strong>保存语音连接</strong>仅新增账号。回到列表再点<strong>使用</strong>，才会切换；保存并不等于启用。</li></ol><small>Mochi v1.0.25 · HTML/CSS 界面示意，非真实截图。说明文字已精简，凭据均为占位内容；请只在 App 中填写真实凭据。</small></figcaption>
+          </figure>
+        </details>
         <details class="wiki-disclosure" id="azure" data-speech-provider="azure"><summary>Azure Speech · 资源地址与密钥</summary><ol><li>创建 <a href="https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices">Azure Speech 资源</a>。</li><li>复制资源地址和密钥。在老莫中选择 Azure Speech，填入<strong>语音服务地址</strong>和<strong>密钥</strong>。地址类似 <code>https://your-resource.cognitiveservices.azure.com</code>，请使用你自己资源中的实际值。</li><li>保存后点击使用，试着说一句话。这里需要 Speech 资源，不是 Azure OpenAI 模型连接。</li></ol></details>
       </section>
-      <section class="wiki-section" id="voices"><h2>选择回答的声音</h2><ol><li>编辑已保存的云端连接，按需开启<strong>同时用于语音合成</strong>；默认关闭。</li><li>保存后重新进入编辑，加载音色并试听。凭据必须先保存；试听不会切换当前账号。</li><li>选好音色后保存，并将该连接设为使用中。</li></ol><p>云端识别会发送音频，云端播报会发送回答文本，可能消耗服务额度。唤醒应答仍使用 Android 系统语音。切换语音账号会停止当前语音会话与试听，不会取消文字或后台任务。</p></section>
+      <section class="wiki-section" id="voices"><h2>选择回答的声音</h2><ol><li>编辑已保存的云端连接，按需开启<strong>同时用于语音合成</strong>；默认关闭。</li><li>保存后重新进入编辑，加载音色并试听。凭据必须先保存；试听不会切换当前账号。</li><li>选好音色后保存，并将该连接设为使用中。</li></ol><p>云端识别会发送音频，云端播报会发送回答文本，可能消耗服务额度。唤醒应答仍使用 Android 系统语音。切换语音账号会停止当前语音会话与试听，不会取消文字或后台任务。</p>
+        <figure class="app-walkthrough" data-app-illustration="voice" data-app-version="v1.0.25">
+          <div class="app-shot" role="img" aria-label="已保存的语音连接编辑页局部：开启同时用于语音合成后，下方显示音色、试听和保存语音连接。">
+            <div aria-hidden="true">
+              <strong class="app-shot-title">编辑语音连接</strong>
+              <span class="app-shot-omitted">上方为已保存的账号与凭据</span>
+              <div class="app-shot-toggle"><span>同时用于语音合成 <b class="app-shot-pin">1</b></span><span class="app-shot-switch is-on"></span></div>
+              <span class="app-shot-omitted">此处省略服务商隐私提示</span>
+              <div class="app-shot-choice"><span>音色<br>跟随应用默认</span><b class="app-shot-pin">2</b></div>
+              <span class="app-shot-link">试听</span>
+              <div class="app-shot-actions"><span>取消</span><span class="app-shot-button">保存语音连接 <b class="app-shot-pin">3</b></span></div>
+            </div>
+          </div>
+          <figcaption><strong>先保存，再选声音</strong><ol><li>图中是<strong>已保存</strong>并开启语音合成的连接。再次编辑时，不更换凭据就让密钥字段留空。</li><li>点击<strong>音色</strong>选择可用声音，再试听。试听使用固定问候语，可能消耗合成额度，但不会切换当前账号。</li><li>保存所选音色；如果这个账号还不是当前连接，回到列表点击<strong>使用</strong>。</li></ol><small>Mochi v1.0.25 · HTML/CSS 界面示意，非真实截图。此图为编辑页局部，可用音色以服务商及账号权限为准。</small></figcaption>
+        </figure>
+      </section>
       <section class="wiki-section" id="wake"><h2>“老莫老莫”还是“Hi Mochi”？</h2><p>在设置 → 语音与唤醒中选择。默认跟随系统语言：中文使用“老莫老莫”，其他语言使用“Hi Mochi”；一次只有一个唤醒词生效。</p><p><strong>保持陪伴页面前台可见、屏幕解锁。</strong>对话页、其他页面、锁屏和后台不监听唤醒词。在对话中可长按输入框转文字，再自行点击发送。</p></section>
       <section class="wiki-section" id="troubleshooting"><h2>快速排查</h2>
         <details class="wiki-disclosure"><summary>识别不到，或听不到声音</summary><ul><li>检查麦克风权限、媒体音量、当前语音账号和已安装的系统语音服务。</li><li>云端服务还要检查网络与对应资源的识别、合成权限。</li><li>配置自检不会录音，需要单独测试麦克风和音色试听；对话中的回答静音也可能关闭播报。</li></ul></details>

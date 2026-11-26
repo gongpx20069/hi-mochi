@@ -96,6 +96,43 @@ Quick start provides a direct recommended APK download and a disclosure
 for all five architectures, not a link back to a homepage card. Its checked-in
 release bundle must match the homepage in both languages.
 
+### App interface illustrations
+
+Quick start, model setup and speech setup include static HTML/CSS illustrations
+in `figure.app-walkthrough`, styled by the shared stylesheet. They show the Chat
+entry, a provider form and saved connection, iFlytek credentials, and the saved
+voice editor. English uses Groq; Chinese uses ModelScope. Keep the capabilities
+reference text-only.
+
+The source baseline is **v1.0.25**, commit `3b26af0`. Each figure has
+`data-app-illustration` and `data-app-version`; its visible caption identifies
+the version, the image as an illustration rather than a screenshot, and any
+omitted content. Numbered highlights correspond to three real instructions.
+The rendered panel has `role="img"` and a localized `aria-label`; its decorative
+children are hidden from assistive technology, while the caption remains normal
+readable text. Use spans, not fake form controls or focusable buttons. Never
+collect credentials on the website or simulate a successful connection.
+
+When updating, compare the **released tag**, not unreleased main, against these
+Android source references (all under
+`android/app/src/main/java/com/example/mochi_pet/feature/home/`):
+
+| Illustration | Source reference |
+| --- | --- |
+| Chat entry and mode switch | `MochiApp.kt`, `ConversationEntryLayout.kt`, `MochiEntryMark.kt` |
+| Model form and saved/active distinction | `ProviderConnectionsSection.kt` |
+| Speech credentials, synthesis toggle and voice selection | `SpeechConnectionsSection.kt`, `SpeechVoicePicker.kt` |
+| Localized labels | `UiLocalization.kt` |
+
+Colors follow `android/extension-ui/src/main/java/com/example/mochi_ui/MochiTheme.kt`.
+These are maintenance references only: the website must not read Kotlin, depend
+on an Android build, or require JavaScript to display the figures. Preserve field
+order, conditional fields, Save versus Use behavior, and foreground-only wake
+guidance. Placeholder model IDs are not recommendations; the Chinese suggested
+model mirrors that release's picker without guaranteeing account availability.
+Keep cropped forms readable rather than scaling a whole phone down. Review both
+languages at 320/390 and desktop widths after changes.
+
 Preserve named AI and speech accounts, document collaboration
 with Notion/Tencent Docs/Feishu, and task-center guidance. Keep onboarding and
 connection-switching semantics aligned with the shipped app. Ordinary
@@ -239,7 +276,7 @@ preserve the matching bundled release as a whole. If the API is unavailable or
 rate-limited, the fallback remains usable. AgentLink pages do not request the
 Mochi release API.
 
-The bundled release is **v1.0.24**. After publishing a new release and completing
+The bundled release is **v1.0.25**. After publishing a new release and completing
 full anonymous download and SHA-256 verification of all nine CNB mirror files,
 update both homepages and quick-start guides' architecture/extension URLs,
 release-page URLs, and version labels together. Retain the last verified Chinese version if mirroring fails;
@@ -290,6 +327,10 @@ setup, all five loaded local logos, reading order, image-input visibility,
 language switching, and desktop navigation bounds.
 Use `--screenshots <directory>` to save AgentLink hero, agent, and feature-section images
 at each tested width for visual review; keep generated images out of the site.
+The same option saves all eight localized app walkthrough figures at 390 and
+1280 pixels. Browser checks exercise them with and without JavaScript, verify
+accessible descriptions and numbered instructions, reject interactive controls
+inside the simulated UI, and check that figure text fits at all six widths.
 
 ## Deployment
 
