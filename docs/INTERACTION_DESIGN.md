@@ -168,17 +168,38 @@ and keeps the task history. Ordinary interruption or failed playback does not
 acknowledge results. If that second wake contains no command, listening continues
 without requiring a third wake. Background/locked wake restrictions are unchanged.
 
-An app-wide compact pipeline card appears above the active surface during
+Except on the Companion Face, a compact pipeline card appears above the active surface during
 Listening, Skilling, Thinking, Tool, Summarizing, and Speaking stages. It uses
 a breathing activity pulse, concise status copy, and a six-segment progress
 track so stage changes remain legible without relying on color alone.
 
-On the Face surface, Mochi is a softly lit character with a layered halo,
-breathing motion, highlights, blush, and animated eyes and mouth. Each pipeline
-stage has a distinct expression and accent, while the current stage is also
-shown as text beneath the character. Home actions and nonessential helper copy
-are hidden while the pipeline is active so the character and current state
-remain the focus.
+The Companion Face uses a quiet warm-dark canvas without an inset panel.
+Mochi is a round, earless cream-colored character with tucked paws, glossy eyes,
+short whiskers, restrained highlights and blush, gentle breathing and animated
+expressions. A single comic speech bubble sits above/right, slightly overlapping
+the crown without covering the eyes. It uses a flat dark-gray fill, a thin muted
+outline and light text; no bubble gradient or shadow.
+
+While idle and wake capture is actually listening, the bubble invites the
+resolved `WakeRuntimeState.keyword`: `Say “Hi Mochi”` or `叫我「老莫老莫」`.
+The surrounding copy follows the interface language; the phrase follows the
+actual runtime choice, independently of UI language. Disabled, starting, paused,
+and failed capture show concise truthful statuses instead of a wake invitation.
+Active pipeline stages replace the invitation inside the same bubble, without
+the duplicate stage chip or top pipeline card. Browser presentations retain
+their existing pipeline feedback. Partial transcripts or current tool details
+remain in a separate, bounded two-line area below the character, never inside
+the small speech bubble. Text may wrap at large font scales; compact
+viewports can scroll rather than clip controls. The bubble is a polite
+accessibility live region, not a place for long replies or raw errors; full
+responses remain in the shared Chat history and detailed wake errors in Settings.
+
+Normal Face retains only the compact **Full screen** action below the character,
+including while the pipeline is active. There are no greeting/helper paragraphs,
+**Talk to Mochi**, or **View today** buttons; Chat and Planner remain available
+through existing navigation. Full-screen Face enlarges the character and retains
+the explicit top-right exit, without a second entry button or idle task shortcut.
+This design does not change the static monochrome low-power standby below.
 
 Current time/date requests transform the full Home content area into a live
 clock and date presentation. Current weather requests use the same full-area

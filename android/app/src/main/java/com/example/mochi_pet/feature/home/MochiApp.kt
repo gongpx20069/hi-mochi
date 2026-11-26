@@ -25,7 +25,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -751,6 +750,8 @@ private fun MochiAppContent(
         }
     }
 
+    val companionFaceVisible = surface == MochiSurface.Face &&
+        !(browserState.active && !browserState.manual && assistanceRequest?.browser != true)
     val renderSurface: @Composable (Modifier) -> Unit = { modifier ->
         val performCardAction:
             (CardPresentation, CardAction) -> Unit = { card, action ->
@@ -914,6 +915,7 @@ private fun MochiAppContent(
             onCardAction = performCardAction,
             onDismissCameraSnapshot = viewModel::dismissCameraSnapshot,
             onFocus = toggleFocusMode,
+            focusMode = focusMode,
             modifier = modifier,
         )
     }
@@ -939,8 +941,8 @@ private fun MochiAppContent(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0xFF17131D),
-                                MaterialTheme.colorScheme.background,
+                                if (companionFaceVisible) Color(0xFF1C1B1E) else Color(0xFF17131D),
+                                if (companionFaceVisible) Color(0xFF1C1B1E) else MaterialTheme.colorScheme.background,
                             ),
                         ),
                     ),
@@ -982,8 +984,10 @@ private fun MochiAppContent(
                                 Text("Exit full screen")
                             }
                         }
-                        ChatPipelineIndicator(state = visiblePipelineState)
-                        TextButton({ taskCenter.open() }) { Text("Task center") }
+                        if (!companionFaceVisible) {
+                            ChatPipelineIndicator(state = visiblePipelineState)
+                            TextButton({ taskCenter.open() }) { Text("Task center") }
+                        }
                     }
                 }
             }
@@ -994,8 +998,8 @@ private fun MochiAppContent(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0xFF17131D),
-                                MaterialTheme.colorScheme.background,
+                                if (companionFaceVisible) Color(0xFF1C1B1E) else Color(0xFF17131D),
+                                if (companionFaceVisible) Color(0xFF1C1B1E) else MaterialTheme.colorScheme.background,
                             ),
                         ),
                     )
@@ -1022,7 +1026,9 @@ private fun MochiAppContent(
                         onSetChatMuted = viewModel::setChatMuted,
                     )
                 }
-                ChatPipelineIndicator(state = visiblePipelineState)
+                if (!companionFaceVisible) {
+                    ChatPipelineIndicator(state = visiblePipelineState)
+                }
                 if (surface == MochiSurface.Settings) {
                     TextButton({ taskCenter.open(diagnostics = true) }) { Text("Configuration check") }
                 }
@@ -1030,9 +1036,9 @@ private fun MochiAppContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    color = if (companionFaceVisible) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                     shape = RoundedCornerShape(28.dp),
-                    tonalElevation = 6.dp,
+                    tonalElevation = if (companionFaceVisible) 0.dp else 6.dp,
                 ) {
                     if (homePresentation && browserState.active && !browserState.manual && assistanceRequest?.browser != true) {
                         BrowserSessionCard(
@@ -1428,7 +1434,7 @@ private fun PipelineTrack(
     }
 }
 
-private fun ChatPipelineStage.displayText(): String =
+internal fun ChatPipelineStage.displayText(): String =
     when (this) {
         ChatPipelineStage.IDLE -> ""
         ChatPipelineStage.LISTENING -> "Listening"
@@ -1620,6 +1626,7 @@ private fun SurfaceContent(
     onCardAction: (CardPresentation, CardAction) -> Unit,
     onDismissCameraSnapshot: () -> Unit,
     onFocus: () -> Unit,
+    focusMode: Boolean,
     modifier: Modifier = Modifier,
     onSetMediaAppPackages: (Set<String>) -> Unit = {},
 ) {
@@ -1640,6 +1647,8 @@ private fun SurfaceContent(
             -> HomePresentationSurface(
                 surface = surface,
                 pipelineState = pipelineState,
+                wakeState = wakeState,
+                focusMode = focusMode,
                 weatherState = weatherState,
                 card = homeCard,
                 cameraSnapshot = cameraSnapshot,
@@ -1776,6 +1785,8 @@ private fun SurfaceContent(
 private fun HomePresentationSurface(
     surface: MochiSurface,
     pipelineState: ChatPipelineUiState,
+    wakeState: WakeRuntimeState,
+    focusMode: Boolean,
     weatherState: WeatherUiState,
     card: CardPresentation?,
     cameraSnapshot: CameraSnapshotUiState?,
@@ -1811,12 +1822,8 @@ private fun HomePresentationSurface(
         when (target) {
             MochiSurface.Face -> MochiFace(
                 pipelineState = pipelineState,
-                onTalk = {
-                    onNavigate(MochiNavigationIntent.ShowConversation)
-                },
-                onToday = {
-                    onNavigate(MochiNavigationIntent.ShowToday)
-                },
+                wakeState = wakeState,
+                focusMode = focusMode,
                 onFocus = onFocus,
             )
             MochiSurface.DateTime -> MochiDateTime(
@@ -2001,225 +2008,6 @@ private fun CameraSnapshotOverlayChip(label: String) {
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
         )
-    }
-}
-
-@Composable
-private fun MochiFace(
-    pipelineState: ChatPipelineUiState,
-    onTalk: () -> Unit,
-    onToday: () -> Unit,
-    onFocus: () -> Unit,
-) {
-    val active = pipelineState.isActive
-    val accent by animateColorAsState(
-        targetValue = pipelineState.stage.accentColor(),
-        animationSpec = tween(420),
-        label = "mochi-accent",
-    )
-    val transition = rememberInfiniteTransition(label = "mochi-breath")
-    val breath by transition.animateFloat(
-        initialValue = 0.985f,
-        targetValue = 1.018f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "mochi-breath-scale",
-    )
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = 300.dp, height = 250.dp)
-                .semantics {
-                    contentDescription = if (active) {
-                        localizeUiText(
-                            "Mochi is " +
-                                pipelineState.stage
-                                    .displayText()
-                                    .lowercase(),
-                        )
-                    } else {
-                        localizeUiText("Mochi is ready.")
-                    }
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            accent.copy(alpha = 0.20f),
-                            accent.copy(alpha = 0.05f),
-                            Color.Transparent,
-                        ),
-                        center = center,
-                        radius = size.minDimension * 0.52f,
-                    ),
-                    radius = size.minDimension * 0.52f,
-                )
-                drawCircle(
-                    color = accent.copy(alpha = 0.10f),
-                    radius = size.minDimension * 0.39f,
-                    style = Stroke(width = 1.dp.toPx()),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .size(width = 244.dp, height = 186.dp)
-                    .graphicsLayer {
-                        scaleX = breath
-                        scaleY = breath
-                    }
-                    .shadow(
-                        elevation = 24.dp,
-                        shape = RoundedCornerShape(
-                            topStart = 78.dp,
-                            topEnd = 78.dp,
-                            bottomStart = 68.dp,
-                            bottomEnd = 68.dp,
-                        ),
-                        ambientColor = accent.copy(alpha = 0.34f),
-                        spotColor = accent.copy(alpha = 0.42f),
-                    )
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 78.dp,
-                            topEnd = 78.dp,
-                            bottomStart = 68.dp,
-                            bottomEnd = 68.dp,
-                        ),
-                    )
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFFFFF8F4),
-                                accent.copy(alpha = 0.88f),
-                            ),
-                        ),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.22f),
-                        radius = 50.dp.toPx(),
-                        center = center.copy(
-                            x = center.x - 62.dp.toPx(),
-                            y = center.y - 52.dp.toPx(),
-                        ),
-                    )
-                }
-                MochiExpression(stage = pipelineState.stage)
-            }
-        }
-        Spacer(modifier = Modifier.height(18.dp))
-        AnimatedVisibility(
-            visible = active,
-            enter = fadeIn(tween(240)),
-            exit = fadeOut(tween(160)),
-        ) {
-            Surface(
-                color = accent.copy(alpha = 0.14f),
-                shape = CircleShape,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(accent),
-                    )
-                    Text(
-                        text = pipelineState.stage.displayText(),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-        }
-        AnimatedVisibility(
-            visible = !active,
-            enter = fadeIn(tween(240)),
-            exit = fadeOut(tween(160)),
-        ) {
-            Column(
-                modifier = Modifier.width(292.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = "Good to see you",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black,
-                )
-                Text(
-                    text = "Use Talk whenever you want to chat.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Button(
-                        onClick = onTalk,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Talk to Mochi")
-                    }
-                    OutlinedButton(
-                        onClick = onToday,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("View today")
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                FocusModeButton(
-                    onClick = onFocus,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FocusModeButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 3.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = "Full screen",
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "Full screen · stays awake",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelSmall,
-            )
-        }
     }
 }
 
@@ -2976,195 +2764,6 @@ private fun HomeInfoHeader(
                         9.dp.toPx(),
                     ),
                     style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MochiExpression(stage: ChatPipelineStage) {
-    val eyeOpenness by animateFloatAsState(
-        targetValue = when (stage) {
-            ChatPipelineStage.SUMMARY -> 0.28f
-            ChatPipelineStage.SPEAKING -> 0.72f
-            else -> 1f
-        },
-        animationSpec = tween(280),
-        label = "mochi-eye-openness",
-    )
-    val eyeShift by animateFloatAsState(
-        targetValue = when (stage) {
-            ChatPipelineStage.SKILLING -> -5f
-            ChatPipelineStage.THINKING -> 5f
-            ChatPipelineStage.TOOL -> 3f
-            else -> 0f
-        },
-        animationSpec = tween(360, easing = FastOutSlowInEasing),
-        label = "mochi-eye-shift",
-    )
-    val speakingTransition = rememberInfiniteTransition(label = "mochi-speaking")
-    val speechAmount by speakingTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(260, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "mochi-speech-mouth",
-    )
-    Canvas(modifier = Modifier.size(width = 150.dp, height = 104.dp)) {
-        val ink = Color(0xFF352832)
-        val blush = Color(0xFFFF7F9E).copy(alpha = 0.28f)
-        val eyeY = 31.dp.toPx()
-        val leftEyeX = 43.dp.toPx() + eyeShift.dp.toPx()
-        val rightEyeX = size.width - 43.dp.toPx() + eyeShift.dp.toPx()
-        val eyeWidth = when (stage) {
-            ChatPipelineStage.LISTENING -> 17.dp.toPx()
-            else -> 14.dp.toPx()
-        }
-        val eyeHeight = 25.dp.toPx() * eyeOpenness
-
-        drawOval(
-            color = blush,
-            topLeft = androidx.compose.ui.geometry.Offset(
-                10.dp.toPx(),
-                54.dp.toPx(),
-            ),
-            size = androidx.compose.ui.geometry.Size(
-                30.dp.toPx(),
-                12.dp.toPx(),
-            ),
-        )
-        drawOval(
-            color = blush,
-            topLeft = androidx.compose.ui.geometry.Offset(
-                size.width - 40.dp.toPx(),
-                54.dp.toPx(),
-            ),
-            size = androidx.compose.ui.geometry.Size(
-                30.dp.toPx(),
-                12.dp.toPx(),
-            ),
-        )
-
-        if (stage == ChatPipelineStage.THINKING) {
-            drawArc(
-                color = ink,
-                startAngle = 20f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = androidx.compose.ui.geometry.Offset(
-                    rightEyeX - 12.dp.toPx(),
-                    eyeY - 2.dp.toPx(),
-                ),
-                size = androidx.compose.ui.geometry.Size(
-                    24.dp.toPx(),
-                    14.dp.toPx(),
-                ),
-                style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round),
-            )
-        } else {
-            drawRoundRect(
-                color = ink,
-                topLeft = androidx.compose.ui.geometry.Offset(
-                    rightEyeX - eyeWidth / 2,
-                    eyeY - eyeHeight / 2,
-                ),
-                size = androidx.compose.ui.geometry.Size(eyeWidth, eyeHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                    eyeWidth / 2,
-                ),
-            )
-        }
-        drawRoundRect(
-            color = ink,
-            topLeft = androidx.compose.ui.geometry.Offset(
-                leftEyeX - eyeWidth / 2,
-                eyeY - eyeHeight / 2,
-            ),
-            size = androidx.compose.ui.geometry.Size(eyeWidth, eyeHeight),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                eyeWidth / 2,
-            ),
-        )
-
-        if (eyeOpenness > 0.55f) {
-            listOf(leftEyeX, rightEyeX).forEach { eyeX ->
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.78f),
-                    radius = 2.6.dp.toPx(),
-                    center = androidx.compose.ui.geometry.Offset(
-                        eyeX - 2.dp.toPx(),
-                        eyeY - 5.dp.toPx(),
-                    ),
-                )
-            }
-        }
-
-        val mouthCenterX = size.width / 2
-        val mouthY = 78.dp.toPx()
-        when (stage) {
-            ChatPipelineStage.SPEAKING -> {
-                drawOval(
-                    color = ink,
-                    topLeft = androidx.compose.ui.geometry.Offset(
-                        mouthCenterX - 10.dp.toPx(),
-                        mouthY - 5.dp.toPx(),
-                    ),
-                    size = androidx.compose.ui.geometry.Size(
-                        20.dp.toPx(),
-                        (8.dp + 12.dp * speechAmount).toPx(),
-                    ),
-                )
-            }
-            ChatPipelineStage.LISTENING -> {
-                drawCircle(
-                    color = ink,
-                    radius = 7.dp.toPx(),
-                    center = androidx.compose.ui.geometry.Offset(
-                        mouthCenterX,
-                        mouthY + 2.dp.toPx(),
-                    ),
-                )
-            }
-            ChatPipelineStage.THINKING,
-            ChatPipelineStage.SKILLING,
-            ChatPipelineStage.SUBAGENT,
-            ChatPipelineStage.TOOL,
-            -> {
-                drawLine(
-                    color = ink,
-                    start = androidx.compose.ui.geometry.Offset(
-                        mouthCenterX - 11.dp.toPx(),
-                        mouthY,
-                    ),
-                    end = androidx.compose.ui.geometry.Offset(
-                        mouthCenterX + 11.dp.toPx(),
-                        mouthY,
-                    ),
-                    strokeWidth = 5.dp.toPx(),
-                    cap = StrokeCap.Round,
-                )
-            }
-            ChatPipelineStage.IDLE,
-            ChatPipelineStage.SUMMARY,
-            -> {
-                val smile = Path().apply {
-                    moveTo(mouthCenterX - 13.dp.toPx(), mouthY - 3.dp.toPx())
-                    cubicTo(
-                        mouthCenterX - 7.dp.toPx(),
-                        mouthY + 10.dp.toPx(),
-                        mouthCenterX + 7.dp.toPx(),
-                        mouthY + 10.dp.toPx(),
-                        mouthCenterX + 13.dp.toPx(),
-                        mouthY - 3.dp.toPx(),
-                    )
-                }
-                drawPath(
-                    path = smile,
-                    color = ink,
-                    style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round),
                 )
             }
         }
